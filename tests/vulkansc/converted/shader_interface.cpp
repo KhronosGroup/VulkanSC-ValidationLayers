@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +15,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/shader_object_helper.h"
@@ -1189,7 +1190,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchShaderObject) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindVertFragShader(vertShader, fragShader);
+    m_command_buffer.BindShaders(vertShader, fragShader);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpEntryPoint-07754");
     vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
     m_errorMonitor->VerifyFound();
@@ -1230,7 +1231,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSizeShaderObject) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindVertFragShader(vertShader, fragShader);
+    m_command_buffer.BindShaders(vertShader, fragShader);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maintenance4-06817");
     vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
     m_errorMonitor->VerifyFound();
@@ -1503,7 +1504,7 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageOutputIndex1) {
         #version 460
         layout(location = 0, index = 1) out vec4 c0;
         void main() {
-		    c0 = vec4(0.0f);
+            c0 = vec4(0.0f);
         }
     )glsl";
     VkShaderObj fs(this, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -1739,7 +1740,8 @@ TEST_F(NegativeShaderInterface, PackingInsideArray) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotWritten) {
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
+TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWritten) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
@@ -1749,42 +1751,175 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotWritten) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
+    // Nothing is written
     VkShaderObj fs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderInputNotProduced");
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
 
-// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923
-TEST_F(NegativeShaderInterface, DISABLED_CreatePipelineFragmentOutputNotWrittenDynamicRendering) {
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
+TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenDynamicRendering) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
-    TEST_DESCRIPTION(
-        "Test that an error is produced for a fragment shader which does not provide an output for one of the pipeline's color "
-        "attachments");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
 
+    // Nothing is written
     VkShaderObj fs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkFormat color_formats = VK_FORMAT_R8G8B8A8_UNORM;
-    VkPipelineRenderingCreateInfoKHR pipeline_rendering_info = vku::InitStructHelper();
+    VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
     pipeline_rendering_info.colorAttachmentCount = 1;
     pipeline_rendering_info.pColorAttachmentFormats = &color_formats;
 
     CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.cb_attachments_.colorWriteMask = 1;
-    pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderInputNotProduced-DynamicRendering");
+    pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced-DynamicRendering");
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
+TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenDynamicRenderingShaderObject) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    const vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl));
+    const vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT,
+                                  GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kMinimalShaderGlsl));
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    VkColorComponentFlags color_write_mask = 0xf;  // all
+    vk::CmdSetColorWriteMaskEXT(m_command_buffer.handle(), 0, 1, &color_write_mask);
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced-DynamicRendering");
+    vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923
+TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArray) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    char const *fs_source = R"glsl(
+        #version 460
+        layout(location = 0) out vec4 uFragColor[2];
+        void main(){
+            uFragColor[0] = vec4(0);
+        }
+    )glsl";
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(1);
+    rp.CreateRenderPass();
+
+    VkPipelineColorBlendAttachmentState color_blends[2];
+    color_blends[0] = DefaultColorBlendAttachmentState();
+    color_blends[0].colorWriteMask = 0xf;
+    color_blends[1] = DefaultColorBlendAttachmentState();
+    color_blends[1].colorWriteMask = 0xf;
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_[1] = fs.GetStageCreateInfo();
+    pipe.cb_ci_.attachmentCount = 2;
+    pipe.cb_ci_.pAttachments = color_blends;
+    pipe.gp_ci_.renderPass = rp.Handle();
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
+}
+
+// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923
+TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArrayDynamicRendering) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    char const *fs_source = R"glsl(
+        #version 460
+        layout(location = 0) out vec4 uFragColor[2];
+        void main(){
+            uFragColor[0] = vec4(0);
+        }
+    )glsl";
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkFormat color_formats[2] = {VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM};
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 2;
+    pipeline_rendering_info.pColorAttachmentFormats = color_formats;
+
+    VkPipelineColorBlendAttachmentState color_blends[2];
+    color_blends[0] = DefaultColorBlendAttachmentState();
+    color_blends[0].colorWriteMask = 0xf;
+    color_blends[1] = DefaultColorBlendAttachmentState();
+    color_blends[1].colorWriteMask = 0xf;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.cb_ci_.attachmentCount = 2;
+    pipe.cb_ci_.pAttachments = color_blends;
+    pipe.CreateGraphicsPipeline();
+
+    VkRenderingAttachmentInfo color_attachments[2];
+    color_attachments[0] = vku::InitStructHelper();
+    color_attachments[0].imageView = GetDynamicRenderTarget();
+    color_attachments[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachments[1] = color_attachments[0];
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.colorAttachmentCount = 2;
+    rendering_info.pColorAttachments = color_attachments;
+    rendering_info.layerCount = 1;
+    rendering_info.renderArea = GetRenderTargetArea();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced-DynamicRendering");
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputTypeMismatch) {
@@ -1813,6 +1948,95 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputTypeMismatch) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kWarningBit, "Undefined-Value-ShaderFragmentOutputMismatch");
 }
 
+TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRendering) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    char const *fs_source = R"glsl(
+        #version 450
+        layout(location=0) out ivec4 x; /* not UNORM */
+        void main(){
+           x = ivec4(1);
+        }
+    )glsl";
+
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 1;
+    pipeline_rendering_info.pColorAttachmentFormats = &color_formats;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderFragmentOutputMismatch-DynamicRendering");
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderInterface, FragmentOutputDynamicRenderingUnusedAttachments) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::dynamicRenderingUnusedAttachments);
+    RETURN_IF_SKIP(Init());
+
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+
+    VkFormat color_formats[] = {VK_FORMAT_R8G8B8A8_UNORM};
+    pipeline_rendering_info.colorAttachmentCount = 1;
+    pipeline_rendering_info.pColorAttachmentFormats = color_formats;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.CreateGraphicsPipeline();
+
+    VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
+
+    vkt::Image color_image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView color_image_view = color_image.CreateView();
+
+    vkt::Image ds_image(*m_device, 32, 32, 1, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    const vkt::ImageView depth_view(*m_device, ds_image.BasicViewCreatInfo(VK_IMAGE_ASPECT_DEPTH_BIT));
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.imageView = VK_NULL_HANDLE;  // null and causes warning
+
+    VkRenderingAttachmentInfo depth_stencil_attachment = vku::InitStructHelper();
+    depth_stencil_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_stencil_attachment.imageView = depth_view.handle();
+
+    m_command_buffer.Begin();
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.layerCount = 1;
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment;
+    begin_rendering_info.pDepthAttachment = &depth_stencil_attachment;
+    begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotConsumed-DynamicRendering");
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotConsumed) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
@@ -1833,10 +2057,50 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotConsumed) {
     )glsl";
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
-        helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    };
-    CreatePipelineHelper::OneshotTest(*this, set_info, kWarningBit, "Undefined-Value-ShaderOutputNotConsumed");
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotConsumed");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderInterface, FragmentOutputNotConsumedDynamicRendering) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    char const *fs_source = R"glsl(
+        #version 450
+        layout(location=0) out vec4 x;
+        layout(location=1) out vec4 y; /* no matching attachment for this */
+        void main(){
+           x = vec4(1);
+           y = vec4(1);
+        }
+    )glsl";
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 1;
+    pipeline_rendering_info.pColorAttachmentFormats = &color_formats;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotConsumed-DynamicRendering");
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeShaderInterface, InvalidStaticSpirv) {
@@ -1968,48 +2232,7 @@ TEST_F(NegativeShaderInterface, InvalidStaticSpirvMaintenance5Compute) {
     m_errorMonitor->VerifyFound();
 }
 
-// TODO - Disabled until https://github.com/KhronosGroup/glslang/issues/3505
-// is resolved in the WG.
-TEST_F(NegativeShaderInterface, DISABLED_PhysicalStorageBufferGlslang3) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
-    TEST_DESCRIPTION("Taken from glslang spv.bufferhandle3.frag test");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
-
-    RETURN_IF_SKIP(Init());
-
-    char const *fsSource = R"glsl(
-        #version 450
-        #extension GL_EXT_buffer_reference : enable
-
-        layout(buffer_reference, std430) buffer t3 {
-            int h;
-        };
-
-        layout(set = 1, binding = 2, buffer_reference, std430) buffer t4 {
-            layout(offset = 0)  int j;
-            t3 k;
-        } x;
-
-        layout(set = 0, binding = 0, std430) buffer t5 {
-            t4 m;
-        } s5;
-
-        layout(location = 0) flat in t4 k;
-
-        t4 foo(t4 y) { return y; }
-        void main() {}
-    )glsl";
-
-    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
-    m_errorMonitor->VerifyFound();
-}
-
-// TODO - Disabled until https://github.com/KhronosGroup/glslang/issues/3505
-// is resolved in the WG.
+// Re-enable when https://github.com/KhronosGroup/SPIRV-Tools/pull/6000 is merged
 TEST_F(NegativeShaderInterface, DISABLED_PhysicalStorageBuffer) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
@@ -2053,15 +2276,16 @@ TEST_F(NegativeShaderInterface, DISABLED_PhysicalStorageBuffer) {
         }
     )glsl";
 
-    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
+    m_errorMonitor->SetDesiredWarning("WARNING-PhysicalStorageBuffer-interface");
     VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
     m_errorMonitor->VerifyFound();
-    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
+    m_errorMonitor->SetDesiredWarning("WARNING-PhysicalStorageBuffer-interface");
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderInterface, MultipleFragmentAttachment) {
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
+TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachment) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923");
@@ -2093,24 +2317,84 @@ TEST_F(NegativeShaderInterface, MultipleFragmentAttachment) {
     rp.AddColorAttachment(2);
     rp.CreateRenderPass();
 
-    VkPipelineColorBlendAttachmentState cb_as = {VK_FALSE,
-                                                 VK_BLEND_FACTOR_ZERO,
-                                                 VK_BLEND_FACTOR_ZERO,
-                                                 VK_BLEND_OP_ADD,
-                                                 VK_BLEND_FACTOR_ZERO,
-                                                 VK_BLEND_FACTOR_ZERO,
-                                                 VK_BLEND_OP_ADD,
-                                                 0xf};
-    VkPipelineColorBlendAttachmentState cb_states[3] = {cb_as, cb_as, cb_as};
+    VkPipelineColorBlendAttachmentState color_blends[3];
+    color_blends[0] = DefaultColorBlendAttachmentState();
+    color_blends[0].colorWriteMask = 0xf;
+    color_blends[1] = DefaultColorBlendAttachmentState();
+    color_blends[1].colorWriteMask = 0xf;
+    color_blends[2] = DefaultColorBlendAttachmentState();
+    color_blends[2].colorWriteMask = 0xf;
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_[1] = fs.GetStageCreateInfo();
     pipe.cb_ci_.attachmentCount = 3;
-    pipe.cb_ci_.pAttachments = cb_states;
+    pipe.cb_ci_.pAttachments = color_blends;
     pipe.gp_ci_.renderPass = rp.Handle();
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderInputNotProduced");
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
+}
+
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
+TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachmentDynamicRendering) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout(location=0) out vec4 color0;
+        layout(location=1) out vec4 color1;
+        void main() {
+           color0 = vec4(1.0);
+           color1 = vec4(1.0);
+        }
+    )glsl";
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkFormat color_formats[3] = {VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM};
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 3;
+    pipeline_rendering_info.pColorAttachmentFormats = color_formats;
+
+    VkPipelineColorBlendAttachmentState color_blends[3];
+    color_blends[0] = DefaultColorBlendAttachmentState();
+    color_blends[0].colorWriteMask = 0xf;
+    color_blends[1] = DefaultColorBlendAttachmentState();
+    color_blends[1].colorWriteMask = 0xf;
+    color_blends[2] = DefaultColorBlendAttachmentState();
+    color_blends[2].colorWriteMask = 0xf;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.cb_ci_.attachmentCount = 3;
+    pipe.cb_ci_.pAttachments = color_blends;
+    pipe.CreateGraphicsPipeline();
+
+    VkRenderingAttachmentInfo color_attachments[3];
+    color_attachments[0] = vku::InitStructHelper();
+    color_attachments[0].imageView = GetDynamicRenderTarget();
+    color_attachments[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachments[1] = color_attachments[0];
+    color_attachments[2] = color_attachments[0];
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.colorAttachmentCount = 3;
+    rendering_info.pColorAttachments = color_attachments;
+    rendering_info.layerCount = 1;
+    rendering_info.renderArea = GetRenderTargetArea();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced-DynamicRendering");
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeShaderInterface, MissingInputAttachmentIndex) {
@@ -2167,7 +2451,7 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndex) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     pipe.gp_ci_.renderPass = rp.Handle();
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-09558");
     pipe.CreateGraphicsPipeline();
@@ -2232,7 +2516,7 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndexArray) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeImage-09644");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
@@ -2293,5 +2577,173 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndexShaderObject) {
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-09558");
     const vkt::Shader frag_shader(*m_device,
                                   ShaderCreateInfo(spv, VK_SHADER_STAGE_FRAGMENT_BIT, 1, &descriptor_set.layout_.handle()));
+    m_errorMonitor->VerifyFound();
+}
+
+// Re-enable when https://github.com/KhronosGroup/SPIRV-Tools/pull/6000 is merged
+TEST_F(NegativeShaderInterface, DISABLED_PhysicalStorageBufferArray) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
+
+    char const *vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference_uvec2 : enable
+
+        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
+            int value1;
+            int value2;
+        };
+
+        layout(location=0) out dataBuffer outgoingPtr[3];
+        void main() {
+            outgoingPtr[2] = dataBuffer(uvec2(2.0));
+        }
+    )glsl";
+
+    char const *fs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference_uvec2 : enable
+
+        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
+            int value1;
+            int value2;
+        };
+
+        layout(location=0) in dataBuffer incomingPtr[3];
+        layout(location=0) out vec4 fragColor;
+        void main() {
+            ivec2 v = ivec2(incomingPtr[1].value1, incomingPtr[2].value2);
+            fragColor = vec4(float(v.x)/255.0,float(v.y)/255.0, float(v.x+v.y)/255.0,1.0);
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredWarning("WARNING-PhysicalStorageBuffer-interface");
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    m_errorMonitor->VerifyFound();
+    m_errorMonitor->SetDesiredWarning("WARNING-PhysicalStorageBuffer-interface");
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+// Re-enable when https://github.com/KhronosGroup/SPIRV-Tools/pull/6000 is merged
+TEST_F(NegativeShaderInterface, DISABLED_PhysicalStorageBufferLinkedList) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
+
+    char const *vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference : enable
+
+        layout(buffer_reference) buffer dataBuffer;
+        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
+            int value1;
+            dataBuffer next;
+        };
+
+        layout(location=0) out dataBuffer outgoingPtr;
+        void main() {
+            outgoingPtr.next.value1 = 3;
+        }
+    )glsl";
+
+    char const *fs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference : enable
+
+        layout(buffer_reference) buffer dataBuffer;
+        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
+            int value1;
+            dataBuffer next;
+        };
+
+        layout(location=0) in dataBuffer incomingPtr;
+        layout(location=0) out vec4 fragColor;
+        void main() {
+            ivec2 v = ivec2(incomingPtr.value1, incomingPtr.next.value1);
+            fragColor = vec4(float(v.x)/255.0,float(v.y)/255.0, float(v.x+v.y)/255.0,1.0);
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredWarning("WARNING-PhysicalStorageBuffer-interface");
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    m_errorMonitor->VerifyFound();
+    m_errorMonitor->SetDesiredWarning("WARNING-PhysicalStorageBuffer-interface");
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+// Re-enable when https://github.com/KhronosGroup/SPIRV-Tools/pull/6000 is merged
+TEST_F(NegativeShaderInterface, DISABLED_PhysicalStorageBufferNested) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
+
+    char const *vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference : enable
+
+        layout(buffer_reference, buffer_reference_align = 4) readonly buffer t2 {
+            int values[];
+        };
+
+        layout(buffer_reference, buffer_reference_align = 4) readonly buffer t1 {
+            t2 c;
+        };
+
+        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
+            int value1;
+            t1 next;
+        };
+
+        layout(location=0) out dataBuffer outgoingPtr;
+        void main() {
+            outgoingPtr.next.c.values[3] = 3;
+        }
+    )glsl";
+
+    char const *fs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference : enable
+
+        layout(buffer_reference, buffer_reference_align = 4) readonly buffer t2 {
+            int values[];
+        };
+
+        layout(buffer_reference, buffer_reference_align = 4) readonly buffer t1 {
+            t2 c;
+        };
+
+        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
+            int value1;
+            t1 next;
+        };
+
+        layout(location=0) in dataBuffer incomingPtr;
+        layout(location=0) out vec4 fragColor;
+        void main() {
+            ivec2 v = ivec2(incomingPtr.value1, incomingPtr.next.c.values[2]);
+            fragColor = vec4(float(v.x)/255.0,float(v.y)/255.0, float(v.x+v.y)/255.0,1.0);
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredWarning("WARNING-PhysicalStorageBuffer-interface");
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    m_errorMonitor->VerifyFound();
+    m_errorMonitor->SetDesiredWarning("WARNING-PhysicalStorageBuffer-interface");
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
     m_errorMonitor->VerifyFound();
 }

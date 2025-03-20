@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+/* Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -24,16 +24,15 @@ bool BestPractices::PreCallValidateAllocateDescriptorSets(VkDevice device, const
                                                           VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj,
                                                           vvl::AllocateDescriptorSetsData& ads_state_data) const {
     bool skip = false;
-    skip |= ValidationStateTracker::PreCallValidateAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets, error_obj,
-                                                                          ads_state_data);
+    skip |= BaseClass::PreCallValidateAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets, error_obj, ads_state_data);
     if (skip) return skip;
 
-    const auto pool_state = Get<bp_state::DescriptorPool>(pAllocateInfo->descriptorPool);
+    const auto pool_state = Get<vvl::DescriptorPool>(pAllocateInfo->descriptorPool);
     ASSERT_AND_RETURN_SKIP(pool_state);
 
     // if the number of freed sets > 0, it implies they could be recycled instead if desirable
     // this warning is specific to Arm
-    if (VendorCheckEnabled(kBPVendorArm) && (pool_state->freed_count > 0)) {
+    if (VendorCheckEnabled(kBPVendorArm) && (pool_state->GetFreedCount() > 0)) {
         skip |= LogPerformanceWarning(
             "BestPractices-Arm-vkAllocateDescriptorSets-suboptimal-reuse", device, error_obj.location,
             "%s Descriptor set memory was allocated via vkAllocateDescriptorSets() for sets which were previously freed in the "
@@ -41,7 +40,7 @@ bool BestPractices::PreCallValidateAllocateDescriptorSets(VkDevice device, const
             VendorSpecificTag(kBPVendorArm));
     }
 
-    if (IsExtEnabled(device_extensions.vk_khr_maintenance1)) {
+    if (IsExtEnabled(extensions.vk_khr_maintenance1)) {
         // Track number of descriptorSets allowable in this pool
         if (pool_state->GetAvailableSets() < pAllocateInfo->descriptorSetCount) {
             skip |=
@@ -51,38 +50,24 @@ bool BestPractices::PreCallValidateAllocateDescriptorSets(VkDevice device, const
                            ". This pool only has %" PRIu32 " descriptorSets remaining.",
                            pAllocateInfo->descriptorSetCount, FormatHandle(*pool_state).c_str(), pool_state->GetAvailableSets());
         }
-    }
+        auto ads_pool_state = Get<vvl::DescriptorPool>(pAllocateInfo->descriptorPool);
+        for (auto it = ads_state_data.required_descriptors_by_type.begin(); it != ads_state_data.required_descriptors_by_type.end();
+             ++it) {
+            auto available_count = ads_pool_state->GetAvailableCount(it->first);
 
-    return skip;
-}
-
-void BestPractices::ManualPostCallRecordAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
-                                                               VkDescriptorSet* pDescriptorSets, const RecordObject& record_obj,
-                                                               vvl::AllocateDescriptorSetsData& ads_state) {
-    if (record_obj.result == VK_SUCCESS) {
-        if (auto pool_state = Get<bp_state::DescriptorPool>(pAllocateInfo->descriptorPool)) {
-            // we record successful allocations by subtracting the allocation count from the last recorded free count
-            const auto alloc_count = pAllocateInfo->descriptorSetCount;
-            // clamp the unsigned subtraction to the range [0, last_free_count]
-            if (pool_state->freed_count > alloc_count) {
-                pool_state->freed_count -= alloc_count;
-            } else {
-                pool_state->freed_count = 0;
+            if (ads_state_data.required_descriptors_by_type.at(it->first) > available_count) {
+                skip |= LogWarning(
+                    "BestPractices-vkAllocateDescriptorSets-EmptyDescriptorPoolType", ads_pool_state->Handle(), error_obj.location,
+                    "Unable to allocate %" PRIu32
+                    " descriptors of type %s from %s"
+                    ". This pool only has %" PRIu32 " descriptors of this type remaining.",
+                    ads_state_data.required_descriptors_by_type.at(it->first), string_VkDescriptorType(VkDescriptorType(it->first)),
+                    FormatHandle(*ads_pool_state).c_str(), available_count);
             }
         }
     }
-}
 
-void BestPractices::PostCallRecordFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount,
-                                                     const VkDescriptorSet* pDescriptorSets, const RecordObject& record_obj) {
-    ValidationStateTracker::PostCallRecordFreeDescriptorSets(device, descriptorPool, descriptorSetCount, pDescriptorSets,
-                                                             record_obj);
-    if (record_obj.result == VK_SUCCESS) {
-        // we want to track frees because we're interested in suggesting re-use
-        if (auto pool_state = Get<bp_state::DescriptorPool>(descriptorPool)) {
-            pool_state->freed_count += descriptorSetCount;
-        }
-    }
+    return skip;
 }
 
 bool BestPractices::PreCallValidateCreateSampler(VkDevice device, const VkSamplerCreateInfo* pCreateInfo,
@@ -180,7 +165,3 @@ bool BestPractices::PreCallValidateCreateDescriptorUpdateTemplate(VkDevice devic
     return skip;
 }
 
-std::shared_ptr<vvl::DescriptorPool> BestPractices::CreateDescriptorPoolState(VkDescriptorPool handle,
-                                                                              const VkDescriptorPoolCreateInfo* create_info) {
-    return std::static_pointer_cast<vvl::DescriptorPool>(std::make_shared<bp_state::DescriptorPool>(*this, handle, create_info));
-}

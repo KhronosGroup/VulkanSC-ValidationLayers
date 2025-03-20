@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2024 Valve Corporation
- * Copyright (c) 2023-2024 LunarG, Inc.
+ * Copyright (c) 2023-2025 Valve Corporation
+ * Copyright (c) 2023-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -179,7 +179,7 @@ void Barrier2QueueFamilyTestHelper::operator()(const std::string &img_err, const
     buffer_barrier_.srcQueueFamilyIndex = src;
     buffer_barrier_.dstQueueFamilyIndex = dst;
 
-    VkDependencyInfoKHR dep_info = vku::InitStructHelper();
+    VkDependencyInfo dep_info = vku::InitStructHelper();
     dep_info.bufferMemoryBarrierCount = 1;
     dep_info.pBufferMemoryBarriers = &buffer_barrier_;
     dep_info.imageMemoryBarrierCount = 1;
@@ -217,12 +217,12 @@ void Barrier2QueueFamilyTestHelper::operator()(const std::string &img_err, const
 void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::Queue *queue, vkt::CommandBuffer &cb, VkPipelineStageFlags src_stages,
                               VkPipelineStageFlags dst_stages, const VkBufferMemoryBarrier *buf_barrier,
                               const VkImageMemoryBarrier *img_barrier) {
-    cb.begin();
+    cb.Begin();
     uint32_t num_buf_barrier = (buf_barrier) ? 1 : 0;
     uint32_t num_img_barrier = (img_barrier) ? 1 : 0;
     vk::CmdPipelineBarrier(cb.handle(), src_stages, dst_stages, 0, 0, nullptr, num_buf_barrier, buf_barrier, num_img_barrier,
                            img_barrier);
-    cb.end();
+    cb.End();
     queue->Submit(cb);
     queue->Wait();
 }
@@ -236,32 +236,32 @@ void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::Queue *queue_from, vkt::
 }
 
 void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::Queue *queue, vkt::CommandBuffer &cb,
-                              const VkBufferMemoryBarrier2KHR *buf_barrier, const VkImageMemoryBarrier2KHR *img_barrier) {
-    cb.begin();
-    VkDependencyInfoKHR dep_info = vku::InitStructHelper();
+                              const VkBufferMemoryBarrier2 *buf_barrier, const VkImageMemoryBarrier2 *img_barrier) {
+    cb.Begin();
+    VkDependencyInfo dep_info = vku::InitStructHelper();
     dep_info.bufferMemoryBarrierCount = (buf_barrier) ? 1 : 0;
     dep_info.pBufferMemoryBarriers = buf_barrier;
     dep_info.imageMemoryBarrierCount = (img_barrier) ? 1 : 0;
     dep_info.pImageMemoryBarriers = img_barrier;
     vk::CmdPipelineBarrier2KHR(cb.handle(), &dep_info);
-    cb.end();
+    cb.End();
     queue->Submit(cb);
     queue->Wait();
 }
 
 void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::Queue *queue_from, vkt::CommandBuffer &cb_from, vkt::Queue *queue_to,
-                            vkt::CommandBuffer &cb_to, const VkBufferMemoryBarrier2KHR *buf_barrier,
-                            const VkImageMemoryBarrier2KHR *img_barrier) {
-    VkBufferMemoryBarrier2KHR fixup_buf_barrier;
-    VkImageMemoryBarrier2KHR fixup_img_barrier;
+                            vkt::CommandBuffer &cb_to, const VkBufferMemoryBarrier2 *buf_barrier,
+                            const VkImageMemoryBarrier2 *img_barrier) {
+    VkBufferMemoryBarrier2 fixup_buf_barrier;
+    VkImageMemoryBarrier2 fixup_img_barrier;
     if (buf_barrier) {
         fixup_buf_barrier = *buf_barrier;
-        fixup_buf_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;
+        fixup_buf_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         fixup_buf_barrier.dstAccessMask = 0;
     }
     if (img_barrier) {
         fixup_img_barrier = *img_barrier;
-        fixup_img_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;
+        fixup_img_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         fixup_img_barrier.dstAccessMask = 0;
     }
 
@@ -270,12 +270,12 @@ void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::Queue *queue_from, vkt::
 
     if (buf_barrier) {
         fixup_buf_barrier = *buf_barrier;
-        fixup_buf_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;
+        fixup_buf_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
         fixup_buf_barrier.srcAccessMask = 0;
     }
     if (img_barrier) {
         fixup_img_barrier = *img_barrier;
-        fixup_img_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;
+        fixup_img_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
         fixup_img_barrier.srcAccessMask = 0;
     }
     ValidOwnershipTransferOp(monitor, queue_to, cb_to, buf_barrier ? &fixup_buf_barrier : nullptr,

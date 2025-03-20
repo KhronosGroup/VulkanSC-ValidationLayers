@@ -57,11 +57,19 @@ class TestDispatchHelper {
             return *this;
         }
 
+        DispatchPolicy& IgnoreMessage(const char* vuid, bool condition = true) {
+            if (condition) {
+                ignore_vuids_.push_back(vuid);
+            }
+            return *this;
+        }
+
       private:
         DispatchPolicy() = default;
         friend class TestDispatchHelper;
 
         std::vector<std::pair<const char*, const char*>> skip_on_vuids_{};
+        std::vector<const char*> ignore_vuids_{};
     };
 
     static void PatchDispatchTable();

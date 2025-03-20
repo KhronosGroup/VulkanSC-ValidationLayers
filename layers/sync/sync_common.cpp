@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2024 Valve Corporation
- * Copyright (c) 2019-2024 LunarG, Inc.
+ * Copyright (c) 2019-2025 Valve Corporation
+ * Copyright (c) 2019-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@
 extern const ResourceAccessRange kFullRange(std::numeric_limits<VkDeviceSize>::min(), std::numeric_limits<VkDeviceSize>::max());
 
 template <typename Flags, typename Map>
-SyncStageAccessFlags AccessScopeImpl(Flags flag_mask, const Map& map) {
-    SyncStageAccessFlags scope;
+SyncAccessFlags AccessScopeImpl(Flags flag_mask, const Map& map) {
+    SyncAccessFlags scope;
     for (const auto& bit_scope : map) {
         if (flag_mask < bit_scope.first) break;
 
@@ -34,16 +34,31 @@ SyncStageAccessFlags AccessScopeImpl(Flags flag_mask, const Map& map) {
     return scope;
 }
 
-SyncStageAccessFlags SyncStageAccess::AccessScopeByStage(VkPipelineStageFlags2 stages) {
-    return AccessScopeImpl(stages, syncStageAccessMaskByStageBit());
+SyncAccessFlags SyncStageAccess::AccessScopeByStage(VkPipelineStageFlags2 stages) {
+    return AccessScopeImpl(stages, syncAccessMaskByStageBit());
 }
 
-SyncStageAccessFlags SyncStageAccess::AccessScopeByAccess(VkAccessFlags2 accesses) {
-    return AccessScopeImpl(sync_utils::ExpandAccessFlags(accesses), syncStageAccessMaskByAccessBit());
+SyncAccessFlags SyncStageAccess::AccessScopeByAccess(VkAccessFlags2 accesses) {
+    SyncAccessFlags sync_accesses = AccessScopeImpl(sync_utils::ExpandAccessFlags(accesses), syncAccessMaskByAccessBit());
+
+    // The above access expansion replaces SHADER_READ meta access with atomic accesses as defined by the specification.
+    // ACCELERATION_STRUCTURE_BUILD and MICROMAP_BUILD stages are special in a way that they use SHADER_READ access directly.
+    // It is an implementation detail of how SHADER_READ is used by the driver, and we cannot make assumption about specific
+    // atomic accesses. If we make such assumption then it can be a problem when after applying synchronization we won't be
+    // able to get full SHADER_READ access back, but only a subset of accesses, for example, only SHADER_STORAGE_READ.
+    // It would mean we made (incorrect) assumption how the driver represents SHADER_READ in the context of AS build.
+    //
+    // Handle special cases that use non-expanded meta accesses.
+    if (accesses & VK_ACCESS_2_SHADER_READ_BIT) {
+        sync_accesses |= SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_READ_BIT;
+        sync_accesses |= SYNC_MICROMAP_BUILD_EXT_SHADER_READ_BIT;
+    }
+
+    return sync_accesses;
 }
 
 // Getting from stage mask and access mask to stage/access masks is something we need to be good at...
-SyncStageAccessFlags SyncStageAccess::AccessScope(VkPipelineStageFlags2 stages, VkAccessFlags2 accesses) {
+SyncAccessFlags SyncStageAccess::AccessScope(VkPipelineStageFlags2 stages, VkAccessFlags2 accesses) {
     // The access scope is the intersection of all stage/access types possible for the enabled stages and the enables
     // accesses (after doing a couple factoring of common terms the union of stage/access intersections is the intersections
     // of the union of all stage/access types for all the stages and the same unions for the access mask...
@@ -52,7 +67,7 @@ SyncStageAccessFlags SyncStageAccess::AccessScope(VkPipelineStageFlags2 stages, 
 ResourceAccessRange MakeRange(VkDeviceSize start, VkDeviceSize size) { return ResourceAccessRange(start, (start + size)); }
 
 ResourceAccessRange MakeRange(const vvl::Buffer& buffer, VkDeviceSize offset, VkDeviceSize size) {
-    return MakeRange(offset, buffer.ComputeSize(offset, size));
+    return MakeRange(offset, buffer.GetRegionSize(offset, size));
 }
 
 ResourceAccessRange MakeRange(const vvl::BufferView& buf_view_state) {

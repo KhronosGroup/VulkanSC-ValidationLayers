@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2024 The Khronos Group Inc.
- * Copyright (c) 2024 Valve Corporation
- * Copyright (c) 2024 LunarG, Inc.
+ * Copyright (c) 2024-2025 The Khronos Group Inc.
+ * Copyright (c) 2024-2025 Valve Corporation
+ * Copyright (c) 2024-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -9,7 +9,10 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
+//stype-check off
 
+#include <cstdarg>
+#include <cstdint>
 #include "../framework/layer_validation_tests.h"
 
 class NegativeLayerSettings : public VkLayerTest {};
@@ -222,7 +225,38 @@ TEST_F(NegativeLayerSettings, DuplicateMessageLimitNone) {
     VkPhysicalDeviceProperties2KHR properties2 = vku::InitStructHelper(&bogus_struct);
 
     const uint32_t default_value = 10; // what we set in vkconfig
-    for (uint32_t i = 0; i < default_value + 1; i++) {
+    for (uint32_t i = 0; i < default_value; i++) {
+        m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceProperties2-pNext-pNext");
+        vk::GetPhysicalDeviceProperties2KHR(Gpu(), &properties2);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Limit should prevent the message from coming through now
+    vk::GetPhysicalDeviceProperties2KHR(Gpu(), &properties2);
+}
+
+TEST_F(NegativeLayerSettings, DuplicateMessageLimitDisable) {
+    TEST_DESCRIPTION("use enable_message_limit explicitly");
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+    VkBool32 enable_message_limit = VK_FALSE;
+    uint32_t value = 3;
+    const VkLayerSettingEXT settings[2] = {
+        {OBJECT_LAYER_NAME, "enable_message_limit", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &enable_message_limit},
+        {OBJECT_LAYER_NAME, "duplicate_message_limit", VK_LAYER_SETTING_TYPE_UINT32_EXT, 1, &value}};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 2, settings};
+
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+
+    // Create an invalid pNext structure to trigger the stateless validation warning
+    VkBaseOutStructure bogus_struct{};
+    bogus_struct.sType = static_cast<VkStructureType>(0x33333333);
+    VkPhysicalDeviceProperties2KHR properties2 = vku::InitStructHelper(&bogus_struct);
+
+    const uint32_t default_value = 10;  // what we set in vkconfig
+    const uint32_t count = default_value + 5;
+    for (uint32_t i = 0; i < count; i++) {
         m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceProperties2-pNext-pNext");
         vk::GetPhysicalDeviceProperties2KHR(Gpu(), &properties2);
         m_errorMonitor->VerifyFound();
@@ -328,8 +362,28 @@ TEST_F(NegativeLayerSettings, VuidFilterInt) {
 }
 
 TEST_F(NegativeLayerSettings, DebugAction) {
-    const char *action[] = {"VK_DBG_LAYER_ACTION_NOT_A_REAL_THING"};
-    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "debug_action", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, action};
+    const char *action = "VK_DBG_LAYER_ACTION_NOT_A_REAL_THING";
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "debug_action", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &action};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_DEBUG_ACTION");
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+    Monitor().VerifyFound();
+}
+
+TEST_F(NegativeLayerSettings, DebugAction2) {
+    const char *actions[2] = {"VK_DBG_LAYER_ACTION_IGNORE,VK_DBG_LAYER_ACTION_CALLBACK"};
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "debug_action", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, actions};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_DEBUG_ACTION");
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+    Monitor().VerifyFound();
+}
+
+TEST_F(NegativeLayerSettings, DebugAction3) {
+    const char *actions[2] = {"VK_DBG_LAYER_ACTION_DEFAULT", "VK_DBG_LAYER_ACTION_NOT_A_REAL_THING"};
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "debug_action", VK_LAYER_SETTING_TYPE_STRING_EXT, 2, actions};
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_DEBUG_ACTION");
     RETURN_IF_SKIP(InitFramework(&create_info));
@@ -338,8 +392,28 @@ TEST_F(NegativeLayerSettings, DebugAction) {
 }
 
 TEST_F(NegativeLayerSettings, ReportFlags) {
-    const char *report_flag[] = {"warn,fake,info"};
-    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "report_flags", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, report_flag};
+    const char *report_flag = "fake";
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "report_flags", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &report_flag};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_REPORT_FLAGS");
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+    Monitor().VerifyFound();
+}
+
+TEST_F(NegativeLayerSettings, ReportFlags2) {
+    const char *report_flag = "warn,fake,info";
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "report_flags", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &report_flag};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_REPORT_FLAGS");
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+    Monitor().VerifyFound();
+}
+
+TEST_F(NegativeLayerSettings, ReportFlags3) {
+    const char *report_flag = "error,warn,info,verbose";
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "report_flags", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &report_flag};
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_REPORT_FLAGS");
     RETURN_IF_SKIP(InitFramework(&create_info));
@@ -358,3 +432,59 @@ TEST_F(NegativeLayerSettings, LogFilename) {
     Monitor().VerifyFound();
 }
 #endif
+
+TEST_F(NegativeLayerSettings, NotRealSetting) {
+    int32_t enable = 1;
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "not_a_real_setting", VK_LAYER_SETTING_TYPE_INT32_EXT, 1, &enable};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    Monitor().ExpectSuccess(kErrorBit | kWarningBit);
+    Monitor().SetDesiredWarning(
+        "The setting not_a_real_setting in VkLayerSettingsCreateInfoEXT was not recognize by the Validation Layers.");
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+    Monitor().VerifyFound();
+}
+
+TEST_F(NegativeLayerSettings, WrongSettingType) {
+    // Actually needs a VK_LAYER_SETTING_TYPE_BOOL32_EXT
+    int32_t enable = 1;
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "enable_message_limit", VK_LAYER_SETTING_TYPE_UINT32_EXT, 1, &enable};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    Monitor().ExpectSuccess(kErrorBit | kWarningBit);
+    Monitor().SetDesiredWarning(
+        "The setting enable_message_limit in VkLayerSettingsCreateInfoEXT was set to type VK_LAYER_SETTING_TYPE_UINT32_EXT but "
+        "requires type VK_LAYER_SETTING_TYPE_BOOL32_EXT and the value may be parsed incorrectly.");
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+    Monitor().VerifyFound();
+}
+
+TEST_F(NegativeLayerSettings, WrongSettingType2) {
+    // Actually needs a VK_LAYER_SETTING_TYPE_BOOL32_EXT
+    int32_t enable = 1;
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "thread_safety", VK_LAYER_SETTING_TYPE_UINT32_EXT, 1, &enable};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    Monitor().ExpectSuccess(kErrorBit | kWarningBit);
+    Monitor().SetDesiredWarning(
+        "The setting thread_safety in VkLayerSettingsCreateInfoEXT was set to type VK_LAYER_SETTING_TYPE_UINT32_EXT but requires "
+        "type VK_LAYER_SETTING_TYPE_BOOL32_EXT and the value may be parsed incorrectly.");
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+    Monitor().VerifyFound();
+}
+
+TEST_F(NegativeLayerSettings, DuplicateSettings) {
+    VkBool32 enable = VK_TRUE;
+    VkBool32 disable = VK_FALSE;
+    const VkLayerSettingEXT settings[2] = {
+        {OBJECT_LAYER_NAME, "enable_message_limit", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &enable},
+        {OBJECT_LAYER_NAME, "enable_message_limit", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable}};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 2, settings};
+    Monitor().ExpectSuccess(kErrorBit | kWarningBit);
+    Monitor().SetDesiredWarning(
+        "The setting enable_message_limit in VkLayerSettingsCreateInfoEXT was listed twice and only the first one listed will be "
+        "recognized");
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+    Monitor().VerifyFound();
+}

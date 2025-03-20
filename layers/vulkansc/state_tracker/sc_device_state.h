@@ -16,7 +16,7 @@
  * Author: Daniel Rakos <daniel.rakos@rastergrid.com>
  */
 #pragma once
-#include "generated/layer_chassis_dispatch.h"
+#include "state_tracker/device_state.h"
 
 struct SCDeviceFeatures {
     VkPhysicalDeviceVulkanSC10Features core;

@@ -20,7 +20,6 @@ class PositivePushDescriptor : public VkLayerTest {};
 TEST_F(PositivePushDescriptor, NullDstSet) {
     TEST_DESCRIPTION("Use null dstSet in CmdPushDescriptorSetKHR");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -34,8 +33,7 @@ TEST_F(PositivePushDescriptor, NullDstSet) {
 
     const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
     // Create push descriptor set layout
-    const vkt::DescriptorSetLayout push_ds_layout(*m_device, {dsl_binding},
-                                                  VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+    const vkt::DescriptorSetLayout push_ds_layout(*m_device, {dsl_binding}, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
 
     // Use helper to create graphics pipeline
     CreatePipelineHelper helper(*this);
@@ -66,10 +64,57 @@ TEST_F(PositivePushDescriptor, NullDstSet) {
                                 &descriptor_write);
 }
 
+TEST_F(PositivePushDescriptor, NullDstSet14) {
+    TEST_DESCRIPTION("Use null dstSet in CmdPushDescriptorSet, function promoted to core in 1.4");
+
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    AddRequiredFeature(vkt::Feature::pushDescriptor);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkDescriptorSetLayoutBinding dsl_binding = {};
+    dsl_binding.binding = 2;
+    dsl_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    dsl_binding.descriptorCount = 1;
+    dsl_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    dsl_binding.pImmutableSamplers = NULL;
+
+    const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
+    // Create push descriptor set layout
+    const vkt::DescriptorSetLayout push_ds_layout(*m_device, {dsl_binding}, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
+
+    // Use helper to create graphics pipeline
+    CreatePipelineHelper helper(*this);
+    helper.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&push_ds_layout, &ds_layout});
+    helper.CreateGraphicsPipeline();
+
+    const uint32_t data_size = sizeof(float) * 3;
+    vkt::Buffer vbo(*m_device, data_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
+    VkDescriptorBufferInfo buff_info;
+    buff_info.buffer = vbo.handle();
+    buff_info.offset = 0;
+    buff_info.range = data_size;
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
+    descriptor_write.dstBinding = 2;
+    descriptor_write.descriptorCount = 1;
+    descriptor_write.pTexelBufferView = nullptr;
+    descriptor_write.pBufferInfo = &buff_info;
+    descriptor_write.pImageInfo = nullptr;
+    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptor_write.dstSet = 0;  // Should not cause a validation error
+
+    m_command_buffer.Begin();
+
+    // In Intel GPU, it needs to bind pipeline before push descriptor set.
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, helper.Handle());
+    vk::CmdPushDescriptorSet(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, helper.pipeline_layout_.handle(), 0, 1,
+                             &descriptor_write);
+}
+
 TEST_F(PositivePushDescriptor, UnboundSet) {
     TEST_DESCRIPTION("Ensure that no validation errors are produced for not bound push descriptor sets");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -86,8 +131,7 @@ TEST_F(PositivePushDescriptor, UnboundSet) {
                                        nullptr);
 
     // Create push descriptor set layout
-    const vkt::DescriptorSetLayout push_ds_layout(*m_device, {dsl_binding},
-                                                  VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+    const vkt::DescriptorSetLayout push_ds_layout(*m_device, {dsl_binding}, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
 
     // Create PSO
     char const fsSource[] = R"glsl(
@@ -136,7 +180,6 @@ TEST_F(PositivePushDescriptor, SetUpdatingSetNumber) {
         "Ensure that no validation errors are produced when the push descriptor set number changes "
         "between two vk::CmdPushDescriptorSetKHR calls.");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -157,7 +200,7 @@ TEST_F(PositivePushDescriptor, SetUpdatingSetNumber) {
     const VkDescriptorSetLayoutBinding push_ds_binding_0 = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
                                                             nullptr};
     const vkt::DescriptorSetLayout push_ds_layout(*m_device, {push_ds_binding_0},
-                                                  VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+                                                  VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
     ASSERT_TRUE(push_ds_layout.initialized());
 
     m_command_buffer.Begin();
@@ -232,7 +275,6 @@ TEST_F(PositivePushDescriptor, SetUpdatingSetNumber) {
 TEST_F(PositivePushDescriptor, CreateDescriptorSetBindingWithIgnoredSamplers) {
     TEST_DESCRIPTION("Test that layers conditionally do ignore the pImmutableSamplers on vkCreateDescriptorSetLayout");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     const uint64_t fake_address_64 = 0xCDCDCDCDCDCDCDCD;
@@ -271,7 +313,7 @@ TEST_F(PositivePushDescriptor, CreateDescriptorSetBindingWithIgnoredSamplers) {
             {6, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, hopefully_undereferencable_pointer},
         };
         const auto dslci = vku::InitStruct<VkDescriptorSetLayoutCreateInfo>(
-            nullptr, static_cast<VkDescriptorSetLayoutCreateFlags>(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR),
+            nullptr, static_cast<VkDescriptorSetLayoutCreateFlags>(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT),
             size32(non_sampler_bindings), non_sampler_bindings);
         vkt::DescriptorSetLayout dsl(*m_device, dslci);
     }
@@ -280,7 +322,6 @@ TEST_F(PositivePushDescriptor, CreateDescriptorSetBindingWithIgnoredSamplers) {
 TEST_F(PositivePushDescriptor, ImmutableSampler) {
     TEST_DESCRIPTION("Use a push descriptor with an immutable sampler.");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
@@ -294,7 +335,7 @@ TEST_F(PositivePushDescriptor, ImmutableSampler) {
         {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_ALL, &sampler_handle}};
     OneOffDescriptorSet descriptor_set(m_device, ds_bindings);
 
-    vkt::DescriptorSetLayout push_dsl(*m_device, ds_bindings, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+    vkt::DescriptorSetLayout push_dsl(*m_device, ds_bindings, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
 
     vkt::PipelineLayout pipeline_layout(*m_device, {&push_dsl});
 
@@ -331,7 +372,7 @@ TEST_F(PositivePushDescriptor, TemplateBasic) {
         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
     OneOffDescriptorSet descriptor_set(m_device, ds_bindings);
 
-    vkt::DescriptorSetLayout push_dsl(*m_device, ds_bindings, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+    vkt::DescriptorSetLayout push_dsl(*m_device, ds_bindings, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
 
     vkt::PipelineLayout pipeline_layout(*m_device, {&push_dsl});
 
@@ -347,16 +388,15 @@ TEST_F(PositivePushDescriptor, TemplateBasic) {
     update_template_entry.offset = offsetof(SimpleTemplateData, buff_info);
     update_template_entry.stride = sizeof(SimpleTemplateData);
 
-    VkDescriptorUpdateTemplateCreateInfoKHR update_template_ci = vku::InitStructHelper();
+    VkDescriptorUpdateTemplateCreateInfo update_template_ci = vku::InitStructHelper();
     update_template_ci.descriptorUpdateEntryCount = 1;
     update_template_ci.pDescriptorUpdateEntries = &update_template_entry;
-    update_template_ci.templateType = VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_PUSH_DESCRIPTORS_KHR;
+    update_template_ci.templateType = VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_PUSH_DESCRIPTORS;
     update_template_ci.descriptorSetLayout = descriptor_set.layout_.handle();
     update_template_ci.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     update_template_ci.pipelineLayout = pipeline_layout.handle();
 
-    VkDescriptorUpdateTemplate update_template = VK_NULL_HANDLE;
-    vk::CreateDescriptorUpdateTemplateKHR(device(), &update_template_ci, nullptr, &update_template);
+    vkt::DescriptorUpdateTemplate update_template(*m_device, update_template_ci);
 
     SimpleTemplateData update_template_data;
     update_template_data.buff_info = {buffer.handle(), 0, 32};
@@ -365,8 +405,6 @@ TEST_F(PositivePushDescriptor, TemplateBasic) {
     vk::CmdPushDescriptorSetWithTemplateKHR(m_command_buffer.handle(), update_template, pipeline_layout.handle(), 0,
                                             &update_template_data);
     m_command_buffer.End();
-
-    vk::DestroyDescriptorUpdateTemplateKHR(device(), update_template, nullptr);
 }
 
 TEST_F(PositivePushDescriptor, WriteDescriptorSetNotAllocated) {
@@ -379,7 +417,7 @@ TEST_F(PositivePushDescriptor, WriteDescriptorSetNotAllocated) {
 
     VkDescriptorSetLayoutBinding ds_binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     VkDescriptorSetLayoutCreateInfo dsl_ci = vku::InitStructHelper();
-    dsl_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+    dsl_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
     dsl_ci.bindingCount = 1;
     dsl_ci.pBindings = &ds_binding;
     vkt::DescriptorSetLayout ds_layout(*m_device, dsl_ci);
@@ -432,7 +470,7 @@ TEST_F(PositivePushDescriptor, PushDescriptorWithTemplateMultipleSets) {
     OneOffDescriptorSet descriptor_set(m_device, ds_bindings);
 
     vkt::DescriptorSetLayout push_dsl1(*m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
-    vkt::DescriptorSetLayout push_dsl2(*m_device, ds_bindings, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+    vkt::DescriptorSetLayout push_dsl2(*m_device, ds_bindings, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
 
     vkt::PipelineLayout pipeline_layout(*m_device, {&push_dsl1, &push_dsl2});
 
@@ -448,17 +486,16 @@ TEST_F(PositivePushDescriptor, PushDescriptorWithTemplateMultipleSets) {
     update_template_entry.offset = offsetof(SimpleTemplateData, buff_info);
     update_template_entry.stride = sizeof(SimpleTemplateData);
 
-    VkDescriptorUpdateTemplateCreateInfoKHR update_template_ci = vku::InitStructHelper();
+    VkDescriptorUpdateTemplateCreateInfo update_template_ci = vku::InitStructHelper();
     update_template_ci.descriptorUpdateEntryCount = 1;
     update_template_ci.pDescriptorUpdateEntries = &update_template_entry;
-    update_template_ci.templateType = VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_PUSH_DESCRIPTORS_KHR;
+    update_template_ci.templateType = VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_PUSH_DESCRIPTORS;
     update_template_ci.descriptorSetLayout = descriptor_set.layout_.handle();
     update_template_ci.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     update_template_ci.pipelineLayout = pipeline_layout.handle();
     update_template_ci.set = 1;
 
-    VkDescriptorUpdateTemplate update_template = VK_NULL_HANDLE;
-    vk::CreateDescriptorUpdateTemplateKHR(device(), &update_template_ci, nullptr, &update_template);
+    vkt::DescriptorUpdateTemplate update_template(*m_device, update_template_ci);
 
     SimpleTemplateData update_template_data;
     update_template_data.buff_info = {buffer.handle(), 0, 32};
@@ -467,6 +504,4 @@ TEST_F(PositivePushDescriptor, PushDescriptorWithTemplateMultipleSets) {
     vk::CmdPushDescriptorSetWithTemplateKHR(m_command_buffer.handle(), update_template, pipeline_layout.handle(), 1,
                                             &update_template_data);
     m_command_buffer.End();
-
-    vk::DestroyDescriptorUpdateTemplateKHR(device(), update_template, nullptr);
 }

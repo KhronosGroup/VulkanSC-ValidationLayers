@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+/* Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -38,7 +38,7 @@ void vvl::Semaphore::TimePoint::Notify() const {
     signal_submit->queue->Notify(signal_submit->seq);
 }
 
-vvl::Semaphore::Semaphore(ValidationStateTracker &dev, VkSemaphore handle, const VkSemaphoreTypeCreateInfo *type_create_info,
+vvl::Semaphore::Semaphore(Device &dev, VkSemaphore handle, const VkSemaphoreTypeCreateInfo *type_create_info,
                           const VkSemaphoreCreateInfo *pCreateInfo)
     : RefcountedStateObject(handle, kVulkanObjectTypeSemaphore),
       type(type_create_info ? type_create_info->semaphoreType : VK_SEMAPHORE_TYPE_BINARY),
@@ -113,20 +113,34 @@ void vvl::Semaphore::EnqueueSignal(const SubmissionReference &signal_submit, uin
 void vvl::Semaphore::EnqueueWait(const SubmissionReference &wait_submit, uint64_t &payload) {
     auto guard = WriteLock();
     if (type == VK_SEMAPHORE_TYPE_BINARY) {
-        // Timeline can be empty for the binary wait operation if the semaphore was imported.
-        // Otherwise timeline should contain a binary signal.
         if (timeline_.empty()) {
-            assert(payload == 0);
-            completed_ = SemOp(kWait, wait_submit, 0);
-            return;
-        }
-        assert(timeline_.rbegin()->second.HasSignaler());
-        payload = timeline_.rbegin()->first;
-    } else {
-        if (payload <= completed_.payload) {
-            return;
+            if (scope_ != vvl::Semaphore::kInternal) {
+                // for external semaphore mark wait as completed, no guarantee of signal visibility
+                completed_ = SemOp(kWait, wait_submit, 0);
+                return;
+            } else {
+                // generate binary payload value from the last completed signals
+                assert(completed_.op_type == kSignal);
+                payload = completed_.payload;
+            }
+        } else {
+            // generate binary payload value from the most recent pending binary signal
+            assert(timeline_.rbegin()->second.HasSignaler());
+            payload = timeline_.rbegin()->first;
         }
     }
+
+    if (payload <= completed_.payload) {
+        // Signal is already retired and its timepoint removed. Mark wait as completed.
+        // NOTE: wait's submission can still be pending, but timepoint lifetime logic
+        // is determined by the signal. completed_ is updated when signal is retired.
+        // The matching waits should be resolved against completed_ in this case.
+        assert(!vvl::Contains(timeline_, payload));
+        completed_.op_type = kWait;
+        completed_.submit = wait_submit;
+        return;
+    }
+
     timeline_[payload].wait_submits.emplace_back(wait_submit);
 }
 
@@ -288,6 +302,12 @@ void vvl::Semaphore::GetLastBinarySignalSource(VkQueue &queue, vvl::Func &acquir
 bool vvl::Semaphore::HasResolvingTimelineSignal(uint64_t wait_payload) const {
     assert(type == VK_SEMAPHORE_TYPE_TIMELINE);
     auto guard = ReadLock();
+
+    // Check if completed payload value (which includes initial value) resolves the wait.
+    if (wait_payload <= completed_.payload) {
+        return true;
+    }
+
     auto it = timeline_.find(wait_payload);
     assert(it != timeline_.end());  // for each registered wait there is a timepoint
     while (it != timeline_.end()) {

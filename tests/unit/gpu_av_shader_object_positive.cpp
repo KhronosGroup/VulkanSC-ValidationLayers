@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2023-2024 Nintendo
- * Copyright (c) 2023-2024 LunarG, Inc.
+ * Copyright (c) 2023-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 #include "../framework/descriptor_helper.h"
 #include "../framework/shader_object_helper.h"
 #include "../framework/shader_templates.h"
+#include "../framework/pipeline_helper.h"
 
 class PositiveGpuAVShaderObject : public GpuAVTest {
   public:
@@ -81,7 +82,7 @@ TEST_F(PositiveGpuAVShaderObject, SelectInstrumentedShaders) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindVertFragShader(vertShader, fragShader);
+    m_command_buffer.BindShaders(vertShader, fragShader);
     vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0u, 1u,
                               &vert_descriptor_set.set_, 0u, nullptr);
     vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
@@ -99,7 +100,7 @@ TEST_F(PositiveGpuAVShaderObject, SelectInstrumentedShaders) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindVertFragShader(vertShader2, fragShader);
+    m_command_buffer.BindShaders(vertShader2, fragShader);
     vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0u, 1u,
                               &vert_descriptor_set.set_, 0u, nullptr);
     vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
@@ -115,7 +116,6 @@ TEST_F(PositiveGpuAVShaderObject, SelectInstrumentedShaders) {
 TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants) {
     TEST_DESCRIPTION("Test that user supplied push constants are correctly restored. One graphics pipeline, indirect draw.");
     InitBasicShaderObject();
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     RETURN_IF_SKIP(InitGpuAvFramework());
@@ -228,7 +228,7 @@ TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants) {
     m_command_buffer.Begin(&begin_info);
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindVertFragShader(vs, fs);
+    m_command_buffer.BindShaders(vs, fs);
 
     vk::CmdPushConstants(m_command_buffer.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, shader_pcr_byte_size,
                          &push_constants);
@@ -258,7 +258,6 @@ TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants2) {
         "Test that user supplied push constants are correctly restored. One graphics pipeline, one compute pipeline, indirect draw "
         "and dispatch.");
     InitBasicShaderObject();
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     RETURN_IF_SKIP(InitGpuAvFramework());
@@ -424,7 +423,7 @@ TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants2) {
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     SetDefaultDynamicStatesExclude();
 
-    m_command_buffer.BindVertFragShader(vs, fs);
+    m_command_buffer.BindShaders(vs, fs);
     m_command_buffer.BindCompShader(cs);
 
     vk::CmdPushConstants(m_command_buffer.handle(), graphics_pipeline_layout.handle(),
@@ -454,4 +453,60 @@ TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants2) {
         ASSERT_EQ(graphics_storage_buffer_ptr[i], i);
     }
     graphics_storage_buffer.Memory().Unmap();
+}
+
+TEST_F(PositiveGpuAVShaderObject, DispatchShaderObjectAndPipeline) {
+    TEST_DESCRIPTION("GPU validation: Validate selection of which shaders get instrumented for GPU-AV");
+    InitBasicShaderObject();
+
+    AddRequiredFeature(vkt::Feature::robustBufferAccess);
+    const VkBool32 value = true;
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
+                                       &value};
+    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                               &setting};
+    RETURN_IF_SKIP(InitGpuAvFramework(&layer_settings_create_info));
+    InitState();
+
+    static const char comp_src[] = R"glsl(
+        #version 450
+        layout(local_size_x=16, local_size_x=1, local_size_x=1) in;
+
+        void main() {
+        }
+    )glsl";
+
+    const auto comp_spv = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, comp_src);
+    VkShaderCreateInfoEXT comp_create_info = ShaderCreateInfo(comp_spv, VK_SHADER_STAGE_COMPUTE_BIT);
+
+    VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT};
+    VkValidationFeaturesEXT features = vku::InitStructHelper();
+    features.enabledValidationFeatureCount = 1;
+    features.pEnabledValidationFeatures = enabled;
+    comp_create_info.pNext = &features;
+
+    const vkt::Shader compShader(*m_device, comp_create_info);
+
+    CreateComputePipelineHelper compute_pipe(*this);
+    compute_pipe.cs_ = std::make_unique<VkShaderObj>(this, comp_src, VK_SHADER_STAGE_COMPUTE_BIT);
+    compute_pipe.CreateComputePipeline();
+
+    vkt::Buffer indirect_dispatch_parameters_buffer(*m_device, sizeof(VkDispatchIndirectCommand),
+                                                    VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
+    auto &indirect_dispatch_parameters =
+        *static_cast<VkDispatchIndirectCommand *>(indirect_dispatch_parameters_buffer.Memory().Map());
+    indirect_dispatch_parameters.x = 1u;
+    indirect_dispatch_parameters.y = 1u;
+    indirect_dispatch_parameters.z = 1u;
+    indirect_dispatch_parameters_buffer.Memory().Unmap();
+
+    m_command_buffer.Begin();
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindCompShader(compShader);
+    vk::CmdDispatchIndirect(m_command_buffer.handle(), indirect_dispatch_parameters_buffer.handle(), 0u);
+
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipe.Handle());
+    vk::CmdDispatchIndirect(m_command_buffer.handle(), indirect_dispatch_parameters_buffer.handle(), 0u);
+
+    m_command_buffer.End();
 }

@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -1072,8 +1072,12 @@ TEST_F(NegativeAndroidHardwareBuffer, InvalidBindBufferMemory) {
     vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
 
     // Try to get memory requirements prior to binding memory
-    VkMemoryRequirements mem_reqs;
-    vk::GetBufferMemoryRequirements(device(), buffer.handle(), &mem_reqs);
+    VkBufferMemoryRequirementsInfo2 buffer_memory_requirements_info = vku::InitStructHelper();
+    buffer_memory_requirements_info.buffer = buffer.handle();
+    VkMemoryDedicatedRequirements memory_dedicated_requirements = vku::InitStructHelper();
+    VkMemoryRequirements2 mem_reqs2 = vku::InitStructHelper(&memory_dedicated_requirements);
+    vk::GetBufferMemoryRequirements2(device(), &buffer_memory_requirements_info, &mem_reqs2);
+    VkMemoryRequirements mem_reqs = mem_reqs2.memoryRequirements;
 
     VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper();
     import_ahb_Info.buffer = ahb.handle();
@@ -1089,6 +1093,7 @@ TEST_F(NegativeAndroidHardwareBuffer, InvalidBindBufferMemory) {
     }
 
     if (mem_reqs.alignment > 1) {
+        m_errorMonitor->SetAllowedFailureMsg("VUID-vkBindBufferMemory-buffer-01444");  // required dedicated
         m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-memoryOffset-01036");
         m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-size-01037");
         vk::BindBufferMemory(device(), buffer.handle(), memory.handle(), 1);
@@ -1098,6 +1103,9 @@ TEST_F(NegativeAndroidHardwareBuffer, InvalidBindBufferMemory) {
     VkDeviceSize buffer_offset = (mem_reqs.size - 1) & ~(mem_reqs.alignment - 1);
     if (buffer_offset > 0) {
         m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-size-01037");
+        if (memory_dedicated_requirements.requiresDedicatedAllocation) {
+            m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-buffer-01444");
+        }
         vk::BindBufferMemory(device(), buffer.handle(), memory.handle(), buffer_offset);
         m_errorMonitor->VerifyFound();
     }

@@ -3,9 +3,9 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -291,6 +291,25 @@ PFN_vkCmdSetPrimitiveRestartEnable CmdSetPrimitiveRestartEnable;
 PFN_vkGetDeviceBufferMemoryRequirements GetDeviceBufferMemoryRequirements;
 PFN_vkGetDeviceImageMemoryRequirements GetDeviceImageMemoryRequirements;
 PFN_vkGetDeviceImageSparseMemoryRequirements GetDeviceImageSparseMemoryRequirements;
+PFN_vkCmdSetLineStipple CmdSetLineStipple;
+PFN_vkMapMemory2 MapMemory2;
+PFN_vkUnmapMemory2 UnmapMemory2;
+PFN_vkCmdBindIndexBuffer2 CmdBindIndexBuffer2;
+PFN_vkGetRenderingAreaGranularity GetRenderingAreaGranularity;
+PFN_vkGetDeviceImageSubresourceLayout GetDeviceImageSubresourceLayout;
+PFN_vkGetImageSubresourceLayout2 GetImageSubresourceLayout2;
+PFN_vkCmdPushDescriptorSet CmdPushDescriptorSet;
+PFN_vkCmdPushDescriptorSetWithTemplate CmdPushDescriptorSetWithTemplate;
+PFN_vkCmdSetRenderingAttachmentLocations CmdSetRenderingAttachmentLocations;
+PFN_vkCmdSetRenderingInputAttachmentIndices CmdSetRenderingInputAttachmentIndices;
+PFN_vkCmdBindDescriptorSets2 CmdBindDescriptorSets2;
+PFN_vkCmdPushConstants2 CmdPushConstants2;
+PFN_vkCmdPushDescriptorSet2 CmdPushDescriptorSet2;
+PFN_vkCmdPushDescriptorSetWithTemplate2 CmdPushDescriptorSetWithTemplate2;
+PFN_vkCopyMemoryToImage CopyMemoryToImage;
+PFN_vkCopyImageToMemory CopyImageToMemory;
+PFN_vkCopyImageToImage CopyImageToImage;
+PFN_vkTransitionImageLayout TransitionImageLayout;
 PFN_vkDestroySurfaceKHR DestroySurfaceKHR;
 PFN_vkGetPhysicalDeviceSurfaceSupportKHR GetPhysicalDeviceSurfaceSupportKHR;
 PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR GetPhysicalDeviceSurfaceCapabilitiesKHR;
@@ -649,12 +668,14 @@ PFN_vkCreatePrivateDataSlotEXT CreatePrivateDataSlotEXT;
 PFN_vkDestroyPrivateDataSlotEXT DestroyPrivateDataSlotEXT;
 PFN_vkSetPrivateDataEXT SetPrivateDataEXT;
 PFN_vkGetPrivateDataEXT GetPrivateDataEXT;
+#ifdef VK_ENABLE_BETA_EXTENSIONS
 PFN_vkCreateCudaModuleNV CreateCudaModuleNV;
 PFN_vkGetCudaModuleCacheNV GetCudaModuleCacheNV;
 PFN_vkCreateCudaFunctionNV CreateCudaFunctionNV;
 PFN_vkDestroyCudaModuleNV DestroyCudaModuleNV;
 PFN_vkDestroyCudaFunctionNV DestroyCudaFunctionNV;
 PFN_vkCmdCudaLaunchKernelNV CmdCudaLaunchKernelNV;
+#endif  // VK_ENABLE_BETA_EXTENSIONS
 #ifdef VK_USE_PLATFORM_METAL_EXT
 PFN_vkExportMetalObjectsEXT ExportMetalObjectsEXT;
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -780,6 +801,9 @@ PFN_vkCmdBindShadersEXT CmdBindShadersEXT;
 PFN_vkCmdSetDepthClampRangeEXT CmdSetDepthClampRangeEXT;
 PFN_vkGetFramebufferTilePropertiesQCOM GetFramebufferTilePropertiesQCOM;
 PFN_vkGetDynamicRenderingTilePropertiesQCOM GetDynamicRenderingTilePropertiesQCOM;
+PFN_vkGetPhysicalDeviceCooperativeVectorPropertiesNV GetPhysicalDeviceCooperativeVectorPropertiesNV;
+PFN_vkConvertCooperativeVectorMatrixNV ConvertCooperativeVectorMatrixNV;
+PFN_vkCmdConvertCooperativeVectorMatrixNV CmdConvertCooperativeVectorMatrixNV;
 PFN_vkSetLatencySleepModeNV SetLatencySleepModeNV;
 PFN_vkLatencySleepNV LatencySleepNV;
 PFN_vkSetLatencyMarkerNV SetLatencyMarkerNV;
@@ -789,6 +813,10 @@ PFN_vkCmdSetAttachmentFeedbackLoopEnableEXT CmdSetAttachmentFeedbackLoopEnableEX
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 PFN_vkGetScreenBufferPropertiesQNX GetScreenBufferPropertiesQNX;
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+PFN_vkGetClusterAccelerationStructureBuildSizesNV GetClusterAccelerationStructureBuildSizesNV;
+PFN_vkCmdBuildClusterAccelerationStructureIndirectNV CmdBuildClusterAccelerationStructureIndirectNV;
+PFN_vkGetPartitionedAccelerationStructuresBuildSizesNV GetPartitionedAccelerationStructuresBuildSizesNV;
+PFN_vkCmdBuildPartitionedAccelerationStructuresNV CmdBuildPartitionedAccelerationStructuresNV;
 PFN_vkGetGeneratedCommandsMemoryRequirementsEXT GetGeneratedCommandsMemoryRequirementsEXT;
 PFN_vkCmdPreprocessGeneratedCommandsEXT CmdPreprocessGeneratedCommandsEXT;
 PFN_vkCmdExecuteGeneratedCommandsEXT CmdExecuteGeneratedCommandsEXT;
@@ -799,6 +827,10 @@ PFN_vkDestroyIndirectExecutionSetEXT DestroyIndirectExecutionSetEXT;
 PFN_vkUpdateIndirectExecutionSetPipelineEXT UpdateIndirectExecutionSetPipelineEXT;
 PFN_vkUpdateIndirectExecutionSetShaderEXT UpdateIndirectExecutionSetShaderEXT;
 PFN_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV;
+#ifdef VK_USE_PLATFORM_METAL_EXT
+PFN_vkGetMemoryMetalHandleEXT GetMemoryMetalHandleEXT;
+PFN_vkGetMemoryMetalHandlePropertiesEXT GetMemoryMetalHandlePropertiesEXT;
+#endif  // VK_USE_PLATFORM_METAL_EXT
 PFN_vkCreateAccelerationStructureKHR CreateAccelerationStructureKHR;
 PFN_vkDestroyAccelerationStructureKHR DestroyAccelerationStructureKHR;
 PFN_vkCmdBuildAccelerationStructuresKHR CmdBuildAccelerationStructuresKHR;
@@ -1061,6 +1093,25 @@ void InitCore(const char *api_name) {
     GetDeviceBufferMemoryRequirements = reinterpret_cast<PFN_vkGetDeviceBufferMemoryRequirements>(get_proc_address(lib_handle, "vkGetDeviceBufferMemoryRequirements"));
     GetDeviceImageMemoryRequirements = reinterpret_cast<PFN_vkGetDeviceImageMemoryRequirements>(get_proc_address(lib_handle, "vkGetDeviceImageMemoryRequirements"));
     GetDeviceImageSparseMemoryRequirements = reinterpret_cast<PFN_vkGetDeviceImageSparseMemoryRequirements>(get_proc_address(lib_handle, "vkGetDeviceImageSparseMemoryRequirements"));
+    CmdSetLineStipple = reinterpret_cast<PFN_vkCmdSetLineStipple>(get_proc_address(lib_handle, "vkCmdSetLineStipple"));
+    MapMemory2 = reinterpret_cast<PFN_vkMapMemory2>(get_proc_address(lib_handle, "vkMapMemory2"));
+    UnmapMemory2 = reinterpret_cast<PFN_vkUnmapMemory2>(get_proc_address(lib_handle, "vkUnmapMemory2"));
+    CmdBindIndexBuffer2 = reinterpret_cast<PFN_vkCmdBindIndexBuffer2>(get_proc_address(lib_handle, "vkCmdBindIndexBuffer2"));
+    GetRenderingAreaGranularity = reinterpret_cast<PFN_vkGetRenderingAreaGranularity>(get_proc_address(lib_handle, "vkGetRenderingAreaGranularity"));
+    GetDeviceImageSubresourceLayout = reinterpret_cast<PFN_vkGetDeviceImageSubresourceLayout>(get_proc_address(lib_handle, "vkGetDeviceImageSubresourceLayout"));
+    GetImageSubresourceLayout2 = reinterpret_cast<PFN_vkGetImageSubresourceLayout2>(get_proc_address(lib_handle, "vkGetImageSubresourceLayout2"));
+    CmdPushDescriptorSet = reinterpret_cast<PFN_vkCmdPushDescriptorSet>(get_proc_address(lib_handle, "vkCmdPushDescriptorSet"));
+    CmdPushDescriptorSetWithTemplate = reinterpret_cast<PFN_vkCmdPushDescriptorSetWithTemplate>(get_proc_address(lib_handle, "vkCmdPushDescriptorSetWithTemplate"));
+    CmdSetRenderingAttachmentLocations = reinterpret_cast<PFN_vkCmdSetRenderingAttachmentLocations>(get_proc_address(lib_handle, "vkCmdSetRenderingAttachmentLocations"));
+    CmdSetRenderingInputAttachmentIndices = reinterpret_cast<PFN_vkCmdSetRenderingInputAttachmentIndices>(get_proc_address(lib_handle, "vkCmdSetRenderingInputAttachmentIndices"));
+    CmdBindDescriptorSets2 = reinterpret_cast<PFN_vkCmdBindDescriptorSets2>(get_proc_address(lib_handle, "vkCmdBindDescriptorSets2"));
+    CmdPushConstants2 = reinterpret_cast<PFN_vkCmdPushConstants2>(get_proc_address(lib_handle, "vkCmdPushConstants2"));
+    CmdPushDescriptorSet2 = reinterpret_cast<PFN_vkCmdPushDescriptorSet2>(get_proc_address(lib_handle, "vkCmdPushDescriptorSet2"));
+    CmdPushDescriptorSetWithTemplate2 = reinterpret_cast<PFN_vkCmdPushDescriptorSetWithTemplate2>(get_proc_address(lib_handle, "vkCmdPushDescriptorSetWithTemplate2"));
+    CopyMemoryToImage = reinterpret_cast<PFN_vkCopyMemoryToImage>(get_proc_address(lib_handle, "vkCopyMemoryToImage"));
+    CopyImageToMemory = reinterpret_cast<PFN_vkCopyImageToMemory>(get_proc_address(lib_handle, "vkCopyImageToMemory"));
+    CopyImageToImage = reinterpret_cast<PFN_vkCopyImageToImage>(get_proc_address(lib_handle, "vkCopyImageToImage"));
+    TransitionImageLayout = reinterpret_cast<PFN_vkTransitionImageLayout>(get_proc_address(lib_handle, "vkTransitionImageLayout"));
 }
 void InitExtensionFromCore(const char* extension_name) {
     static const vvl::unordered_map<std::string, std::function<void()>> initializers = {
@@ -1109,10 +1160,17 @@ void InitExtensionFromCore(const char* extension_name) {
             }
         },
         {
+            "VK_KHR_push_descriptor", []() {
+                CmdPushDescriptorSetKHR = CmdPushDescriptorSet;
+                CmdPushDescriptorSetWithTemplateKHR = CmdPushDescriptorSetWithTemplate;
+            }
+        },
+        {
             "VK_KHR_descriptor_update_template", []() {
                 CreateDescriptorUpdateTemplateKHR = CreateDescriptorUpdateTemplate;
                 DestroyDescriptorUpdateTemplateKHR = DestroyDescriptorUpdateTemplate;
                 UpdateDescriptorSetWithTemplateKHR = UpdateDescriptorSetWithTemplate;
+                CmdPushDescriptorSetWithTemplateKHR = CmdPushDescriptorSetWithTemplate;
             }
         },
         {
@@ -1166,10 +1224,22 @@ void InitExtensionFromCore(const char* extension_name) {
             }
         },
         {
+            "VK_KHR_dynamic_rendering_local_read", []() {
+                CmdSetRenderingAttachmentLocationsKHR = CmdSetRenderingAttachmentLocations;
+                CmdSetRenderingInputAttachmentIndicesKHR = CmdSetRenderingInputAttachmentIndices;
+            }
+        },
+        {
             "VK_KHR_buffer_device_address", []() {
                 GetBufferDeviceAddressKHR = GetBufferDeviceAddress;
                 GetBufferOpaqueCaptureAddressKHR = GetBufferOpaqueCaptureAddress;
                 GetDeviceMemoryOpaqueCaptureAddressKHR = GetDeviceMemoryOpaqueCaptureAddress;
+            }
+        },
+        {
+            "VK_KHR_map_memory2", []() {
+                MapMemory2KHR = MapMemory2;
+                UnmapMemory2KHR = UnmapMemory2;
             }
         },
         {
@@ -1200,6 +1270,27 @@ void InitExtensionFromCore(const char* extension_name) {
             }
         },
         {
+            "VK_KHR_maintenance5", []() {
+                CmdBindIndexBuffer2KHR = CmdBindIndexBuffer2;
+                GetRenderingAreaGranularityKHR = GetRenderingAreaGranularity;
+                GetDeviceImageSubresourceLayoutKHR = GetDeviceImageSubresourceLayout;
+                GetImageSubresourceLayout2KHR = GetImageSubresourceLayout2;
+            }
+        },
+        {
+            "VK_KHR_line_rasterization", []() {
+                CmdSetLineStippleKHR = CmdSetLineStipple;
+            }
+        },
+        {
+            "VK_KHR_maintenance6", []() {
+                CmdBindDescriptorSets2KHR = CmdBindDescriptorSets2;
+                CmdPushConstants2KHR = CmdPushConstants2;
+                CmdPushDescriptorSet2KHR = CmdPushDescriptorSet2;
+                CmdPushDescriptorSetWithTemplate2KHR = CmdPushDescriptorSetWithTemplate2;
+            }
+        },
+        {
             "VK_EXT_debug_marker", []() {
             }
         },
@@ -1220,6 +1311,7 @@ void InitExtensionFromCore(const char* extension_name) {
         },
         {
             "VK_EXT_line_rasterization", []() {
+                CmdSetLineStippleEXT = CmdSetLineStipple;
             }
         },
         {
@@ -1241,6 +1333,15 @@ void InitExtensionFromCore(const char* extension_name) {
                 CmdSetDepthBoundsTestEnableEXT = CmdSetDepthBoundsTestEnable;
                 CmdSetStencilTestEnableEXT = CmdSetStencilTestEnable;
                 CmdSetStencilOpEXT = CmdSetStencilOp;
+            }
+        },
+        {
+            "VK_EXT_host_image_copy", []() {
+                CopyMemoryToImageEXT = CopyMemoryToImage;
+                CopyImageToMemoryEXT = CopyImageToMemory;
+                CopyImageToImageEXT = CopyImageToImage;
+                TransitionImageLayoutEXT = TransitionImageLayout;
+                GetImageSubresourceLayout2EXT = GetImageSubresourceLayout2;
             }
         },
         {
@@ -2099,6 +2200,7 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
                 GetPrivateDataEXT = reinterpret_cast<PFN_vkGetPrivateDataEXT>(GetDeviceProcAddr(device, "vkGetPrivateDataEXT"));
             }
         },
+#ifdef VK_ENABLE_BETA_EXTENSIONS
         {
             "VK_NV_cuda_kernel_launch", [](VkInstance , VkDevice device) {
                 CreateCudaModuleNV = reinterpret_cast<PFN_vkCreateCudaModuleNV>(GetDeviceProcAddr(device, "vkCreateCudaModuleNV"));
@@ -2109,6 +2211,7 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
                 CmdCudaLaunchKernelNV = reinterpret_cast<PFN_vkCmdCudaLaunchKernelNV>(GetDeviceProcAddr(device, "vkCmdCudaLaunchKernelNV"));
             }
         },
+#endif  // VK_ENABLE_BETA_EXTENSIONS
 #ifdef VK_USE_PLATFORM_METAL_EXT
         {
             "VK_EXT_metal_objects", [](VkInstance , VkDevice device) {
@@ -2397,6 +2500,13 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
             }
         },
         {
+            "VK_NV_cooperative_vector", [](VkInstance instance, VkDevice device) {
+                ConvertCooperativeVectorMatrixNV = reinterpret_cast<PFN_vkConvertCooperativeVectorMatrixNV>(GetDeviceProcAddr(device, "vkConvertCooperativeVectorMatrixNV"));
+                CmdConvertCooperativeVectorMatrixNV = reinterpret_cast<PFN_vkCmdConvertCooperativeVectorMatrixNV>(GetDeviceProcAddr(device, "vkCmdConvertCooperativeVectorMatrixNV"));
+                GetPhysicalDeviceCooperativeVectorPropertiesNV = reinterpret_cast<PFN_vkGetPhysicalDeviceCooperativeVectorPropertiesNV>(GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeVectorPropertiesNV"));
+            }
+        },
+        {
             "VK_NV_low_latency2", [](VkInstance , VkDevice device) {
                 SetLatencySleepModeNV = reinterpret_cast<PFN_vkSetLatencySleepModeNV>(GetDeviceProcAddr(device, "vkSetLatencySleepModeNV"));
                 LatencySleepNV = reinterpret_cast<PFN_vkLatencySleepNV>(GetDeviceProcAddr(device, "vkLatencySleepNV"));
@@ -2417,6 +2527,18 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
             }
         },
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+        {
+            "VK_NV_cluster_acceleration_structure", [](VkInstance , VkDevice device) {
+                GetClusterAccelerationStructureBuildSizesNV = reinterpret_cast<PFN_vkGetClusterAccelerationStructureBuildSizesNV>(GetDeviceProcAddr(device, "vkGetClusterAccelerationStructureBuildSizesNV"));
+                CmdBuildClusterAccelerationStructureIndirectNV = reinterpret_cast<PFN_vkCmdBuildClusterAccelerationStructureIndirectNV>(GetDeviceProcAddr(device, "vkCmdBuildClusterAccelerationStructureIndirectNV"));
+            }
+        },
+        {
+            "VK_NV_partitioned_acceleration_structure", [](VkInstance , VkDevice device) {
+                GetPartitionedAccelerationStructuresBuildSizesNV = reinterpret_cast<PFN_vkGetPartitionedAccelerationStructuresBuildSizesNV>(GetDeviceProcAddr(device, "vkGetPartitionedAccelerationStructuresBuildSizesNV"));
+                CmdBuildPartitionedAccelerationStructuresNV = reinterpret_cast<PFN_vkCmdBuildPartitionedAccelerationStructuresNV>(GetDeviceProcAddr(device, "vkCmdBuildPartitionedAccelerationStructuresNV"));
+            }
+        },
         {
             "VK_EXT_device_generated_commands", [](VkInstance , VkDevice device) {
                 GetGeneratedCommandsMemoryRequirementsEXT = reinterpret_cast<PFN_vkGetGeneratedCommandsMemoryRequirementsEXT>(GetDeviceProcAddr(device, "vkGetGeneratedCommandsMemoryRequirementsEXT"));
@@ -2440,6 +2562,14 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
                 GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV = reinterpret_cast<PFN_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV>(GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV"));
             }
         },
+#ifdef VK_USE_PLATFORM_METAL_EXT
+        {
+            "VK_EXT_external_memory_metal", [](VkInstance , VkDevice device) {
+                GetMemoryMetalHandleEXT = reinterpret_cast<PFN_vkGetMemoryMetalHandleEXT>(GetDeviceProcAddr(device, "vkGetMemoryMetalHandleEXT"));
+                GetMemoryMetalHandlePropertiesEXT = reinterpret_cast<PFN_vkGetMemoryMetalHandlePropertiesEXT>(GetDeviceProcAddr(device, "vkGetMemoryMetalHandlePropertiesEXT"));
+            }
+        },
+#endif  // VK_USE_PLATFORM_METAL_EXT
         {
             "VK_KHR_acceleration_structure", [](VkInstance , VkDevice device) {
                 CreateAccelerationStructureKHR = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(GetDeviceProcAddr(device, "vkCreateAccelerationStructureKHR"));
@@ -2843,12 +2973,14 @@ void ResetAllExtensions() {
     DestroyPrivateDataSlotEXT = nullptr;
     SetPrivateDataEXT = nullptr;
     GetPrivateDataEXT = nullptr;
+#ifdef VK_ENABLE_BETA_EXTENSIONS
     CreateCudaModuleNV = nullptr;
     GetCudaModuleCacheNV = nullptr;
     CreateCudaFunctionNV = nullptr;
     DestroyCudaModuleNV = nullptr;
     DestroyCudaFunctionNV = nullptr;
     CmdCudaLaunchKernelNV = nullptr;
+#endif  // VK_ENABLE_BETA_EXTENSIONS
 #ifdef VK_USE_PLATFORM_METAL_EXT
     ExportMetalObjectsEXT = nullptr;
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -2974,6 +3106,9 @@ void ResetAllExtensions() {
     CmdSetDepthClampRangeEXT = nullptr;
     GetFramebufferTilePropertiesQCOM = nullptr;
     GetDynamicRenderingTilePropertiesQCOM = nullptr;
+    GetPhysicalDeviceCooperativeVectorPropertiesNV = nullptr;
+    ConvertCooperativeVectorMatrixNV = nullptr;
+    CmdConvertCooperativeVectorMatrixNV = nullptr;
     SetLatencySleepModeNV = nullptr;
     LatencySleepNV = nullptr;
     SetLatencyMarkerNV = nullptr;
@@ -2983,6 +3118,10 @@ void ResetAllExtensions() {
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
     GetScreenBufferPropertiesQNX = nullptr;
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+    GetClusterAccelerationStructureBuildSizesNV = nullptr;
+    CmdBuildClusterAccelerationStructureIndirectNV = nullptr;
+    GetPartitionedAccelerationStructuresBuildSizesNV = nullptr;
+    CmdBuildPartitionedAccelerationStructuresNV = nullptr;
     GetGeneratedCommandsMemoryRequirementsEXT = nullptr;
     CmdPreprocessGeneratedCommandsEXT = nullptr;
     CmdExecuteGeneratedCommandsEXT = nullptr;
@@ -2993,6 +3132,10 @@ void ResetAllExtensions() {
     UpdateIndirectExecutionSetPipelineEXT = nullptr;
     UpdateIndirectExecutionSetShaderEXT = nullptr;
     GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV = nullptr;
+#ifdef VK_USE_PLATFORM_METAL_EXT
+    GetMemoryMetalHandleEXT = nullptr;
+    GetMemoryMetalHandlePropertiesEXT = nullptr;
+#endif  // VK_USE_PLATFORM_METAL_EXT
     CreateAccelerationStructureKHR = nullptr;
     DestroyAccelerationStructureKHR = nullptr;
     CmdBuildAccelerationStructuresKHR = nullptr;

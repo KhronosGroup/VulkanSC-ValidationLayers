@@ -2,8 +2,8 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023-2024 Valve Corporation
- * Copyright (c) 2023-2024 LunarG, Inc.
+ * Copyright (c) 2023-2025 Valve Corporation
+ * Copyright (c) 2023-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -167,7 +167,7 @@ TEST_F(PositiveSubpass, SubpassWithEventWait) {
     {
         vkt::Event event(*m_device);
         m_command_buffer.Begin();
-        vk::CmdSetEvent(m_command_buffer, event, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+        vk::CmdSetEvent(m_command_buffer, event, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
         m_command_buffer.BeginRenderPass(render_pass, framebuffer, 32, 32);
         vk::CmdWaitEvents(m_command_buffer, 1, &event.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
@@ -211,7 +211,7 @@ TEST_F(PositiveSubpass, DISABLED_InputAttachmentMissingSpecConstant) {
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+        helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }

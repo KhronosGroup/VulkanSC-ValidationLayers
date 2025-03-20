@@ -1,6 +1,6 @@
-/* Copyright (c) 2024 The Khronos Group Inc.
- * Copyright (c) 2024 Valve Corporation
- * Copyright (c) 2024 LunarG, Inc.
+/* Copyright (c) 2024-2025 The Khronos Group Inc.
+ * Copyright (c) 2024-2025 Valve Corporation
+ * Copyright (c) 2024-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "state_tracker/shader_module.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
 
+// Common for both Pipeline and Shader Object
 void GetActiveSlots(ActiveSlotMap &active_slots, const std::shared_ptr<const spirv::EntryPoint> &entrypoint) {
     if (!entrypoint) {
         return;
@@ -35,7 +36,7 @@ void GetActiveSlots(ActiveSlotMap &active_slots, const std::shared_ptr<const spi
     }
 }
 
-// static
+// Used by pipeline
 ActiveSlotMap GetActiveSlots(const std::vector<ShaderStageState> &stage_states) {
     ActiveSlotMap active_slots;
     for (const auto &stage : stage_states) {
@@ -44,6 +45,7 @@ ActiveSlotMap GetActiveSlots(const std::vector<ShaderStageState> &stage_states) 
     return active_slots;
 }
 
+// Used by Shader Object
 ActiveSlotMap GetActiveSlots(const std::shared_ptr<const spirv::EntryPoint> &entrypoint) {
     ActiveSlotMap active_slots;
     GetActiveSlots(active_slots, entrypoint);
@@ -90,6 +92,32 @@ bool ShaderStageState::GetInt32ConstantValue(const spirv::Instruction &insn, uin
         if (spec_info && spec_id < spec_info->mapEntryCount) {
             memcpy(value, (uint8_t *)spec_info->pData + spec_info->pMapEntries[spec_id].offset,
                    spec_info->pMapEntries[spec_id].size);
+        }
+        return true;
+    }
+
+    // This means the value is not known until runtime and will need to be checked in GPU-AV
+    return false;
+}
+
+bool ShaderStageState::GetBooleanConstantValue(const spirv::Instruction &insn, bool *value) const {
+    const spirv::Instruction *type_id = spirv_state->FindDef(insn.Word(1));
+    if (type_id->Opcode() != spv::OpTypeBool) {
+        return false;
+    }
+
+    if (insn.Opcode() == spv::OpConstantFalse) {
+        *value = false;
+        return true;
+    } else if (insn.Opcode() == spv::OpConstantTrue) {
+        *value = true;
+        return true;
+    } else if (insn.Opcode() == spv::OpSpecConstantTrue || insn.Opcode() == spv::OpSpecConstantFalse) {
+        *value = insn.Opcode() == spv::OpSpecConstantTrue;  // default value
+        const auto *spec_info = GetSpecializationInfo();
+        const uint32_t spec_id = spirv_state->static_data_.id_to_spec_id.at(insn.Word(2));
+        if (spec_info && spec_id < spec_info->mapEntryCount) {
+            memcpy(value, (uint8_t *)spec_info->pData + spec_info->pMapEntries[spec_id].offset, 1);
         }
         return true;
     }

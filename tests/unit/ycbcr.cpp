@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -120,11 +120,11 @@ TEST_F(NegativeYcbcr, Sampler) {
     sampler_info.minFilter = VK_FILTER_NEAREST;  // Different than chromaFilter
     sampler_info.magFilter = VK_FILTER_LINEAR;
     sampler_info.pNext = (void *)&sampler_ycbcr_info;
-    CreateSamplerTest(*this, &sampler_info, "VUID-VkSamplerCreateInfo-minFilter-01645");
+    CreateSamplerTest(sampler_info, "VUID-VkSamplerCreateInfo-minFilter-01645");
 
     sampler_info.magFilter = VK_FILTER_NEAREST;
     sampler_info.minFilter = VK_FILTER_LINEAR;
-    CreateSamplerTest(*this, &sampler_info, "VUID-VkSamplerCreateInfo-minFilter-01645");
+    CreateSamplerTest(sampler_info, "VUID-VkSamplerCreateInfo-minFilter-01645");
 }
 
 TEST_F(NegativeYcbcr, Swizzle) {
@@ -272,7 +272,7 @@ TEST_F(NegativeYcbcr, Swizzle) {
     image_view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     image_view_create_info.components = identity;
     image_view_create_info.components.r = VK_COMPONENT_SWIZZLE_B;
-    CreateImageViewTest(*this, &image_view_create_info, "VUID-VkImageViewCreateInfo-pNext-01970");
+    CreateImageViewTest(image_view_create_info, "VUID-VkImageViewCreateInfo-pNext-01970");
 }
 
 TEST_F(NegativeYcbcr, Formats) {
@@ -305,9 +305,7 @@ TEST_F(NegativeYcbcr, Formats) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = mp_format;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 32, 1};
     image_create_info.mipLevels = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -324,17 +322,17 @@ TEST_F(NegativeYcbcr, Formats) {
     if ((image_format_props.sampleCounts & VK_SAMPLE_COUNT_4_BIT) == 0) {
         m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-samples-02258");
     }
-    CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-format-06411");
+    CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-format-06411");
     image_create_info = reset_create_info;
 
     // invalid width
     image_create_info.extent.width = 31;
-    CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-format-04712");
+    CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-format-04712");
     image_create_info = reset_create_info;
 
     // invalid height (since 420 format)
     image_create_info.extent.height = 31;
-    CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-format-04713");
+    CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-format-04713");
     image_create_info = reset_create_info;
 
     // invalid imageType
@@ -346,13 +344,13 @@ TEST_F(NegativeYcbcr, Formats) {
         // Can't just set height to 1 as stateless validation will hit 04713 first
         m_errorMonitor->SetUnexpectedError("VUID-VkImageCreateInfo-imageType-00956");
         m_errorMonitor->SetUnexpectedError("VUID-VkImageCreateInfo-extent-02253");
-        CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-format-06412");
+        CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-format-06412");
     }
     image_create_info = reset_create_info;
 
     // Test using a format that doesn't support disjoint
     image_create_info.flags = VK_IMAGE_CREATE_DISJOINT_BIT;
-    CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-imageCreateFormatFeatures-02260");
+    CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-imageCreateFormatFeatures-02260");
     image_create_info = reset_create_info;
 }
 
@@ -386,9 +384,7 @@ TEST_F(NegativeYcbcr, FormatsLimits) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = mp_format;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 32, 1};
     image_create_info.mipLevels = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -405,7 +401,7 @@ TEST_F(NegativeYcbcr, FormatsLimits) {
     // if more then 2 the VU since its larger the (depth^2 + 1)
     // if up the depth the VU for IMAGE_TYPE_2D and depth != 1 hits
     image_create_info.mipLevels = 2;
-    CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-format-06410");
+    CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-format-06410");
 }
 
 TEST_F(NegativeYcbcr, ImageViewFormat) {
@@ -627,16 +623,11 @@ TEST_F(NegativeYcbcr, SamplerYcbcrConversionEnable) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    // Explictly not enable Ycbcr Conversion Features
-    VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcr_features = vku::InitStructHelper();
-    ycbcr_features.samplerYcbcrConversion = VK_FALSE;
-    RETURN_IF_SKIP(InitState(nullptr, &ycbcr_features));
+    RETURN_IF_SKIP(Init());
 
-    // Create Ycbcr conversion
     VkSamplerYcbcrConversion conversions;
     VkSamplerYcbcrConversionCreateInfo ycbcr_create_info = {VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO,
-                                                            NULL,
+                                                            nullptr,
                                                             VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
                                                             VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY,
                                                             VK_SAMPLER_YCBCR_RANGE_ITU_FULL,
@@ -664,9 +655,7 @@ TEST_F(NegativeYcbcr, ClearColorImageFormat) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = mp_format;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 32, 1};
     image_create_info.mipLevels = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -1324,7 +1313,7 @@ TEST_F(NegativeYcbcr, MismatchedImageViewAndSamplerFormat) {
     view_info.subresourceRange.levelCount = 1;
     view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    CreateImageViewTest(*this, &view_info, "VUID-VkImageViewCreateInfo-pNext-06658");
+    CreateImageViewTest(view_info, "VUID-VkImageViewCreateInfo-pNext-06658");
 }
 
 TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat3Plane) {
@@ -1367,20 +1356,20 @@ TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat3Plane) {
     ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT;
 
     // Incompatible format error
-    CreateImageViewTest(*this, &ivci, "VUID-VkImageViewCreateInfo-image-01586");
+    CreateImageViewTest(ivci, "VUID-VkImageViewCreateInfo-image-01586");
 
     // Correct format succeeds
     ivci.format = VK_FORMAT_R8_UNORM;
-    CreateImageViewTest(*this, &ivci);
+    vkt::ImageView image_view(*m_device, ivci);
 
     // R8_SNORM is compatible with R8_UNORM
     ivci.format = VK_FORMAT_R8_SNORM;
-    CreateImageViewTest(*this, &ivci);
+    vkt::ImageView image_view2(*m_device, ivci);
 
     // Try a multiplane imageview
     ivci.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
     ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    CreateImageViewTest(*this, &ivci, "VUID-VkImageViewCreateInfo-format-06415");
+    CreateImageViewTest(ivci, "VUID-VkImageViewCreateInfo-format-06415");
 }
 
 TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat2Plane) {
@@ -1428,20 +1417,20 @@ TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat2Plane) {
     // Correct format succeeds
     ivci.format = VK_FORMAT_R8_UNORM;
     ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
-    CreateImageViewTest(*this, &ivci);
+    vkt::ImageView image_view(*m_device, ivci);
 
     ivci.format = VK_FORMAT_R8G8_UNORM;
     ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT;
-    CreateImageViewTest(*this, &ivci);
+    vkt::ImageView image_view2(*m_device, ivci);
 
     // Incompatible format error
     ivci.format = VK_FORMAT_R8_UNORM;
     ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT;
-    CreateImageViewTest(*this, &ivci, "VUID-VkImageViewCreateInfo-image-01586");
+    CreateImageViewTest(ivci, "VUID-VkImageViewCreateInfo-image-01586");
 
     ivci.format = VK_FORMAT_R8G8_UNORM;
     ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
-    CreateImageViewTest(*this, &ivci, "VUID-VkImageViewCreateInfo-image-01586");
+    CreateImageViewTest(ivci, "VUID-VkImageViewCreateInfo-image-01586");
 }
 
 TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
@@ -1453,10 +1442,15 @@ TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
     if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_portability_subset enabled, can hit issues with imageViewFormatReinterpretation";
     }
+    const VkFormat mp_format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
+
+    if (!(m_device->FormatFeaturesOptimal(mp_format) & VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT)) {
+        GTEST_SKIP() << "Missing MIDPOINT_CHROMA_SAMPLES support";
+    }
 
     VkImageCreateInfo ci = vku::InitStructHelper();
     ci.imageType = VK_IMAGE_TYPE_2D;
-    ci.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
+    ci.format = mp_format;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     ci.extent = {128, 128, 1};
@@ -1479,7 +1473,7 @@ TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
         ivci.format = VK_FORMAT_R8_UNORM;
         ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT;
 
-        CreateImageViewTest(*this, &ivci, "VUID-VkImageViewCreateInfo-subresourceRange-07818");
+        CreateImageViewTest(ivci, "VUID-VkImageViewCreateInfo-subresourceRange-07818");
     }
 
     // Without Mutable format
@@ -1488,7 +1482,7 @@ TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
         vkt::Image image(*m_device, ci, vkt::set_layout);
 
         VkSamplerYcbcrConversionCreateInfo ycbcr_create_info = vku::InitStructHelper();
-        ycbcr_create_info.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
+        ycbcr_create_info.format = mp_format;
         ycbcr_create_info.ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY;
         ycbcr_create_info.ycbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_FULL;
         ycbcr_create_info.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -1503,10 +1497,10 @@ TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
         ycbcr_info.conversion = conversion;
 
         ivci.image = image.handle();
-        ivci.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
+        ivci.format = mp_format;
         ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT;
         ivci.pNext = &ycbcr_info;
-        CreateImageViewTest(*this, &ivci, "VUID-VkImageViewCreateInfo-subresourceRange-07818");
+        CreateImageViewTest(ivci, "VUID-VkImageViewCreateInfo-subresourceRange-07818");
     }
 }
 
@@ -1787,6 +1781,84 @@ TEST_F(NegativeYcbcr, DrawFetchArray) {
     m_command_buffer.End();
 }
 
+TEST_F(NegativeYcbcr, DrawFetchIndexed) {
+    TEST_DESCRIPTION("Do OpImageFetch on a Ycbcr COMBINED_IMAGE_SAMPLER.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+    const VkFormat format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
+
+    auto ci = vku::InitStruct<VkImageCreateInfo>();
+    ci.flags = 0;
+    ci.imageType = VK_IMAGE_TYPE_2D;
+    ci.format = format;
+    ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    ci.extent = {256, 256, 1};
+    ci.mipLevels = 1;
+    ci.arrayLayers = 1;
+    ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    if (!ImageFormatIsSupported(instance(), Gpu(), ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        // Assume there's low ROI on searching for different mp formats
+        GTEST_SKIP() << "Multiplane image format not supported";
+    }
+
+    vkt::Image image(*m_device, ci, vkt::set_layout);
+    vkt::SamplerYcbcrConversion conversion(*m_device, format);
+    auto conversion_info = conversion.ConversionInfo();
+    vkt::ImageView view = image.CreateView(VK_IMAGE_ASPECT_COLOR_BIT, &conversion_info);
+
+    VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
+    sampler_ci.pNext = &conversion_info;
+    vkt::Sampler sampler(*m_device, sampler_ci);
+    VkSampler immutable_samplers[2] = {sampler, sampler};
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
+    OneOffDescriptorSet descriptor_set(
+        m_device, {
+                      {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_VERTEX_BIT, immutable_samplers},
+                      {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
+                  });
+    if (!descriptor_set.set_) {
+        GTEST_SKIP() << "Can't allocate descriptor with immutable sampler";
+    }
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorImageInfo(0, view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
+    descriptor_set.WriteDescriptorImageInfo(0, view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
+    descriptor_set.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char vsSource[] = R"glsl(
+        #version 450
+        layout (set = 0, binding = 0) uniform sampler2D ycbcr[2];
+        layout (set = 0, binding = 1) uniform UBO { uint index; };
+        void main() {
+            gl_Position = texelFetch(ycbcr[index], ivec2(0), 0);
+        }
+    )glsl";
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_[0] = vs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-06550");
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeYcbcr, DrawConstOffset) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
@@ -1903,9 +1975,7 @@ TEST_F(NegativeYcbcr, FormatCompatibilitySamePlane) {
     image_create_info.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
     image_create_info.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 32, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1935,9 +2005,7 @@ TEST_F(NegativeYcbcr, FormatCompatibilityDifferentPlane) {
     image_create_info.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
     image_create_info.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 32, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1968,9 +2036,7 @@ TEST_F(NegativeYcbcr, DISABLED_FormatCompatibilityNonMutable) {
     image_create_info.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
     image_create_info.flags = 0;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 32, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1982,4 +2048,45 @@ TEST_F(NegativeYcbcr, DISABLED_FormatCompatibilityNonMutable) {
     m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-10062");
     vkt::Image image(*m_device, image_create_info);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeYcbcr, MultiplaneImageCopyAspectMask) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    auto ci = vku::InitStruct<VkImageCreateInfo>();
+    ci.imageType = VK_IMAGE_TYPE_2D;
+    ci.format = VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM;
+    ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    ci.extent = {128, 128, 1};
+    ci.mipLevels = 1;
+    ci.arrayLayers = 1;
+    ci.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    if (!ImageFormatIsSupported(instance(), Gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT)) {
+        GTEST_SKIP() << "Multiplane image format not supported";
+    }
+
+    vkt::Image image(*m_device, ci, vkt::no_mem);
+    vkt::DeviceMemory mem_obj(*m_device, vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(), 0));
+    vk::BindImageMemory(device(), image, mem_obj, 0);
+
+    VkImageCopy image_copy = {};
+    image_copy.srcSubresource = {VK_IMAGE_ASPECT_PLANE_0_BIT, 0, 0, 1};
+    image_copy.srcOffset = {0, 0, 0};
+    image_copy.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    image_copy.dstOffset = {0, 0, 0};
+    image_copy.extent = {16, 16, 1};
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-dstImage-08714");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-aspectMask-00143");
+    image.ImageMemoryBarrier(m_command_buffer, VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, VK_IMAGE_LAYOUT_GENERAL);
+    vk::CmdCopyImage(m_command_buffer.handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
+                     &image_copy);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
 }

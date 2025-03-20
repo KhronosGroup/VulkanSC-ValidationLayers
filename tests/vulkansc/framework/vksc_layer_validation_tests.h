@@ -31,7 +31,7 @@ class VkSCDeviceCreateTest : public VkSCLayerTest {
     void InitFramework() {
         VkSCLayerTest::InitFramework();
 
-        vksc::GetPhysicalDeviceProperties(gpu(), &phys_dev_props);
+        vksc::GetPhysicalDeviceProperties(Gpu(), &phys_dev_props);
     }
 
     void TestCreateDevice(void* pNext) {
@@ -46,7 +46,7 @@ class VkSCDeviceCreateTest : public VkSCLayerTest {
 
         VkDevice device = VK_NULL_HANDLE;
 
-        vksc::CreateDevice(gpu(), &create_info, nullptr, &device);
+        vksc::CreateDevice(Gpu(), &create_info, nullptr, &device);
         m_errorMonitor->VerifyFound();
 
         vksc::DestroyDevice(device, nullptr);

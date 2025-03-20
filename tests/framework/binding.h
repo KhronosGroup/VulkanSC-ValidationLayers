@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2016, 2020-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2016, 2020-2024 Valve Corporation
- * Copyright (c) 2015-2016, 2020-2024 LunarG, Inc.
+ * Copyright (c) 2015-2016, 2020-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2016, 2020-2025 Valve Corporation
+ * Copyright (c) 2015-2016, 2020-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,6 +171,27 @@ class NonDispHandle : public Handle<T> {
 };
 
 }  // namespace internal
+   //
+class Instance {
+  public:
+    Instance(const VkInstanceCreateInfo &info) { Init(info); }
+    void Init(const VkInstanceCreateInfo &info);
+
+    ~Instance() noexcept { Destroy(); }
+    void Destroy() noexcept;
+
+    VkInstance Handle() const { return handle_; }
+
+    Instance(Instance &&src) noexcept : handle_{src.handle_} { src.handle_ = {}; }
+    Instance &operator=(Instance &&src) noexcept {
+        handle_ = src.handle_;
+        src.handle_ = {};
+        return *this;
+    }
+
+  private:
+    VkInstance handle_{};
+};
 
 class PhysicalDevice : public internal::Handle<VkPhysicalDevice> {
   public:
@@ -241,8 +262,6 @@ class Device : public internal::Handle<VkDevice> {
 
     void SetName(const char *name) { Handle<VkDevice>::SetName(handle_, VK_OBJECT_TYPE_DEVICE, name); }
     const PhysicalDevice &Physical() const { return physical_device_; }
-    // Deprecated, use Physical()
-    const PhysicalDevice &phy() const { return physical_device_; }
 
     std::vector<const char *> GetEnabledExtensions() { return enabled_extensions_; }
     bool IsEnabledExtension(const char *extension) const;
@@ -352,15 +371,6 @@ class DeviceMemory : public internal::NonDispHandle<VkDeviceMemory> {
     // vkUnmapMemory()
     void Unmap() const;
 
-    // Deprecated, use Map() and Unmap()
-    const void *map(VkFlags flags) const { return Map(flags); }
-    void *map(VkFlags flags) { return Map(flags); }
-    const void *map() const { return Map(0); }
-    void *map() { return Map(0); }
-
-    // vkUnmapMemory()
-    void unmap() const { return Unmap(); };
-
     static VkMemoryAllocateInfo GetResourceAllocInfo(const Device &dev, const VkMemoryRequirements &reqs,
                                                      VkMemoryPropertyFlags mem_props, void *alloc_info_pnext = nullptr);
 
@@ -432,7 +442,7 @@ inline const Semaphore no_semaphore;  // equivalent to vkt::Semaphore{}
 class Event : public internal::NonDispHandle<VkEvent> {
   public:
     Event() = default;
-    Event(const Device &dev) { init(dev, vku::InitStruct<VkEventCreateInfo>()); }
+    Event(const Device &dev) { init(dev, CreateInfo(0)); }
     Event(const Device &dev, const VkEventCreateInfo &info) { init(dev, info); }
     ~Event() noexcept;
     void destroy() noexcept;
@@ -592,21 +602,8 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
         InitHostVisibleWithData(dev, usage, data, data_size, queue_families);
     }
 
-    Buffer(Buffer &&rhs) noexcept : NonDispHandle(std::move(rhs)) {
-        create_info_ = std::move(rhs.create_info_);
-        internal_mem_ = std::move(rhs.internal_mem_);
-    }
-    Buffer &operator=(Buffer &&rhs) noexcept {
-        if (&rhs == this) {
-            return *this;
-        }
-        destroy();
-        internal_mem_.destroy();
-        NonDispHandle::operator=(std::move(rhs));
-        create_info_ = std::move(rhs.create_info_);
-        internal_mem_ = std::move(rhs.internal_mem_);
-        return *this;
-    }
+    Buffer(Buffer &&rhs) noexcept;
+    Buffer &operator=(Buffer &&rhs) noexcept;
     ~Buffer() noexcept;
     void destroy() noexcept;
 
@@ -627,14 +624,8 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
     const DeviceMemory &Memory() const { return internal_mem_; }
     DeviceMemory &Memory() { return internal_mem_; }
 
-    // Deprecated, use Memory()
-    const DeviceMemory &memory() const { return internal_mem_; }
-    DeviceMemory &memory() { return internal_mem_; }
-
     // vkGetObjectMemoryRequirements()
     VkMemoryRequirements MemoryRequirements() const;
-    // Deprecated, use MemoryRequirements()
-    VkMemoryRequirements memory_requirements() const { return MemoryRequirements(); };
 
     // Allocate and bind memory
     // The assumption that this object was created in no_mem configuration
@@ -662,10 +653,10 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
         return barrier;
     }
 
-    VkBufferMemoryBarrier2KHR BufferMemoryBarrier(VkPipelineStageFlags2KHR src_stage, VkPipelineStageFlags2KHR dst_stage,
-                                                  VkAccessFlags2KHR src_access, VkAccessFlags2KHR dst_access, VkDeviceSize offset,
-                                                  VkDeviceSize size) const {
-        VkBufferMemoryBarrier2KHR barrier = vku::InitStructHelper();
+    VkBufferMemoryBarrier2 BufferMemoryBarrier(VkPipelineStageFlags2KHR src_stage, VkPipelineStageFlags2KHR dst_stage,
+                                               VkAccessFlags2KHR src_access, VkAccessFlags2KHR dst_access, VkDeviceSize offset,
+                                               VkDeviceSize size) const {
+        VkBufferMemoryBarrier2 barrier = vku::InitStructHelper();
         barrier.buffer = handle();
         barrier.srcStageMask = src_stage;
         barrier.dstStageMask = dst_stage;
@@ -681,8 +672,6 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
     }
 
     [[nodiscard]] VkDeviceAddress Address() const;
-    // Deprecated, use Address()
-    [[nodiscard]] VkDeviceAddress address() const { return Address(); };
 
   private:
     VkBufferCreateInfo create_info_;
@@ -693,6 +682,10 @@ class BufferView : public internal::NonDispHandle<VkBufferView> {
   public:
     BufferView() = default;
     BufferView(const Device &dev, const VkBufferViewCreateInfo &info) { init(dev, info); }
+    BufferView(const Device &dev, VkBuffer buffer, VkFormat format, VkDeviceSize offset = 0, VkDeviceSize range = VK_WHOLE_SIZE) {
+        VkBufferViewCreateInfo buffer_view_ci = CreateInfo(buffer, format, offset, range);
+        init(dev, buffer_view_ci);
+    }
     ~BufferView() noexcept;
     void destroy() noexcept;
 
@@ -724,6 +717,8 @@ class Image : public internal::NonDispHandle<VkImage> {
 
     explicit Image(const Device &dev, const VkImageCreateInfo &info, NoMemT);
     explicit Image(const Device &dev, const VkImageCreateInfo &info, SetLayoutT);
+    Image(Image &&rhs) noexcept;
+    Image &operator=(Image &&rhs) noexcept;
 
     ~Image() noexcept;
     void destroy() noexcept;
@@ -745,14 +740,8 @@ class Image : public internal::NonDispHandle<VkImage> {
     const DeviceMemory &Memory() const { return internal_mem_; }
     DeviceMemory &Memory() { return internal_mem_; }
 
-    // Deprecated, use Memory()
-    const DeviceMemory &memory() const { return internal_mem_; }
-    DeviceMemory &memory() { return internal_mem_; }
-
     // vkGetObjectMemoryRequirements()
     VkMemoryRequirements MemoryRequirements() const;
-    // Deprecated, use MemoryRequirements()
-    VkMemoryRequirements memory_requirements() const { return MemoryRequirements(); };
 
     // Allocate and bind memory
     // The assumption that this object was created in no_mem configuration
@@ -780,11 +769,10 @@ class Image : public internal::NonDispHandle<VkImage> {
         return barrier;
     }
 
-    VkImageMemoryBarrier2KHR ImageMemoryBarrier(VkPipelineStageFlags2KHR src_stage, VkPipelineStageFlags2KHR dst_stage,
-                                                VkAccessFlags2KHR src_access, VkAccessFlags2KHR dst_access,
-                                                VkImageLayout old_layout, VkImageLayout new_layout,
-                                                const VkImageSubresourceRange &range) const {
-        VkImageMemoryBarrier2KHR barrier = vku::InitStructHelper();
+    VkImageMemoryBarrier2 ImageMemoryBarrier(VkPipelineStageFlags2KHR src_stage, VkPipelineStageFlags2KHR dst_stage,
+                                             VkAccessFlags2KHR src_access, VkAccessFlags2KHR dst_access, VkImageLayout old_layout,
+                                             VkImageLayout new_layout, const VkImageSubresourceRange &range) const {
+        VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
         barrier.srcStageMask = src_stage;
         barrier.dstStageMask = dst_stage;
         barrier.srcAccessMask = src_access;
@@ -907,8 +895,12 @@ class ShaderModule : public internal::NonDispHandle<VkShaderModule> {
 
 class Shader : public internal::NonDispHandle<VkShaderEXT> {
   public:
+    Shader() = default;
+    Shader(const Device &dev, VkShaderEXT shader) { NonDispHandle::init(dev.handle(), shader); }
     Shader(const Device &dev, const VkShaderCreateInfoEXT &info) { init(dev, info); }
     Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint32_t> &spv,
+           const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange *pushConstRange = nullptr);
+    Shader(const Device &dev, const VkShaderStageFlagBits stage, const char* code,
            const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange *pushConstRange = nullptr);
     Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint8_t> &binary,
            const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange *pushConstRange = nullptr);
@@ -1104,6 +1096,19 @@ class DescriptorSet : public internal::NonDispHandle<VkDescriptorSet> {
     DescriptorPool *containing_pool_;
 };
 
+class DescriptorUpdateTemplate : public internal::NonDispHandle<VkDescriptorUpdateTemplate> {
+  public:
+    ~DescriptorUpdateTemplate() noexcept;
+    void destroy() noexcept;
+
+    explicit DescriptorUpdateTemplate() : NonDispHandle() {}
+    explicit DescriptorUpdateTemplate(const Device &dev, const VkDescriptorUpdateTemplateCreateInfo &info) { Init(dev, info); }
+    void Init(const Device &dev, const VkDescriptorUpdateTemplateCreateInfo &info);
+    void SetName(const char *name) {
+        NonDispHandle<VkDescriptorUpdateTemplate>::SetName(VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE, name);
+    }
+};
+
 class CommandPool : public internal::NonDispHandle<VkCommandPool> {
   public:
     ~CommandPool() noexcept;
@@ -1153,14 +1158,6 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     void Reset(VkCommandBufferResetFlags flags);
     void Reset() { Reset(VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT); }
 
-    // Deprecated, use Begin(), End(), Reset()
-    void begin(const VkCommandBufferBeginInfo *info) { Begin(info); };
-    void begin(VkCommandBufferUsageFlags flags) { Begin(flags); };
-    void begin() { Begin(0u); }
-    void end() { End(); };
-    void reset(VkCommandBufferResetFlags flags) { Reset(flags); };
-    void reset() { Reset(VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT); }
-
     static VkCommandBufferAllocateInfo CreateInfo(VkCommandPool const &pool);
 
     void BeginRenderPass(const VkRenderPassBeginInfo &info, VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
@@ -1168,12 +1165,19 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
                          uint32_t clear_count = 0, VkClearValue *clear_values = nullptr);
     void NextSubpass(VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
     void EndRenderPass();
-    void BeginRendering(const VkRenderingInfoKHR &renderingInfo);
+    void BeginRendering(const VkRenderingInfo &renderingInfo);
     void BeginRenderingColor(const VkImageView imageView, VkRect2D render_area);
     void EndRendering();
 
-    void BindVertFragShader(const vkt::Shader &vert_shader, const vkt::Shader &frag_shader);
+    void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &frag_shader);
+    void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &geom_shader, const vkt::Shader &frag_shader);
+    void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &tesc_shader, const vkt::Shader &tese_shader,
+                     const vkt::Shader &frag_shader);
+    void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &tesc_shader, const vkt::Shader &tese_shader,
+                     const vkt::Shader &geom_shader, const vkt::Shader &frag_shader);
     void BindCompShader(const vkt::Shader &comp_shader);
+    void BindMeshShaders(const vkt::Shader &mesh_shader, const vkt::Shader &frag_shader);
+    void BindMeshShaders(const vkt::Shader &task_shader, const vkt::Shader &mesh_shader, const vkt::Shader &frag_shader);
 
     void BeginVideoCoding(const VkVideoBeginCodingInfoKHR &beginInfo);
     void ControlVideoCoding(const VkVideoCodingControlInfoKHR &controlInfo);
@@ -1193,6 +1197,8 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
 
     void Copy(const Buffer &src, const Buffer &dst);
     void ExecuteCommands(const CommandBuffer &secondary);
+
+    void FullMemoryBarrier();
 
   private:
     VkDevice dev_handle_;
@@ -1465,4 +1471,55 @@ class IndirectExecutionSet : public internal::NonDispHandle<VkIndirectExecutionS
     void Init(const Device &dev, const VkIndirectExecutionSetCreateInfoEXT &info);
 };
 
+class Surface {
+  public:
+    Surface() : instance_(VK_NULL_HANDLE), handle_(VK_NULL_HANDLE) {}
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+    VkResult Init(VkInstance, const VkWin32SurfaceCreateInfoKHR &);
+#endif
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+    VkResult Init(VkInstance, const VkMetalSurfaceCreateInfoEXT &);
+#endif
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+    VkResult Init(VkInstance, const VkAndroidSurfaceCreateInfoKHR &);
+#endif
+#if defined(VK_USE_PLATFORM_XLIB_KHR)
+    VkResult Init(VkInstance, const VkXlibSurfaceCreateInfoKHR &);
+#endif
+#if defined(VK_USE_PLATFORM_XCB_KHR)
+    VkResult Init(VkInstance, const VkXcbSurfaceCreateInfoKHR &);
+#endif
+
+    ~Surface() noexcept { Destroy(); }
+    void Destroy() noexcept {
+        if (handle_ != VK_NULL_HANDLE) {
+            vk::DestroySurfaceKHR(instance_, handle_, nullptr);
+            handle_ = VK_NULL_HANDLE;
+        }
+    }
+    VkSurfaceKHR Handle() const { return handle_; }
+
+    Surface(Surface &&src) noexcept : instance_{src.instance_}, handle_{src.handle_} {
+        src.instance_ = {};
+        src.handle_ = {};
+    }
+    Surface &operator=(Surface &&src) noexcept {
+        instance_ = src.instance_;
+        src.instance_ = {};
+        handle_ = src.handle_;
+        src.handle_ = {};
+        return *this;
+    }
+
+    // This is ONLY for tests that need a way test destroying an instance and leak the Surface object (and calling
+    // vkDestroySurfaceKHR will be invalid)
+    void DestroyExplicitly() {
+        handle_ = VK_NULL_HANDLE;
+        instance_ = VK_NULL_HANDLE;
+    }
+
+  private:
+    VkInstance instance_ = VK_NULL_HANDLE;
+    VkSurfaceKHR handle_ = VK_NULL_HANDLE;
+};
 }  // namespace vkt

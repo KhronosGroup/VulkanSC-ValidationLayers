@@ -1,9 +1,9 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2015-2024 The Khronos Group Inc.
-# Copyright (c) 2015-2024 Valve Corporation
-# Copyright (c) 2015-2024 LunarG, Inc.
-# Copyright (c) 2015-2024 Google Inc.
+# Copyright (c) 2015-2025 The Khronos Group Inc.
+# Copyright (c) 2015-2025 Valve Corporation
+# Copyright (c) 2015-2025 LunarG, Inc.
+# Copyright (c) 2015-2025 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 
 
 import os
-from generators.base_generator import BaseGenerator
+from base_generator import BaseGenerator
 from generators.generator_utils import PlatformGuardHelper
 
 class PnextChainExtractionGenerator(BaseGenerator):
@@ -38,9 +38,9 @@ class PnextChainExtractionGenerator(BaseGenerator):
 
             /***************************************************************************
             *
-            * Copyright (c) 2023-2024 The Khronos Group Inc.
-            * Copyright (c) 2023-2024 Valve Corporation
-            * Copyright (c) 2023-2024 LunarG, Inc.
+            * Copyright (c) 2023-2025 The Khronos Group Inc.
+            * Copyright (c) 2023-2025 Valve Corporation
+            * Copyright (c) 2023-2025 LunarG, Inc.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.
@@ -83,9 +83,9 @@ class PnextChainExtractionGenerator(BaseGenerator):
 
             // Remove last element from a pNext chain
             void PnextChainRemoveLast(void *chain);
-            
+
             // Free dynamically allocated pnext chain structs
-            void PnextChainFree(void *chain);       
+            void PnextChainFree(void *chain);
 
             // Helper class relying on RAII to help with adding and removing an element from a pNext chain
             class PnextChainScopedAdd {
@@ -164,11 +164,11 @@ void *PnextChainExtract(const void */*in_pnext_chain*/, T &/*out*/) { assert(fal
             }
 
             void PnextChainFree(void *chain) {
-                if (!chain) return;       
+                if (!chain) return;
                 auto header = reinterpret_cast<VkBaseOutStructure *>(chain);
                 switch (header->sType) {
             ''')
-        
+
         guard_helper = PlatformGuardHelper()
         for struct in [x for x in self.vk.structs.values() if x.extends]:
             out.extend(guard_helper.add_guard(struct.protect))

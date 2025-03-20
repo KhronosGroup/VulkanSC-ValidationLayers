@@ -27,20 +27,19 @@
 
 namespace vvl::sc {
 
-PipelineCache::PipelineCache(const ValidationStateTracker& dev_data, VkPipelineCache pipeline_cache,
-                             const VkPipelineCacheCreateInfo* pCreateInfo)
+PipelineCache::PipelineCache(const Device& state_data, VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo* pCreateInfo)
     : vvl::PipelineCache(pipeline_cache, pCreateInfo), pipelines_() {
     vvl::sc::PipelineCacheData pipeline_cache_data(*pCreateInfo);
 
     for (uint32_t pipeline_index = 0; pipeline_index < pipeline_cache_data.PipelineIndexCount(); ++pipeline_index) {
         auto cache_entry = pipeline_cache_data.PipelineIndexEntry(pipeline_index);
         if (cache_entry) {
-            pipelines_.emplace(cache_entry.PipelineID(), Entry(dev_data, cache_entry));
+            pipelines_.emplace(cache_entry.PipelineID(), Entry(state_data, cache_entry));
         }
     }
 }
 
-PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const ValidationStateTracker& dev_data,
+PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const Device& state_data,
                                                                            const PipelineCacheData::Entry& cache_entry) {
     Entry::StageModules stage_modules;
     stage_modules.reserve(cache_entry.StageIndexCount());
@@ -54,7 +53,7 @@ PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const
 
             if (stateless_data.has_group_decoration) {
                 // Run optimizer to flatten group decorations
-                spv_target_env spirv_environment = PickSpirvEnv(dev_data.api_version, true);
+                spv_target_env spirv_environment = PickSpirvEnv(state_data.api_version, true);
                 spvtools::Optimizer optimizer(spirv_environment);
                 optimizer.RegisterPass(spvtools::CreateFlattenDecorationPass());
                 std::vector<uint32_t> optimized_binary;

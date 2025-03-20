@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,18 @@
 
 #include <atomic>
 #include <mutex>
-#include <regex>
 #include <cassert>
+
+// TODO https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9384
+// Fix GCC 13 issues with regex
+#if defined(__GNUC__) && (__GNUC__ > 12)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+#include <regex>
+#if defined(__GNUC__) && (__GNUC__ > 12)
+#pragma GCC diagnostic pop
+#endif
 
 #include "error_message/log_message_type.h"
 #include <vulkan/vulkan_core.h>
@@ -63,7 +73,8 @@ class ErrorMonitor {
     void SetDesiredError(const char *msg, uint32_t count = 1);
     // Regex uses modified ECMAScript regular expression grammar https://eel.is/c++draft/re.grammar
     void SetDesiredErrorRegex(const char *vuid, std::string regex_str, uint32_t count = 1);
-    // And use this for warnings
+    // And use this for
+    void SetDesiredWarningRegex(const char *vuid, std::string regex_str, uint32_t count = 1);
     void SetDesiredWarning(const char *msg, uint32_t count = 1);
     void SetDesiredInfo(const char *msg, uint32_t count = 1);
 
@@ -101,13 +112,8 @@ class ErrorMonitor {
     void MonitorReset();
     std::unique_lock<std::mutex> Lock() const { return std::unique_lock<std::mutex>(mutex_); }
 
-#if !defined(VK_USE_PLATFORM_ANDROID_KHR)
     VkDebugUtilsMessengerEXT debug_obj_ = VK_NULL_HANDLE;
     VkDebugUtilsMessengerCreateInfoEXT debug_create_info_{};
-#else
-    VkDebugReportCallbackEXT debug_obj_ = VK_NULL_HANDLE;
-    VkDebugReportCallbackCreateInfoEXT debug_create_info_{};
-#endif
 
     VkFlags message_flags_{};
     std::vector<std::string> failure_message_strings_;

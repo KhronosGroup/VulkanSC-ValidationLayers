@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +23,6 @@ class NegativeQuery : public QueryTest {};
 
 TEST_F(NegativeQuery, PerformanceCreation) {
     TEST_DESCRIPTION("Create performance query without support");
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::performanceCounterQueryPools);
     RETURN_IF_SKIP(Init());
@@ -98,7 +97,6 @@ TEST_F(NegativeQuery, PerformanceCreation) {
 TEST_F(NegativeQuery, PerformanceCounterCommandbufferScope) {
     TEST_DESCRIPTION("Insert a performance query begin/end with respect to the command buffer counter scope");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::performanceCounterQueryPools);
     RETURN_IF_SKIP(Init());
@@ -108,7 +106,7 @@ TEST_F(NegativeQuery, PerformanceCounterCommandbufferScope) {
     std::vector<VkPerformanceCounterKHR> counters;
     std::vector<uint32_t> counterIndices;
 
-    // Find a single counter with VK_QUERY_SCOPE_COMMAND_BUFFER_KHR scope.
+    // Find a single counter with VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_BUFFER_KHR scope.
     for (uint32_t idx = 0; idx < queueFamilyProperties.size(); idx++) {
         uint32_t nCounters;
 
@@ -123,7 +121,7 @@ TEST_F(NegativeQuery, PerformanceCounterCommandbufferScope) {
         queueFamilyIndex = idx;
 
         for (uint32_t counterIdx = 0; counterIdx < counters.size(); counterIdx++) {
-            if (counters[counterIdx].scope == VK_QUERY_SCOPE_COMMAND_BUFFER_KHR) {
+            if (counters[counterIdx].scope == VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_BUFFER_KHR) {
                 counterIndices.push_back(counterIdx);
                 break;
             }
@@ -212,7 +210,6 @@ TEST_F(NegativeQuery, PerformanceCounterCommandbufferScope) {
 TEST_F(NegativeQuery, PerformanceCounterRenderPassScope) {
     TEST_DESCRIPTION("Insert a performance query begin/end with respect to the render pass counter scope");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::performanceCounterQueryPools);
     RETURN_IF_SKIP(Init());
@@ -222,7 +219,7 @@ TEST_F(NegativeQuery, PerformanceCounterRenderPassScope) {
     std::vector<VkPerformanceCounterKHR> counters;
     std::vector<uint32_t> counterIndices;
 
-    // Find a single counter with VK_QUERY_SCOPE_RENDER_PASS_KHR scope.
+    // Find a single counter with VK_PERFORMANCE_COUNTER_SCOPE_RENDER_PASS_KHR scope.
     for (uint32_t idx = 0; idx < queueFamilyProperties.size(); idx++) {
         uint32_t nCounters;
 
@@ -237,7 +234,7 @@ TEST_F(NegativeQuery, PerformanceCounterRenderPassScope) {
         queueFamilyIndex = idx;
 
         for (uint32_t counterIdx = 0; counterIdx < counters.size(); counterIdx++) {
-            if (counters[counterIdx].scope == VK_QUERY_SCOPE_RENDER_PASS_KHR) {
+            if (counters[counterIdx].scope == VK_PERFORMANCE_COUNTER_SCOPE_RENDER_PASS_KHR) {
                 counterIndices.push_back(counterIdx);
                 break;
             }
@@ -304,7 +301,6 @@ TEST_F(NegativeQuery, PerformanceCounterRenderPassScope) {
 TEST_F(NegativeQuery, PerformanceReleaseProfileLockBeforeSubmit) {
     TEST_DESCRIPTION("Verify that we get an error if we release the profiling lock during the recording of performance queries");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::performanceCounterQueryPools);
     RETURN_IF_SKIP(Init());
@@ -314,7 +310,7 @@ TEST_F(NegativeQuery, PerformanceReleaseProfileLockBeforeSubmit) {
     std::vector<VkPerformanceCounterKHR> counters;
     std::vector<uint32_t> counterIndices;
 
-    // Find a single counter with VK_QUERY_SCOPE_COMMAND_KHR scope.
+    // Find a single counter with VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_KHR scope.
     for (uint32_t idx = 0; idx < queueFamilyProperties.size(); idx++) {
         uint32_t nCounters;
 
@@ -329,7 +325,7 @@ TEST_F(NegativeQuery, PerformanceReleaseProfileLockBeforeSubmit) {
         queueFamilyIndex = idx;
 
         for (uint32_t counterIdx = 0; counterIdx < counters.size(); counterIdx++) {
-            if (counters[counterIdx].scope == VK_QUERY_SCOPE_COMMAND_KHR) {
+            if (counters[counterIdx].scope == VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_KHR) {
                 counterIndices.push_back(counterIdx);
                 break;
             }
@@ -426,7 +422,6 @@ TEST_F(NegativeQuery, PerformanceReleaseProfileLockBeforeSubmit) {
 
 TEST_F(NegativeQuery, PerformanceIncompletePasses) {
     TEST_DESCRIPTION("Verify that we get an error if we don't submit a command buffer for each passes before getting the results.");
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME);
@@ -451,7 +446,7 @@ TEST_F(NegativeQuery, PerformanceIncompletePasses) {
     std::vector<uint32_t> counterIndices;
     uint32_t nPasses = 0;
 
-    // Find all counters with VK_QUERY_SCOPE_COMMAND_KHR scope.
+    // Find all counters with VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_KHR scope.
     for (uint32_t idx = 0; idx < queueFamilyProperties.size(); idx++) {
         uint32_t nCounters;
 
@@ -466,7 +461,7 @@ TEST_F(NegativeQuery, PerformanceIncompletePasses) {
         queueFamilyIndex = idx;
 
         for (uint32_t counterIdx = 0; counterIdx < counters.size(); counterIdx++) {
-            if (counters[counterIdx].scope == VK_QUERY_SCOPE_COMMAND_KHR) counterIndices.push_back(counterIdx);
+            if (counters[counterIdx].scope == VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_KHR) counterIndices.push_back(counterIdx);
         }
         if (counterIndices.empty()) continue;  // might not be a scope command
 
@@ -663,7 +658,6 @@ TEST_F(NegativeQuery, PerformanceIncompletePasses) {
 
 TEST_F(NegativeQuery, PerformanceResetAndBegin) {
     TEST_DESCRIPTION("Verify that we get an error if we reset & begin a performance query within the same primary command buffer.");
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::hostQueryReset);
@@ -675,7 +669,7 @@ TEST_F(NegativeQuery, PerformanceResetAndBegin) {
     std::vector<VkPerformanceCounterKHR> counters;
     std::vector<uint32_t> counterIndices;
 
-    // Find a single counter with VK_QUERY_SCOPE_COMMAND_KHR scope.
+    // Find a single counter with VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_KHR scope.
     for (uint32_t idx = 0; idx < queueFamilyProperties.size(); idx++) {
         uint32_t nCounters;
 
@@ -690,7 +684,7 @@ TEST_F(NegativeQuery, PerformanceResetAndBegin) {
         queueFamilyIndex = idx;
 
         for (uint32_t counterIdx = 0; counterIdx < counters.size(); counterIdx++) {
-            if (counters[counterIdx].scope == VK_QUERY_SCOPE_COMMAND_KHR) {
+            if (counters[counterIdx].scope == VK_PERFORMANCE_COUNTER_SCOPE_COMMAND_KHR) {
                 counterIndices.push_back(counterIdx);
                 break;
             }
@@ -934,10 +928,10 @@ TEST_F(NegativeQuery, InsideRenderPassDynamicRendering) {
 
     vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 1);
 
-    VkRenderingAttachmentInfoKHR color_attachment = vku::InitStructHelper();
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {64, 64}};
     begin_rendering_info.colorAttachmentCount = 1;
@@ -965,10 +959,10 @@ TEST_F(NegativeQuery, OutsideRenderPassDynamicRendering) {
 
     vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 1);
 
-    VkRenderingAttachmentInfoKHR color_attachment = vku::InitStructHelper();
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {64, 64}};
     begin_rendering_info.colorAttachmentCount = 1;
@@ -1313,7 +1307,6 @@ TEST_F(NegativeQuery, DISABLED_PoolInUseDestroyedSignaled) {
 TEST_F(NegativeQuery, WriteTimeStamp) {
     TEST_DESCRIPTION("Test for invalid query slot in query pool.");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::synchronization2);
     RETURN_IF_SKIP(Init());
@@ -1413,7 +1406,6 @@ TEST_F(NegativeQuery, TransformFeedbackStream) {
         "Call CmdBeginQuery with query type transform feedback stream when transformFeedbackQueries is not supported.");
 
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceTransformFeedbackPropertiesEXT transform_feedback_props = vku::InitStructHelper();
@@ -1741,7 +1733,7 @@ TEST_F(NegativeQuery, PrimitivesGeneratedDiscardEnabled) {
     CreatePipelineHelper pipe(*this);
     pipe.rs_state_ci_ = rs_ci;
     // Rasterization discard enable prohibits fragment shader.
-    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
+    pipe.VertexShaderOnly();
     pipe.CreateGraphicsPipeline();
 
     vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT, 1);
@@ -1922,7 +1914,7 @@ TEST_F(NegativeQuery, WriteTimestampWithoutQueryPool) {
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdWriteTimestamp2-queryPool-parameter");
-    vk::CmdWriteTimestamp2KHR(m_command_buffer.handle(), VK_PIPELINE_STAGE_2_NONE_KHR, bad_query_pool, 0);
+    vk::CmdWriteTimestamp2KHR(m_command_buffer.handle(), VK_PIPELINE_STAGE_2_NONE, bad_query_pool, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -2506,4 +2498,38 @@ TEST_F(NegativeQuery, NoInitReset) {
     m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeQuery, CopyUnavailableQueries) {
+    TEST_DESCRIPTION("Copy query results when they are not available");
+    RETURN_IF_SKIP(Init());
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_TIMESTAMP, 1u);
+    vkt::Buffer buffer(*m_device, 16u, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer.handle(), query_pool.handle(), 0u, 1u);
+    vk::CmdCopyQueryPoolResults(m_command_buffer.handle(), query_pool.handle(), 0u, 1u, buffer.handle(), 0u, 0u, 0u);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResults-None-08752");
+    m_default_queue->Submit(m_command_buffer);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeQuery, QueryResultCopyBufferInvalidFlags) {
+    TEST_DESCRIPTION("Copy query results to a buffer without transfer dst flag");
+    RETURN_IF_SKIP(Init());
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_TIMESTAMP, 1u);
+    vkt::Buffer buffer(*m_device, 16u, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer.handle(), query_pool.handle(), 0u, 1u);
+    vk::CmdWriteTimestamp(m_command_buffer.handle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool.handle(), 0u);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResults-dstBuffer-00825");
+    vk::CmdCopyQueryPoolResults(m_command_buffer.handle(), query_pool.handle(), 0u, 1u, buffer.handle(), 0u, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
 }

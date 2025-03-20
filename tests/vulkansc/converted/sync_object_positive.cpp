@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,8 +56,8 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersImage) {
     // Change layouts while changing ownership
     image_barrier.srcQueueFamilyIndex = no_gfx_queue->family_index;
     image_barrier.dstQueueFamilyIndex = m_device->graphics_queue_node_index_;
-    image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT_KHR;
-    image_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT_KHR;
+    image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    image_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
     image_barrier.oldLayout = image.Layout();
     // Make sure the new layout is different from the old
     if (image_barrier.oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
@@ -85,8 +85,8 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersBuffer) {
     vkt::CommandBuffer no_gfx_cb(*m_device, no_gfx_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
     vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-    auto buffer_barrier = buffer.BufferMemoryBarrier(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT_KHR, VK_PIPELINE_STAGE_2_TRANSFER_BIT_KHR,
-                                                     VK_ACCESS_2_NONE_KHR, VK_ACCESS_2_NONE_KHR, 0, VK_WHOLE_SIZE);
+    auto buffer_barrier = buffer.BufferMemoryBarrier(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                                                     VK_ACCESS_2_NONE, VK_ACCESS_2_NONE, 0, VK_WHOLE_SIZE);
 
     // Let gfx own it.
     buffer_barrier.srcQueueFamilyIndex = m_device->graphics_queue_node_index_;
@@ -100,10 +100,43 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersBuffer) {
     // Transfer it to gfx
     buffer_barrier.srcQueueFamilyIndex = no_gfx_queue->family_index;
     buffer_barrier.dstQueueFamilyIndex = m_device->graphics_queue_node_index_;
-    buffer_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT_KHR;
-    buffer_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT_KHR;
+    buffer_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    buffer_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
 
     ValidOwnershipTransfer(m_errorMonitor, no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer, &buffer_barrier, nullptr);
+}
+
+TEST_F(PositiveSyncObject, BarrierQueueFamily2) {
+    TEST_DESCRIPTION("Create and submit barriers with invalid queue families");
+    SetTargetApiVersion(VK_API_VERSION_1_0);
+    RETURN_IF_SKIP(Init());
+
+    // Find queues of two families
+    const uint32_t submit_family = m_device->graphics_queue_node_index_;
+    const uint32_t queue_family_count = static_cast<uint32_t>(m_device->Physical().queue_properties_.size());
+    const uint32_t other_family = submit_family != 0 ? 0 : 1;
+    const bool only_one_family = (queue_family_count == 1) ||
+                                 (m_device->Physical().queue_properties_[other_family].queueCount == 0) ||
+                                 ((m_device->Physical().queue_properties_[other_family].queueFlags & VK_QUEUE_TRANSFER_BIT) == 0);
+
+    if (only_one_family) {
+        GTEST_SKIP() << "Single queue family found";
+    }
+    std::vector<uint32_t> qf_indices{{submit_family, other_family}};
+    BarrierQueueFamilyTestHelper::Context test_context(this, qf_indices);
+
+    BarrierQueueFamilyTestHelper excl_test(&test_context);
+    excl_test.Init(nullptr);
+
+    // Although other_family does not match submit_family, because the barrier families are
+    // equal here, no ownership transfer actually happens, and this barrier is valid by the spec.
+    excl_test(other_family, other_family, submit_family);
+
+    // positive test (testing both the index logic and the QFO transfer tracking.
+    excl_test(submit_family, other_family, submit_family);
+    excl_test(submit_family, other_family, other_family);
+    excl_test(other_family, submit_family, other_family);
+    excl_test(other_family, submit_family, submit_family);
 }
 
 TEST_F(PositiveSyncObject, LayoutFromPresentWithoutAccessMemoryRead) {
@@ -734,10 +767,10 @@ TEST_F(PositiveSyncObject, LongSemaphoreChain) {
 TEST_F(PositiveSyncObject, ExternalSemaphore) {
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     const auto extension_name = VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
 #else
     const auto extension_name = VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
 
     AddRequiredExtensions(extension_name);
@@ -747,18 +780,18 @@ TEST_F(PositiveSyncObject, ExternalSemaphore) {
     RETURN_IF_SKIP(Init());
 
     // Check for external semaphore import and export capability
-    VkPhysicalDeviceExternalSemaphoreInfoKHR esi = vku::InitStructHelper();
+    VkPhysicalDeviceExternalSemaphoreInfo esi = vku::InitStructHelper();
     esi.handleType = handle_type;
     VkExternalSemaphorePropertiesKHR esp = vku::InitStructHelper();
     vk::GetPhysicalDeviceExternalSemaphorePropertiesKHR(Gpu(), &esi, &esp);
 
-    if (!(esp.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT_KHR) ||
-        !(esp.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR)) {
+    if (!(esp.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) ||
+        !(esp.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT)) {
         GTEST_SKIP() << "External semaphore does not support importing and exporting";
     }
 
     // Create a semaphore to export payload from
-    VkExportSemaphoreCreateInfoKHR esci = vku::InitStructHelper();
+    VkExportSemaphoreCreateInfo esci = vku::InitStructHelper();
     esci.handleTypes = handle_type;
     VkSemaphoreCreateInfo sci = vku::InitStructHelper(&esci);
 
@@ -807,10 +840,10 @@ TEST_F(PositiveSyncObject, ExternalTimelineSemaphore) {
         "Should be roughly equivalant to the CTS *cross_instance*timeline_semaphore* tests");
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     const auto extension_name = VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else
     const auto extension_name = VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
     AddRequiredExtensions(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -824,26 +857,26 @@ TEST_F(PositiveSyncObject, ExternalTimelineSemaphore) {
     }
 
     // Check for external semaphore import and export capability
-    VkSemaphoreTypeCreateInfoKHR tci = vku::InitStructHelper();
-    tci.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
+    VkSemaphoreTypeCreateInfo tci = vku::InitStructHelper();
+    tci.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
 
-    VkPhysicalDeviceExternalSemaphoreInfoKHR esi = vku::InitStructHelper(&tci);
+    VkPhysicalDeviceExternalSemaphoreInfo esi = vku::InitStructHelper(&tci);
     esi.handleType = handle_type;
 
     VkExternalSemaphorePropertiesKHR esp = vku::InitStructHelper();
 
     vk::GetPhysicalDeviceExternalSemaphorePropertiesKHR(Gpu(), &esi, &esp);
 
-    if (!(esp.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT_KHR) ||
-        !(esp.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR)) {
+    if (!(esp.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) ||
+        !(esp.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT)) {
         GTEST_SKIP() << "External semaphore does not support importing and exporting, skipping test";
     }
 
     // Create a semaphore to export payload from
-    VkExportSemaphoreCreateInfoKHR esci = vku::InitStructHelper();
+    VkExportSemaphoreCreateInfo esci = vku::InitStructHelper();
     esci.handleTypes = handle_type;
-    VkSemaphoreTypeCreateInfoKHR stci = vku::InitStructHelper(&esci);
-    stci.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
+    VkSemaphoreTypeCreateInfo stci = vku::InitStructHelper(&esci);
+    stci.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
     VkSemaphoreCreateInfo sci = vku::InitStructHelper(&stci);
 
     vkt::Semaphore export_semaphore(*m_device, sci);
@@ -893,10 +926,10 @@ TEST_F(PositiveSyncObject, ExternalTimelineSemaphore) {
 TEST_F(PositiveSyncObject, ExternalFence) {
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     const auto extension_name = VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else
     const auto extension_name = VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
     AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -905,18 +938,18 @@ TEST_F(PositiveSyncObject, ExternalFence) {
     RETURN_IF_SKIP(Init());
 
     // Check for external fence import and export capability
-    VkPhysicalDeviceExternalFenceInfoKHR efi = vku::InitStructHelper();
+    VkPhysicalDeviceExternalFenceInfo efi = vku::InitStructHelper();
     efi.handleType = handle_type;
     VkExternalFencePropertiesKHR efp = vku::InitStructHelper();
     vk::GetPhysicalDeviceExternalFencePropertiesKHR(Gpu(), &efi, &efp);
 
-    if (!(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT_KHR) ||
-        !(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_IMPORTABLE_BIT_KHR)) {
+    if (!(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT) ||
+        !(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_IMPORTABLE_BIT)) {
         GTEST_SKIP() << "External fence does not support importing and exporting, skipping test.";
     }
 
     // Create a fence to export payload from
-    VkExportFenceCreateInfoKHR efci = vku::InitStructHelper();
+    VkExportFenceCreateInfo efci = vku::InitStructHelper();
     efci.handleTypes = handle_type;
     VkFenceCreateInfo fci = vku::InitStructHelper(&efci);
     vkt::Fence export_fence(*m_device, fci);
@@ -952,7 +985,7 @@ TEST_F(PositiveSyncObject, ExternalFence) {
 
 TEST_F(PositiveSyncObject, ExternalFenceSyncFdLoop) {
     const auto extension_name = VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
     AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
@@ -960,19 +993,19 @@ TEST_F(PositiveSyncObject, ExternalFenceSyncFdLoop) {
     RETURN_IF_SKIP(Init());
 
     // Check for external fence import and export capability
-    VkPhysicalDeviceExternalFenceInfoKHR efi = vku::InitStructHelper();
+    VkPhysicalDeviceExternalFenceInfo efi = vku::InitStructHelper();
     efi.handleType = handle_type;
     VkExternalFencePropertiesKHR efp = vku::InitStructHelper();
     vk::GetPhysicalDeviceExternalFencePropertiesKHR(Gpu(), &efi, &efp);
 
-    if (!(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT_KHR) ||
-        !(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_IMPORTABLE_BIT_KHR)) {
+    if (!(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT) ||
+        !(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_IMPORTABLE_BIT)) {
         GTEST_SKIP() << "External fence does not support importing and exporting, skipping test.";
         return;
     }
 
     // Create a fence to export payload from
-    VkExportFenceCreateInfoKHR efci = vku::InitStructHelper();
+    VkExportFenceCreateInfo efci = vku::InitStructHelper();
     efci.handleTypes = handle_type;
     VkFenceCreateInfo fci = vku::InitStructHelper(&efci);
     vkt::Fence export_fence(*m_device, fci);
@@ -1004,7 +1037,7 @@ TEST_F(PositiveSyncObject, ExternalFenceSyncFdLoop) {
 
 TEST_F(PositiveSyncObject, ExternalFenceSubmitCmdBuffer) {
     const auto extension_name = VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
     AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
@@ -1015,18 +1048,18 @@ TEST_F(PositiveSyncObject, ExternalFenceSubmitCmdBuffer) {
     }
 
     // Check for external fence export capability
-    VkPhysicalDeviceExternalFenceInfoKHR efi = vku::InitStructHelper();
+    VkPhysicalDeviceExternalFenceInfo efi = vku::InitStructHelper();
     efi.handleType = handle_type;
     VkExternalFencePropertiesKHR efp = vku::InitStructHelper();
     vk::GetPhysicalDeviceExternalFencePropertiesKHR(Gpu(), &efi, &efp);
 
-    if (!(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT_KHR)) {
+    if (!(efp.externalFenceFeatures & VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT)) {
         GTEST_SKIP() << "External fence does not support exporting, skipping test.";
         return;
     }
 
     // Create a fence to export payload from
-    VkExportFenceCreateInfoKHR efci = vku::InitStructHelper();
+    VkExportFenceCreateInfo efci = vku::InitStructHelper();
     efci.handleTypes = handle_type;
     VkFenceCreateInfo fci = vku::InitStructHelper(&efci);
     vkt::Fence export_fence(*m_device, fci);
@@ -1122,6 +1155,30 @@ TEST_F(PositiveSyncObject, BasicSetAndWaitEvent2) {
     m_device->Wait();
 }
 
+TEST_F(PositiveSyncObject, WaitEvent2HostStage) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::Event event(*m_device);
+    VkEvent event_handle = event.handle();
+
+    VkMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;  // Ok to use if outside the renderpass
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+    VkDependencyInfo dependency_info = vku::InitStructHelper();
+    dependency_info.memoryBarrierCount = 1;
+    dependency_info.pMemoryBarriers = &barrier;
+
+    m_command_buffer.Begin();
+    vk::CmdWaitEvents2KHR(m_command_buffer.handle(), 1, &event_handle, &dependency_info);
+    m_command_buffer.End();
+}
+
 TEST_F(PositiveSyncObject, DoubleLayoutTransition) {
     TEST_DESCRIPTION("Attempt vkCmdPipelineBarrier with 2 layout transitions of the same image.");
 
@@ -1130,9 +1187,7 @@ TEST_F(PositiveSyncObject, DoubleLayoutTransition) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 1;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 1, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1488,15 +1543,16 @@ TEST_F(PositiveSyncObject, WaitTimelineSemaphoreWithWin32HandleRetrieved) {
         GTEST_SKIP() << "Test not supported by MockICD";
     }
     constexpr auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-    if (!SemaphoreExportImportSupported(Gpu(), handle_type)) {
-        GTEST_SKIP() << "Semaphore does not support export and import through Win32 handle";
-    }
 
-    // Create exportable timeline semaphore
     VkSemaphoreTypeCreateInfo semaphore_type_create_info = vku::InitStructHelper();
     semaphore_type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
     semaphore_type_create_info.initialValue = 0;
 
+    if (!SemaphoreExportImportSupported(Gpu(), handle_type, &semaphore_type_create_info)) {
+        GTEST_SKIP() << "Semaphore does not support export and import through Win32 handle";
+    }
+
+    // Create exportable timeline semaphore
     VkExportSemaphoreCreateInfo export_info = vku::InitStructHelper(&semaphore_type_create_info);
     export_info.handleTypes = handle_type;
 
@@ -1733,6 +1789,7 @@ TEST_F(PositiveSyncObject, BarrierAccessSyncMicroMap) {
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::micromap);
     RETURN_IF_SKIP(Init());
 
     VkMemoryBarrier2 mem_barrier = vku::InitStructHelper();
@@ -1764,7 +1821,7 @@ TEST_F(PositiveSyncObject, DynamicRenderingLocalReadImageBarrier) {
 
     vkt::Image image(*m_device, 128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM,
                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR);
+    image.SetLayout(VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ);
 
     VkFormat colorAttachment = VK_FORMAT_R16_UNORM;
 
@@ -1782,8 +1839,8 @@ TEST_F(PositiveSyncObject, DynamicRenderingLocalReadImageBarrier) {
     VkImageMemoryBarrier imageMemoryBarrier = vku::InitStructHelper();
     imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     imageMemoryBarrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR;
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ;
+    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ;
     imageMemoryBarrier.image = image.handle();
     imageMemoryBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u};
 
@@ -1872,10 +1929,10 @@ TEST_F(PositiveSyncObject, SubmitImportedBinarySemaphoreWithNonZeroValue) {
     TEST_DESCRIPTION("QueueSubmit2 can specify arbitrary payload value for binary semaphore and it should be ignored");
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     const auto extension_name = VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else
     const auto extension_name = VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
     AddRequiredExtensions(extension_name);
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -1883,17 +1940,17 @@ TEST_F(PositiveSyncObject, SubmitImportedBinarySemaphoreWithNonZeroValue) {
     RETURN_IF_SKIP(Init());
 
     // Check semaphore's import/export capability
-    VkPhysicalDeviceExternalSemaphoreInfoKHR semaphore_info = vku::InitStructHelper();
+    VkPhysicalDeviceExternalSemaphoreInfo semaphore_info = vku::InitStructHelper();
     semaphore_info.handleType = handle_type;
     VkExternalSemaphorePropertiesKHR semaphore_properties = vku::InitStructHelper();
     vk::GetPhysicalDeviceExternalSemaphorePropertiesKHR(Gpu(), &semaphore_info, &semaphore_properties);
-    if (!(semaphore_properties.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT_KHR) ||
-        !(semaphore_properties.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR)) {
+    if (!(semaphore_properties.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) ||
+        !(semaphore_properties.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT)) {
         GTEST_SKIP() << "Semaphore does not support import and/or export";
     }
 
     // Signaling semaphore
-    VkExportSemaphoreCreateInfoKHR export_info = vku::InitStructHelper();
+    VkExportSemaphoreCreateInfo export_info = vku::InitStructHelper();
     export_info.handleTypes = handle_type;
     VkSemaphoreCreateInfo semaphore_ci = vku::InitStructHelper(&export_info);
     vkt::Semaphore semaphore(*m_device, semaphore_ci);
@@ -2153,7 +2210,7 @@ TEST_F(PositiveSyncObject, TimelineHostWaitThenSubmitSignal) {
         GTEST_SKIP() << "Test not supported by MockICD (WaitSemaphores)";
     }
 
-    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE_KHR);
+    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
     auto thread = [&semaphore]() { semaphore.Wait(1, kWaitTimeout); };
     std::thread t(thread);
 
@@ -2175,7 +2232,7 @@ TEST_F(PositiveSyncObject, TimelineHostWaitThenSubmitLargerSignal) {
         GTEST_SKIP() << "Test not supported by MockICD (WaitSemaphores)";
     }
 
-    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE_KHR);
+    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
     auto thread = [&semaphore]() { semaphore.Wait(1, kWaitTimeout); };
     std::thread t(thread);
 
@@ -2196,7 +2253,7 @@ TEST_F(PositiveSyncObject, TimelineHostWaitThenHostSignal) {
     if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD (WaitSemaphores)";
     }
-    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE_KHR);
+    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
     auto thread = [&semaphore]() { semaphore.Wait(1, kWaitTimeout); };
     std::thread t(thread);
 
@@ -2214,7 +2271,7 @@ TEST_F(PositiveSyncObject, TimelineHostSignalThenHostWait) {
     AddRequiredFeature(vkt::Feature::timelineSemaphore);
     RETURN_IF_SKIP(Init());
 
-    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE_KHR);
+    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
     semaphore.Signal(1);
     semaphore.Wait(1, kWaitTimeout);
 }
@@ -2349,4 +2406,187 @@ TEST_F(PositiveSyncObject, KhronosTimelineSemaphoreExample) {
         t2.join();
         t1.join();
     }
+}
+
+TEST_F(PositiveSyncObject, BarrierWithoutOwnershipTransferUseAllStages) {
+    TEST_DESCRIPTION("Barrier without ownership transfer with USE_ALL_STAGES flag (no-op)");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_8_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance8);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    VkBufferMemoryBarrier barrier = vku::InitStructHelper();
+    barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    // The queue family are the same here, so flag is basically a no-op
+    barrier.srcQueueFamilyIndex = 0;
+    barrier.dstQueueFamilyIndex = 0;
+    barrier.buffer = buffer;
+    barrier.offset = 0;
+    barrier.size = 256;
+
+    m_command_buffer.Begin();
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                           VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR, 0, nullptr, 1, &barrier, 0,
+                           nullptr);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveSyncObject, OwnershipTransferUseAllStages) {
+    TEST_DESCRIPTION("Barrier with ownership transfer with USE_ALL_STAGES flag");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    // Enable feature to use stage other than ALL_COMMANDS during ownership transfer
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_8_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance8);
+    RETURN_IF_SKIP(Init());
+
+    std::optional<uint32_t> transfer_only_family = m_device->TransferOnlyQueueFamily();
+    if (!transfer_only_family.has_value()) {
+        GTEST_SKIP() << "Transfer-only queue family is required";
+    }
+    vkt::CommandPool transfer_pool(*m_device, transfer_only_family.value(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    vkt::CommandBuffer transfer_cb(*m_device, transfer_pool);
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    // Acquire operation on transfer queue.
+    // The src stage should be a valid transfer stage.
+    VkBufferMemoryBarrier2 acquire_barrier = vku::InitStructHelper();
+    acquire_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    acquire_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    acquire_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    acquire_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    acquire_barrier.srcQueueFamilyIndex = m_default_queue->family_index;
+    acquire_barrier.dstQueueFamilyIndex = transfer_only_family.value();
+    acquire_barrier.buffer = buffer;
+    acquire_barrier.offset = 0;
+    acquire_barrier.size = 256;
+
+    VkDependencyInfo acquire_dep_info = vku::InitStructHelper();
+    // Use this dependency flag to be able to use src stage other then ALL_COMMANDS
+    acquire_dep_info.dependencyFlags = VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR;
+    acquire_dep_info.bufferMemoryBarrierCount = 1;
+    acquire_dep_info.pBufferMemoryBarriers = &acquire_barrier;
+
+    transfer_cb.Begin();
+    vk::CmdPipelineBarrier2(transfer_cb, &acquire_dep_info);
+    transfer_cb.End();
+
+    // Release operation on transfer queue.
+    // The dst stage should be a valid transfer stage.
+    VkBufferMemoryBarrier2 release_barrier = vku::InitStructHelper();
+    release_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    release_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    release_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    release_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    release_barrier.srcQueueFamilyIndex = transfer_only_family.value();
+    release_barrier.dstQueueFamilyIndex = m_default_queue->family_index;
+    release_barrier.buffer = buffer;
+    release_barrier.offset = 0;
+    release_barrier.size = 256;
+
+    VkDependencyInfo release_dep_info = vku::InitStructHelper();
+    // Use this dependency flag to be able to use dst stage other then ALL_COMMANDS
+    release_dep_info.dependencyFlags = VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR;
+    release_dep_info.bufferMemoryBarrierCount = 1;
+    release_dep_info.pBufferMemoryBarriers = &release_barrier;
+
+    transfer_cb.Begin();
+    vk::CmdPipelineBarrier2(transfer_cb, &release_dep_info);
+    transfer_cb.End();
+}
+
+TEST_F(PositiveSyncObject, BinarySyncAfterResolvedTimelineWait) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8900
+    TEST_DESCRIPTION("Test binary wait followed by the previous resolved timeline wait");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Semaphore timeline_semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+    vkt::Semaphore binary_semaphore(*m_device);
+
+    m_default_queue->Submit(vkt::no_cmd, vkt::TimelineSignal(timeline_semaphore, 1));
+
+    // This removes signal's timepoint from timeline (not pending anymore)
+    timeline_semaphore.Wait(1, kWaitTimeout);
+
+    // Wait one more time (should just check completed state).
+    m_default_queue->Submit(vkt::no_cmd, vkt::TimelineWait(timeline_semaphore, 1));
+
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(binary_semaphore));
+
+    // Waiting on binary semaphore initiates check of unresolved timeline wait dependency.
+    // This check did not work properly when resolving timeline signal was already retired.
+    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(binary_semaphore));
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncObject, QueueWaitAfterBinarySignal) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8989
+    TEST_DESCRIPTION("Wait for binary signal after queue wait");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Semaphore timeline_semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE, 1);
+    vkt::Semaphore binary_semaphore(*m_device);
+
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(binary_semaphore));
+    // this removes timepoint with signal op from timeline, but it should not be a problem to wait for this signal
+    m_default_queue->Wait();
+
+    // Values that corresponds to binary semaphore should not affect internal logic.
+    // Use non-zero value for binary semaphore to increase probability of the issues in case of regression.
+    const uint64_t values[2] = {
+        1,  // timeline value
+        42  // arbitrary value that should be ignored (binary semaphore slot)
+    };
+    VkTimelineSemaphoreSubmitInfo timeline_info = vku::InitStructHelper();
+    timeline_info.waitSemaphoreValueCount = 2;
+    timeline_info.pWaitSemaphoreValues = values;
+
+    const VkPipelineStageFlags wait_dst_stages[2] = {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
+    const VkSemaphore wait_semaphores[2] = {timeline_semaphore, binary_semaphore};
+
+    VkSubmitInfo submit = vku::InitStructHelper(&timeline_info);
+    submit.waitSemaphoreCount = 2;
+    submit.pWaitSemaphores = wait_semaphores;
+    submit.pWaitDstStageMask = wait_dst_stages;
+
+    // Wait on the binary signal that was followed by Wait().
+    // This also waits on the timeline initial value, so effectiely no-wait.
+    // The only reason timeline semaphore is used in this test, is to have a
+    // slot in VkTimelineSemaphoreSubmitInfo that corresponds to binary semaphore.
+    vk::QueueSubmit(m_default_queue->handle(), 1, &submit, VK_NULL_HANDLE);
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncObject, QueueWaitAfterBinarySignal2) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8989
+    TEST_DESCRIPTION("Binary signal followed by queue wait");
+    RETURN_IF_SKIP(Init());
+
+    vkt::Semaphore semaphore(*m_device);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(semaphore));
+    m_default_queue->Wait();  // this removes timepoint with signal op from timeline
+
+    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(semaphore));
+    // Test for regression that triggers assert in Semaphore::CanBinaryBeSignaled
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(semaphore));
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncObject, QueueWaitAfterBinarySignal3) {
+    TEST_DESCRIPTION("Binary signal followed by queue wait");
+    RETURN_IF_SKIP(Init());
+
+    vkt::Semaphore semaphore(*m_device);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(semaphore));
+    m_default_queue->Wait();  // this removes timepoint with signal op from timeline
+    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(semaphore), vkt::Signal(semaphore));
+    m_default_queue->Wait();
 }

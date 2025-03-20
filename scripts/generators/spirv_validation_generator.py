@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2020-2024 The Khronos Group Inc.
+# Copyright (c) 2020-2025 The Khronos Group Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 import sys
 import os
 import json
-from generators.vulkan_object import SpirvEnables
-from generators.base_generator import BaseGenerator
+from vulkan_object import SpirvEnables
+from base_generator import BaseGenerator
 from generators.generator_utils import IsNonVulkanSprivCapability
 
 #
@@ -31,6 +31,7 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
         # that require an update of the SPIRV-Headers which might not be ready to pull in.
         # Get the list of safe enum values to use from the SPIR-V grammar
         self.capabilityList = []
+        self.provisionalList = []
         with open(grammar) as grammar_file:
             grammar_dict = json.load(grammar_file)
         for kind in grammar_dict['operand_kinds']:
@@ -38,6 +39,8 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
                 for enum in kind['enumerants']:
                     if not IsNonVulkanSprivCapability(enum['enumerant']):
                         self.capabilityList.append(enum['enumerant'])
+                    if 'provisional' in enum:
+                        self.provisionalList.append(enum['enumerant'])
                 break
 
         # Promoted features structure in state_tracker.cpp are put in the VkPhysicalDeviceVulkan*Features structs
@@ -112,13 +115,12 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
         return "".join(out)
 
     def generate(self):
-        out = []
-        out.append(f'''// *** THIS FILE IS GENERATED - DO NOT EDIT ***
+        self.write(f'''// *** THIS FILE IS GENERATED - DO NOT EDIT ***
             // See {os.path.basename(__file__)} for modifications
 
             /***************************************************************************
             *
-            * Copyright (c) 2020-2024 The Khronos Group Inc.
+            * Copyright (c) 2020-2025 The Khronos Group Inc.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.
@@ -137,7 +139,34 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
             *
             ****************************************************************************/
             ''')
-        out.append('// NOLINTBEGIN') # Wrap for clang-tidy to ignore
+        self.write('// NOLINTBEGIN') # Wrap for clang-tidy to ignore
+
+        if self.filename == 'spirv_validation_helper.h':
+            self.generateHeader()
+        elif self.filename == 'spirv_validation_helper.cpp':
+            self.generateSource()
+        else:
+            self.write(f'\nFile name {self.filename} has no code to generate\n')
+
+        self.write('// NOLINTEND') # Wrap for clang-tidy to ignore
+
+    def generateHeader(self):
+        out = []
+        out.append('''
+            #pragma once
+            #include <vulkan/vulkan_core.h>
+
+            // This is the one function that requires mapping SPIR-V enums to Vulkan enums
+            VkFormat CompatibleSpirvImageFormat(uint32_t spirv_image_format);
+            // Since we keep things in VkFormat for checking, we need a way to get the original SPIR-V
+            // Format name for any error message
+            const char* string_SpirvImageFormat(VkFormat format);
+        ''')
+
+        self.write("".join(out))
+
+    def generateSource(self):
+        out = []
         out.append('''
             #include <string>
             #include <string_view>
@@ -145,7 +174,7 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
             #include <spirv/unified1/spirv.hpp>
             #include "vk_extension_helper.h"
             #include "state_tracker/shader_instruction.h"
-            #include "core_checks/core_validation.h"
+            #include "stateless/sl_spirv.h"
             ''')
 
         #
@@ -186,9 +215,13 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
             for enable in [x for x in spirv.enable if x.struct is None or x.struct not in self.promotedFeatures]:
                 if spirv.name not in self.capabilityList:
                     out.append('\n        // Not found in current SPIR-V Headers\n        // ')
+                elif spirv.name in self.provisionalList:
+                    out.append('\n#ifdef VK_ENABLE_BETA_EXTENSIONS\n        ')
                 else:
                     out.append('\n        ')
                 out.append(f'{{spv::Capability{spirv.name}, {self.createMapValue(spirv.name, enable, False)}}},')
+
+                out.append('\n#endif') if spirv.name in self.provisionalList else None
         out.append('\n    };\n')
         out.append('// clang-format on\n')
         out.append('    return spirv_capabilities;\n')
@@ -214,8 +247,10 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
         out.append('static inline const char* string_SpvCapability(uint32_t input_value) {\n')
         out.append('    switch ((spv::Capability)input_value) {\n')
         for name in self.capabilityList:
+            out.append('#ifdef VK_ENABLE_BETA_EXTENSIONS\n') if name in self.provisionalList else None
             out.append(f'         case spv::Capability{name}:\n')
             out.append(f'            return "{name}";\n')
+            out.append('#endif\n') if name in self.provisionalList else None
         out.append('        default:\n')
         out.append('            return \"Unhandled OpCapability\";\n')
         out.append('    };\n')
@@ -224,10 +259,10 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
         # Creates SPIR-V image format helper
         out.append('''
             // Will return the Vulkan format for a given SPIR-V image format value
-            // Note: will return VK_FORMAT_UNDEFINED if non valid input
+            // Note: will return VK_FORMAT_UNDEFINED if non valid input (or if ImageFormatUnknown)
             // This was in vk_format_utils but the SPIR-V Header dependency was an issue
             //   see https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/4647
-            VkFormat CoreChecks::CompatibleSpirvImageFormat(uint32_t spirv_image_format) const {
+            VkFormat CompatibleSpirvImageFormat(uint32_t spirv_image_format) {
                 switch (spirv_image_format) {
             ''')
         for format in [x for x in self.vk.formats.values() if x.spirvImageFormat]:
@@ -238,6 +273,17 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
         out.append('    };\n')
         out.append('}\n')
 
+        out.append('''
+            const char* string_SpirvImageFormat(VkFormat format) {
+                switch (format) {
+            ''')
+        for format in [x for x in self.vk.formats.values() if x.spirvImageFormat]:
+            out.append(f'        case {format.name}:\n')
+            out.append(f'            return \"{format.spirvImageFormat}\";\n')
+        out.append('        default:\n')
+        out.append('            return "Unknown SPIR-V Format";\n')
+        out.append('    };\n')
+        out.append('}\n')
 
         out.append('''
 // clang-format off
@@ -256,7 +302,10 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
                     requirment += enable.extension
                 elif enable.property is not None:
                     requirment += f'({enable.property}::{enable.member} == {enable.value})'
+
+            out.append('#ifdef VK_ENABLE_BETA_EXTENSIONS\n') if spirv.name in self.provisionalList else None
             out.append(f'    {{spv::Capability{spirv.name}, "{requirment}"}},\n')
+            out.append('#endif  // VK_ENABLE_BETA_EXTENSIONS\n') if spirv.name in self.provisionalList else None
         out.append('''    };
 
     // VUs before catch unknown capabilities
@@ -302,23 +351,24 @@ static inline std::string SpvExtensionRequirments(std::string_view extension) {
         #
         # The main function to validate all the extensions and capabilities
         out.append('''
-            bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(const spirv::Instruction &insn,  const Location& loc) const {
+            bool stateless::SpirvValidator::ValidateShaderCapabilitiesAndExtensions(const spirv::Module& module_state, const spirv::Instruction &insn,  const Location& loc) const {
                 bool skip = false;
                 const bool pipeline = loc.function != vvl::Func::vkCreateShadersEXT;
 
                 if (insn.Opcode() == spv::OpCapability) {
+                    const uint32_t insn_capability = insn.Word(1);
                     // All capabilities are generated so if it is not in the list it is not supported by Vulkan
-                    if (GetSpirvCapabilites().count(insn.Word(1)) == 0) {
+                    if (GetSpirvCapabilites().count(insn_capability) == 0) {
                         const char *vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08739" : "VUID-VkShaderCreateInfoEXT-pCode-08739";
-                        skip |= LogError(vuid, device, loc,
-                            "SPIR-V has Capability (%s) declared, but this is not supported by Vulkan.", string_SpvCapability(insn.Word(1)));
+                        skip |= LogError(vuid, module_state.handle(), loc,
+                            "SPIR-V has Capability (%s) declared, but this is not supported by Vulkan.", string_SpvCapability(insn_capability));
                         return skip; // no known capability to validate
                     }
 
                     // Each capability has one or more requirements to check
                     // Only one item has to be satisfied and an error only occurs
                     // when all are not satisfied
-                    auto caps = GetSpirvCapabilites().equal_range(insn.Word(1));
+                    auto caps = GetSpirvCapabilites().equal_range(insn_capability);
                     bool has_support = false;
                     for (auto it = caps.first; (it != caps.second) && (has_support == false); ++it) {
                         if (it->second.version) {
@@ -332,12 +382,12 @@ static inline std::string SpvExtensionRequirments(std::string_view extension) {
                         } else if (it->second.extension) {
                             // kEnabledByApiLevel is not valid as some extension are promoted with feature bits to be used.
                             // If the new Api Level gives support, it will be caught in the "it->second.version" check instead.
-                            if (IsExtEnabledByCreateinfo(device_extensions.*(it->second.extension))) {
+                            if (IsExtEnabledByCreateinfo(extensions.*(it->second.extension))) {
                                 has_support = true;
                             }
                         } else if (it->second.property) {
                             // support is or'ed as only one has to be supported (if applicable)
-                            switch (insn.Word(1)) {''')
+                            switch (insn_capability) {''')
 
         for name, infos in sorted(self.propertyInfo.items()):
             # Only capabilities here (all items in array are the same)
@@ -365,17 +415,24 @@ static inline std::string SpvExtensionRequirments(std::string_view extension) {
             ''')
 
         out.append('''
+                if (!has_support && insn_capability == spv::CapabilityShaderViewportIndexLayerEXT) {
+                    // special case (https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9601)
+                    if (enabled_features.shaderOutputLayer && enabled_features.shaderOutputViewportIndex) {
+                        has_support = true;
+                    }
+                }
+
                 if (has_support == false) {
                     const char *vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08740" : "VUID-VkShaderCreateInfoEXT-pCode-08740";
-                    skip |= LogError(vuid, device, loc,
-                        "SPIR-V Capability %s was declared, but one of the following requirements is required (%s).", string_SpvCapability(insn.Word(1)), SpvCapabilityRequirements(insn.Word(1)));
+                    skip |= LogError(vuid, module_state.handle(), loc,
+                        "SPIR-V Capability %s was declared, but one of the following requirements is required (%s).", string_SpvCapability(insn_capability), SpvCapabilityRequirements(insn_capability));
                 }
 
                 // Portability checks
-                if (IsExtEnabled(device_extensions.vk_khr_portability_subset)) {
+                if (IsExtEnabled(extensions.vk_khr_portability_subset)) {
                     if ((VK_FALSE == enabled_features.shaderSampleRateInterpolationFunctions) &&
-                        (spv::CapabilityInterpolationFunction == insn.Word(1))) {
-                        skip |= LogError("VUID-RuntimeSpirv-shaderSampleRateInterpolationFunctions-06325", device, loc,
+                        (spv::CapabilityInterpolationFunction == insn_capability)) {
+                        skip |= LogError("VUID-RuntimeSpirv-shaderSampleRateInterpolationFunctions-06325", module_state.handle(), loc,
                                             "SPIR-V (portability error) InterpolationFunction Capability are not supported "
                                             "by this platform");
                     }
@@ -387,13 +444,13 @@ static inline std::string SpvExtensionRequirments(std::string_view extension) {
                 if (0 == extension_name.compare(0, spv_prefix.size(), spv_prefix)) {
                     if (GetSpirvExtensions().count(extension_name) == 0) {
                         const char *vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08741" : "VUID-VkShaderCreateInfoEXT-pCode-08741";
-                        skip |= LogError(vuid, device,loc,
+                        skip |= LogError(vuid, module_state.handle(), loc,
                             "SPIR-V Extension %s was declared, but that is not supported by Vulkan.", extension_name.c_str());
                         return skip; // no known extension to validate
                     }
                 } else {
                     const char *vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08741" : "VUID-VkShaderCreateInfoEXT-pCode-08741";
-                    skip |= LogError( vuid, device,loc,
+                    skip |= LogError(vuid, module_state.handle(), loc,
                         "SPIR-V Extension %s was declared, but this is not a SPIR-V extension. Please use a SPIR-V"
                         " extension (https://github.com/KhronosGroup/SPIRV-Registry) for OpExtension instructions. Non-SPIR-V extensions can be"
                         " recorded in SPIR-V using the OpSourceExtension instruction.", extension_name.c_str());
@@ -415,7 +472,7 @@ static inline std::string SpvExtensionRequirments(std::string_view extension) {
                             has_support = true;
                         }
                     } else if (it->second.extension) {
-                        if (IsExtEnabled(device_extensions.*(it->second.extension))) {
+                        if (IsExtEnabled(extensions.*(it->second.extension))) {
                             has_support = true;
                         }
                     }
@@ -423,12 +480,11 @@ static inline std::string SpvExtensionRequirments(std::string_view extension) {
 
                 if (has_support == false) {
                     const char *vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08742" : "VUID-VkShaderCreateInfoEXT-pCode-08742";
-                    skip |= LogError(vuid, device, loc,
+                    skip |= LogError(vuid, module_state.handle(), loc,
                         "SPIR-V Extension %s was declared, but one of the following requirements is required (%s).", extension_name.c_str(), SpvExtensionRequirments(extension_name).c_str());
                 }
             } //spv::OpExtension
             return skip;
             }
             ''')
-        out.append('// NOLINTEND') # Wrap for clang-tidy to ignore
         self.write("".join(out))

@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -97,7 +97,7 @@ TEST_F(NegativeProtectedMemory, Submit) {
     buffer_create_info.flags = VK_BUFFER_CREATE_PROTECTED_BIT;
     buffer_create_info.size = 4096;
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-flags-01887");
+    CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-01887");
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.flags = VK_IMAGE_CREATE_PROTECTED_BIT;
@@ -109,7 +109,7 @@ TEST_F(NegativeProtectedMemory, Submit) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.arrayLayers = 1;
     image_create_info.mipLevels = 1;
-    CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-flags-01890");
+    CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-flags-01890");
 
     // Try to find memory with protected bit in it at all
     VkDeviceMemory memory_protected = VK_NULL_HANDLE;
@@ -164,7 +164,7 @@ TEST_F(NegativeProtectedMemory, Memory) {
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
     if (sparse_support == true) {
-        CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-None-01888");
+        CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-None-01888");
     }
 
     // Create actual protected and unprotected buffers
@@ -186,7 +186,7 @@ TEST_F(NegativeProtectedMemory, Memory) {
     image_create_info.mipLevels = 1;
 
     if (sparse_support == true) {
-        CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-None-01891");
+        CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-None-01891");
     }
 
     // Create actual protected and unprotected images
@@ -454,14 +454,14 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccess) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
-    pipe.gp_ci_.flags = VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT_EXT | VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT_EXT;
+    pipe.VertexShaderOnly();
+    pipe.gp_ci_.flags = VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT | VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT;
 
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-flags-07369");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 
-    pipe.gp_ci_.flags = VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT_EXT;
+    pipe.gp_ci_.flags = VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT;
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -471,7 +471,7 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccess) {
 
     CreatePipelineHelper protected_pipe(*this);
     protected_pipe.shader_stages_ = {protected_pipe.vs_->GetStageCreateInfo()};
-    protected_pipe.gp_ci_.flags = VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT_EXT;
+    protected_pipe.gp_ci_.flags = VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT;
     protected_pipe.CreateGraphicsPipeline();
 
     vkt::CommandPool command_pool(*m_device, m_device->graphics_queue_node_index_);
@@ -516,7 +516,7 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccess) {
     featureless_pipe.device_ = &test_device;
     featureless_pipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
     featureless_pipe.shader_stages_ = {vs2.GetStageCreateInfo()};
-    featureless_pipe.gp_ci_.flags = VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT_EXT;
+    featureless_pipe.gp_ci_.flags = VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT;
     featureless_pipe.gp_ci_.layout = test_pipeline_layout.handle();
     featureless_pipe.gp_ci_.renderPass = render_pass.handle();
     featureless_pipe.CreateGraphicsPipeline();
@@ -554,26 +554,26 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccessGPL) {
         pre_raster_lib.Handle(),
     };
     VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size(libraries);
+    link_info.libraryCount = size32(libraries);
     link_info.pLibraries = libraries;
 
     m_errorMonitor->SetDesiredError("VUID-VkPipelineLibraryCreateInfoKHR-pipeline-07404");
     VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
-    lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT_EXT;
+    lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT;
     lib_ci.renderPass = RenderPass();
     lib_ci.layout = pre_raster_lib.gp_ci_.layout;
     vkt::Pipeline lib(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-VkPipelineLibraryCreateInfoKHR-pipeline-07406");
-    lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT_EXT;
+    lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT;
     vkt::Pipeline lib2(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
 
     CreatePipelineHelper protected_pre_raster_lib(*this);
     protected_pre_raster_lib.InitPreRasterLibInfo(&stage_ci);
     protected_pre_raster_lib.pipeline_layout_ci_.flags |= VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT;
-    protected_pre_raster_lib.gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT_EXT;
+    protected_pre_raster_lib.gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT;
     ASSERT_EQ(VK_SUCCESS, protected_pre_raster_lib.CreateGraphicsPipeline());
     libraries[0] = protected_pre_raster_lib.Handle();
     VkGraphicsPipelineCreateInfo protected_lib_ci = vku::InitStructHelper(&link_info);
@@ -588,7 +588,7 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccessGPL) {
     CreatePipelineHelper unprotected_pre_raster_lib(*this);
     unprotected_pre_raster_lib.InitPreRasterLibInfo(&stage_ci);
     unprotected_pre_raster_lib.pipeline_layout_ci_.flags |= VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT;
-    unprotected_pre_raster_lib.gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT_EXT;
+    unprotected_pre_raster_lib.gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT;
     ASSERT_EQ(VK_SUCCESS, unprotected_pre_raster_lib.CreateGraphicsPipeline());
     libraries[0] = unprotected_pre_raster_lib.Handle();
     VkGraphicsPipelineCreateInfo unprotected_lib_ci = vku::InitStructHelper(&link_info);
@@ -1169,7 +1169,7 @@ TEST_F(NegativeProtectedMemory, Usage) {
     buffer_create_info.flags = VK_BUFFER_CREATE_PROTECTED_BIT;
     buffer_create_info.size = 4096;
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
-    CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-flags-09641");
+    CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-09641");
 }
 
 TEST_F(NegativeProtectedMemory, WriteToProtectedStorageBuffer) {
@@ -1203,7 +1203,7 @@ TEST_F(NegativeProtectedMemory, WriteToProtectedStorageBuffer) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     pipe.CreateGraphicsPipeline();
 
     // Use unprotected resources in protected command buffer
@@ -1221,4 +1221,127 @@ TEST_F(NegativeProtectedMemory, WriteToProtectedStorageBuffer) {
     m_errorMonitor->VerifyFound();
     vk::CmdEndRenderPass(m_command_buffer.handle());
     m_command_buffer.End();
+}
+
+TEST_F(NegativeProtectedMemory, ResolveProtectedImage) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::protectedMemory);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceProtectedMemoryProperties prot_mem_props = vku::InitStructHelper();
+    VkPhysicalDeviceProperties2 props = vku::InitStructHelper(&prot_mem_props);
+    vk::GetPhysicalDeviceProperties2(Gpu(), &props);
+
+    const auto protected_no_fault_supported = (prot_mem_props.protectedNoFault == VK_TRUE);
+    if (protected_no_fault_supported) {
+        GTEST_SKIP() << "Test requires protectedMemory support without protectedNoFault support";
+    }
+
+    VkImageFormatProperties2 image_format_prop = vku::InitStructHelper();
+    VkPhysicalDeviceImageFormatInfo2 image_format_info = vku::InitStructHelper();
+    image_format_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_format_info.type = VK_IMAGE_TYPE_2D;
+    image_format_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    image_format_info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkResult result =
+        vk::GetPhysicalDeviceImageFormatProperties2(m_device->Physical().handle(), &image_format_info, &image_format_prop);
+    if ((result != VK_SUCCESS) || !(image_format_prop.imageFormatProperties.sampleCounts & VK_SAMPLE_COUNT_4_BIT)) {
+        GTEST_SKIP() << "Cannot create an image with format VK_FORMAT_R8G8B8A8_UNORM and sample count VK_SAMPLE_COUNT_4_BIT. "
+                        "Skipping remainder of the test";
+    }
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                                                  VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    vkt::Image image(*m_device, image_ci);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    vkt::Image ms_image(*m_device, image_ci);
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.flags = VK_IMAGE_CREATE_PROTECTED_BIT;
+    vkt::Image image_protected(*m_device, image_ci, vkt::no_mem);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    vkt::Image ms_image_protected(*m_device, image_ci, vkt::no_mem);
+
+    VkPhysicalDeviceMemoryProperties phys_mem_props;
+    vk::GetPhysicalDeviceMemoryProperties(Gpu(), &phys_mem_props);
+    uint32_t protected_index = phys_mem_props.memoryTypeCount;
+    for (uint32_t i = 0; i < phys_mem_props.memoryTypeCount; i++) {
+        if ((phys_mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_PROTECTED_BIT) != 0) {
+            protected_index = i;
+            break;
+        }
+    }
+
+    VkMemoryRequirements mem_reqs;
+    vk::GetImageMemoryRequirements(device(), image_protected, &mem_reqs);
+    VkMemoryRequirements ms_mem_reqs;
+    vk::GetImageMemoryRequirements(device(), ms_image_protected, &ms_mem_reqs);
+
+    VkMemoryAllocateInfo mem_alloc = vku::InitStructHelper();
+    mem_alloc.allocationSize = mem_reqs.size;
+    mem_alloc.memoryTypeIndex = protected_index;
+    vkt::DeviceMemory memory(*m_device, mem_alloc);
+    vk::BindImageMemory(device(), image_protected.handle(), memory.handle(), 0);
+
+    mem_alloc.allocationSize = ms_mem_reqs.size;
+    vkt::DeviceMemory ms_memory(*m_device, mem_alloc);
+    vk::BindImageMemory(device(), ms_image_protected.handle(), ms_memory.handle(), 0);
+
+    m_command_buffer.Begin();
+
+    VkImageResolve region;
+    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 0u, 1u};
+    region.srcOffset = {0, 0, 0};
+    region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 0u, 1u};
+    region.dstOffset = {0, 0, 0};
+    region.extent = {1u, 1u, 1u};
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-commandBuffer-01837");
+    vk::CmdResolveImage(m_command_buffer.handle(), ms_image_protected.handle(), VK_IMAGE_LAYOUT_GENERAL, image.handle(),
+                        VK_IMAGE_LAYOUT_GENERAL, 1u, &region);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-commandBuffer-01838");
+    vk::CmdResolveImage(m_command_buffer.handle(), ms_image.handle(), VK_IMAGE_LAYOUT_GENERAL, image_protected.handle(),
+                        VK_IMAGE_LAYOUT_GENERAL, 1u, &region);
+
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeProtectedMemory, ResolveImageInProtectedCmdBuffer) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::protectedMemory);
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_PROTECTED_BIT));
+
+    VkPhysicalDeviceProtectedMemoryProperties prot_mem_props = vku::InitStructHelper();
+    VkPhysicalDeviceProperties2 props = vku::InitStructHelper(&prot_mem_props);
+    vk::GetPhysicalDeviceProperties2(Gpu(), &props);
+
+    const auto protected_no_fault_supported = (prot_mem_props.protectedNoFault == VK_TRUE);
+    if (protected_no_fault_supported) {
+        GTEST_SKIP() << "Test requires protectedMemory support without protectedNoFault support";
+    }
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                                                  VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    vkt::Image image(*m_device, image_ci);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    vkt::Image ms_image(*m_device, image_ci);
+
+    m_command_buffer.Begin();
+
+    VkImageResolve region;
+    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 0u, 1u};
+    region.srcOffset = {0, 0, 0};
+    region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 0u, 1u};
+    region.dstOffset = {0, 0, 0};
+    region.extent = {1u, 1u, 1u};
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-commandBuffer-01839");
+    vk::CmdResolveImage(m_command_buffer.handle(), ms_image.handle(), VK_IMAGE_LAYOUT_GENERAL, image.handle(),
+                        VK_IMAGE_LAYOUT_GENERAL, 1u, &region);
+
+    m_errorMonitor->VerifyFound();
 }

@@ -3,7 +3,7 @@
     "profiles": {
         "MAX_PROFILE": {
             "version": 1,
-            "api-version": "1.3.238",
+            "api-version": "1.4.304",
             "label": "Max Profile",
             "description": "Profile that supports everything possible",
             "contributors": {},
@@ -169,6 +169,9 @@
                 "VkPhysicalDeviceMaintenance7FeaturesKHR": {
                     "maintenance7": true
                 },
+                "VkPhysicalDeviceMaintenance8FeaturesKHR": {
+                    "maintenance8": true
+                },
                 "VkPhysicalDeviceShaderDrawParametersFeatures": {
                     "shaderDrawParameters": true
                 },
@@ -266,6 +269,9 @@
                 "VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR": {
                     "vertexAttributeInstanceRateDivisor": true,
                     "vertexAttributeInstanceRateZeroDivisor": true
+                },
+                "VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT": {
+                    "vertexAttributeRobustness": true
                 },
                 "VkPhysicalDeviceASTCDecodeFeaturesEXT": {
                     "decodeModeSharedExponent": true
@@ -535,6 +541,29 @@
                     "dynamicRendering": true,
                     "shaderIntegerDotProduct": true,
                     "maintenance4": true
+                },
+                "VkPhysicalDeviceVulkan14Features": {
+                    "globalPriorityQuery": true,
+                    "shaderSubgroupRotate": true,
+                    "shaderSubgroupRotateClustered": true,
+                    "shaderFloatControls2": true,
+                    "shaderExpectAssume": true,
+                    "rectangularLines": true,
+                    "bresenhamLines": true,
+                    "smoothLines": true,
+                    "stippledRectangularLines": true,
+                    "stippledBresenhamLines": true,
+                    "stippledSmoothLines": true,
+                    "vertexAttributeInstanceRateDivisor": true,
+                    "vertexAttributeInstanceRateZeroDivisor": true,
+                    "indexTypeUint8": true,
+                    "dynamicRenderingLocalRead": true,
+                    "maintenance5": true,
+                    "maintenance6": true,
+                    "pipelineProtectedAccess": true,
+                    "pipelineRobustness": true,
+                    "hostImageCopy": true,
+                    "pushDescriptor": true
                 },
                 "VkPhysicalDeviceCoherentMemoryFeaturesAMD": {
                     "deviceCoherentMemory": true
@@ -887,6 +916,18 @@
                     "perStageDescriptorSet": true,
                     "dynamicPipelineLayout": true
                 },
+                "VkPhysicalDeviceVideoMaintenance1FeaturesKHR": {
+                    "videoMaintenance1": true
+                },
+                "VkPhysicalDeviceVideoMaintenance2FeaturesKHR": {
+                    "videoMaintenance2": true
+                },
+                "VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR": {
+                    "videoEncodeQuantizationMap": true
+                },
+                "VkPhysicalDeviceVideoEncodeAV1FeaturesKHR": {
+                    "videoEncodeAV1": true
+                },
                 "VkPhysicalDeviceNestedCommandBufferFeaturesEXT": {
                     "nestedCommandBuffer": true,
                     "nestedCommandBufferRendering": true,
@@ -917,7 +958,7 @@
             "properties": {
                 "VkPhysicalDeviceProperties": {
                     "vendorID": 1,
-                    "apiVersion": 4206830,
+                    "apiVersion": 4210688,
                     "pipelineCacheUUID": [
                         0,
                         0,
@@ -1542,7 +1583,12 @@
                     "maxSubsampledArrayLayers": 4096,
                     "maxDescriptorSetSubsampledSamplers": 4096
                 },
-                "VkPhysicalDeviceFragmentDensityMapOffsetPropertiesQCOM": {},
+                "VkPhysicalDeviceFragmentDensityMapOffsetPropertiesQCOM": {
+                    "fragmentDensityOffsetGranularity": {
+                        "width": 8,
+                        "height": 8
+                    }
+                },
                 "VkPhysicalDeviceCooperativeMatrixPropertiesNV": {
                     "cooperativeMatrixSupportedStages": [
                         "VK_SHADER_STAGE_VERTEX_BIT",
@@ -1738,6 +1784,14 @@
                     "uniformTexelBufferOffsetSingleTexelAlignment": true,
                     "uniformTexelBufferOffsetAlignmentBytes": 16,
                     "maxBufferSize": 1073741824
+                },
+                "VkPhysicalDeviceVulkan14Properties": {
+                    "maxVertexAttribDivisor": 4294967000,
+                    "supportsNonZeroFirstInstance": true,
+                    "maxPushDescriptors": 4294967000,
+                    "blockTexelViewCompatibleMultipleLayers": true,
+                    "maxCombinedImageSamplerDescriptorCount": 1073741824,
+                    "identicalMemoryTypeRequirements": true
                 },
                 "VkPhysicalDeviceCustomBorderColorPropertiesEXT": {
                     "maxCustomBorderColorSamplers": 4294967000
@@ -2064,6 +2118,7 @@
                 "VK_EXT_vertex_attribute_divisor": 1,
                 "VK_KHR_vertex_attribute_divisor": 1,
                 "VK_EXT_vertex_input_dynamic_state": 1,
+                "VK_EXT_vertex_attribute_robustness": 1,
                 "VK_EXT_video_encode_h264": 1,
                 "VK_EXT_video_encode_h265": 1,
                 "VK_EXT_ycbcr_2plane_444_formats": 1,
@@ -2139,6 +2194,7 @@
                 "VK_KHR_maintenance5": 1,
                 "VK_KHR_maintenance6": 1,
                 "VK_KHR_maintenance7": 1,
+                "VK_KHR_maintenance8": 1,
                 "VK_KHR_multiview": 1,
                 "VK_KHR_performance_query": 1,
                 "VK_KHR_pipeline_binary": 1,
@@ -2186,10 +2242,13 @@
                 "VK_KHR_video_decode_h264": 1,
                 "VK_KHR_video_decode_h265": 1,
                 "VK_KHR_video_decode_queue": 1,
+                "VK_KHR_video_encode_av1": 1,
                 "VK_KHR_video_encode_h264": 1,
                 "VK_KHR_video_encode_h265": 1,
                 "VK_KHR_video_encode_queue": 1,
+                "VK_KHR_video_encode_quantization_map": 1,
                 "VK_KHR_video_maintenance1": 1,
+                "VK_KHR_video_maintenance2": 1,
                 "VK_KHR_video_queue": 1,
                 "VK_KHR_vulkan_memory_model": 1,
                 "VK_KHR_wayland_surface": 1,
@@ -2611,7 +2670,9 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
                         ],
                         "optimalTilingFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -2634,7 +2695,9 @@
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
-                            "VK_FORMAT_FEATURE_2_WEIGHT_IMAGE_BIT_QCOM"
+                            "VK_FORMAT_FEATURE_2_WEIGHT_IMAGE_BIT_QCOM",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
                         ],
                         "bufferFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -2829,7 +2892,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "optimalTilingFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -2852,7 +2916,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "bufferFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -4296,7 +4361,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "optimalTilingFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -4319,7 +4385,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "bufferFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -4368,7 +4435,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "optimalTilingFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -4390,7 +4458,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "bufferFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -4803,7 +4872,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "optimalTilingFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -4825,7 +4895,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "bufferFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -4874,7 +4945,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "optimalTilingFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -4897,7 +4969,8 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
-                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
+                            "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
                         ],
                         "bufferFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -5599,76 +5672,6 @@
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_DENSITY_MAP_BIT_EXT",
                             "VK_FORMAT_FEATURE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR"
-                        ]
-                    }
-                },
-                "VK_FORMAT_E5B9G9R9_UFLOAT_PACK32": {
-                    "VkFormatProperties3": {
-                        "linearTilingFeatures": [
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_ATOMIC_BIT",
-                            "VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_ATOMIC_BIT",
-                            "VK_FORMAT_FEATURE_2_VERTEX_BUFFER_BIT",
-                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT",
-                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT",
-                            "VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT",
-                            "VK_FORMAT_FEATURE_2_BLIT_SRC_BIT",
-                            "VK_FORMAT_FEATURE_2_BLIT_DST_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_CUBIC_BIT",
-                            "VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT",
-                            "VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_MINMAX_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT"
-                        ],
-                        "optimalTilingFeatures": [
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_ATOMIC_BIT",
-                            "VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_ATOMIC_BIT",
-                            "VK_FORMAT_FEATURE_2_VERTEX_BUFFER_BIT",
-                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT",
-                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT",
-                            "VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT",
-                            "VK_FORMAT_FEATURE_2_BLIT_SRC_BIT",
-                            "VK_FORMAT_FEATURE_2_BLIT_DST_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_CUBIC_BIT",
-                            "VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT",
-                            "VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_MINMAX_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT"
-                        ],
-                        "bufferFeatures": [
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_ATOMIC_BIT",
-                            "VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_ATOMIC_BIT",
-                            "VK_FORMAT_FEATURE_2_VERTEX_BUFFER_BIT",
-                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT",
-                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT",
-                            "VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT",
-                            "VK_FORMAT_FEATURE_2_BLIT_SRC_BIT",
-                            "VK_FORMAT_FEATURE_2_BLIT_DST_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_CUBIC_BIT",
-                            "VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT",
-                            "VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_MINMAX_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
-                            "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT"
                         ]
                     }
                 },
@@ -6927,7 +6930,11 @@
                             "VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT",
                             "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
-                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT"
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_OUTPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_DPB_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_INPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_DPB_BIT_KHR"
                         ],
                         "optimalTilingFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -6956,7 +6963,110 @@
                             "VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT",
                             "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_OUTPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_DPB_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_INPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_DPB_BIT_KHR"
+                        ],
+                        "bufferFeatures": [
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_ATOMIC_BIT",
+                            "VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_ATOMIC_BIT",
+                            "VK_FORMAT_FEATURE_2_VERTEX_BUFFER_BIT",
+                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT",
+                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT",
+                            "VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT",
+                            "VK_FORMAT_FEATURE_2_BLIT_SRC_BIT",
+                            "VK_FORMAT_FEATURE_2_BLIT_DST_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_CUBIC_BIT",
+                            "VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT",
+                            "VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_MINMAX_BIT",
+                            "VK_FORMAT_FEATURE_2_MIDPOINT_CHROMA_SAMPLES_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT",
+                            "VK_FORMAT_FEATURE_2_DISJOINT_BIT",
+                            "VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT"
+                        ]
+                    }
+                },
+                "VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16": {
+                    "VkFormatProperties3": {
+                        "linearTilingFeatures": [
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_ATOMIC_BIT",
+                            "VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_ATOMIC_BIT",
+                            "VK_FORMAT_FEATURE_2_VERTEX_BUFFER_BIT",
+                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT",
+                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT",
+                            "VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT",
+                            "VK_FORMAT_FEATURE_2_BLIT_SRC_BIT",
+                            "VK_FORMAT_FEATURE_2_BLIT_DST_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_CUBIC_BIT",
+                            "VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT",
+                            "VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_MINMAX_BIT",
+                            "VK_FORMAT_FEATURE_2_MIDPOINT_CHROMA_SAMPLES_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT",
+                            "VK_FORMAT_FEATURE_2_DISJOINT_BIT",
+                            "VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_OUTPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_DPB_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_INPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_DPB_BIT_KHR"
+                        ],
+                        "optimalTilingFeatures": [
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_IMAGE_ATOMIC_BIT",
+                            "VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_ATOMIC_BIT",
+                            "VK_FORMAT_FEATURE_2_VERTEX_BUFFER_BIT",
+                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT",
+                            "VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT",
+                            "VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT",
+                            "VK_FORMAT_FEATURE_2_BLIT_SRC_BIT",
+                            "VK_FORMAT_FEATURE_2_BLIT_DST_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_CUBIC_BIT",
+                            "VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT",
+                            "VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_MINMAX_BIT",
+                            "VK_FORMAT_FEATURE_2_MIDPOINT_CHROMA_SAMPLES_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT",
+                            "VK_FORMAT_FEATURE_2_DISJOINT_BIT",
+                            "VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
+                            "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
+                            "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_OUTPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_DPB_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_INPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_DPB_BIT_KHR"
                         ],
                         "bufferFeatures": [
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT",
@@ -7019,6 +7129,10 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_OUTPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_DPB_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_INPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_DPB_BIT_KHR",
                             "VK_FORMAT_FEATURE_2_HOST_IMAGE_TRANSFER_BIT_EXT"
                         ],
                         "optimalTilingFeatures": [
@@ -7049,6 +7163,10 @@
                             "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT",
                             "VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_OUTPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_DECODE_DPB_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_INPUT_BIT_KHR",
+                            "VK_FORMAT_FEATURE_2_VIDEO_ENCODE_DPB_BIT_KHR",
                             "VK_FORMAT_FEATURE_2_HOST_IMAGE_TRANSFER_BIT_EXT"
                         ],
                         "bufferFeatures": [
@@ -7913,7 +8031,8 @@
                     "VkQueueFamilyVideoPropertiesKHR": {
                         "videoCodecOperations": [
                             "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR",
-                            "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR"
+                            "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR",
+                            "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR"
                         ]
                     }
                 },
@@ -7930,6 +8049,2511 @@
                             "depth": 1
                         }
                     }
+                }
+            ],
+            "videoProfiles": [
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH264ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H264_PROFILE_IDC_BASELINE",
+                            "pictureLayout": "VK_VIDEO_DECODE_H264_PICTURE_LAYOUT_PROGRESSIVE_KHR"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH264ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H264_PROFILE_IDC_MAIN",
+                            "pictureLayout": "VK_VIDEO_DECODE_H264_PICTURE_LAYOUT_PROGRESSIVE_KHR"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH264ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H264_PROFILE_IDC_MAIN",
+                            "pictureLayout": "VK_VIDEO_DECODE_H264_PICTURE_LAYOUT_PROGRESSIVE_KHR"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH264ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H264_PROFILE_IDC_MAIN",
+                            "pictureLayout": "VK_VIDEO_DECODE_H264_PICTURE_LAYOUT_INTERLACED_SEPARATE_PLANES_BIT_KHR"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH264ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H264_PROFILE_IDC_MAIN",
+                            "pictureLayout": "VK_VIDEO_DECODE_H264_PICTURE_LAYOUT_PROGRESSIVE_KHR"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH264ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H264_PROFILE_IDC_MAIN",
+                            "pictureLayout": "VK_VIDEO_DECODE_H264_PICTURE_LAYOUT_INTERLACED_INTERLEAVED_LINES_BIT_KHR"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR"
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_CAPABILITY_PROTECTED_CONTENT_BIT_KHR"
+                            ],
+                            "minBitstreamBufferOffsetAlignment": 256,
+                            "minBitstreamBufferSizeAlignment": 256,
+                            "pictureAccessGranularity": {
+                                "width": 16,
+                                "height": 16
+                            },
+                            "minCodedExtent": {
+                                "width": 16,
+                                "height": 16
+                            },
+                            "maxCodedExtent": {
+                                "width": 1920,
+                                "height": 1080
+                            },
+                            "maxDpbSlots": 33,
+                            "maxActiveReferencePictures": 32,
+                            "stdHeaderVersion": {
+                                "extensionName": "VK_STD_vulkan_video_codec_h264_decode",
+                                "specVersion": 4194304
+                            }
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_COINCIDE_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH264CapabilitiesKHR": {
+                            "maxLevelIdc": "STD_VIDEO_H264_LEVEL_IDC_6_2",
+                            "fieldOffsetGranularity": {
+                                "x": 0,
+                                "y": 0
+                            }
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_DISTINCT_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH264CapabilitiesKHR": {
+                            "maxLevelIdc": "STD_VIDEO_H264_LEVEL_IDC_5_0",
+                            "fieldOffsetGranularity": {
+                                "x": 0,
+                                "y": 16
+                            }
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_COINCIDE_BIT_KHR",
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_DISTINCT_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH264CapabilitiesKHR": {
+                            "maxLevelIdc": "STD_VIDEO_H264_LEVEL_IDC_3_2",
+                            "fieldOffsetGranularity": {
+                                "x": 0,
+                                "y": 1
+                            }
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH265ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H265_PROFILE_IDC_MAIN"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH265ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H265_PROFILE_IDC_MAIN"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH265ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H265_PROFILE_IDC_MAIN"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR"
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_CAPABILITY_SEPARATE_REFERENCE_IMAGES_BIT_KHR"
+                            ],
+                            "minBitstreamBufferOffsetAlignment": 64,
+                            "minBitstreamBufferSizeAlignment": 64,
+                            "pictureAccessGranularity": {
+                                "width": 32,
+                                "height": 32
+                            },
+                            "minCodedExtent": {
+                                "width": 48,
+                                "height": 48
+                            },
+                            "maxCodedExtent": {
+                                "width": 3840,
+                                "height": 2160
+                            },
+                            "maxDpbSlots": 16,
+                            "maxActiveReferencePictures": 15,
+                            "stdHeaderVersion": {
+                                "extensionName": "VK_STD_vulkan_video_codec_h265_decode",
+                                "specVersion": 4194304
+                            }
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_COINCIDE_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH265CapabilitiesKHR": {
+                            "maxLevelIdc": "STD_VIDEO_H265_LEVEL_IDC_6_0"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_DISTINCT_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH265CapabilitiesKHR": {
+                            "maxLevelIdc": "STD_VIDEO_H265_LEVEL_IDC_5_2"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_COINCIDE_BIT_KHR",
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_DISTINCT_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeH265CapabilitiesKHR": {
+                            "maxLevelIdc": "STD_VIDEO_H265_LEVEL_IDC_4_1"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeAV1ProfileInfoKHR": {
+                            "stdProfile": "STD_VIDEO_AV1_PROFILE_MAIN",
+                            "filmGrainSupport": false
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeAV1ProfileInfoKHR": {
+                            "stdProfile": "STD_VIDEO_AV1_PROFILE_MAIN",
+                            "filmGrainSupport": false
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeAV1ProfileInfoKHR": {
+                            "stdProfile": "STD_VIDEO_AV1_PROFILE_MAIN",
+                            "filmGrainSupport": true
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeAV1ProfileInfoKHR": {
+                            "stdProfile": "STD_VIDEO_AV1_PROFILE_MAIN",
+                            "filmGrainSupport": false
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeAV1ProfileInfoKHR": {
+                            "stdProfile": "STD_VIDEO_AV1_PROFILE_MAIN",
+                            "filmGrainSupport": true
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR"
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_CAPABILITY_PROTECTED_CONTENT_BIT_KHR"
+                            ],
+                            "minBitstreamBufferOffsetAlignment": 256,
+                            "minBitstreamBufferSizeAlignment": 256,
+                            "pictureAccessGranularity": {
+                                "width": 16,
+                                "height": 16
+                            },
+                            "minCodedExtent": {
+                                "width": 16,
+                                "height": 16
+                            },
+                            "maxCodedExtent": {
+                                "width": 1920,
+                                "height": 1080
+                            },
+                            "maxDpbSlots": 8,
+                            "maxActiveReferencePictures": 7,
+                            "stdHeaderVersion": {
+                                "extensionName": "VK_STD_vulkan_video_codec_av1_decode",
+                                "specVersion": 4194304
+                            }
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_COINCIDE_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeAV1CapabilitiesKHR": {
+                            "maxLevel": "STD_VIDEO_AV1_LEVEL_6_2"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_DISTINCT_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeAV1CapabilitiesKHR": {
+                            "maxLevel": "STD_VIDEO_AV1_LEVEL_5_0"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_COINCIDE_BIT_KHR",
+                                "VK_VIDEO_DECODE_CAPABILITY_DPB_AND_OUTPUT_DISTINCT_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoDecodeAV1CapabilitiesKHR": {
+                            "maxLevel": "STD_VIDEO_AV1_LEVEL_3_2"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH264ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H264_PROFILE_IDC_BASELINE"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH264ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H264_PROFILE_IDC_BASELINE"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH264ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H264_PROFILE_IDC_BASELINE"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR"
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_CAPABILITY_SEPARATE_REFERENCE_IMAGES_BIT_KHR"
+                            ],
+                            "minBitstreamBufferOffsetAlignment": 4096,
+                            "minBitstreamBufferSizeAlignment": 4096,
+                            "pictureAccessGranularity": {
+                                "width": 16,
+                                "height": 16
+                            },
+                            "minCodedExtent": {
+                                "width": 160,
+                                "height": 128
+                            },
+                            "maxCodedExtent": {
+                                "width": 1920,
+                                "height": 1080
+                            },
+                            "maxDpbSlots": 10,
+                            "maxActiveReferencePictures": 4,
+                            "stdHeaderVersion": {
+                                "extensionName": "VK_STD_vulkan_video_codec_h264_encode",
+                                "specVersion": 4194304
+                            }
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_CAPABILITY_PRECEDING_EXTERNALLY_ENCODED_BYTES_BIT_KHR",
+                                "VK_VIDEO_ENCODE_CAPABILITY_QUANTIZATION_DELTA_MAP_BIT_KHR",
+                                "VK_VIDEO_ENCODE_CAPABILITY_EMPHASIS_MAP_BIT_KHR"
+                            ],
+                            "rateControlModes": [
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_DISABLED_BIT_KHR",
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_CBR_BIT_KHR",
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_VBR_BIT_KHR"
+                            ],
+                            "maxRateControlLayers": 4,
+                            "maxBitrate": 800000000,
+                            "maxQualityLevels": 4,
+                            "encodeInputPictureGranularity": {
+                                "width": 16,
+                                "height": 16
+                            },
+                            "supportedEncodeFeedbackFlags": [
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_HAS_OVERRIDES_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH264CapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_HRD_COMPLIANCE_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_PREDICTION_WEIGHT_TABLE_GENERATED_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_ROW_UNALIGNED_SLICE_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_B_FRAME_IN_L0_LIST_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_PER_PICTURE_TYPE_MIN_MAX_QP_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_GENERATE_PREFIX_NALU_BIT_KHR"
+                            ],
+                            "maxLevelIdc": "STD_VIDEO_H264_LEVEL_IDC_6_2",
+                            "maxSliceCount": 8,
+                            "maxPPictureL0ReferenceCount": 4,
+                            "maxBPictureL0ReferenceCount": 3,
+                            "maxL1ReferenceCount": 2,
+                            "maxTemporalLayerCount": 4,
+                            "expectDyadicTemporalLayerPattern": false,
+                            "minQp": 0,
+                            "maxQp": 51,
+                            "prefersGopRemainingFrames": false,
+                            "requiresGopRemainingFrames": false
+                        },
+                        "VkVideoEncodeQuantizationMapCapabilitiesKHR": {
+                            "maxQuantizationMapExtent": {
+                                "width": 120,
+                                "height": 68
+                            }
+                        },
+                        "VkVideoEncodeH264QuantizationMapCapabilitiesKHR": {
+                            "minQpDelta": -26,
+                            "maxQpDelta": 25
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_CAPABILITY_PRECEDING_EXTERNALLY_ENCODED_BYTES_BIT_KHR",
+                                "VK_VIDEO_ENCODE_CAPABILITY_EMPHASIS_MAP_BIT_KHR"
+                            ],
+                            "rateControlModes": [
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_DISABLED_BIT_KHR",
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_VBR_BIT_KHR"
+                            ],
+                            "maxRateControlLayers": 1,
+                            "maxBitrate": 480000000,
+                            "maxQualityLevels": 3,
+                            "encodeInputPictureGranularity": {
+                                "width": 32,
+                                "height": 32
+                            },
+                            "supportedEncodeFeedbackFlags": [
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH264CapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_DIFFERENT_SLICE_TYPE_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_PER_SLICE_CONSTANT_QP_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_GENERATE_PREFIX_NALU_BIT_KHR"
+                            ],
+                            "maxLevelIdc": "STD_VIDEO_H264_LEVEL_IDC_6_1",
+                            "maxSliceCount": 4,
+                            "maxPPictureL0ReferenceCount": 4,
+                            "maxBPictureL0ReferenceCount": 0,
+                            "maxL1ReferenceCount": 0,
+                            "maxTemporalLayerCount": 4,
+                            "expectDyadicTemporalLayerPattern": true,
+                            "minQp": 0,
+                            "maxQp": 30,
+                            "prefersGopRemainingFrames": true,
+                            "requiresGopRemainingFrames": false
+                        },
+                        "VkVideoEncodeQuantizationMapCapabilitiesKHR": {
+                            "maxQuantizationMapExtent": {
+                                "width": 120,
+                                "height": 68
+                            }
+                        },
+                        "VkVideoEncodeH264QuantizationMapCapabilitiesKHR": {
+                            "minQpDelta": 0,
+                            "maxQpDelta": 0
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {
+                            "flags": [],
+                            "rateControlModes": [
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_CBR_BIT_KHR"
+                            ],
+                            "maxRateControlLayers": 1,
+                            "maxBitrate": 240000000,
+                            "maxQualityLevels": 1,
+                            "encodeInputPictureGranularity": {
+                                "width": 1,
+                                "height": 1
+                            },
+                            "supportedEncodeFeedbackFlags": [
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH264CapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_ROW_UNALIGNED_SLICE_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_B_FRAME_IN_L1_LIST_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H264_CAPABILITY_PER_PICTURE_TYPE_MIN_MAX_QP_BIT_KHR"
+                            ],
+                            "maxLevelIdc": "STD_VIDEO_H264_LEVEL_IDC_5_1",
+                            "maxSliceCount": 1,
+                            "maxPPictureL0ReferenceCount": 0,
+                            "maxBPictureL0ReferenceCount": 2,
+                            "maxL1ReferenceCount": 2,
+                            "maxTemporalLayerCount": 1,
+                            "expectDyadicTemporalLayerPattern": false,
+                            "minQp": 5,
+                            "maxQp": 40,
+                            "prefersGopRemainingFrames": true,
+                            "requiresGopRemainingFrames": true
+                        },
+                        "VkVideoEncodeQuantizationMapCapabilitiesKHR": {
+                            "maxQuantizationMapExtent": {
+                                "width": 0,
+                                "height": 0
+                            }
+                        },
+                        "VkVideoEncodeH264QuantizationMapCapabilitiesKHR": {
+                            "minQpDelta": 0,
+                            "maxQpDelta": 0
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH265ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H265_PROFILE_IDC_MAIN"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH265ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H265_PROFILE_IDC_MAIN"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH265ProfileInfoKHR": {
+                            "stdProfileIdc": "STD_VIDEO_H265_PROFILE_IDC_MAIN"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR"
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_CAPABILITY_PROTECTED_CONTENT_BIT_KHR"
+                            ],
+                            "minBitstreamBufferOffsetAlignment": 1,
+                            "minBitstreamBufferSizeAlignment": 1,
+                            "pictureAccessGranularity": {
+                                "width": 8,
+                                "height": 8
+                            },
+                            "minCodedExtent": {
+                                "width": 64,
+                                "height": 48
+                            },
+                            "maxCodedExtent": {
+                                "width": 4096,
+                                "height": 2560
+                            },
+                            "maxDpbSlots": 8,
+                            "maxActiveReferencePictures": 2,
+                            "stdHeaderVersion": {
+                                "extensionName": "VK_STD_vulkan_video_codec_h265_encode",
+                                "specVersion": 4194304
+                            }
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_CAPABILITY_EMPHASIS_MAP_BIT_KHR"
+                            ],
+                            "rateControlModes": [
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_CBR_BIT_KHR"
+                            ],
+                            "maxRateControlLayers": 1,
+                            "maxBitrate": 800000000,
+                            "maxQualityLevels": 1,
+                            "encodeInputPictureGranularity": {
+                                "width": 64,
+                                "height": 64
+                            },
+                            "supportedEncodeFeedbackFlags": [
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH265CapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_HRD_COMPLIANCE_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_PREDICTION_WEIGHT_TABLE_GENERATED_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_ROW_UNALIGNED_SLICE_SEGMENT_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_B_FRAME_IN_L0_LIST_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_PER_SLICE_SEGMENT_CONSTANT_QP_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_MULTIPLE_SLICE_SEGMENTS_PER_TILE_BIT_KHR"
+                            ],
+                            "maxLevelIdc": "STD_VIDEO_H265_LEVEL_IDC_6_2",
+                            "maxSliceSegmentCount": 8,
+                            "maxTiles": {
+                                "width": 1,
+                                "height": 1
+                            },
+                            "ctbSizes": [
+                                "VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR"
+                            ],
+                            "transformBlockSizes": [
+                                "VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_4_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_8_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_32_BIT_KHR"
+                            ],
+                            "maxPPictureL0ReferenceCount": 4,
+                            "maxBPictureL0ReferenceCount": 3,
+                            "maxL1ReferenceCount": 2,
+                            "maxSubLayerCount": 1,
+                            "expectDyadicTemporalLayerPattern": false,
+                            "minQp": 16,
+                            "maxQp": 32,
+                            "prefersGopRemainingFrames": false,
+                            "requiresGopRemainingFrames": false
+                        },
+                        "VkVideoEncodeQuantizationMapCapabilitiesKHR": {
+                            "maxQuantizationMapExtent": {
+                                "width": 1024,
+                                "height": 640
+                            }
+                        },
+                        "VkVideoEncodeH265QuantizationMapCapabilitiesKHR": {
+                            "minQpDelta": 0,
+                            "maxQpDelta": 0
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_CAPABILITY_QUANTIZATION_DELTA_MAP_BIT_KHR"
+                            ],
+                            "rateControlModes": [
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_DISABLED_BIT_KHR"
+                            ],
+                            "maxRateControlLayers": 0,
+                            "maxBitrate": 480000000,
+                            "maxQualityLevels": 2,
+                            "encodeInputPictureGranularity": {
+                                "width": 32,
+                                "height": 32
+                            },
+                            "supportedEncodeFeedbackFlags": [
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH265CapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_DIFFERENT_SLICE_SEGMENT_TYPE_BIT_KHR"
+                            ],
+                            "maxLevelIdc": "STD_VIDEO_H265_LEVEL_IDC_6_1",
+                            "maxSliceSegmentCount": 4,
+                            "maxTiles": {
+                                "width": 2,
+                                "height": 2
+                            },
+                            "ctbSizes": [
+                                "VK_VIDEO_ENCODE_H265_CTB_SIZE_16_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR"
+                            ],
+                            "transformBlockSizes": [
+                                "VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_8_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_16_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_32_BIT_KHR"
+                            ],
+                            "maxPPictureL0ReferenceCount": 4,
+                            "maxBPictureL0ReferenceCount": 0,
+                            "maxL1ReferenceCount": 0,
+                            "maxSubLayerCount": 1,
+                            "expectDyadicTemporalLayerPattern": false,
+                            "minQp": 0,
+                            "maxQp": 51,
+                            "prefersGopRemainingFrames": true,
+                            "requiresGopRemainingFrames": false
+                        },
+                        "VkVideoEncodeQuantizationMapCapabilitiesKHR": {
+                            "maxQuantizationMapExtent": {
+                                "width": 128,
+                                "height": 80
+                            }
+                        },
+                        "VkVideoEncodeH265QuantizationMapCapabilitiesKHR": {
+                            "minQpDelta": -16,
+                            "maxQpDelta": 15
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_CAPABILITY_PRECEDING_EXTERNALLY_ENCODED_BYTES_BIT_KHR"
+                            ],
+                            "rateControlModes": [
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_DISABLED_BIT_KHR",
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_CBR_BIT_KHR",
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_VBR_BIT_KHR"
+                            ],
+                            "maxRateControlLayers": 2,
+                            "maxBitrate": 240000000,
+                            "maxQualityLevels": 3,
+                            "encodeInputPictureGranularity": {
+                                "width": 16,
+                                "height": 16
+                            },
+                            "supportedEncodeFeedbackFlags": [
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_HAS_OVERRIDES_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeH265CapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_B_FRAME_IN_L1_LIST_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_PER_PICTURE_TYPE_MIN_MAX_QP_BIT_KHR",
+                                "VK_VIDEO_ENCODE_H265_CAPABILITY_MULTIPLE_TILES_PER_SLICE_SEGMENT_BIT_KHR"
+                            ],
+                            "maxLevelIdc": "STD_VIDEO_H265_LEVEL_IDC_5_1",
+                            "maxSliceSegmentCount": 1,
+                            "maxTiles": {
+                                "width": 2,
+                                "height": 2
+                            },
+                            "ctbSizes": [
+                                "VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_KHR"
+                            ],
+                            "transformBlockSizes": [
+                                "VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_32_BIT_KHR"
+                            ],
+                            "maxPPictureL0ReferenceCount": 0,
+                            "maxBPictureL0ReferenceCount": 2,
+                            "maxL1ReferenceCount": 2,
+                            "maxSubLayerCount": 4,
+                            "expectDyadicTemporalLayerPattern": true,
+                            "minQp": 16,
+                            "maxQp": 51,
+                            "prefersGopRemainingFrames": true,
+                            "requiresGopRemainingFrames": true
+                        },
+                        "VkVideoEncodeQuantizationMapCapabilitiesKHR": {
+                            "maxQuantizationMapExtent": {
+                                "width": 0,
+                                "height": 0
+                            }
+                        },
+                        "VkVideoEncodeH265QuantizationMapCapabilitiesKHR": {
+                            "minQpDelta": 0,
+                            "maxQpDelta": 0
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeAV1ProfileInfoKHR": {
+                            "stdProfile": "STD_VIDEO_AV1_PROFILE_MAIN"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeAV1ProfileInfoKHR": {
+                            "stdProfile": "STD_VIDEO_AV1_PROFILE_MAIN"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ],
+                            "lumaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ],
+                            "chromaBitDepth": [
+                                "VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeAV1ProfileInfoKHR": {
+                            "stdProfile": "STD_VIDEO_AV1_PROFILE_MAIN"
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR"
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_CAPABILITY_PROTECTED_CONTENT_BIT_KHR"
+                            ],
+                            "minBitstreamBufferOffsetAlignment": 1,
+                            "minBitstreamBufferSizeAlignment": 1,
+                            "pictureAccessGranularity": {
+                                "width": 8,
+                                "height": 8
+                            },
+                            "minCodedExtent": {
+                                "width": 192,
+                                "height": 128
+                            },
+                            "maxCodedExtent": {
+                                "width": 4096,
+                                "height": 2560
+                            },
+                            "maxDpbSlots": 8,
+                            "maxActiveReferencePictures": 2,
+                            "stdHeaderVersion": {
+                                "extensionName": "VK_STD_vulkan_video_codec_av1_encode",
+                                "specVersion": 4194304
+                            }
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_CAPABILITY_QUANTIZATION_DELTA_MAP_BIT_KHR",
+                                "VK_VIDEO_ENCODE_CAPABILITY_EMPHASIS_MAP_BIT_KHR"
+                            ],
+                            "rateControlModes": [
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_CBR_BIT_KHR"
+                            ],
+                            "maxRateControlLayers": 1,
+                            "maxBitrate": 800000000,
+                            "maxQualityLevels": 1,
+                            "encodeInputPictureGranularity": {
+                                "width": 64,
+                                "height": 64
+                            },
+                            "supportedEncodeFeedbackFlags": [
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeAV1CapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_AV1_CAPABILITY_PRIMARY_REFERENCE_CDF_ONLY_BIT_KHR"
+                            ],
+                            "maxLevel": "STD_VIDEO_AV1_LEVEL_6_2",
+                            "maxTiles": {
+                                "width": 1,
+                                "height": 1
+                            },
+                            "minTileSize": {
+                                "width": 64,
+                                "height": 64
+                            },
+                            "maxTileSize": {
+                                "width": 4096,
+                                "height": 2560
+                            },
+                            "superblockSizes": [
+                                "VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_64_BIT_KHR"
+                            ],
+                            "maxSingleReferenceCount": 1,
+                            "singleReferenceNameMask": 123,
+                            "maxUnidirectionalCompoundReferenceCount": 0,
+                            "maxUnidirectionalCompoundGroup1ReferenceCount": 0,
+                            "unidirectionalCompoundReferenceNameMask": 0,
+                            "maxBidirectionalCompoundReferenceCount": 0,
+                            "maxBidirectionalCompoundGroup1ReferenceCount": 0,
+                            "maxBidirectionalCompoundGroup2ReferenceCount": 0,
+                            "bidirectionalCompoundReferenceNameMask": 0,
+                            "maxTemporalLayerCount": 1,
+                            "maxSpatialLayerCount": 1,
+                            "maxOperatingPoints": 1,
+                            "minQIndex": 32,
+                            "maxQIndex": 128,
+                            "prefersGopRemainingFrames": false,
+                            "requiresGopRemainingFrames": false
+                        },
+                        "VkVideoEncodeQuantizationMapCapabilitiesKHR": {
+                            "maxQuantizationMapExtent": {
+                                "width": 512,
+                                "height": 320
+                            }
+                        },
+                        "VkVideoEncodeAV1QuantizationMapCapabilitiesKHR": {
+                            "minQIndexDelta": -64,
+                            "maxQIndexDelta": 64
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_CAPABILITY_QUANTIZATION_DELTA_MAP_BIT_KHR"
+                            ],
+                            "rateControlModes": [
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_DISABLED_BIT_KHR"
+                            ],
+                            "maxRateControlLayers": 0,
+                            "maxBitrate": 480000000,
+                            "maxQualityLevels": 2,
+                            "encodeInputPictureGranularity": {
+                                "width": 32,
+                                "height": 32
+                            },
+                            "supportedEncodeFeedbackFlags": [
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeAV1CapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_AV1_CAPABILITY_PRIMARY_REFERENCE_CDF_ONLY_BIT_KHR",
+                                "VK_VIDEO_ENCODE_AV1_CAPABILITY_GENERATE_OBU_EXTENSION_HEADER_BIT_KHR",
+                                "VK_VIDEO_ENCODE_AV1_CAPABILITY_FRAME_SIZE_OVERRIDE_BIT_KHR"
+                            ],
+                            "maxLevel": "STD_VIDEO_AV1_LEVEL_6_1",
+                            "maxTiles": {
+                                "width": 2,
+                                "height": 2
+                            },
+                            "minTileSize": {
+                                "width": 128,
+                                "height": 128
+                            },
+                            "maxTileSize": {
+                                "width": 4096,
+                                "height": 2048
+                            },
+                            "superblockSizes": [
+                                "VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_64_BIT_KHR",
+                                "VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_128_BIT_KHR"
+                            ],
+                            "maxSingleReferenceCount": 0,
+                            "singleReferenceNameMask": 0,
+                            "maxUnidirectionalCompoundReferenceCount": 2,
+                            "maxUnidirectionalCompoundGroup1ReferenceCount": 2,
+                            "unidirectionalCompoundReferenceNameMask": 95,
+                            "maxBidirectionalCompoundReferenceCount": 2,
+                            "maxBidirectionalCompoundGroup1ReferenceCount": 2,
+                            "maxBidirectionalCompoundGroup2ReferenceCount": 2,
+                            "bidirectionalCompoundReferenceNameMask": 95,
+                            "maxTemporalLayerCount": 4,
+                            "maxSpatialLayerCount": 1,
+                            "maxOperatingPoints": 4,
+                            "minQIndex": 0,
+                            "maxQIndex": 255,
+                            "prefersGopRemainingFrames": true,
+                            "requiresGopRemainingFrames": false
+                        },
+                        "VkVideoEncodeQuantizationMapCapabilitiesKHR": {
+                            "maxQuantizationMapExtent": {
+                                "width": 64,
+                                "height": 40
+                            }
+                        },
+                        "VkVideoEncodeAV1QuantizationMapCapabilitiesKHR": {
+                            "minQIndexDelta": -255,
+                            "maxQIndexDelta": 255
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_CAPABILITY_PRECEDING_EXTERNALLY_ENCODED_BYTES_BIT_KHR",
+                                "VK_VIDEO_ENCODE_CAPABILITY_EMPHASIS_MAP_BIT_KHR"
+                            ],
+                            "rateControlModes": [
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_DISABLED_BIT_KHR",
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_CBR_BIT_KHR",
+                                "VK_VIDEO_ENCODE_RATE_CONTROL_MODE_VBR_BIT_KHR"
+                            ],
+                            "maxRateControlLayers": 2,
+                            "maxBitrate": 240000000,
+                            "maxQualityLevels": 3,
+                            "encodeInputPictureGranularity": {
+                                "width": 16,
+                                "height": 16
+                            },
+                            "supportedEncodeFeedbackFlags": [
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BUFFER_OFFSET_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_BYTES_WRITTEN_BIT_KHR",
+                                "VK_VIDEO_ENCODE_FEEDBACK_BITSTREAM_HAS_OVERRIDES_BIT_KHR"
+                            ]
+                        },
+                        "VkVideoEncodeAV1CapabilitiesKHR": {
+                            "flags": [
+                                "VK_VIDEO_ENCODE_AV1_CAPABILITY_PER_RATE_CONTROL_GROUP_MIN_MAX_Q_INDEX_BIT_KHR",
+                                "VK_VIDEO_ENCODE_AV1_CAPABILITY_FRAME_SIZE_OVERRIDE_BIT_KHR",
+                                "VK_VIDEO_ENCODE_AV1_CAPABILITY_MOTION_VECTOR_SCALING_BIT_KHR"
+                            ],
+                            "maxLevel": "STD_VIDEO_AV1_LEVEL_5_1",
+                            "maxTiles": {
+                                "width": 4,
+                                "height": 4
+                            },
+                            "minTileSize": {
+                                "width": 128,
+                                "height": 128
+                            },
+                            "maxTileSize": {
+                                "width": 2048,
+                                "height": 2048
+                            },
+                            "superblockSizes": [
+                                "VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_128_BIT_KHR"
+                            ],
+                            "maxSingleReferenceCount": 1,
+                            "singleReferenceNameMask": 95,
+                            "maxUnidirectionalCompoundReferenceCount": 4,
+                            "maxUnidirectionalCompoundGroup1ReferenceCount": 4,
+                            "unidirectionalCompoundReferenceNameMask": 91,
+                            "maxBidirectionalCompoundReferenceCount": 0,
+                            "maxBidirectionalCompoundGroup1ReferenceCount": 0,
+                            "maxBidirectionalCompoundGroup2ReferenceCount": 0,
+                            "bidirectionalCompoundReferenceNameMask": 0,
+                            "maxTemporalLayerCount": 4,
+                            "maxSpatialLayerCount": 2,
+                            "maxOperatingPoints": 2,
+                            "minQIndex": 16,
+                            "maxQIndex": 96,
+                            "prefersGopRemainingFrames": true,
+                            "requiresGopRemainingFrames": true
+                        },
+                        "VkVideoEncodeQuantizationMapCapabilitiesKHR": {
+                            "maxQuantizationMapExtent": {
+                                "width": 32,
+                                "height": 20
+                            }
+                        },
+                        "VkVideoEncodeAV1QuantizationMapCapabilitiesKHR": {
+                            "minQIndexDelta": -64,
+                            "maxQIndexDelta": 63
+                        }
+                    }
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {}
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_420_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_420_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {}
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_422_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_422_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoDecodeCapabilitiesKHR": {}
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_444_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_444_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {}
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_420_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_420_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {}
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_422_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_422_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "capabilities": {
+                        "VkVideoEncodeCapabilitiesKHR": {}
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_444_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_G8_B8R8_2PLANE_444_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT",
+                                    "VK_IMAGE_CREATE_ALIAS_BIT",
+                                    "VK_IMAGE_CREATE_EXTENDED_USAGE_BIT",
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT",
+                                    "VK_IMAGE_CREATE_DISJOINT_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_OPTIMAL",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_SAMPLED_BIT",
+                                    "VK_IMAGE_USAGE_STORAGE_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R32_SINT",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 16,
+                                    "height": 16
+                                }
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R8_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 16,
+                                    "height": 16
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R8_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 16,
+                                    "height": 16
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R8_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 4,
+                                    "height": 4
+                                }
+                            },
+                            "VkVideoFormatH265QuantizationMapPropertiesKHR": {
+                                "compatibleCtbSizes": [
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_KHR",
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R8_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 8,
+                                    "height": 8
+                                }
+                            },
+                            "VkVideoFormatH265QuantizationMapPropertiesKHR": {
+                                "compatibleCtbSizes": [
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_KHR",
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R8_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 32,
+                                    "height": 32
+                                }
+                            },
+                            "VkVideoFormatH265QuantizationMapPropertiesKHR": {
+                                "compatibleCtbSizes": [
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_KHR",
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R8_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 64,
+                                    "height": 64
+                                }
+                            },
+                            "VkVideoFormatH265QuantizationMapPropertiesKHR": {
+                                "compatibleCtbSizes": [
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R32_SINT",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 32,
+                                    "height": 32
+                                }
+                            },
+                            "VkVideoFormatH265QuantizationMapPropertiesKHR": {
+                                "compatibleCtbSizes": [
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_KHR",
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R32_SINT",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 64,
+                                    "height": 64
+                                }
+                            },
+                            "VkVideoFormatH265QuantizationMapPropertiesKHR": {
+                                "compatibleCtbSizes": [
+                                    "VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R32_SINT",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 8,
+                                    "height": 8
+                                }
+                            },
+                            "VkVideoFormatAV1QuantizationMapPropertiesKHR": {
+                                "compatibleSuperblockSizes": [
+                                    "VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_64_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R8_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 64,
+                                    "height": 64
+                                }
+                            },
+                            "VkVideoFormatAV1QuantizationMapPropertiesKHR": {
+                                "compatibleSuperblockSizes": [
+                                    "VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_64_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R32_SINT",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 64,
+                                    "height": 64
+                                }
+                            },
+                            "VkVideoFormatAV1QuantizationMapPropertiesKHR": {
+                                "compatibleSuperblockSizes": [
+                                    "VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_64_BIT_KHR"
+                                ]
+                            }
+                        },
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R32_SINT",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 128,
+                                    "height": 128
+                                }
+                            },
+                            "VkVideoFormatAV1QuantizationMapPropertiesKHR": {
+                                "compatibleSuperblockSizes": [
+                                    "VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_128_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "profile": {
+                        "VkVideoProfileInfoKHR": {
+                            "videoCodecOperation": "VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR",
+                            "chromaSubsampling": [
+                                "VK_VIDEO_CHROMA_SUBSAMPLING_444_BIT_KHR"
+                            ]
+                        }
+                    },
+                    "formats": [
+                        {
+                            "VkVideoFormatPropertiesKHR": {
+                                "format": "VK_FORMAT_R8_UNORM",
+                                "componentMapping": {
+                                    "r": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "g": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "b": "VK_COMPONENT_SWIZZLE_IDENTITY",
+                                    "a": "VK_COMPONENT_SWIZZLE_IDENTITY"
+                                },
+                                "imageCreateFlags": [
+                                    "VK_IMAGE_CREATE_PROTECTED_BIT"
+                                ],
+                                "imageType": "VK_IMAGE_TYPE_2D",
+                                "imageTiling": "VK_IMAGE_TILING_LINEAR",
+                                "imageUsageFlags": [
+                                    "VK_IMAGE_USAGE_TRANSFER_SRC_BIT",
+                                    "VK_IMAGE_USAGE_TRANSFER_DST_BIT",
+                                    "VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR"
+                                ]
+                            },
+                            "VkVideoFormatQuantizationMapPropertiesKHR": {
+                                "quantizationMapTexelSize": {
+                                    "width": 128,
+                                    "height": 128
+                                }
+                            },
+                            "VkVideoFormatAV1QuantizationMapPropertiesKHR": {
+                                "compatibleSuperblockSizes": [
+                                    "VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_128_BIT_KHR"
+                                ]
+                            }
+                        }
+                    ]
                 }
             ]
         }

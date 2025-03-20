@@ -20,6 +20,7 @@
 #include "vksc_test_dispatch_helper.h"
 
 #include "utils/vk_layer_utils.h"
+#include "utils/text_utils.h"
 #include "vk_layer_config.h"
 
 #include <glslang/Public/ShaderLang.h>
@@ -187,7 +188,7 @@ static bool GetCLIFlag(int *argc, char *argv[], const char *flag, bool remove = 
 
 static bool GetEnvironmentFlag(const char *name) {
     auto value = GetEnvironment(name);
-    vvl::ToLower(value);
+    text::ToLower(value);
     return !(value == "false" || value == "0" || value == "");
 }
 

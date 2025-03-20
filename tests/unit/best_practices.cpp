@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,6 +30,7 @@ void VkBestPracticesLayerTest::InitBestPracticesFramework(const char *vendor_che
 
     features_.pNext = &layer_settings_create_info;
 
+    AddRequiredExtensions(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
     InitFramework(&features_);
 }
 
@@ -72,7 +73,7 @@ TEST_F(VkBestPracticesLayerTest, ReturnCodes) {
     // Force a non-success success code by only asking for a subset of query results
     uint32_t format_count;
     std::vector<VkSurfaceFormatKHR> formats;
-    result = vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface, &format_count, NULL);
+    result = vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface.Handle(), &format_count, NULL);
     if (result != VK_SUCCESS || format_count <= 1) {
         GTEST_SKIP() << "test requires 2 or more extensions available";
     }
@@ -80,7 +81,7 @@ TEST_F(VkBestPracticesLayerTest, ReturnCodes) {
     formats.resize(format_count);
 
     m_errorMonitor->SetDesiredFailureMsg(kVerboseBit, "BestPractices-Verbose-Success-Logging");
-    result = vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface, &format_count, formats.data());
+    result = vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface.Handle(), &format_count, formats.data());
     ASSERT_TRUE(result > VK_SUCCESS);
     m_errorMonitor->VerifyFound();
 }
@@ -103,9 +104,13 @@ TEST_F(VkBestPracticesLayerTest, UseDeprecatedInstanceExtensions) {
         // Extra error if VK_EXT_debug_report is used on Android still
         m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");
     }
-    m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");
-    m_errorMonitor->SetDesiredWarning("BestPractices-specialuse-extension");
-    VkInstance dummy;
+
+    m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");  // VK_KHR_get_physical_device_properties2
+    m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");  // VK_EXT_validation_features
+    m_errorMonitor->SetDesiredWarning("BestPractices-specialuse-extension");  // VK_EXT_debug_utils
+    m_errorMonitor->SetDesiredWarning("BestPractices-specialuse-extension");  // VK_EXT_validation_features
+
+    VkInstance dummy = VK_NULL_HANDLE;
     auto features = features_;
     auto ici = GetInstanceCreateInfo();
     features.pNext = ici.pNext;
@@ -113,9 +118,6 @@ TEST_F(VkBestPracticesLayerTest, UseDeprecatedInstanceExtensions) {
     vk::CreateInstance(&ici, nullptr, &dummy);
     m_errorMonitor->VerifyFound();
 
-    // Create a 1.0 vulkan instance and request an extension promoted to core in 1.1
-    m_errorMonitor->SetUnexpectedError("khronos-Validation-debug-build-warning-message");
-    m_errorMonitor->SetUnexpectedError("khronos-Validation-fine-grained-locking-warning-message");
     VkApplicationInfo new_info{};
     new_info.apiVersion = VK_API_VERSION_1_0;
     new_info.pApplicationName = ici.pApplicationInfo->pApplicationName;
@@ -123,8 +125,22 @@ TEST_F(VkBestPracticesLayerTest, UseDeprecatedInstanceExtensions) {
     new_info.pEngineName = ici.pApplicationInfo->pEngineName;
     new_info.engineVersion = ici.pApplicationInfo->engineVersion;
     ici.pApplicationInfo = &new_info;
+
+    // Create a 1.0 vulkan instance and request an extension promoted to core in 1.1
+    if (IsExtensionsEnabled(VK_EXT_DEBUG_REPORT_EXTENSION_NAME)) {
+        // Extra error if VK_EXT_debug_report is used on Android still
+        m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");
+    }
+    m_errorMonitor->SetUnexpectedError("khronos-Validation-debug-build-warning-message");
+    m_errorMonitor->SetUnexpectedError("khronos-Validation-fine-grained-locking-warning-message");
+    m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");  // VK_EXT_validation_features
+    m_errorMonitor->SetDesiredWarning("BestPractices-specialuse-extension");  // VK_EXT_debug_utils
+    m_errorMonitor->SetDesiredWarning("BestPractices-specialuse-extension");  // VK_EXT_validation_features
     vk::CreateInstance(&ici, nullptr, &dummy);
-    vk::DestroyInstance(dummy, nullptr);
+    m_errorMonitor->VerifyFound();
+    if (dummy != VK_NULL_HANDLE) {
+        vk::DestroyInstance(dummy, nullptr);
+    }
 }
 
 TEST_F(VkBestPracticesLayerTest, UseDeprecatedDeviceExtensions) {
@@ -294,9 +310,7 @@ TEST_F(VkBestPracticesLayerTest, CmdResolveImageTypeMismatch) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 1;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 1, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_4_BIT;  // guarantee support from sampledImageColorSampleCounts
@@ -834,7 +848,7 @@ TEST_F(VkBestPracticesLayerTest, TripleBufferingTest) {
     InitSwapchainInfo();
 
     VkBool32 supported;
-    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
+    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface.Handle(), &supported);
     if (!supported) {
         GTEST_SKIP() << "Graphics queue does not support present";
     }
@@ -856,11 +870,11 @@ TEST_F(VkBestPracticesLayerTest, TripleBufferingTest) {
     VkSwapchainCreateInfoKHR swapchain_create_info = {};
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchain_create_info.pNext = 0;
-    swapchain_create_info.surface = m_surface;
+    swapchain_create_info.surface = m_surface.Handle();
     swapchain_create_info.minImageCount = 2;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
     swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
-    swapchain_create_info.imageExtent = {m_surface_capabilities.minImageExtent.width, m_surface_capabilities.minImageExtent.height};
+    swapchain_create_info.imageExtent = m_surface_capabilities.minImageExtent;
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = imageUsage;
     swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -899,7 +913,7 @@ TEST_F(VkBestPracticesLayerTest, SwapchainCreationTest) {
     VkSwapchainCreateInfoKHR swapchain_create_info = {};
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchain_create_info.pNext = 0;
-    swapchain_create_info.surface = m_surface;
+    swapchain_create_info.surface = m_surface.Handle();
     swapchain_create_info.minImageCount = 3;
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = imageUsage;
@@ -913,18 +927,18 @@ TEST_F(VkBestPracticesLayerTest, SwapchainCreationTest) {
     // Test for successful swapchain creation when GetPhysicalDeviceSurfaceCapabilitiesKHR() and
     // GetPhysicalDeviceSurfaceFormatsKHR() are queried as expected and GetPhysicalDeviceSurfacePresentModesKHR() is not called but
     // the present mode is VK_PRESENT_MODE_FIFO_KHR
-    vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(Gpu(), m_surface, &m_surface_capabilities);
+    vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(Gpu(), m_surface.Handle(), &m_surface_capabilities);
 
     uint32_t format_count;
-    vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface, &format_count, nullptr);
+    vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface.Handle(), &format_count, nullptr);
     if (format_count != 0) {
         m_surface_formats.resize(format_count);
-        vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface, &format_count, m_surface_formats.data());
+        vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface.Handle(), &format_count, m_surface_formats.data());
     }
 
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
     swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
-    swapchain_create_info.imageExtent = {m_surface_capabilities.minImageExtent.width, m_surface_capabilities.minImageExtent.height};
+    swapchain_create_info.imageExtent = m_surface_capabilities.minImageExtent;
 
     // GetPhysicalDeviceSurfacePresentModesKHR() not called before trying to create a swapchain
     m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateSwapchainKHR-present-mode-no-surface");
@@ -1131,20 +1145,8 @@ TEST_F(VkBestPracticesLayerTest, ImageExtendedUsageWithoutMutableFormat) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    auto image_ci = vkt::Image::ImageCreateInfo2D(256, 256, 1, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     image_ci.flags = VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_ci.extent.width = 256;
-    image_ci.extent.height = 256;
-    image_ci.extent.depth = 1;
-    image_ci.mipLevels = 1;
-    image_ci.arrayLayers = 1;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
     VkImage image;
     m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateImage-CreateFlags");
     vk::CreateImage(device(), &image_ci, nullptr, &image);
@@ -1161,25 +1163,17 @@ TEST_F(VkBestPracticesLayerTest, ThreadUpdateDescriptorUpdateAfterBindNoCollisio
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    std::array<VkDescriptorBindingFlagsEXT, 2> flags = {
-        {VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT}};
-    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flags_create_info = vku::InitStructHelper();
-    flags_create_info.bindingCount = (uint32_t)flags.size();
-    flags_create_info.pBindingFlags = flags.data();
-
-    OneOffDescriptorSet normal_descriptor_set(m_device,
-                                              {
-                                                  {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                                  {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                              },
-                                              VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT, &flags_create_info,
-                                              VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT);
-
+    OneOffDescriptorIndexingSet descriptor_set(m_device, {
+                                                             {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT,
+                                                              nullptr, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT},
+                                                             {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT,
+                                                              nullptr, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT},
+                                                         });
     vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     ThreadTestData data;
     data.device = device();
-    data.descriptorSet = normal_descriptor_set.set_;
+    data.descriptorSet = descriptor_set.set_;
     data.binding = 0;
     data.buffer = buffer.handle();
     std::atomic<bool> bailout{false};
@@ -1192,7 +1186,7 @@ TEST_F(VkBestPracticesLayerTest, ThreadUpdateDescriptorUpdateAfterBindNoCollisio
 
     ThreadTestData data2;
     data2.device = device();
-    data2.descriptorSet = normal_descriptor_set.set_;
+    data2.descriptorSet = descriptor_set.set_;
     data2.binding = 1;
     data2.buffer = buffer.handle();
     data2.bailout = &bailout;
@@ -1290,11 +1284,11 @@ TEST_F(VkBestPracticesLayerTest, OverAllocateFromDescriptorPool) {
 
     VkDescriptorPoolSize ds_type_count = {};
     ds_type_count.type = VK_DESCRIPTOR_TYPE_SAMPLER;
-    ds_type_count.descriptorCount = 2;
+    ds_type_count.descriptorCount = 8;
 
     VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
     ds_pool_ci.flags = 0;
-    ds_pool_ci.maxSets = 1;
+    ds_pool_ci.maxSets = 3;
     ds_pool_ci.poolSizeCount = 1;
     ds_pool_ci.pPoolSizes = &ds_type_count;
 
@@ -1310,14 +1304,57 @@ TEST_F(VkBestPracticesLayerTest, OverAllocateFromDescriptorPool) {
     const vkt::DescriptorSetLayout ds_layout_samp(*m_device, {dsl_binding_samp});
 
     // Try to allocate 2 sets when pool only has 1 set
-    VkDescriptorSet descriptor_sets[2];
+    VkDescriptorSet descriptor_sets[4];
     VkDescriptorSetLayout set_layouts[2] = {ds_layout_samp.handle(), ds_layout_samp.handle()};
     VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.descriptorSetCount = 2;
     alloc_info.descriptorPool = ds_pool.handle();
     alloc_info.pSetLayouts = set_layouts;
+    vk::AllocateDescriptorSets(device(), &alloc_info, &descriptor_sets[0]);
     m_errorMonitor->SetDesiredWarning("BestPractices-vkAllocateDescriptorSets-EmptyDescriptorPool");
-    vk::AllocateDescriptorSets(device(), &alloc_info, descriptor_sets);
+    vk::AllocateDescriptorSets(device(), &alloc_info, &descriptor_sets[2]);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkBestPracticesLayerTest, OverAllocateTypeFromDescriptorPool) {
+    TEST_DESCRIPTION("Attempt to allocate more sets and descriptors than descriptor pool has available.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkDescriptorPoolSize ds_type_count = {};
+    ds_type_count.type = VK_DESCRIPTOR_TYPE_SAMPLER;
+    ds_type_count.descriptorCount = 3;
+
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
+    ds_pool_ci.flags = 0;
+    ds_pool_ci.maxSets = 4;
+    ds_pool_ci.poolSizeCount = 1;
+    ds_pool_ci.pPoolSizes = &ds_type_count;
+
+    vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
+
+    VkDescriptorSetLayoutBinding dsl_binding_samp = {};
+    dsl_binding_samp.binding = 0;
+    dsl_binding_samp.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+    dsl_binding_samp.descriptorCount = 1;
+    dsl_binding_samp.stageFlags = VK_SHADER_STAGE_ALL;
+    dsl_binding_samp.pImmutableSamplers = NULL;
+
+    const vkt::DescriptorSetLayout ds_layout_samp(*m_device, {dsl_binding_samp});
+
+    // Try to allocate 2 sets when pool only has 1 set
+    VkDescriptorSet descriptor_sets[4];
+    VkDescriptorSetLayout set_layouts[2] = {ds_layout_samp.handle(), ds_layout_samp.handle()};
+    VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
+    alloc_info.descriptorSetCount = 2;
+    alloc_info.descriptorPool = ds_pool.handle();
+    alloc_info.pSetLayouts = set_layouts;
+    vk::AllocateDescriptorSets(device(), &alloc_info, &descriptor_sets[0]);
+    m_errorMonitor->SetDesiredWarning("BestPractices-vkAllocateDescriptorSets-EmptyDescriptorPoolType");
+    vk::AllocateDescriptorSets(device(), &alloc_info, &descriptor_sets[2]);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1815,7 +1852,7 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
     vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
                            nullptr, 0, nullptr, 1, &img_barrier);
 
-    // PRESENT_SRC_KHR	- Must be 0
+    // PRESENT_SRC_KHR - Must be 0
     img_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     img_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
     m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
@@ -1829,7 +1866,7 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
                            nullptr, 0, nullptr, 1, &img_barrier);
 
     {
-        VkImageMemoryBarrier2KHR img_barrier2 = vku::InitStructHelper();
+        VkImageMemoryBarrier2 img_barrier2 = vku::InitStructHelper();
         img_barrier2.srcAccessMask = 0;
         img_barrier2.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         img_barrier2.image = image.handle();
@@ -1839,7 +1876,7 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
         img_barrier2.subresourceRange.layerCount = 1;
         img_barrier2.subresourceRange.levelCount = 1;
 
-        VkDependencyInfoKHR dependency_info = vku::InitStructHelper();
+        VkDependencyInfo dependency_info = vku::InitStructHelper();
         dependency_info.imageMemoryBarrierCount = 1;
         dependency_info.pImageMemoryBarriers = &img_barrier2;
 
@@ -1901,7 +1938,7 @@ TEST_F(VkBestPracticesLayerTest, NoCreateSwapchainPresentModes) {
     RETURN_IF_SKIP(InitSurface());
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");
     m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateSwapchainKHR-no-VkSwapchainPresentModesCreateInfoEXT-provided");
-    m_swapchain = CreateSwapchain(m_surface, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
+    m_swapchain = CreateSwapchain(m_surface.Handle(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2048,7 +2085,6 @@ TEST_F(VkBestPracticesLayerTest, PartialPushConstantSetEnd) {
 
 TEST_F(VkBestPracticesLayerTest, PartialPushConstantSetMiddle) {
     TEST_DESCRIPTION("Set only a part of push constants in middle of as struct");
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
@@ -2118,14 +2154,14 @@ TEST_F(VkBestPracticesLayerTest, IgnoreResolveImageView) {
     vkt::Image resolve_image(*m_device, image_create_info, vkt::set_layout);
     vkt::ImageView resolve_image_view = resolve_image.CreateView();
 
-    VkRenderingAttachmentInfoKHR color_attachment = vku::InitStructHelper();
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageView = image_view;
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     color_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
     color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
     color_attachment.resolveImageView = resolve_image_view;
 
-    VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
     begin_rendering_info.layerCount = 1;
@@ -2303,4 +2339,53 @@ TEST_F(VkBestPracticesLayerTest, SetSignaledEventSecondary3) {
     m_default_queue->Submit(cb2);
     m_errorMonitor->VerifyFound();
     m_device->Wait();
+}
+
+TEST_F(VkBestPracticesLayerTest, PartialPushConstantSetEndCompute) {
+    TEST_DESCRIPTION("Set only a part of push constants at end of a struct");
+
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    char const *const csSource = R"glsl(
+        #version 450
+        layout(push_constant, std430) uniform foo { uint x[2]; } constants;
+        layout(set = 0, binding = 0) buffer bar { vec4 r; } res;
+        void main(){
+           res.r = vec4(constants.x[0] * constants.x[1]);
+        }
+    )glsl";
+
+    uint32_t data[2] = {1u, 2u};
+    VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(data)};
+
+    vkt::Buffer buffer(*m_device, 16u, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                       });
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0u, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_}, {push_constant_range});
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0u, 1u,
+                              &descriptor_set.set_, 0u, nullptr);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                         sizeof(uint32_t), data);
+
+    m_errorMonitor->SetDesiredWarning("BestPractices-PushConstants");
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+
+    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_COMPUTE_BIT, sizeof(uint32_t),
+                         sizeof(uint32_t), &data[1]);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+
+    m_command_buffer.End();
 }

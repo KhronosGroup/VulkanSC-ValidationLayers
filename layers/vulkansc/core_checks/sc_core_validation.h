@@ -20,21 +20,78 @@
 
 #include "core_checks/core_validation.h"
 #include "vulkansc/state_tracker/sc_state_tracker.h"
+#include "stateless/sl_spirv.h"
 
 namespace vvl::sc {
 class PipelineCacheData;
 }
 
-class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
+namespace core::sc {
+
+class Instance : public vvl::sc::Instance<core::Instance> {
   protected:
-    using BASE = SCValidationStateTracker<CoreChecks>;
+    using BaseClass = vvl::sc::Instance<core::Instance>;
 
     void InitFilters();
 
   public:
-    using StateTracker = SCValidationStateTracker<CoreChecks>;
+    using StateTracker = vvl::sc::Instance<core::Instance>;
 
-    SCCoreChecks() {}
+    Instance(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch) {}
+
+    template <typename VkHandleType>
+    bool ValidateRemovedCommand(VkHandleType handle, const Location& loc) const;
+
+    // Intercept instance creation to set up VUID filters
+    void PreCallRecordCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
+                                     VkInstance* pInstance, const RecordObject& record_obj) override;
+
+    template <typename VkHandleType>
+    bool ValidatePipelineCacheCreateInfo(VkHandleType handle, const Location& loc,
+                                         const VkPipelineCacheCreateInfo& create_info) const;
+    bool ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const stateless::SpirvValidator& stateless_spirv_validator,
+                                   const VkPipelineCacheCreateInfo& create_info, const Location& loc) const;
+    bool ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, const stateless::SpirvValidator& stateless_spirv_validator,
+                                    const vvl::sc::PipelineCacheData& data, uint32_t pipeline_index, uint32_t stage_index,
+                                    const Location& loc) const;
+
+    // Functions requiring additional/modified validation for Vulkan SC
+    bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
+                                       VkInstance* pInstance, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
+                                     const VkAllocationCallbacks* pAllocator, VkDevice* pDevice,
+                                     const ErrorObject& error_obj) const override;
+
+    bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format,
+                                                                     VkImageType type, VkSampleCountFlagBits samples,
+                                                                     VkImageUsageFlags usage, VkImageTiling tiling,
+                                                                     uint32_t* pPropertyCount,
+                                                                     VkSparseImageFormatProperties* pProperties,
+                                                                     const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties2(VkPhysicalDevice physicalDevice,
+                                                                      const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo,
+                                                                      uint32_t* pPropertyCount,
+                                                                      VkSparseImageFormatProperties2* pProperties,
+                                                                      const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties2KHR(VkPhysicalDevice physicalDevice,
+                                                                         const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo,
+                                                                         uint32_t* pPropertyCount,
+                                                                         VkSparseImageFormatProperties2* pProperties,
+                                                                         const ErrorObject& error_obj) const override;
+};
+
+class Device : public vvl::sc::Device<CoreChecks> {
+  protected:
+    using BaseClass = vvl::sc::Device<CoreChecks>;
+
+    void InitFilters();
+
+    core::sc::Instance* instance_vo_;
+
+  public:
+    using StateTracker = vvl::sc::Device<CoreChecks>;
+
+    Device(vvl::dispatch::Device* dev, core::sc::Instance* instance_vo) : BaseClass(dev, instance_vo), instance_vo_(instance_vo) {}
 
     bool ValidateObjectRequestCount(VkDevice device, const Location& loc, const char* vuid, const char* object_name_plural,
                                     size_t existing_count, const char* requested_count_name, uint32_t requested_count,
@@ -50,16 +107,9 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     bool ValidatePipelinePoolMemory(VkDevice device, const Location& loc, uint32_t create_info_count,
                                     const CreateInfo* create_info) const;
 
-    template <typename VkHandle>
-    bool ValidatePipelineCacheCreateInfo(VkHandle handle, const Location& loc, const VkPipelineCacheCreateInfo& create_info) const;
-    bool ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const VkPipelineCacheCreateInfo& create_info,
-                                   const Location& loc) const;
-
     bool ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchainCreateInfoKHR& create_info, const Location& loc) const;
 
     // Functions removed in Vulkan SC
-    template <typename VkHandle>
-    bool ValidateRemovedCommand(VkHandle handle, const Location& loc) const;
     bool PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
                                            const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule,
                                            const ErrorObject& error_obj) const override;
@@ -103,22 +153,6 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     bool PreCallValidateUpdateDescriptorSetWithTemplateKHR(VkDevice device, VkDescriptorSet descriptorSet,
                                                            VkDescriptorUpdateTemplate descriptorUpdateTemplate, const void* pData,
                                                            const ErrorObject& error_obj) const override;
-    bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format,
-                                                                     VkImageType type, VkSampleCountFlagBits samples,
-                                                                     VkImageUsageFlags usage, VkImageTiling tiling,
-                                                                     uint32_t* pPropertyCount,
-                                                                     VkSparseImageFormatProperties* pProperties,
-                                                                     const ErrorObject& error_obj) const override;
-    bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties2(VkPhysicalDevice physicalDevice,
-                                                                      const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo,
-                                                                      uint32_t* pPropertyCount,
-                                                                      VkSparseImageFormatProperties2* pProperties,
-                                                                      const ErrorObject& error_obj) const override;
-    bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties2KHR(VkPhysicalDevice physicalDevice,
-                                                                         const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo,
-                                                                         uint32_t* pPropertyCount,
-                                                                         VkSparseImageFormatProperties2* pProperties,
-                                                                         const ErrorObject& error_obj) const override;
     bool PreCallValidateGetImageSparseMemoryRequirements(VkDevice device, VkImage image, uint32_t* pSparseMemoryRequirementCount,
                                                          VkSparseImageMemoryRequirements* pSparseMemoryRequirements,
                                                          const ErrorObject& error_obj) const override;
@@ -136,18 +170,6 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     // Validation utility functions overridden for Vulkan SC
     bool ValidatePipelineShaderStage(const vvl::Pipeline& pipeline, const vku::safe_VkPipelineShaderStageCreateInfo& stage_ci,
                                      const void* pipeline_ci_pnext, const Location& loc) const override;
-
-    // Intercept instance creation to set up VUID filters
-    void PreCallRecordCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
-                                     VkInstance* pInstance, const RecordObject& record_obj) override;
-
-    // Functions requiring additional/modified validation for Vulkan SC
-    bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
-                                       VkInstance* pInstance, const ErrorObject& error_obj) const override;
-    bool PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
-                                     const VkAllocationCallbacks* pAllocator, VkDevice* pDevice,
-                                     const ErrorObject& error_obj) const override;
-    void PostCreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
 
     bool PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
                                           const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
@@ -239,10 +261,9 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
                                      uint32_t* pFaultCount, VkFaultData* pFaults, const ErrorObject& error_obj) const override;
 
     // SPIR-V validation related utilities
-    bool ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, const vvl::sc::PipelineCacheData& data,
-                                    uint32_t pipeline_index, uint32_t stage_index, const Location& loc) const;
     bool ValidatePipelineStageInfo(uint32_t stage_index, const VkPipelineShaderStageCreateInfo& stage_info,
                                    const vvl::sc::PipelineCache* pipeline_cache_state,
                                    const VkPipelineOfflineCreateInfo* offline_info, const Location& loc) const;
+};
 
-};  // Class SCCoreChecks
+}  // namespace core::sc

@@ -19,7 +19,6 @@
 
 #include "utils/hash_util.h"
 #include "state_tracker/pipeline_state.h"
-#include "generated/layer_chassis_dispatch.h"
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -169,9 +168,9 @@ class PipelineCache : public vvl::PipelineCache {
         using ID = PipelineCacheData::Entry::ID;
         using StageModules = std::vector<std::shared_ptr<vvl::ShaderModule>>;
 
-        Entry(const ValidationStateTracker& dev_data, const PipelineCacheData::Entry& cache_entry)
+        Entry(const Device& state_data, const PipelineCacheData::Entry& cache_entry)
             : id_(cache_entry.PipelineID()),
-              shader_modules_(InitShaderModules(dev_data, cache_entry)),
+              shader_modules_(InitShaderModules(state_data, cache_entry)),
               json_data_(ParseJsonData(cache_entry)) {}
 
         ID PipelineID() const { return id_; }
@@ -207,7 +206,7 @@ class PipelineCache : public vvl::PipelineCache {
             std::vector<std::unique_ptr<vku::safe_VkSpecializationInfo>> specialization_info{};
         };
 
-        StageModules InitShaderModules(const ValidationStateTracker& dev_data, const PipelineCacheData::Entry& cache_entry);
+        StageModules InitShaderModules(const Device& state_data, const PipelineCacheData::Entry& cache_entry);
         JsonData ParseJsonData(const PipelineCacheData::Entry& cache_entry);
 
         ID id_;
@@ -215,8 +214,7 @@ class PipelineCache : public vvl::PipelineCache {
         JsonData json_data_;
     };
 
-    PipelineCache(const ValidationStateTracker& dev_data, VkPipelineCache pipeline_cache,
-                  const VkPipelineCacheCreateInfo* pCreateInfo);
+    PipelineCache(const Device& state_data, VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo* pCreateInfo);
 
     const Entry* GetPipeline(const VkPipelineOfflineCreateInfo* offline_info) const {
         if (offline_info) {
@@ -253,7 +251,7 @@ class Pipeline : public vvl::Pipeline {
     const VkPipelineOfflineCreateInfo *offline_info;
 
     template <typename CreateInfo, typename... Args>
-    Pipeline(const ValidationStateTracker& state_data, const CreateInfo* pCreateInfo, Args&&... args)
+    Pipeline(const Device& state_data, const CreateInfo* pCreateInfo, Args&&... args)
         : vvl::Pipeline(state_data, pCreateInfo, std::forward<Args>(args)...), offline_info(FindOfflineCreateInfo()) {}
 
   private:

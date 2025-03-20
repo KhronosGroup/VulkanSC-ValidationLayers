@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,12 @@
 
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
+
+// Remove Windows macro that prevents usage of its name in any scope of the program.
+// For example, BitstreamBuffer::MemoryBarrier() won't compile on ARM64.
+#if defined(VK_USE_PLATFORM_WIN32_KHR) && defined(MemoryBarrier)
+#undef MemoryBarrier
+#endif
 
 #include "binding.h"
 #include "containers/custom_containers.h"
@@ -70,16 +76,15 @@
 
 #define OBJECT_LAYER_NAME "VK_LAYER_KHRONOS_validation"
 
-//--------------------------------------------------------------------------------------
-// Mesh and VertexFormat Data
-//--------------------------------------------------------------------------------------
+// This is only for tests where you have a good reason to have more than the default (10) duplicate message limit.
+// It is highly suggested you first try to breakup your test up into smaller tests if you are trying to use this.
+static VkBool32 kVkFalse = VK_FALSE;
+static const VkLayerSettingEXT kDisableMessageLimitSetting = {OBJECT_LAYER_NAME, "enable_message_limit",
+                                                              VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse};
+[[maybe_unused]] static VkLayerSettingsCreateInfoEXT kDisableMessageLimit = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
+                                                                             nullptr, 1, &kDisableMessageLimitSetting};
 
 // Static arrays helper
-template <class ElementT, size_t array_size>
-size_t size(ElementT (&)[array_size]) {
-    return array_size;
-}
-
 template <class ElementT, size_t array_size>
 uint32_t size32(ElementT (&)[array_size]) {
     return static_cast<uint32_t>(array_size);
@@ -196,6 +201,13 @@ class VkLayerTest : public VkLayerTestBase {
     }
     APIVersion DeviceValidationVersion() const;
 
+    // Helpers to quickly create a Handle and check it gives a certain VU error
+    void CreateSamplerTest(const VkSamplerCreateInfo &create_info, const char *vuid);
+    void CreateBufferTest(const VkBufferCreateInfo &create_info, const char *vuid);
+    void CreateImageTest(const VkImageCreateInfo &create_info, const char *vuid);
+    void CreateBufferViewTest(const VkBufferViewCreateInfo &create_info, const char *vuid);
+    void CreateImageViewTest(const VkImageViewCreateInfo &create_info, const char *vuid);
+
   protected:
     void SetTargetApiVersion(APIVersion target_api_version);
     bool LoadDeviceProfileLayer(
@@ -246,9 +258,19 @@ class GpuAVDescriptorIndexingTest : public GpuAVTest {
     void InitGpuVUDescriptorIndexing();
 };
 
+class GpuAVDescriptorClassGeneralBuffer : public GpuAVTest {
+  public:
+    void ComputeStorageBufferTest(const char *shader, bool is_glsl, VkDeviceSize buffer_size, const char *expected_error = nullptr);
+};
+
 class GpuAVRayQueryTest : public GpuAVTest {
   public:
     void InitGpuAVRayQuery();
+};
+
+class GpuAVImageLayout : public GpuAVTest {
+  public:
+    void InitGpuAVImageLayout();
 };
 
 class DebugPrintfTests : public VkLayerTest {
@@ -262,6 +284,7 @@ class VkSyncValTest : public VkLayerTest {
     void InitSyncValFramework(const SyncValSettings *p_sync_settings = nullptr);
     void InitSyncVal(const SyncValSettings *p_sync_settings = nullptr);
     void InitTimelineSemaphore();
+    void InitRayTracing();
 };
 
 class AndroidExternalResolveTest : public VkLayerTest {
@@ -272,7 +295,7 @@ class AndroidExternalResolveTest : public VkLayerTest {
 
 class DescriptorBufferTest : public VkLayerTest {
   public:
-    void InitBasicDescriptorBuffer();
+    void InitBasicDescriptorBuffer(void *instance_pnext = nullptr);
 };
 
 class DescriptorIndexingTest : public VkLayerTest {
@@ -315,11 +338,9 @@ class GraphicsLibraryTest : public VkLayerTest {
 
 class HostImageCopyTest : public VkLayerTest {
   public:
-    void InitHostImageCopyTest(const VkImageCreateInfo &create_info);
+    void InitHostImageCopyTest();
     bool CopyLayoutSupported(const std::vector<VkImageLayout> &copy_src_layouts, const std::vector<VkImageLayout> &copy_dst_layouts,
                              VkImageLayout layout);
-    VkFormat compressed_format = VK_FORMAT_UNDEFINED;
-    bool separate_depth_stencil = false;
     std::vector<VkImageLayout> copy_src_layouts;
     std::vector<VkImageLayout> copy_dst_layouts;
 
@@ -360,6 +381,11 @@ class ShaderObjectTest : public virtual VkLayerTest {
   public:
     void InitBasicShaderObject();
     void InitBasicMeshShaderObject(APIVersion target_api_version);
+
+    // Many tests just need a basic vert/frag shader
+    vkt::Shader m_vert_shader;
+    vkt::Shader m_frag_shader;
+    void CreateMinimalShaders();
 };
 
 class SyncObjectTest : public VkLayerTest {
@@ -440,15 +466,5 @@ VkFormat FindFormatWithoutFeatures(VkPhysicalDevice gpu, VkImageTiling tiling,
                                    VkFormatFeatureFlags undesired_features = vvl::kU32Max);
 
 VkFormat FindFormatWithoutFeatures2(VkPhysicalDevice gpu, VkImageTiling tiling, VkFormatFeatureFlags2 undesired_features);
-
-void CreateSamplerTest(VkLayerTest &test, const VkSamplerCreateInfo *pCreateInfo, const std::string &code = "");
-
-void CreateBufferTest(VkLayerTest &test, const VkBufferCreateInfo *pCreateInfo, const std::string &code = "");
-
-void CreateImageTest(VkLayerTest &test, const VkImageCreateInfo *pCreateInfo, const std::string &code = "");
-
-void CreateBufferViewTest(VkLayerTest &test, const VkBufferViewCreateInfo *pCreateInfo, const std::vector<std::string> &codes);
-
-void CreateImageViewTest(VkLayerTest &test, const VkImageViewCreateInfo *pCreateInfo, const std::string &code = "");
 
 void PrintAndroid(const char *c);

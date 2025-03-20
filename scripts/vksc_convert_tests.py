@@ -138,20 +138,25 @@ def convert_test_file(args, filename, data, converted_cases):
                     converted_cases[test_suite] = {}
                 if not test_case in converted_cases[test_suite]:
                     converted_cases[test_suite][test_case] = True
-                else:
-                    print(f'ERROR: Duplicate test case "{test_suite}.{test_case}" in file "{filename}"')
-                    result = False
-                    output.write(line)
-                    continue
 
                 if case_data['disable']:
                     output.write(f"// {case_data['reason']}\n")
                     output.write(line.replace(test_case, f"DISABLED_{test_case}"))
-                else:
-                    output.write(line)
-                    output.write(f"    // {case_data['reason']}\n")
+                elif case_data['patch']:
+                    patch_str = f"    // {case_data['reason']}\n"
                     for patch in case_data['patch']:
-                        output.write(f'    {patch};\n')
+                        patch_str += f'    {patch};\n'
+
+                    # Handle the weird case of single-line test cases caused by clang-format formatting
+                    if line.find('}') >= 0:
+                        split_pos = line.find('{') + 1
+                        output_str = f'{line[0:split_pos]}\n{patch_str}\n{line[split_pos:]}'
+                        output.write(output_str)
+                    else:
+                        output.write(line)
+                        output.write(patch_str)
+                else:
+                    print(line)
 
     return result
 

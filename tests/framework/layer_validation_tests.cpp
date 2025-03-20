@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ VkFormat FindSupportedStencilOnlyFormat(VkPhysicalDevice phy) {
 
 VkFormat FindSupportedDepthStencilFormat(VkPhysicalDevice phy) {
     const VkFormat ds_formats[] = {VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT};
-    for (uint32_t i = 0; i < size(ds_formats); ++i) {
+    for (uint32_t i = 0; i < size32(ds_formats); ++i) {
         VkFormatProperties format_props;
         vk::GetPhysicalDeviceFormatProperties(phy, ds_formats[i], &format_props);
 
@@ -183,7 +183,7 @@ void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, con
         vk::ResetCommandBuffer(command_buffer, 0);
     }
     if (rp2Supported && rp2_vuid) {
-        VkSubpassBeginInfoKHR subpass_begin_info = {VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO_KHR, nullptr, VK_SUBPASS_CONTENTS_INLINE};
+        VkSubpassBeginInfo subpass_begin_info = {VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO_KHR, nullptr, VK_SUBPASS_CONTENTS_INLINE};
         vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
         error_monitor->SetDesiredError(rp2_vuid);
         vk::CmdBeginRenderPass2KHR(command_buffer, begin_info, &subpass_begin_info);
@@ -246,56 +246,34 @@ VkFormat FindFormatWithoutFeatures2(VkPhysicalDevice gpu, VkImageTiling tiling, 
     return return_format;
 }
 
-void CreateSamplerTest(VkLayerTest &test, const VkSamplerCreateInfo *create_info, const std::string &code) {
-    if (code.length()) {
-        test.Monitor().SetDesiredError(code.c_str());
-    }
-
-    vkt::Sampler sampler(*test.DeviceObj(), *create_info);
-
-    if (code.length()) {
-        test.Monitor().VerifyFound();
-    }
+void VkLayerTest::CreateSamplerTest(const VkSamplerCreateInfo &create_info, const char *vuid) {
+    Monitor().SetDesiredError(vuid);
+    vkt::Sampler sampler(*m_device, create_info);
+    Monitor().VerifyFound();
 }
 
-void CreateBufferTest(VkLayerTest &test, const VkBufferCreateInfo *create_info, const std::string &code) {
-    if (code.length()) {
-        test.Monitor().SetDesiredError(code.c_str());
-    }
-    vkt::Buffer buffer(*test.DeviceObj(), *create_info, vkt::no_mem);
-    if (code.length()) {
-        test.Monitor().VerifyFound();
-    }
+void VkLayerTest::CreateBufferTest(const VkBufferCreateInfo &create_info, const char *vuid) {
+    Monitor().SetDesiredError(vuid);
+    vkt::Buffer buffer(*m_device, create_info, vkt::no_mem);
+    Monitor().VerifyFound();
 }
 
-void CreateImageTest(VkLayerTest &test, const VkImageCreateInfo *create_info, const std::string &code) {
-    if (code.length()) {
-        test.Monitor().SetDesiredError(code.c_str());
-    }
-    vkt::Image image(*test.DeviceObj(), *create_info, vkt::no_mem);
-    if (code.length()) {
-        test.Monitor().VerifyFound();
-    }
+void VkLayerTest::CreateImageTest(const VkImageCreateInfo &create_info, const char *vuid) {
+    Monitor().SetDesiredError(vuid);
+    vkt::Image image(*m_device, create_info, vkt::no_mem);
+    Monitor().VerifyFound();
 }
 
-void CreateBufferViewTest(VkLayerTest &test, const VkBufferViewCreateInfo *create_info, const std::vector<std::string> &codes) {
-    if (codes.size()) {
-        std::for_each(codes.begin(), codes.end(), [&](const std::string &s) { test.Monitor().SetDesiredError(s.c_str()); });
-    }
-    vkt::BufferView view(*test.DeviceObj(), *create_info);
-    if (codes.size()) {
-        test.Monitor().VerifyFound();
-    }
+void VkLayerTest::CreateBufferViewTest(const VkBufferViewCreateInfo &create_info, const char *vuid) {
+    Monitor().SetDesiredError(vuid);
+    vkt::BufferView view(*m_device, create_info);
+    Monitor().VerifyFound();
 }
 
-void CreateImageViewTest(VkLayerTest &test, const VkImageViewCreateInfo *create_info, const std::string &code) {
-    if (code.length()) {
-        test.Monitor().SetDesiredError(code.c_str());
-    }
-    vkt::ImageView view(*test.DeviceObj(), *create_info);
-    if (code.length()) {
-        test.Monitor().VerifyFound();
-    }
+void VkLayerTest::CreateImageViewTest(const VkImageViewCreateInfo &create_info, const char *vuid) {
+    Monitor().SetDesiredError(vuid);
+    vkt::ImageView view(*m_device, create_info);
+    Monitor().VerifyFound();
 }
 
 VkSamplerCreateInfo SafeSaneSamplerCreateInfo() {
@@ -325,12 +303,7 @@ void VkLayerTest::Init(VkPhysicalDeviceFeatures *features, VkPhysicalDeviceFeatu
 }
 
 VkLayerTest::VkLayerTest() {
-#if !defined(VK_USE_PLATFORM_ANDROID_KHR)
     m_instance_extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-#else
-    m_instance_extension_names.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-#endif
-
     instance_layers_.push_back(kValidationLayerName);
 
     if (InstanceLayerSupported("VK_LAYER_LUNARG_device_profile_api")) {

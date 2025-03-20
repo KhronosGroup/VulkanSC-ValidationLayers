@@ -1,10 +1,10 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2015-2024 The Khronos Group Inc.
-# Copyright (c) 2015-2024 Valve Corporation
-# Copyright (c) 2015-2024 LunarG, Inc.
-# Copyright (c) 2015-2024 Google Inc.
-# Copyright (c) 2023-2024 RasterGrid Kft.
+# Copyright (c) 2015-2025 The Khronos Group Inc.
+# Copyright (c) 2015-2025 Valve Corporation
+# Copyright (c) 2015-2025 LunarG, Inc.
+# Copyright (c) 2015-2025 Google Inc.
+# Copyright (c) 2023-2025 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 # limitations under the License.
 
 import os
-from generators.base_generator import BaseGenerator
+from base_generator import BaseGenerator
 from generators.generator_utils import PlatformGuardHelper
 
 # This class is a container for any source code, data, or other behavior that is necessary to
@@ -47,6 +47,7 @@ class APISpecific:
                     'const VkExternalMemoryHandleTypeFlagsNV AllVkExternalMemoryHandleTypeFlagBitsNV = 0;\n',
                     'const VkVideoEncodeFeedbackFlagsKHR AllVkVideoEncodeFeedbackFlagBitsKHR = 0;\n',
                     'const VkIndirectCommandsInputModeFlagsEXT AllVkIndirectCommandsInputModeFlagBitsEXT = 0;\n',
+                    'const VkInstanceCreateFlags AllVkInstanceCreateFlagBits = 0;\n'
                     # This one is special, because upstream code uses it to verify whether a GPL based pipeline
                     # has all subsections specified and zero has a special meaning indicating no use of GPL
                     'const VkGraphicsPipelineLibraryFlagsEXT AllVkGraphicsPipelineLibraryFlagBitsEXT = 0xF;\n',
@@ -93,9 +94,9 @@ class EnumFlagBitsOutputGenerator(BaseGenerator):
 
             /***************************************************************************
             *
-            * Copyright (c) 2015-2024 The Khronos Group Inc.
-            * Copyright (c) 2015-2024 Valve Corporation
-            * Copyright (c) 2015-2024 LunarG, Inc.
+            * Copyright (c) 2015-2025 The Khronos Group Inc.
+            * Copyright (c) 2015-2025 Valve Corporation
+            * Copyright (c) 2015-2025 LunarG, Inc.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.

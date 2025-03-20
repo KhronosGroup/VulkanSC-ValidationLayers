@@ -441,7 +441,8 @@ TEST_F(PositiveSyncValTimelineSemaphore, FrameSynchronization2) {
     vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
     for (int i = 1; i <= N; i++) {
         m_default_queue->Submit2(m_command_buffer, vkt::TimelineSignal(semaphore, i));
-        while (semaphore.GetCounterValue() != i);
+        while (semaphore.GetCounterValue() != i)
+            ;
     }
     m_device->Wait();
 }

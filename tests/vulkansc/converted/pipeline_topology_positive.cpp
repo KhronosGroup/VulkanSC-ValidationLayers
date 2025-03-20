@@ -171,7 +171,7 @@ TEST_F(PositivePipelineTopology, LoosePointSizeWrite) {
     }
 }
 
-TEST_F(PositivePipelineTopology, PointSizeStructMemeberWritten) {
+TEST_F(PositivePipelineTopology, PointSizeStructMemberWritten) {
     TEST_DESCRIPTION("Write built-in PointSize within a struct");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);  // At least 1.1 is required for maintenance4
@@ -470,7 +470,7 @@ TEST_F(PositivePipelineTopology, LineTopologyClasses) {
 
     // Verify each vkCmdSet command
     CreatePipelineHelper pipe(*this);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
     pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     VkVertexInputBindingDescription inputBinding = {0, sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     pipe.vi_ci_.pVertexBindingDescriptions = &inputBinding;

@@ -97,7 +97,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelinesWithBasePipeline) {
 TEST_F(VkSCNegativePipeline, CreatePipelinePoolSize) {
     TEST_DESCRIPTION("Test pipeline pool size related VUs for pipeline create commands");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();

@@ -31,30 +31,30 @@ class VkSCNegativeWsi : public VkSCLayerTest {
             }
 
             if (result == VK_SUCCESS) {
-                result = vksc::GetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(), surface_, &surface_caps_);
+                result = vksc::GetPhysicalDeviceSurfaceCapabilitiesKHR(Gpu(), surface_, &surface_caps_);
             }
 
             if (result == VK_SUCCESS) {
                 uint32_t count = 0;
-                result = vksc::GetPhysicalDeviceSurfaceFormatsKHR(gpu(), surface_, &count, nullptr);
+                result = vksc::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), surface_, &count, nullptr);
                 if (count == 0) {
                     result = VK_ERROR_INITIALIZATION_FAILED;
                 }
                 if (result == VK_SUCCESS) {
                     surface_formats_.resize(count);
-                    result = vksc::GetPhysicalDeviceSurfaceFormatsKHR(gpu(), surface_, &count, surface_formats_.data());
+                    result = vksc::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), surface_, &count, surface_formats_.data());
                 }
             }
 
             if (result == VK_SUCCESS) {
                 uint32_t count = 0;
-                result = vksc::GetPhysicalDeviceSurfacePresentModesKHR(gpu(), surface_, &count, nullptr);
+                result = vksc::GetPhysicalDeviceSurfacePresentModesKHR(Gpu(), surface_, &count, nullptr);
                 if (count == 0) {
                     result = VK_ERROR_INITIALIZATION_FAILED;
                 }
                 if (result == VK_SUCCESS) {
                     surface_present_modes_.resize(count);
-                    result = vksc::GetPhysicalDeviceSurfacePresentModesKHR(gpu(), surface_, &count, surface_present_modes_.data());
+                    result = vksc::GetPhysicalDeviceSurfacePresentModesKHR(Gpu(), surface_, &count, surface_present_modes_.data());
                 }
             }
 

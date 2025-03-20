@@ -87,7 +87,7 @@ void PipelineBuilder::TestDeviceCreateFail() {
 
     VkDevice device = VK_NULL_HANDLE;
 
-    vksc::CreateDevice(framework_.gpu(), &create_info, nullptr, &device);
+    vksc::CreateDevice(framework_.Gpu(), &create_info, nullptr, &device);
     vksc::DestroyDevice(device, nullptr);
 }
 

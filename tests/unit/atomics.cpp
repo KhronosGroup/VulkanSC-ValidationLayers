@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,7 +41,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
 
         auto info_override = [&](CreatePipelineHelper &info) {
             info.shader_stages_ = {vs.GetStageCreateInfo(), info.fs_->GetStageCreateInfo()};
-            info.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}};
+            info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr};
         };
 
         CreatePipelineHelper::OneshotTest(*this, info_override, kErrorBit, "VUID-RuntimeSpirv-NonWritable-06341");
@@ -61,7 +61,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
         if (VK_SUCCESS == vs.InitFromGLSLTry()) {
             auto info_override = [&](CreatePipelineHelper &info) {
                 info.shader_stages_ = {vs.GetStageCreateInfo(), info.fs_->GetStageCreateInfo()};
-                info.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}};
+                info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr};
             };
 
             CreatePipelineHelper::OneshotTest(*this, info_override, kErrorBit, "VUID-RuntimeSpirv-NonWritable-06341");
@@ -92,7 +92,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
 
         auto info_override = [&](CreatePipelineHelper &info) {
             info.shader_stages_ = {info.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-            info.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+            info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
         };
 
         CreatePipelineHelper::OneshotTest(*this, info_override, kErrorBit, "VUID-RuntimeSpirv-NonWritable-06340");
@@ -112,7 +112,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
         if (VK_SUCCESS == fs.InitFromGLSLTry()) {
             auto info_override = [&](CreatePipelineHelper &info) {
                 info.shader_stages_ = {info.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-                info.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+                info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
             };
 
             CreatePipelineHelper::OneshotTest(*this, info_override, kErrorBit, "VUID-RuntimeSpirv-NonWritable-06340");
@@ -139,7 +139,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureBuffer) {
 
     auto info_override = [&](CreatePipelineHelper &info) {
         info.shader_stages_ = {info.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-        info.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+        info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     };
 
     CreatePipelineHelper::OneshotTest(*this, info_override, kErrorBit, "VUID-RuntimeSpirv-NonWritable-06340");
@@ -179,18 +179,6 @@ TEST_F(NegativeAtomic, Int64) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
     RETURN_IF_SKIP(Init());
 
-    // For sanity check without GL_EXT_shader_atomic_int64
-    std::string cs_positive = R"glsl(
-        #version 450
-        #extension GL_EXT_shader_explicit_arithmetic_types_int64 : enable
-        #extension GL_KHR_memory_scope_semantics : enable
-        shared uint64_t x;
-        layout(set = 0, binding = 0) buffer ssbo { uint64_t y; };
-        void main() {
-           y = x + 1;
-        }
-    )glsl";
-
     std::string cs_base = R"glsl(
         #version 450
         #extension GL_EXT_shader_explicit_arithmetic_types_int64 : enable
@@ -224,8 +212,6 @@ TEST_F(NegativeAtomic, Int64) {
     )glsl";
     // clang-format on
 
-    { VkShaderObj const cs(this, cs_positive.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1); }
-
     {
         // shaderBufferInt64Atomics
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
@@ -248,6 +234,53 @@ TEST_F(NegativeAtomic, Int64) {
         VkShaderObj const cs(this, cs_workgroup.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(NegativeAtomic, Int64Slang) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    AddRequiredFeature(vkt::Feature::shaderBufferInt64Atomics);  // to allow OpCapability Int64Atomics
+    RETURN_IF_SKIP(Init());
+
+    std::string cs_source = R"(
+               OpCapability Int64
+               OpCapability Int64Atomics
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %atomicVariable %gl_GlobalInvocationID
+               OpExecutionMode %main LocalSize 1 1 1
+               OpSource Slang 1
+               OpName %value "value"
+               OpName %atomicVariable "atomicVariable"
+               OpName %main "main"
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+     %v3uint = OpTypeVector %uint 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+      %ulong = OpTypeInt 64 0
+    %ulong_4 = OpConstant %ulong 4
+     %uint_1 = OpConstant %uint 1
+     %uint_0 = OpConstant %uint 0
+%_ptr_Workgroup_ulong = OpTypePointer Workgroup %ulong
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+%atomicVariable = OpVariable %_ptr_Workgroup_ulong Workgroup
+       %main = OpFunction %void None %3
+          %4 = OpLabel
+          %7 = OpLoad %v3uint %gl_GlobalInvocationID
+         %10 = OpCompositeExtract %uint %7 0
+         %12 = OpUConvert %ulong %10
+      %value = OpIMul %ulong %ulong_4 %12
+               OpAtomicStore %atomicVariable %uint_1 %uint_0 %value
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06279");
+    VkShaderObj const cs(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeAtomic, ImageInt64) {
@@ -330,17 +363,9 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime64) {
     TEST_DESCRIPTION("Test VK_EXT_shader_image_atomic_int64 draw time with 64 bit image view.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT image_atomic_int64_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(image_atomic_int64_features);
-    if (features2.features.shaderInt64 == VK_FALSE) {
-        GTEST_SKIP() << "shaderInt64 feature not supported";
-    } else if (image_atomic_int64_features.shaderImageInt64Atomics == VK_FALSE) {
-        GTEST_SKIP() << "shaderImageInt64Atomics feature not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    AddRequiredFeature(vkt::Feature::shaderImageInt64Atomics);
+    RETURN_IF_SKIP(Init());
 
     std::string cs_source = R"glsl(
         #version 450
@@ -355,7 +380,7 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime64) {
 
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr}};
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr};
     pipe.CreateComputePipeline();
 
     vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R32_UINT, VK_IMAGE_USAGE_STORAGE_BIT);
@@ -381,17 +406,9 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime32) {
     TEST_DESCRIPTION("Test VK_EXT_shader_image_atomic_int64 draw time with 32 bit image view.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT image_atomic_int64_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(image_atomic_int64_features);
-    if (features2.features.shaderInt64 == VK_FALSE) {
-        GTEST_SKIP() << "shaderInt64 feature not supported";
-    } else if (image_atomic_int64_features.shaderImageInt64Atomics == VK_FALSE) {
-        GTEST_SKIP() << "shaderImageInt64Atomics feature not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    AddRequiredFeature(vkt::Feature::shaderImageInt64Atomics);
+    RETURN_IF_SKIP(Init());
 
     std::string cs_source = R"glsl(
         #version 450
@@ -404,7 +421,7 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime32) {
 
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr}};
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr};
     pipe.CreateComputePipeline();
 
     // "64-bit integer atomic support is guaranteed for optimally tiled images with the VK_FORMAT_R64_UINT"
@@ -430,21 +447,12 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime32) {
 TEST_F(NegativeAtomic, ImageInt64DrawtimeSparse) {
     TEST_DESCRIPTION("Test VK_EXT_shader_image_atomic_int64 at draw time with Sparse image.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-
     AddRequiredExtensions(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT image_atomic_int64_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(image_atomic_int64_features);
-    if (!features2.features.shaderInt64) {
-        GTEST_SKIP() << "shaderInt64 feature not supported";
-    } else if (!features2.features.sparseBinding) {
-        GTEST_SKIP() << "sparseBinding feature not supported";
-    } else if (!image_atomic_int64_features.shaderImageInt64Atomics) {
-        GTEST_SKIP() << "shaderImageInt64Atomics feature not supported";
-    }
-    image_atomic_int64_features.sparseImageInt64Atomics = VK_FALSE;  // turn off
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    AddRequiredFeature(vkt::Feature::sparseBinding);
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
+    AddRequiredFeature(vkt::Feature::shaderImageInt64Atomics);
+    RETURN_IF_SKIP(Init());
 
     const char *cs_source = R"glsl(
         #version 450
@@ -469,16 +477,8 @@ TEST_F(NegativeAtomic, ImageInt64DrawtimeSparse) {
     pipe.descriptor_set_->WriteDescriptorBufferInfo(0, buffer.handle(), 0, 1024, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R64_UINT, VK_IMAGE_USAGE_STORAGE_BIT);
     image_ci.flags = VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT | VK_IMAGE_CREATE_SPARSE_BINDING_BIT;
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.format = VK_FORMAT_R64_UINT;
-    image_ci.extent = {32, 32, 1};
-    image_ci.mipLevels = 1;
-    image_ci.arrayLayers = 1;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_ci.usage = VK_IMAGE_USAGE_STORAGE_BIT;
     vkt::Image image(*m_device, image_ci, vkt::no_mem);
     vkt::ImageView image_view = image.CreateView();
     pipe.descriptor_set_->WriteDescriptorImageInfo(1, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -500,21 +500,10 @@ TEST_F(NegativeAtomic, ImageInt64Mesh32) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper();
-    VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT image_atomic_int64_features = vku::InitStructHelper(&mesh_shader_features);
-    auto features2 = GetPhysicalDeviceFeatures2(image_atomic_int64_features);
-    if (features2.features.shaderInt64 == VK_FALSE) {
-        GTEST_SKIP() << "shaderInt64 feature not supported";
-    } else if (image_atomic_int64_features.shaderImageInt64Atomics == VK_FALSE) {
-        GTEST_SKIP() << "shaderImageInt64Atomics feature not supported";
-    } else if (mesh_shader_features.meshShader == VK_FALSE) {
-        GTEST_SKIP() << "Mesh shader feature not supported";
-    }
-    mesh_shader_features.multiviewMeshShader = VK_FALSE;
-    mesh_shader_features.primitiveFragmentShadingRateMeshShader = VK_FALSE;
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    AddRequiredFeature(vkt::Feature::shaderImageInt64Atomics);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const char *mesh_source = R"glsl(
@@ -537,7 +526,7 @@ TEST_F(NegativeAtomic, ImageInt64Mesh32) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr}};
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr};
     // Ensure pVertexInputState and pInputAssembly state are null, as these should be ignored.
     pipe.gp_ci_.pVertexInputState = nullptr;
     pipe.gp_ci_.pInputAssemblyState = nullptr;
@@ -1188,20 +1177,13 @@ TEST_F(NegativeAtomic, Float2WidthMismatch) {
     TEST_DESCRIPTION("VK_EXT_shader_atomic_float2 but enable wrong bitwidth.");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
 
-    VkPhysicalDeviceVulkan13Features features13 = vku::InitStructHelper();  // need maintenance4
-    VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT atomic_float2_features = vku::InitStructHelper(&features13);
-    VkPhysicalDeviceShaderFloat16Int8Features float16int8_features = vku::InitStructHelper(&atomic_float2_features);
-    VkPhysicalDevice16BitStorageFeatures storage_16_bit_features = vku::InitStructHelper(&float16int8_features);
-    GetPhysicalDeviceFeatures2(storage_16_bit_features);
-    if (!float16int8_features.shaderFloat16 || !storage_16_bit_features.storageBuffer16BitAccess ||
-        !atomic_float2_features.shaderBufferFloat16AtomicMinMax) {
-        GTEST_SKIP() << "Required float 16 atomic features not supported";
-    }
-    // turn off 32-bit support
-    atomic_float2_features.shaderBufferFloat32AtomicMinMax = VK_FALSE;
-    RETURN_IF_SKIP(InitState(nullptr, &storage_16_bit_features));
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
+    AddRequiredFeature(vkt::Feature::storageBuffer16BitAccess);
+    AddRequiredFeature(vkt::Feature::shaderBufferFloat16AtomicMinMax);
+    AddRequiredFeature(vkt::Feature::shaderSharedFloat32AtomicMinMax);
+    // shaderBufferFloat32AtomicMinMax not enabled
+    RETURN_IF_SKIP(Init());
 
     // clang-format off
     std::string cs_buffer_float_16_min = R"glsl(
@@ -1234,7 +1216,7 @@ TEST_F(NegativeAtomic, Float2WidthMismatch) {
     const char *current_shader = nullptr;
     const auto set_info = [this, &current_shader](CreateComputePipelineHelper &helper) {
         helper.cs_ = std::make_unique<VkShaderObj>(this, current_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3);
-        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+        helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     };
 
     // shaderBufferFloat16AtomicMinMax - valid - everything enabled
@@ -1318,111 +1300,6 @@ void main() {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeAtomic, FloatShaderDebugInfo) {
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init());
-
-    std::string cs_source = R"(
-               OpCapability Shader
-               OpExtension "SPV_KHR_non_semantic_info"
-          %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
-          %3 = OpExtInstImport "GLSL.std.450"
-               OpMemoryModel Logical GLSL450
-               OpEntryPoint GLCompute %main "main"
-               OpExecutionMode %main LocalSize 1 1 1
-          %2 = OpString "a.comp"
-          %8 = OpString "uint"
-         %16 = OpString "main"
-         %19 = OpString "#version 450
-#extension GL_EXT_shader_atomic_float : enable
-#extension GL_KHR_memory_scope_semantics : enable
-#extension GL_EXT_shader_explicit_arithmetic_types_float32 : enable
-
-layout(set = 0, binding = 0) buffer ssbo { float32_t y; };
-void main() {
-    y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
-}"
-         %29 = OpString "float"
-         %33 = OpString "y"
-         %36 = OpString "ssbo"
-         %43 = OpString ""
-         %45 = OpString "int"
-               OpSourceExtension "GL_EXT_shader_atomic_float"
-               OpSourceExtension "GL_EXT_shader_explicit_arithmetic_types_float32"
-               OpSourceExtension "GL_KHR_memory_scope_semantics"
-               OpName %main "main"
-               OpName %ssbo "ssbo"
-               OpMemberName %ssbo 0 "y"
-               OpName %_ ""
-               OpModuleProcessed "client vulkan100"
-               OpModuleProcessed "target-env spirv1.3"
-               OpModuleProcessed "target-env vulkan1.1"
-               OpModuleProcessed "entry-point main"
-               OpDecorate %ssbo Block
-               OpMemberDecorate %ssbo 0 Offset 0
-               OpDecorate %_ Binding 0
-               OpDecorate %_ DescriptorSet 0
-       %void = OpTypeVoid
-          %5 = OpTypeFunction %void
-       %uint = OpTypeInt 32 0
-    %uint_32 = OpConstant %uint 32
-     %uint_6 = OpConstant %uint 6
-     %uint_0 = OpConstant %uint 0
-          %9 = OpExtInst %void %1 DebugTypeBasic %8 %uint_32 %uint_6 %uint_0
-     %uint_3 = OpConstant %uint 3
-          %6 = OpExtInst %void %1 DebugTypeFunction %uint_3 %void
-         %18 = OpExtInst %void %1 DebugSource %2 %19
-     %uint_7 = OpConstant %uint 7
-     %uint_1 = OpConstant %uint 1
-     %uint_4 = OpConstant %uint 4
-     %uint_2 = OpConstant %uint 2
-         %21 = OpExtInst %void %1 DebugCompilationUnit %uint_1 %uint_4 %18 %uint_2
-         %17 = OpExtInst %void %1 DebugFunction %16 %6 %18 %uint_7 %uint_0 %21 %16 %uint_3 %uint_7
-      %float = OpTypeFloat 32
-         %30 = OpExtInst %void %1 DebugTypeBasic %29 %uint_32 %uint_3 %uint_0
-       %ssbo = OpTypeStruct %float
-    %uint_54 = OpConstant %uint 54
-         %32 = OpExtInst %void %1 DebugTypeMember %33 %30 %18 %uint_6 %uint_54 %uint_0 %uint_0 %uint_3
-     %uint_8 = OpConstant %uint 8
-         %35 = OpExtInst %void %1 DebugTypeComposite %36 %uint_1 %18 %uint_8 %uint_0 %21 %36 %uint_0 %uint_3 %32
-%_ptr_StorageBuffer_ssbo = OpTypePointer StorageBuffer %ssbo
-    %uint_12 = OpConstant %uint 12
-         %40 = OpExtInst %void %1 DebugTypePointer %35 %uint_12 %uint_0
-          %_ = OpVariable %_ptr_StorageBuffer_ssbo StorageBuffer
-         %42 = OpExtInst %void %1 DebugGlobalVariable %43 %35 %18 %uint_8 %uint_0 %21 %43 %_ %uint_8
-        %int = OpTypeInt 32 1
-         %46 = OpExtInst %void %1 DebugTypeBasic %45 %uint_32 %uint_4 %uint_0
-      %int_0 = OpConstant %int 0
-    %float_1 = OpConstant %float 1
-%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
-         %50 = OpExtInst %void %1 DebugTypePointer %30 %uint_12 %uint_0
-      %int_1 = OpConstant %int 1
-     %int_64 = OpConstant %int 64
-    %uint_64 = OpConstant %uint 64
-     %uint_9 = OpConstant %uint 9
-       %main = OpFunction %void None %5
-         %15 = OpLabel
-         %26 = OpExtInst %void %1 DebugScope %17
-         %27 = OpExtInst %void %1 DebugLine %18 %uint_7 %uint_7 %uint_0 %uint_0
-         %25 = OpExtInst %void %1 DebugFunctionDefinition %17 %main
-         %52 = OpExtInst %void %1 DebugLine %18 %uint_8 %uint_8 %uint_0 %uint_0
-         %51 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
-         %56 = OpAtomicLoad %float %51 %int_1 %uint_64
-         %57 = OpFAdd %float %float_1 %56
-         %58 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
-               OpStore %58 %57
-         %59 = OpExtInst %void %1 DebugLine %18 %uint_9 %uint_9 %uint_0 %uint_0
-               OpReturn
-               OpFunctionEnd
-    )";
-
-    // VUID-RuntimeSpirv-None-06284
-    m_errorMonitor->SetDesiredError("atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);");
-    VkShaderObj const cs(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
-    m_errorMonitor->VerifyFound();
-}
-
 TEST_F(NegativeAtomic, InvalidStorageOperation) {
     TEST_DESCRIPTION(
         "If storage view use atomic operation, the view's format MUST support VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT or "
@@ -1458,12 +1335,7 @@ TEST_F(NegativeAtomic, InvalidStorageOperation) {
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
     vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
-
-    VkBufferViewCreateInfo bvci = vku::InitStructHelper();
-    bvci.buffer = buffer.handle();
-    bvci.format = buffer_view_format;
-    bvci.range = VK_WHOLE_SIZE;
-    vkt::BufferView buffer_view(*m_device, bvci);
+    vkt::BufferView buffer_view(*m_device, buffer, buffer_view_format);
 
     char const *fsSource = R"glsl(
         #version 450
@@ -1636,8 +1508,101 @@ TEST_F(NegativeAtomic, VertexPipelineStoresAndAtomics) {
     VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
-    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}};
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr};
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-NonWritable-06341");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeAtomic, BufferViewInt64Drawtime32) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    AddRequiredFeature(vkt::Feature::shaderImageInt64Atomics);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat format = VK_FORMAT_R64_UINT;
+    VkFormatProperties format_properties;
+    vk::GetPhysicalDeviceFormatProperties(Gpu(), format, &format_properties);
+    if (!(format_properties.bufferFeatures & VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT)) {
+        GTEST_SKIP() << "Test requires support for VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT";
+    }
+
+    std::string cs_source = R"glsl(
+        #version 450
+        #extension GL_KHR_memory_scope_semantics : enable
+        layout(set = 0, binding = 0, r32ui) uniform uimageBuffer z;
+        void main() {
+            uint y = imageAtomicLoad(z, 1, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    pipe.CreateComputePipeline();
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
+    vkt::BufferView view(*m_device, buffer, format);
+
+    pipe.descriptor_set_->WriteDescriptorBufferView(0, view);
+    pipe.descriptor_set_->UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+                              &pipe.descriptor_set_->set_, 0, nullptr);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-SampledType-04472");
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeAtomic, BufferViewInt64Drawtime64) {
+    TEST_DESCRIPTION("Test VK_EXT_shader_image_atomic_int64 draw time with 64 bit image view.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    AddRequiredFeature(vkt::Feature::shaderImageInt64Atomics);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat format = VK_FORMAT_R32_UINT;
+    VkFormatProperties format_properties;
+    vk::GetPhysicalDeviceFormatProperties(Gpu(), format, &format_properties);
+    if (!(format_properties.bufferFeatures & VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT)) {
+        GTEST_SKIP() << "Test requires support for VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT";
+    }
+
+    std::string cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_explicit_arithmetic_types_int64 : enable
+        #extension GL_EXT_shader_image_int64 : enable
+        #extension GL_KHR_memory_scope_semantics : enable
+        layout(set = 0, binding = 0, r64ui) uniform u64imageBuffer z;
+        void main() {
+            uint64_t y = imageAtomicLoad(z, 1, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    pipe.CreateComputePipeline();
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
+    vkt::BufferView view(*m_device, buffer, format);
+
+    pipe.descriptor_set_->WriteDescriptorBufferView(0, view, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER);
+    pipe.descriptor_set_->UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+                              &pipe.descriptor_set_->set_, 0, nullptr);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-SampledType-04473");
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
 }

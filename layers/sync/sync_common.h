@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2024 Valve Corporation
- * Copyright (c) 2019-2024 LunarG, Inc.
+ * Copyright (c) 2019-2025 Valve Corporation
+ * Copyright (c) 2019-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
  */
 #pragma once
 #include "containers/subresource_adapter.h"
-#include "containers/range_vector.h"
+#include "containers/range.h"
 #include "generated/sync_validation_types.h"
 #include <set>
 
@@ -48,9 +48,9 @@ using ResourceUsageTag = size_t;
 constexpr static ResourceUsageTag kMaxIndex = std::numeric_limits<ResourceUsageTag>::max();
 constexpr static ResourceUsageTag kInvalidTag = kMaxIndex;
 
-using ResourceUsageRange = sparse_container::range<ResourceUsageTag>;
+using ResourceUsageRange = vvl::range<ResourceUsageTag>;
 using ResourceAddress = VkDeviceSize;
-using ResourceAccessRange = sparse_container::range<ResourceAddress>;
+using ResourceAccessRange = vvl::range<ResourceAddress>;
 
 // Usage tag extended with resource handle information
 struct ResourceUsageTagEx {
@@ -60,7 +60,7 @@ struct ResourceUsageTagEx {
 
 template <typename T>
 ResourceAccessRange MakeRange(const T &has_offset_and_size) {
-    return ResourceAccessRange(has_offset_and_size.offset, (has_offset_and_size.offset + has_offset_and_size.size));
+    return ResourceAccessRange(has_offset_and_size.offset, (has_offset_and_size.offset + has_offset_and_size.effective_size));
 }
 ResourceAccessRange MakeRange(VkDeviceSize start, VkDeviceSize size);
 ResourceAccessRange MakeRange(const vvl::Buffer &buffer, VkDeviceSize offset, VkDeviceSize size);
@@ -75,25 +75,25 @@ constexpr VkImageAspectFlags kDepthStencilAspects = VK_IMAGE_ASPECT_DEPTH_BIT | 
 
 // Useful Utilites for manipulating StageAccess parameters, suitable as base class to save typing
 struct SyncStageAccess {
-    static inline const SyncStageAccessInfoType &UsageInfo(SyncStageAccessIndex stage_access_index) {
-        return syncStageAccessInfoByStageAccessIndex()[stage_access_index];
+    static inline const SyncAccessInfo &AccessInfo(SyncAccessIndex access_index) {
+        return syncAccessInfoByAccessIndex()[access_index];
     }
-    static inline SyncStageAccessFlags FlagBit(SyncStageAccessIndex stage_access) {
-        return syncStageAccessInfoByStageAccessIndex()[stage_access].stage_access_bit;
+    static inline SyncAccessFlags FlagBit(SyncAccessIndex stage_access) {
+        return syncAccessInfoByAccessIndex()[stage_access].access_bit;
     }
 
-    static bool IsRead(SyncStageAccessIndex stage_access_index) { return syncStageAccessReadMask[stage_access_index]; }
-    static bool IsRead(const SyncStageAccessInfoType &info) { return IsRead(info.stage_access_index); }
-    static bool IsWrite(SyncStageAccessIndex stage_access_index) { return syncStageAccessWriteMask[stage_access_index]; }
-    static bool IsWrite(const SyncStageAccessInfoType &info) { return IsWrite(info.stage_access_index); }
+    static bool IsRead(SyncAccessIndex access_index) { return syncAccessReadMask[access_index]; }
+    static bool IsRead(const SyncAccessInfo &info) { return IsRead(info.access_index); }
+    static bool IsWrite(SyncAccessIndex access_index) { return syncAccessWriteMask[access_index]; }
+    static bool IsWrite(const SyncAccessInfo &info) { return IsWrite(info.access_index); }
 
-    static VkPipelineStageFlags2 PipelineStageBit(SyncStageAccessIndex stage_access_index) {
-        return syncStageAccessInfoByStageAccessIndex()[stage_access_index].stage_mask;
+    static VkPipelineStageFlags2 PipelineStageBit(SyncAccessIndex access_index) {
+        return syncAccessInfoByAccessIndex()[access_index].stage_mask;
     }
-    static SyncStageAccessFlags AccessScopeByStage(VkPipelineStageFlags2 stages);
-    static SyncStageAccessFlags AccessScopeByAccess(VkAccessFlags2 access);
-    static SyncStageAccessFlags AccessScope(VkPipelineStageFlags2 stages, VkAccessFlags2 access);
-    static SyncStageAccessFlags AccessScope(const SyncStageAccessFlags &stage_scope, VkAccessFlags2 accesses) {
+    static SyncAccessFlags AccessScopeByStage(VkPipelineStageFlags2 stages);
+    static SyncAccessFlags AccessScopeByAccess(VkAccessFlags2 access);
+    static SyncAccessFlags AccessScope(VkPipelineStageFlags2 stages, VkAccessFlags2 access);
+    static SyncAccessFlags AccessScope(const SyncAccessFlags &stage_scope, VkAccessFlags2 accesses) {
         return stage_scope & AccessScopeByAccess(accesses);
     }
 };

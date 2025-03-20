@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+/* Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,8 @@
 
 // Print messages
 #define VVL_TracyMessage TracyMessage
+#define VVL_TracyMessageL TracyMessageL
+#define VVL_TracyPlot(name, value) TracyPlot(name, value)
 #define VVL_TracyMessageStream(message)                \
     {                                                  \
         std::stringstream tracy_ss;                    \
@@ -63,6 +65,8 @@
 #define VVL_TracyCZoneEnd(zone_name)
 #define VVL_TracyCFrameMark
 #define VVL_TracyMessage
+#define VVL_TracyMessageL
+#define VVL_TracyPlot(name, value)
 #define VVL_TracyMessageStream(message)
 #define VVL_TracyMessageMap(map, key_printer, value_printer)
 #endif
@@ -73,4 +77,81 @@
 #else
 #define VVL_TracyAlloc(ptr, size)
 #define VVL_TracyFree(ptr)
+#endif
+
+#if defined(VVL_TRACY_GPU)
+
+#include <vulkan/vulkan.h>
+#include "tracy/TracyVulkan.hpp"
+
+#include "generated/vk_layer_dispatch_table.h"
+
+#include <atomic>
+#include <optional>
+
+#define VVL_TracyVkZone(ctx, cmdbuf, name) TracyVkZone(ctx, cmdbuf, name)
+
+void InitTracyVk(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, PFN_vkGetInstanceProcAddr GetInstanceProcAddr,
+                 PFN_vkGetDeviceProcAddr GetDeviceProcAddr, VkLayerDispatchTable& device_dispatch_table);
+void CleanupTracyVk(VkDevice device);
+
+TracyVkCtx& GetTracyVkCtx();
+
+// One per queue
+class TracyVkCollector {
+  public:
+    static void Create(VkDevice device, VkQueue queue, uint32_t queue_family_i);
+    static void Destroy(TracyVkCollector& collector);
+
+    static TracyVkCollector& GetTracyVkCollector(VkQueue queue);
+    static void TrySubmitCollectCb(VkQueue queue);
+
+    void Collect();
+    std::optional<std::pair<VkCommandBuffer, VkFence>> TryGetCollectCb(VkQueue queue);
+
+    static PFN_vkCreateCommandPool CreateCommandPool;
+    static PFN_vkAllocateCommandBuffers AllocateCommandBuffers;
+    static PFN_vkCreateFence CreateFence;
+    static PFN_vkWaitForFences WaitForFences;
+    static PFN_vkDestroyFence DestroyFence;
+    static PFN_vkFreeCommandBuffers FreeCommandBuffers;
+    static PFN_vkDestroyCommandPool DestroyCommandPool;
+    static PFN_vkResetFences ResetFences;
+
+    static PFN_vkResetCommandBuffer ResetCommandBuffer;
+    static PFN_vkBeginCommandBuffer BeginCommandBuffer;
+    static PFN_vkEndCommandBuffer EndCommandBuffer;
+    static PFN_vkQueueSubmit QueueSubmit;
+
+    VkDevice device = VK_NULL_HANDLE;  // weak reference
+    VkCommandPool cmd_pool = VK_NULL_HANDLE;
+    VkCommandBuffer cmd_buf = VK_NULL_HANDLE;
+    VkQueue queue = VK_NULL_HANDLE;  // weak reference
+    VkFence fence = VK_NULL_HANDLE;
+
+    bool should_abort = false;
+    bool should_collect = false;
+    std::mutex collect_mutex;
+    std::condition_variable collect_cv;
+    std::thread collect_thread;
+
+    std::mutex collect_cb_mutex;
+    bool collect_cb_ready = false;
+};
+
+tracy::VkCtxManualScope TracyVkZoneStart(tracy::VkCtx* ctx, const tracy::SourceLocationData* srcloc, VkQueue queue);
+void TracyVkZoneEnd(tracy::VkCtxManualScope& scope_to_close, VkQueue queue);
+
+#define VVL_TracyVkNamedZoneStart(ctx, queue, name, zone_var_name)                                                                 \
+    static constexpr tracy::SourceLocationData TracyConcat(__tracy_gpu_source_location, TracyLine){name, TracyFunction, TracyFile, \
+                                                                                                   (uint32_t)TracyLine, 0};        \
+    tracy::VkCtxManualScope zone_var_name = TracyVkZoneStart(ctx, &TracyConcat(__tracy_gpu_source_location, TracyLine), queue);
+#define VVL_TracyVkNamedZoneEnd(zone_var_name, queue) TracyVkZoneEnd(zone_var_name, queue);
+
+#else
+
+#define VVL_TracyVkZone(ctx, cmdbuf, name)
+#define VVL_TracyVkNamedZoneStart(ctx, queue, name, zone_var_name)
+#define VVL_TracyVkNamedZoneEnd(zone_var_name, queue)
+
 #endif

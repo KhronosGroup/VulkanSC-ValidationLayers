@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,9 +109,7 @@ TEST_F(PositiveYcbcr, MultiplaneImageCopyBufferToImage) {
 
     VkBufferImageCopy copy = {};
     copy.imageSubresource.layerCount = 1;
-    copy.imageExtent.depth = 1;
-    copy.imageExtent.height = 16;
-    copy.imageExtent.width = 16;
+    copy.imageExtent = {16, 16, 1};
 
     for (size_t i = 0; i < aspects.size(); ++i) {
         buffers[i].init(*m_device, 16 * 16 * 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
@@ -299,11 +297,8 @@ TEST_F(PositiveYcbcr, ImageLayout) {
     VkBufferImageCopy copy_region = {};
     copy_region.bufferRowLength = 128;
     copy_region.bufferImageHeight = 128;
-    copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT;
-    copy_region.imageSubresource.layerCount = 1;
-    copy_region.imageExtent.height = 64;
-    copy_region.imageExtent.width = 64;
-    copy_region.imageExtent.depth = 1;
+    copy_region.imageSubresource = {VK_IMAGE_ASPECT_PLANE_1_BIT, 0, 0, 1};
+    copy_region.imageExtent = {64, 64, 1};
 
     vk::ResetCommandBuffer(m_command_buffer.handle(), 0);
     m_command_buffer.Begin();
@@ -336,6 +331,9 @@ TEST_F(PositiveYcbcr, ImageLayout) {
         m_device, {
                       {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler.handle()},
                   });
+    if (!descriptor_set.set_) {
+        GTEST_SKIP() << "Can't allocate descriptor with immutable sampler";
+    }
 
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     descriptor_set.WriteDescriptorImageInfo(0, view.handle(), sampler.handle());
@@ -525,9 +523,7 @@ TEST_F(PositiveYcbcr, FormatCompatibilitySamePlane) {
     image_create_info.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
     image_create_info.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 32, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -555,9 +551,7 @@ TEST_F(PositiveYcbcr, FormatCompatibilityDifferentPlane) {
     image_create_info.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
     image_create_info.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {32, 32, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -567,4 +561,43 @@ TEST_F(PositiveYcbcr, FormatCompatibilityDifferentPlane) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
     vkt::Image image(*m_device, image_create_info);
+}
+
+// Being decided in https://gitlab.khronos.org/vulkan/vulkan/-/issues/4151
+TEST_F(PositiveYcbcr, DISABLED_CopyImageSinglePlane422Alignment) {
+    AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+
+    VkImageCreateInfo image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_G8B8G8R8_422_UNORM,
+                                                               VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+
+    VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+    bool supported = ImageFormatIsSupported(instance(), Gpu(), image_ci, features);
+    if (!supported) {
+        GTEST_SKIP() << "Single-plane _422 image format not supported";
+    }
+
+    vkt::Image image_422(*m_device, image_ci, vkt::set_layout);
+
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent = {32, 64, 1};
+    vkt::Image image_color(*m_device, image_ci, vkt::set_layout);
+
+    m_command_buffer.Begin();
+
+    VkImageCopy copy_region;
+    copy_region.extent = {1, 1, 1};
+    copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy_region.srcSubresource.mipLevel = 0;
+    copy_region.srcSubresource.baseArrayLayer = 0;
+    copy_region.srcSubresource.layerCount = 1;
+    copy_region.dstSubresource = copy_region.srcSubresource;
+    copy_region.srcOffset = {0, 0, 0};
+    copy_region.dstOffset = {0, 0, 0};
+
+    vk::CmdCopyImage(m_command_buffer.handle(), image_color, VK_IMAGE_LAYOUT_GENERAL, image_422, VK_IMAGE_LAYOUT_GENERAL, 1,
+                     &copy_region);
+
+    m_command_buffer.End();
 }

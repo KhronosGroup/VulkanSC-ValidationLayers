@@ -38,7 +38,7 @@ class VkSCNegativeObjectReservation : public VkSCLayerTest {
                 continue;
             }
 
-            vkt::Device device(gpu(), device_extensions, nullptr, &object_reservation_info);
+            vkt::Device device(Gpu(), device_extensions, nullptr, &object_reservation_info);
 
             if (setup_func) {
                 if (!setup_func(device)) {
@@ -226,7 +226,7 @@ class VkSCNegativeObjectReservation : public VkSCLayerTest {
 TEST_F(VkSCNegativeObjectReservation, CommandPoolRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::commandPoolRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkCommandPool> cmd_pools{};
@@ -278,7 +278,7 @@ TEST_F(VkSCNegativeObjectReservation, CommandPoolRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, CommandBufferRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::commandBufferRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkCommandPool> cmd_pools{};
@@ -331,7 +331,7 @@ TEST_F(VkSCNegativeObjectReservation, CommandBufferRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, DescriptorSetLayoutRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::descriptorSetLayoutRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkDescriptorSetLayout> descriptor_set_layouts{};
@@ -393,7 +393,7 @@ TEST_F(VkSCNegativeObjectReservation, DescriptorSetLayoutRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, DescriptorSetLayoutBindingRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::descriptorSetLayoutBindingRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkDescriptorSetLayout> descriptor_set_layouts{};
@@ -459,7 +459,7 @@ TEST_F(VkSCNegativeObjectReservation, DescriptorSetLayoutBindingRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, PipelineLayoutRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::pipelineLayoutRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         VkDescriptorSetLayout descriptor_set_layout{VK_NULL_HANDLE};
@@ -534,7 +534,7 @@ TEST_F(VkSCNegativeObjectReservation, PipelineLayoutRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, DescriptorPoolRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::descriptorPoolRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkDescriptorPool> descriptor_pools{};
@@ -589,7 +589,7 @@ TEST_F(VkSCNegativeObjectReservation, DescriptorPoolRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, DescriptorSetRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::descriptorSetRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         const uint32_t max_descriptor_sets_per_pool = 16;
@@ -698,7 +698,7 @@ TEST_F(VkSCNegativeObjectReservation, DescriptorSetRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, DeviceMemoryRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::deviceMemoryRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkDeviceMemory> device_memories{};
@@ -747,7 +747,7 @@ TEST_F(VkSCNegativeObjectReservation, DeviceMemoryRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, PipelineCacheRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::pipelineCacheRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkPipelineCache> pipeline_caches{};
@@ -803,7 +803,7 @@ TEST_F(VkSCNegativeObjectReservation, PipelineCacheRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, ComputePipelineRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::computePipelineRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         VkPipelinePoolSize pipeline_pool_size{};
@@ -901,7 +901,7 @@ TEST_F(VkSCNegativeObjectReservation, ComputePipelineRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, GraphicsPipelineRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::graphicsPipelineRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         VkPipelinePoolSize pipeline_pool_size{};
@@ -1029,7 +1029,7 @@ TEST_F(VkSCNegativeObjectReservation, GraphicsPipelineRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, QueryPoolRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::queryPoolRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkQueryPool> query_pools{};
@@ -1079,7 +1079,7 @@ TEST_F(VkSCNegativeObjectReservation, QueryPoolRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, RenderPassRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::renderPassRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         bool use_create_render_pass2{};
@@ -1161,7 +1161,7 @@ TEST_F(VkSCNegativeObjectReservation, RenderPassRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, SubpassDescriptionRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::subpassDescriptionRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         bool use_create_render_pass2{};
@@ -1245,7 +1245,7 @@ TEST_F(VkSCNegativeObjectReservation, SubpassDescriptionRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, AttachmentDescriptionRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::attachmentDescriptionRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         bool use_create_render_pass2{};
@@ -1350,7 +1350,7 @@ TEST_F(VkSCNegativeObjectReservation, AttachmentDescriptionRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, FramebufferRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::framebufferRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         VkRenderPass render_pass{VK_NULL_HANDLE};
@@ -1425,7 +1425,7 @@ TEST_F(VkSCNegativeObjectReservation, FramebufferRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, BufferRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::bufferRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkBuffer> buffers{};
@@ -1480,7 +1480,7 @@ TEST_F(VkSCNegativeObjectReservation, BufferRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, BufferViewRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::bufferViewRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::unique_ptr<vkt::Buffer> buffer{};
@@ -1511,7 +1511,7 @@ TEST_F(VkSCNegativeObjectReservation, BufferViewRequestCount) {
             create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
 
             data.buffer = std::make_unique<vkt::Buffer>(device, create_info);
-            if (data.buffer->memory().handle() == VK_NULL_HANDLE) return false;
+            if (data.buffer->Memory().handle() == VK_NULL_HANDLE) return false;
 
             return true;
         },
@@ -1548,7 +1548,7 @@ TEST_F(VkSCNegativeObjectReservation, BufferViewRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, ImageRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::imageRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkImage> images{};
@@ -1609,7 +1609,7 @@ TEST_F(VkSCNegativeObjectReservation, ImageRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, ImageViewRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::imageViewRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::unique_ptr<vkt::Image> image{};
@@ -1648,7 +1648,7 @@ TEST_F(VkSCNegativeObjectReservation, ImageViewRequestCount) {
             create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
             data.image = std::make_unique<vkt::Image>(device, create_info);
-            if (data.image->memory().handle() == VK_NULL_HANDLE) return false;
+            if (data.image->Memory().handle() == VK_NULL_HANDLE) return false;
 
             return true;
         },
@@ -1686,7 +1686,7 @@ TEST_F(VkSCNegativeObjectReservation, ImageViewRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, LayeredImageViewRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::layeredImageViewRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         const uint32_t layer_count = 32;
@@ -1733,7 +1733,7 @@ TEST_F(VkSCNegativeObjectReservation, LayeredImageViewRequestCount) {
             create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
             data.image = std::make_unique<vkt::Image>(device, create_info);
-            if (data.image->memory().handle() == VK_NULL_HANDLE) return false;
+            if (data.image->Memory().handle() == VK_NULL_HANDLE) return false;
 
             for (uint32_t i = 0; i < data.layer_count; ++i) {
                 auto view_create_info = vku::InitStruct<VkImageViewCreateInfo>();
@@ -1791,7 +1791,7 @@ TEST_F(VkSCNegativeObjectReservation, LayeredImageViewRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, SamplerRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::samplerRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkSampler> samplers{};
@@ -1846,7 +1846,7 @@ TEST_F(VkSCNegativeObjectReservation, SamplerRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, SamplerYcbcrConversionRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::samplerYcbcrConversionRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         VkFormat ycbcr_format = VK_FORMAT_UNDEFINED;
@@ -1864,7 +1864,7 @@ TEST_F(VkSCNegativeObjectReservation, SamplerYcbcrConversionRequestCount) {
                                               VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM, VK_FORMAT_G8_B8R8_2PLANE_422_UNORM,
                                               VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM};
     for (const auto format : ycbcr_formats) {
-        if (FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        if (FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
             data.ycbcr_format = format;
             break;
         }
@@ -1921,7 +1921,7 @@ TEST_F(VkSCNegativeObjectReservation, SamplerYcbcrConversionRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, FenceRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::fenceRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkFence> fences{};
@@ -1974,7 +1974,7 @@ TEST_F(VkSCNegativeObjectReservation, FenceRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, SemaphoreRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::semaphoreRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkSemaphore> semaphores{};
@@ -2027,7 +2027,7 @@ TEST_F(VkSCNegativeObjectReservation, SemaphoreRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, EventRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::eventRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     struct {
         std::vector<VkEvent> events{};
@@ -2080,7 +2080,7 @@ TEST_F(VkSCNegativeObjectReservation, EventRequestCount) {
 TEST_F(VkSCNegativeObjectReservation, PrivateDataSlotRequestCount) {
     TEST_DESCRIPTION("Test VkDevicePrivateDataCreateInfoEXT::privateDataSlotRequestCount");
 
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
 
     if (!DeviceExtensionSupported(VK_EXT_PRIVATE_DATA_EXTENSION_NAME)) {
         GTEST_SKIP() << "Test requires VK_EXT_private_data";

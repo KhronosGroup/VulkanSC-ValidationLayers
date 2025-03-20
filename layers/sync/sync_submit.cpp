@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2024 Valve Corporation
- * Copyright (c) 2019-2024 LunarG, Inc.
+ * Copyright (c) 2019-2025 Valve Corporation
+ * Copyright (c) 2019-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,8 +159,7 @@ std::optional<SignalInfo> SignalsUpdate::OnTimelineWait(VkSemaphore semaphore, u
     return resolving_signal;  // empty result if it is a wait-before-signal
 }
 
-syncval_state::Swapchain::Swapchain(ValidationStateTracker& dev_data, const VkSwapchainCreateInfoKHR* pCreateInfo,
-                                    VkSwapchainKHR handle)
+syncval_state::Swapchain::Swapchain(vvl::Device& dev_data, const VkSwapchainCreateInfoKHR* pCreateInfo, VkSwapchainKHR handle)
     : vvl::Swapchain(dev_data, pCreateInfo, handle) {}
 
 void syncval_state::Swapchain::RecordPresentedImage(PresentedImage&& presented_image) {
@@ -205,7 +204,7 @@ class ApplySemaphoreBarrierAction {
 class ApplyAcquireNextSemaphoreAction {
   public:
     ApplyAcquireNextSemaphoreAction(const SyncExecScope& wait_scope, ResourceUsageTag acquire_tag)
-        : barrier_(1, SyncBarrier(getPresentSrcScope(), getPresentValidAccesses(), wait_scope, SyncStageAccessFlags())),
+        : barrier_(1, SyncBarrier(getPresentSrcScope(), getPresentValidAccesses(), wait_scope, SyncAccessFlags())),
           acq_tag_(acquire_tag) {}
     void operator()(ResourceAccessState* access) const {
         // Note that the present operations may or may not be present, given that the fence wait may have cleared them out.
@@ -223,14 +222,13 @@ class ApplyAcquireNextSemaphoreAction {
     const SyncExecScope& getPresentSrcScope() const {
         static const SyncExecScope kPresentSrcScope =
             SyncExecScope(VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL,  // mask_param (unused)
-                          VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL,  // expanded_mask
                           VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL,  // exec_scope
                           getPresentValidAccesses());                      // valid_accesses
         return kPresentSrcScope;
     }
-    const SyncStageAccessFlags& getPresentValidAccesses() const {
-        static const SyncStageAccessFlags kPresentValidAccesses =
-            SyncStageAccessFlags(SyncStageAccess::AccessScopeByStage(VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL));
+    const SyncAccessFlags& getPresentValidAccesses() const {
+        static const SyncAccessFlags kPresentValidAccesses =
+            SyncAccessFlags(SyncStageAccess::AccessScopeByStage(VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL));
         return kPresentValidAccesses;
     }
 
@@ -312,6 +310,12 @@ void QueueBatchContext::ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag) 
 void QueueBatchContext::ApplyAcquireWait(const AcquiredImage& acquired) {
     ResourceAccessState::WaitAcquirePredicate predicate{acquired.present_tag, acquired.acquire_tag};
     ApplyPredicatedWait(predicate);
+}
+
+void QueueBatchContext::OnResourceDestroyed(const ResourceAccessRange& resource_range) {
+    // Remove all accesses associated with the resource being destroyed
+    access_context_.EraseIf(
+        [&resource_range](ResourceAccessRangeMap::value_type& access) { return resource_range.includes(access.first); });
 }
 
 void QueueBatchContext::BeginRenderPassReplaySetup(ReplayState& replay, const SyncOpBeginRenderPass& begin_op) {
@@ -435,24 +439,28 @@ std::vector<QueueBatchContext::ConstPtr> QueueBatchContext::ResolvePresentWaits(
 
 bool QueueBatchContext::DoQueuePresentValidate(const Location& loc, const PresentedImages& presented_images) {
     bool skip = false;
-
     // Tag the presented images so record doesn't have to know the tagging scheme
-    for (size_t index = 0; index < presented_images.size(); ++index) {
-        const PresentedImage& presented = presented_images[index];
-
-        // Need a copy that can be used as the pseudo-iterator...
+    for (const PresentedImage& presented : presented_images) {
         HazardResult hazard =
             access_context_.DetectHazard(presented.range_gen, SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_PRESENTED_SYNCVAL);
         if (hazard.IsHazard()) {
-            const auto queue_handle = queue_state_->Handle();
-            const auto swap_handle = vvl::StateObject::Handle(presented.swapchain_state.lock());
-            const auto image_handle = vvl::StateObject::Handle(presented.image);
-            skip |= sync_state_.LogError(
-                string_SyncHazardVUID(hazard.Hazard()), queue_handle, loc,
-                "Hazard %s for present pSwapchains[%" PRIu32 "] , swapchain %s, image index %" PRIu32 " %s, Access info %s.",
-                string_SyncHazard(hazard.Hazard()), presented.present_index, sync_state_.FormatHandle(swap_handle).c_str(),
-                presented.image_index, sync_state_.FormatHandle(image_handle).c_str(), FormatHazard(hazard).c_str());
-            if (skip) break;
+            const VulkanTypedHandle swapchain_handle = vvl::StateObject::Handle(presented.swapchain_state.lock());
+            const VulkanTypedHandle image_handle = vvl::StateObject::Handle(presented.image);
+
+            LogObjectList objlist(queue_state_->Handle(), swapchain_handle, image_handle);
+
+            std::stringstream ss;
+            ss << "swapchain image " << presented.image_index << " (";
+            ss << sync_state_.FormatHandle(image_handle);
+            ss << " from " << sync_state_.FormatHandle(swapchain_handle) << ")";
+            const std::string resource_description = ss.str();
+
+            const std::string error = sync_state_.error_messages_.PresentError(hazard, *this, vvl::Func::vkQueuePresentKHR,
+                                                                               resource_description, presented.present_index);
+            skip |= sync_state_.SyncError(hazard.Hazard(), objlist, loc, error);
+            if (skip) {
+                break;
+            }
         }
     }
     return skip;
@@ -897,7 +905,7 @@ void PresentedImage::SetImage(uint32_t at_index) {
     }
 }
 
-void PresentedImage::UpdateMemoryAccess(SyncStageAccessIndex usage, ResourceUsageTag tag, AccessContext& access_context) const {
+void PresentedImage::UpdateMemoryAccess(SyncAccessIndex usage, ResourceUsageTag tag, AccessContext& access_context) const {
     // Intentional copy. The range_gen argument is not copied by the Update... call below
     access_context.UpdateAccessState(range_gen, usage, SyncOrdering::kNonAttachment, ResourceUsageTagEx{tag});
 }

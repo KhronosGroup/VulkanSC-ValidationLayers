@@ -166,6 +166,13 @@ def RunVVLTests(args):
 
     lvt_cmd = os.path.join(CI_INSTALL_DIR, 'bin', 'vksc_layer_validation_tests')
 
+    if args.tsan:
+        # These are tests we have decided are worth using Thread Sanitize as it will take about 9x longer to run a test
+        # We have also seen TSAN turn bug out and make each test incrementally take longer
+        # (https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8931)
+        common_ci.RunShellCmd(lvt_cmd + " --gtest_filter=*SyncVal.*:*Threading.*:*SyncObject.*:*Wsi.*:-*Video*", env=lvt_env)
+        return
+
     common_ci.RunShellCmd(lvt_cmd, env=lvt_env)
 
     print("Re-Running multithreaded tests with VK_LAYER_FINE_GRAINED_LOCKING disabled")
@@ -206,6 +213,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--test', dest='test',
         action='store_true', help='Tests the layers')
+    parser.add_argument(
+        '--tsan', dest='tsan',
+        action='store_true', help='Filter out tests for TSAN')
 
     args = parser.parse_args()
 

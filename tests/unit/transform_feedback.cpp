@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -457,10 +457,6 @@ TEST_F(NegativeTransformFeedback, ExecuteSecondaryCommandBuffers) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-commandBuffer-recording");
     vk::CmdBeginTransformFeedbackEXT(m_command_buffer.handle(), 0, 1, nullptr, nullptr);
     m_errorMonitor->VerifyFound();
-    // TODO - When proper VU above is added, see if 02286 is still needed
-    // m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-None-02286");
-    // vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
-    // m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeTransformFeedback, BindPipeline) {
@@ -613,14 +609,9 @@ TEST_F(NegativeTransformFeedback, UsingRasterizationStateStreamExtDisabled) {
     TEST_DESCRIPTION("Test using TestRasterizationStateStreamCreateInfoEXT but it doesn't enable geometryStreams.");
 
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceTransformFeedbackFeaturesEXT transform_feedback_features = vku::InitStructHelper();
-    transform_feedback_features.geometryStreams = VK_FALSE;  // Invalid
-
-    // Extension enabled via VK_EXT_transform_feedback dependency
-    VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&transform_feedback_features);
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::transformFeedback);
+    // geometryStreams not enabled
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
@@ -977,7 +968,6 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
 TEST_F(NegativeTransformFeedback, PipelineRasterizationStateStreamCreateInfoEXT) {
     TEST_DESCRIPTION("Test using TestRasterizationStateStreamCreateInfoEXT with invalid rasterizationStream.");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::transformFeedback);
     AddRequiredFeature(vkt::Feature::geometryStreams);
@@ -1123,4 +1113,77 @@ TEST_F(NegativeTransformFeedback, XfbExecutionModePipeline) {
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pStages-02318");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTransformFeedback, InvalidCounterBuffers) {
+    TEST_DESCRIPTION("Begin transform feedback with invalid counter buffer handles");
+
+    AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::transformFeedback);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::Buffer buffer(*m_device, 4, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT);
+    VkBuffer buffer_handle = buffer.handle();
+    buffer.destroy();
+
+    CreatePipelineHelper pipe(*this);
+    auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    pipe.shader_stages_[0] = vs->GetStageCreateInfo();
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    VkDeviceSize offset = 0u;
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-counterBufferCount-02607");
+    vk::CmdBeginTransformFeedbackEXT(m_command_buffer.handle(), 0u, 1u, &buffer_handle, &offset);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeTransformFeedback, ExecuteSecondaryCommandBuffersWithDynamicRenderPass) {
+    TEST_DESCRIPTION("Call CmdExecuteCommandBuffers when transform feedback is active");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::maintenance7);
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
+
+    InitRenderTarget();
+
+    vkt::CommandBuffer secondary_cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    VkFormat format = m_renderTargets[0]->Format();
+    VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info = vku::InitStructHelper();
+    inheritance_rendering_info.colorAttachmentCount = 1u;
+    inheritance_rendering_info.pColorAttachmentFormats = &format;
+    inheritance_rendering_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkCommandBufferInheritanceInfo inheritance_info = vku::InitStructHelper(&inheritance_rendering_info);
+
+    VkCommandBufferBeginInfo secondary_begin = vku::InitStructHelper();
+    secondary_begin.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    secondary_begin.pInheritanceInfo = &inheritance_info;
+    secondary_cb.Begin(&secondary_begin);
+    secondary_cb.End();
+
+    CreatePipelineHelper pipe(*this);
+    auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    pipe.shader_stages_[0] = vs->GetStageCreateInfo();
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE_AND_SECONDARY_COMMAND_BUFFERS_KHR);
+    vk::CmdBeginTransformFeedbackEXT(m_command_buffer.handle(), 0u, 0u, NULL, NULL);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-None-02286");
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_cb.handle());
+    m_errorMonitor->VerifyFound();
+
+    vk::CmdEndTransformFeedbackEXT(m_command_buffer.handle(), 0u, 0u, NULL, NULL);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

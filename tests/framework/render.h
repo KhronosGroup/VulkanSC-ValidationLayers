@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ struct SurfaceContext {
     xcb_connection_t *m_surface_xcb_conn{};
 #endif
 #if defined(VK_USE_PLATFORM_METAL_EXT)
-    void *caMetalLayer;
+    void *caMetalLayer{};
 #endif
 
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
@@ -61,6 +61,8 @@ struct SurfaceContext {
     static bool CanResize() { return false; }
     void Resize(uint32_t width, uint32_t height) {}
 #endif
+    void Destroy();
+    ~SurfaceContext() { Destroy(); }
 };
 
 struct SurfaceInformation {
@@ -77,8 +79,6 @@ class VkRenderFramework : public VkTestFramework {
     VkDevice device() const { return m_device->handle(); }
     vkt::Device *DeviceObj() const { return m_device; }
     VkPhysicalDevice Gpu() const;
-    // Deprecated, use Gpu()
-    VkPhysicalDevice gpu() const { return Gpu(); }
     VkRenderPass RenderPass() const { return m_renderPass; }
     VkFramebuffer Framebuffer() const { return m_framebuffer->handle(); }
 
@@ -87,8 +87,6 @@ class VkRenderFramework : public VkTestFramework {
 
     ErrorMonitor &Monitor();
     const VkPhysicalDeviceProperties &PhysicalDeviceProps() const;
-    // Deprecated, use PhysicalDeviceProps()
-    const VkPhysicalDeviceProperties &physDevProps() const { return PhysicalDeviceProps(); }
 
     bool InstanceLayerSupported(const char *layer_name, uint32_t spec_version = 0, uint32_t impl_version = 0);
     bool InstanceExtensionSupported(const char *extension_name, uint32_t spec_version = 0);
@@ -99,17 +97,14 @@ class VkRenderFramework : public VkTestFramework {
 
     // Functions to modify the VkRenderFramework surface & swapchain variables
     void InitSurface();
-    void DestroySurface();
     void InitSwapchainInfo();
     void InitSwapchain(VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                        VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
     void DestroySwapchain();
     // Functions to create surfaces and swapchains that *aren't* member variables of VkRenderFramework
-    VkResult CreateSurface(SurfaceContext &surface_context, VkSurfaceKHR &surface, VkInstance custom_instance = VK_NULL_HANDLE);
-    void DestroySurface(VkSurfaceKHR &surface);
-    void DestroySurfaceContext(SurfaceContext &surface_context);
+    VkResult CreateSurface(SurfaceContext &surface_context, vkt::Surface &surface, VkInstance custom_instance = VK_NULL_HANDLE);
     SurfaceInformation GetSwapchainInfo(const VkSurfaceKHR surface);
-    vkt::Swapchain CreateSwapchain(VkSurfaceKHR &surface, VkImageUsageFlags imageUsage, VkSurfaceTransformFlagBitsKHR preTransform,
+    vkt::Swapchain CreateSwapchain(VkSurfaceKHR surface, VkImageUsageFlags imageUsage, VkSurfaceTransformFlagBitsKHR preTransform,
                                    VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE);
 
     // Swapchain capabilities declaration to be used with RETURN_IF_SKIP
@@ -164,8 +159,12 @@ class VkRenderFramework : public VkTestFramework {
 
     // Add a feature required for the test to be executed. The currently targeted API version is used to add the correct struct, so
     // be sure to call SetTargetApiVersion before.
-    // Only features added with this method will be enabled.
+    // Only features added with this or the AddOptionalFeature method will be enabled.
     void AddRequiredFeature(vkt::Feature feature);
+    // Add an optional feature for the test to be executed. The currently targeted API version is used to add the correct struct, so
+    // be sure to call SetTargetApiVersion before
+    // Only features added with this or the AddRequiredFeature method will be enabled.
+    void AddOptionalFeature(vkt::Feature feature);
 
     std::vector<uint32_t> GLSLToSPV(VkShaderStageFlagBits stage, const char *code, const spv_target_env env = SPV_ENV_VULKAN_1_0);
 
@@ -220,7 +219,7 @@ class VkRenderFramework : public VkTestFramework {
 
     // WSI items
     SurfaceContext m_surface_context{};
-    VkSurfaceKHR m_surface{};
+    vkt::Surface m_surface{};
     vkt::Swapchain m_swapchain;
     VkSurfaceCapabilitiesKHR m_surface_capabilities{};
     std::vector<VkSurfaceFormatKHR> m_surface_formats;
@@ -238,6 +237,7 @@ class VkRenderFramework : public VkTestFramework {
     vkt::Image *m_depthStencil;
     // first graphics queue, used must often, don't overwrite, use Device class
     vkt::Queue *m_default_queue = nullptr;
+    VkQueueFlags m_default_queue_caps = 0;
 
     // A queue different from the default one (can be null).
     // The queue with the most capabilities is selected (graphics > compute > transfer).

@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (C) 2015-2024 Google Inc.
+/* Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (C) 2015-2025 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +19,7 @@
 #pragma once
 #include "state_tracker/device_memory_state.h"
 #include "state_tracker/buffer_state.h"
-#include "generated/layer_chassis_dispatch.h"
+#include "generated/dispatch_functions.h"
 
 namespace vvl {
 
@@ -76,11 +76,12 @@ class AccelerationStructureNV : public Bindable {
 class AccelerationStructureKHR : public StateObject {
   public:
     AccelerationStructureKHR(VkAccelerationStructureKHR handle, const VkAccelerationStructureCreateInfoKHR *pCreateInfo,
-                             std::shared_ptr<Buffer> &&buf_state)
+                             std::shared_ptr<Buffer> &&buf_state, const VkDeviceAddress buffer_device_address)
         : StateObject(handle, kVulkanObjectTypeAccelerationStructureKHR),
           safe_create_info(pCreateInfo),
           create_info(*safe_create_info.ptr()),
-          buffer_state(buf_state) {}
+          buffer_state(buf_state),
+          buffer_device_address(buffer_device_address) {}
     AccelerationStructureKHR(const AccelerationStructureKHR &rh_obj) = delete;
 
     virtual ~AccelerationStructureKHR() {
@@ -116,8 +117,25 @@ class AccelerationStructureKHR : public StateObject {
     void UpdateBuildRangeInfos(const VkAccelerationStructureBuildRangeInfoKHR *p_build_range_infos, uint32_t geometry_count) {
         build_range_infos.resize(geometry_count);
         for (const auto [i, build_range] : vvl::enumerate(p_build_range_infos, geometry_count)) {
-            build_range_infos[i] = *build_range;
+            build_range_infos[i] = build_range;
         }
+    }
+
+    // Returns the device address range effectively occupied by the acceleration structure,
+    // as defined by its creation info.
+    // It does NOT take into account the acceleration structure address as returned by
+    // vkGetAccelerationStructureDeviceAddress, this address may be at an offset
+    // of the buffer range backing the acceleration structure
+    vvl::range<VkDeviceAddress> GetDeviceAddressRange() const {
+        if (!buffer_state) {
+            return {};
+        }
+        if (buffer_state->deviceAddress != 0) {
+            return {buffer_state->deviceAddress + safe_create_info.offset,
+                    buffer_state->deviceAddress + safe_create_info.offset + safe_create_info.size};
+        }
+        return {buffer_device_address + safe_create_info.offset,
+                buffer_device_address + safe_create_info.offset + safe_create_info.size};
     }
 
     const vku::safe_VkAccelerationStructureCreateInfoKHR safe_create_info;
@@ -125,6 +143,8 @@ class AccelerationStructureKHR : public StateObject {
 
     uint64_t opaque_handle = 0;
     std::shared_ptr<vvl::Buffer> buffer_state{};
+    // Used in case buffer_state->deviceAddress is 0 (happens if app never queried address)
+    const VkDeviceAddress buffer_device_address = 0;
     std::optional<vku::safe_VkAccelerationStructureBuildGeometryInfoKHR> build_info_khr{};
     std::vector<VkAccelerationStructureBuildRangeInfoKHR> build_range_infos{};
     // You can't have is_built == false and a build_info_khr, but you can have is_built == true and no build_info_khr,

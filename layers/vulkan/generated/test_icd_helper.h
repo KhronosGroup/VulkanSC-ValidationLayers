@@ -3,7 +3,7 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2024 LunarG, Inc.
+ * Copyright (c) 2024-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -217,6 +217,9 @@ static const std::unordered_map<std::string, uint32_t> device_extension_map = {
     {VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_EXTENSION_NAME, VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_SPEC_VERSION},
     {VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME, VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_SPEC_VERSION},
     {VK_KHR_MAINTENANCE_7_EXTENSION_NAME, VK_KHR_MAINTENANCE_7_SPEC_VERSION},
+    {VK_KHR_MAINTENANCE_8_EXTENSION_NAME, VK_KHR_MAINTENANCE_8_SPEC_VERSION},
+    {VK_KHR_VIDEO_MAINTENANCE_2_EXTENSION_NAME, VK_KHR_VIDEO_MAINTENANCE_2_SPEC_VERSION},
+    {VK_KHR_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME, VK_KHR_DEPTH_CLAMP_ZERO_ONE_SPEC_VERSION},
     {VK_NV_GLSL_SHADER_EXTENSION_NAME, VK_NV_GLSL_SHADER_SPEC_VERSION},
     {VK_EXT_DEPTH_RANGE_UNRESTRICTED_EXTENSION_NAME, VK_EXT_DEPTH_RANGE_UNRESTRICTED_SPEC_VERSION},
     {VK_IMG_FILTER_CUBIC_EXTENSION_NAME, VK_IMG_FILTER_CUBIC_SPEC_VERSION},
@@ -362,7 +365,9 @@ static const std::unordered_map<std::string, uint32_t> device_extension_map = {
     {VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME, VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_SPEC_VERSION},
     {VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME, VK_NV_DEVICE_DIAGNOSTICS_CONFIG_SPEC_VERSION},
     {VK_QCOM_RENDER_PASS_STORE_OPS_EXTENSION_NAME, VK_QCOM_RENDER_PASS_STORE_OPS_SPEC_VERSION},
+#ifdef VK_ENABLE_BETA_EXTENSIONS
     {VK_NV_CUDA_KERNEL_LAUNCH_EXTENSION_NAME, VK_NV_CUDA_KERNEL_LAUNCH_SPEC_VERSION},
+#endif  // VK_ENABLE_BETA_EXTENSIONS
     {VK_NV_LOW_LATENCY_EXTENSION_NAME, VK_NV_LOW_LATENCY_SPEC_VERSION},
 #ifdef VK_USE_PLATFORM_METAL_EXT
     {VK_EXT_METAL_OBJECTS_EXTENSION_NAME, VK_EXT_METAL_OBJECTS_SPEC_VERSION},
@@ -430,6 +435,7 @@ static const std::unordered_map<std::string, uint32_t> device_extension_map = {
     {VK_NV_COPY_MEMORY_INDIRECT_EXTENSION_NAME, VK_NV_COPY_MEMORY_INDIRECT_SPEC_VERSION},
     {VK_NV_MEMORY_DECOMPRESSION_EXTENSION_NAME, VK_NV_MEMORY_DECOMPRESSION_SPEC_VERSION},
     {VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_EXTENSION_NAME, VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_SPEC_VERSION},
+    {VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME, VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_SPEC_VERSION},
     {VK_NV_LINEAR_COLOR_ATTACHMENT_EXTENSION_NAME, VK_NV_LINEAR_COLOR_ATTACHMENT_SPEC_VERSION},
     {VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_EXTENSION_NAME, VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_SPEC_VERSION},
     {VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME, VK_QCOM_IMAGE_PROCESSING_SPEC_VERSION},
@@ -451,6 +457,7 @@ static const std::unordered_map<std::string, uint32_t> device_extension_map = {
     {VK_SEC_AMIGO_PROFILING_EXTENSION_NAME, VK_SEC_AMIGO_PROFILING_SPEC_VERSION},
     {VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_EXTENSION_NAME, VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_SPEC_VERSION},
     {VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME, VK_NV_RAY_TRACING_INVOCATION_REORDER_SPEC_VERSION},
+    {VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME, VK_NV_COOPERATIVE_VECTOR_SPEC_VERSION},
     {VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_EXTENSION_NAME, VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_SPEC_VERSION},
     {VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME, VK_EXT_MUTABLE_DESCRIPTOR_TYPE_SPEC_VERSION},
     {VK_EXT_LEGACY_VERTEX_ATTRIBUTES_EXTENSION_NAME, VK_EXT_LEGACY_VERTEX_ATTRIBUTES_SPEC_VERSION},
@@ -475,12 +482,21 @@ static const std::unordered_map<std::string, uint32_t> device_extension_map = {
     {VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_EXTENSION_NAME, VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_SPEC_VERSION},
     {VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME, VK_EXT_SHADER_REPLICATED_COMPOSITES_SPEC_VERSION},
     {VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME, VK_NV_RAY_TRACING_VALIDATION_SPEC_VERSION},
+    {VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME, VK_NV_CLUSTER_ACCELERATION_STRUCTURE_SPEC_VERSION},
+    {VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_EXTENSION_NAME, VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_SPEC_VERSION},
     {VK_EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME, VK_EXT_DEVICE_GENERATED_COMMANDS_SPEC_VERSION},
     {VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME, VK_MESA_IMAGE_ALIGNMENT_CONTROL_SPEC_VERSION},
     {VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME, VK_EXT_DEPTH_CLAMP_CONTROL_SPEC_VERSION},
     {VK_HUAWEI_HDR_VIVID_EXTENSION_NAME, VK_HUAWEI_HDR_VIVID_SPEC_VERSION},
     {VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME, VK_NV_COOPERATIVE_MATRIX_2_SPEC_VERSION},
+    {VK_ARM_PIPELINE_OPACITY_MICROMAP_EXTENSION_NAME, VK_ARM_PIPELINE_OPACITY_MICROMAP_SPEC_VERSION},
+#ifdef VK_USE_PLATFORM_METAL_EXT
+    {VK_EXT_EXTERNAL_MEMORY_METAL_EXTENSION_NAME, VK_EXT_EXTERNAL_MEMORY_METAL_SPEC_VERSION},
+#endif  // VK_USE_PLATFORM_METAL_EXT
     {VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME, VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_SPEC_VERSION},
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+    {VK_NV_PRESENT_METERING_EXTENSION_NAME, VK_NV_PRESENT_METERING_SPEC_VERSION},
+#endif  // VK_ENABLE_BETA_EXTENSIONS
     {VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, VK_KHR_ACCELERATION_STRUCTURE_SPEC_VERSION},
     {VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, VK_KHR_RAY_TRACING_PIPELINE_SPEC_VERSION},
     {VK_KHR_RAY_QUERY_EXTENSION_NAME, VK_KHR_RAY_QUERY_SPEC_VERSION},
@@ -904,6 +920,41 @@ static VKAPI_ATTR void VKAPI_CALL GetDeviceImageMemoryRequirements(VkDevice devi
 static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSparseMemoryRequirements(
     VkDevice device, const VkDeviceImageMemoryRequirements* pInfo, uint32_t* pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements2* pSparseMemoryRequirements);
+static VKAPI_ATTR void VKAPI_CALL CmdSetLineStipple(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
+                                                    uint16_t lineStipplePattern);
+static VKAPI_ATTR VkResult VKAPI_CALL MapMemory2(VkDevice device, const VkMemoryMapInfo* pMemoryMapInfo, void** ppData);
+static VKAPI_ATTR VkResult VKAPI_CALL UnmapMemory2(VkDevice device, const VkMemoryUnmapInfo* pMemoryUnmapInfo);
+static VKAPI_ATTR void VKAPI_CALL CmdBindIndexBuffer2(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                      VkDeviceSize size, VkIndexType indexType);
+static VKAPI_ATTR void VKAPI_CALL GetRenderingAreaGranularity(VkDevice device, const VkRenderingAreaInfo* pRenderingAreaInfo,
+                                                              VkExtent2D* pGranularity);
+static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSubresourceLayout(VkDevice device, const VkDeviceImageSubresourceInfo* pInfo,
+                                                                  VkSubresourceLayout2* pLayout);
+static VKAPI_ATTR void VKAPI_CALL GetImageSubresourceLayout2(VkDevice device, VkImage image,
+                                                             const VkImageSubresource2* pSubresource,
+                                                             VkSubresourceLayout2* pLayout);
+static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSet(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
+                                                       VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
+                                                       const VkWriteDescriptorSet* pDescriptorWrites);
+static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSetWithTemplate(VkCommandBuffer commandBuffer,
+                                                                   VkDescriptorUpdateTemplate descriptorUpdateTemplate,
+                                                                   VkPipelineLayout layout, uint32_t set, const void* pData);
+static VKAPI_ATTR void VKAPI_CALL CmdSetRenderingAttachmentLocations(VkCommandBuffer commandBuffer,
+                                                                     const VkRenderingAttachmentLocationInfo* pLocationInfo);
+static VKAPI_ATTR void VKAPI_CALL CmdSetRenderingInputAttachmentIndices(
+    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfo* pInputAttachmentIndexInfo);
+static VKAPI_ATTR void VKAPI_CALL CmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
+                                                         const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo);
+static VKAPI_ATTR void VKAPI_CALL CmdPushConstants2(VkCommandBuffer commandBuffer, const VkPushConstantsInfo* pPushConstantsInfo);
+static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSet2(VkCommandBuffer commandBuffer,
+                                                        const VkPushDescriptorSetInfo* pPushDescriptorSetInfo);
+static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSetWithTemplate2(
+    VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfo* pPushDescriptorSetWithTemplateInfo);
+static VKAPI_ATTR VkResult VKAPI_CALL CopyMemoryToImage(VkDevice device, const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo);
+static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToMemory(VkDevice device, const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo);
+static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToImage(VkDevice device, const VkCopyImageToImageInfo* pCopyImageToImageInfo);
+static VKAPI_ATTR VkResult VKAPI_CALL TransitionImageLayout(VkDevice device, uint32_t transitionCount,
+                                                            const VkHostImageLayoutTransitionInfo* pTransitions);
 static VKAPI_ATTR void VKAPI_CALL DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface,
                                                     const VkAllocationCallbacks* pAllocator);
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
@@ -1179,9 +1230,9 @@ GetPhysicalDeviceFragmentShadingRatesKHR(VkPhysicalDevice physicalDevice, uint32
 static VKAPI_ATTR void VKAPI_CALL CmdSetFragmentShadingRateKHR(VkCommandBuffer commandBuffer, const VkExtent2D* pFragmentSize,
                                                                const VkFragmentShadingRateCombinerOpKHR combinerOps[2]);
 static VKAPI_ATTR void VKAPI_CALL CmdSetRenderingAttachmentLocationsKHR(VkCommandBuffer commandBuffer,
-                                                                        const VkRenderingAttachmentLocationInfoKHR* pLocationInfo);
+                                                                        const VkRenderingAttachmentLocationInfo* pLocationInfo);
 static VKAPI_ATTR void VKAPI_CALL CmdSetRenderingInputAttachmentIndicesKHR(
-    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfoKHR* pInputAttachmentIndexInfo);
+    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfo* pInputAttachmentIndexInfo);
 static VKAPI_ATTR VkResult VKAPI_CALL WaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t presentId,
                                                         uint64_t timeout);
 static VKAPI_ATTR VkDeviceAddress VKAPI_CALL GetBufferDeviceAddressKHR(VkDevice device, const VkBufferDeviceAddressInfo* pInfo);
@@ -1205,8 +1256,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPipelineExecutableStatisticsKHR(VkDevic
 static VKAPI_ATTR VkResult VKAPI_CALL GetPipelineExecutableInternalRepresentationsKHR(
     VkDevice device, const VkPipelineExecutableInfoKHR* pExecutableInfo, uint32_t* pInternalRepresentationCount,
     VkPipelineExecutableInternalRepresentationKHR* pInternalRepresentations);
-static VKAPI_ATTR VkResult VKAPI_CALL MapMemory2KHR(VkDevice device, const VkMemoryMapInfoKHR* pMemoryMapInfo, void** ppData);
-static VKAPI_ATTR VkResult VKAPI_CALL UnmapMemory2KHR(VkDevice device, const VkMemoryUnmapInfoKHR* pMemoryUnmapInfo);
+static VKAPI_ATTR VkResult VKAPI_CALL MapMemory2KHR(VkDevice device, const VkMemoryMapInfo* pMemoryMapInfo, void** ppData);
+static VKAPI_ATTR VkResult VKAPI_CALL UnmapMemory2KHR(VkDevice device, const VkMemoryUnmapInfo* pMemoryUnmapInfo);
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(
     VkPhysicalDevice physicalDevice, const VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR* pQualityLevelInfo,
     VkVideoEncodeQualityLevelPropertiesKHR* pQualityLevelProperties);
@@ -1243,13 +1294,13 @@ static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSparseMemoryRequirementsKHR(
     VkSparseImageMemoryRequirements2* pSparseMemoryRequirements);
 static VKAPI_ATTR void VKAPI_CALL CmdBindIndexBuffer2KHR(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                          VkDeviceSize size, VkIndexType indexType);
-static VKAPI_ATTR void VKAPI_CALL GetRenderingAreaGranularityKHR(VkDevice device, const VkRenderingAreaInfoKHR* pRenderingAreaInfo,
+static VKAPI_ATTR void VKAPI_CALL GetRenderingAreaGranularityKHR(VkDevice device, const VkRenderingAreaInfo* pRenderingAreaInfo,
                                                                  VkExtent2D* pGranularity);
-static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSubresourceLayoutKHR(VkDevice device, const VkDeviceImageSubresourceInfoKHR* pInfo,
-                                                                     VkSubresourceLayout2KHR* pLayout);
+static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSubresourceLayoutKHR(VkDevice device, const VkDeviceImageSubresourceInfo* pInfo,
+                                                                     VkSubresourceLayout2* pLayout);
 static VKAPI_ATTR void VKAPI_CALL GetImageSubresourceLayout2KHR(VkDevice device, VkImage image,
-                                                                const VkImageSubresource2KHR* pSubresource,
-                                                                VkSubresourceLayout2KHR* pLayout);
+                                                                const VkImageSubresource2* pSubresource,
+                                                                VkSubresourceLayout2* pLayout);
 static VKAPI_ATTR VkResult VKAPI_CALL CreatePipelineBinariesKHR(VkDevice device, const VkPipelineBinaryCreateInfoKHR* pCreateInfo,
                                                                 const VkAllocationCallbacks* pAllocator,
                                                                 VkPipelineBinaryHandlesInfoKHR* pBinaries);
@@ -1274,13 +1325,13 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetCalibratedTimestampsKHR(VkDevice device
                                                                  const VkCalibratedTimestampInfoKHR* pTimestampInfos,
                                                                  uint64_t* pTimestamps, uint64_t* pMaxDeviation);
 static VKAPI_ATTR void VKAPI_CALL CmdBindDescriptorSets2KHR(VkCommandBuffer commandBuffer,
-                                                            const VkBindDescriptorSetsInfoKHR* pBindDescriptorSetsInfo);
+                                                            const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo);
 static VKAPI_ATTR void VKAPI_CALL CmdPushConstants2KHR(VkCommandBuffer commandBuffer,
-                                                       const VkPushConstantsInfoKHR* pPushConstantsInfo);
+                                                       const VkPushConstantsInfo* pPushConstantsInfo);
 static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSet2KHR(VkCommandBuffer commandBuffer,
-                                                           const VkPushDescriptorSetInfoKHR* pPushDescriptorSetInfo);
+                                                           const VkPushDescriptorSetInfo* pPushDescriptorSetInfo);
 static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSetWithTemplate2KHR(
-    VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfoKHR* pPushDescriptorSetWithTemplateInfo);
+    VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfo* pPushDescriptorSetWithTemplateInfo);
 static VKAPI_ATTR void VKAPI_CALL CmdSetDescriptorBufferOffsets2EXT(
     VkCommandBuffer commandBuffer, const VkSetDescriptorBufferOffsetsInfoEXT* pSetDescriptorBufferOffsetsInfo);
 static VKAPI_ATTR void VKAPI_CALL CmdBindDescriptorBufferEmbeddedSamplers2EXT(
@@ -1614,16 +1665,14 @@ static VKAPI_ATTR void VKAPI_CALL CmdSetDepthBoundsTestEnableEXT(VkCommandBuffer
 static VKAPI_ATTR void VKAPI_CALL CmdSetStencilTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 stencilTestEnable);
 static VKAPI_ATTR void VKAPI_CALL CmdSetStencilOpEXT(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, VkStencilOp failOp,
                                                      VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp);
-static VKAPI_ATTR VkResult VKAPI_CALL CopyMemoryToImageEXT(VkDevice device,
-                                                           const VkCopyMemoryToImageInfoEXT* pCopyMemoryToImageInfo);
-static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToMemoryEXT(VkDevice device,
-                                                           const VkCopyImageToMemoryInfoEXT* pCopyImageToMemoryInfo);
-static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToImageEXT(VkDevice device, const VkCopyImageToImageInfoEXT* pCopyImageToImageInfo);
+static VKAPI_ATTR VkResult VKAPI_CALL CopyMemoryToImageEXT(VkDevice device, const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo);
+static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToMemoryEXT(VkDevice device, const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo);
+static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToImageEXT(VkDevice device, const VkCopyImageToImageInfo* pCopyImageToImageInfo);
 static VKAPI_ATTR VkResult VKAPI_CALL TransitionImageLayoutEXT(VkDevice device, uint32_t transitionCount,
-                                                               const VkHostImageLayoutTransitionInfoEXT* pTransitions);
+                                                               const VkHostImageLayoutTransitionInfo* pTransitions);
 static VKAPI_ATTR void VKAPI_CALL GetImageSubresourceLayout2EXT(VkDevice device, VkImage image,
-                                                                const VkImageSubresource2KHR* pSubresource,
-                                                                VkSubresourceLayout2KHR* pLayout);
+                                                                const VkImageSubresource2* pSubresource,
+                                                                VkSubresourceLayout2* pLayout);
 static VKAPI_ATTR VkResult VKAPI_CALL ReleaseSwapchainImagesEXT(VkDevice device,
                                                                 const VkReleaseSwapchainImagesInfoEXT* pReleaseInfo);
 static VKAPI_ATTR void VKAPI_CALL GetGeneratedCommandsMemoryRequirementsNV(VkDevice device,
@@ -1655,6 +1704,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL SetPrivateDataEXT(VkDevice device, VkObjec
                                                         VkPrivateDataSlot privateDataSlot, uint64_t data);
 static VKAPI_ATTR void VKAPI_CALL GetPrivateDataEXT(VkDevice device, VkObjectType objectType, uint64_t objectHandle,
                                                     VkPrivateDataSlot privateDataSlot, uint64_t* pData);
+#ifdef VK_ENABLE_BETA_EXTENSIONS
 static VKAPI_ATTR VkResult VKAPI_CALL CreateCudaModuleNV(VkDevice device, const VkCudaModuleCreateInfoNV* pCreateInfo,
                                                          const VkAllocationCallbacks* pAllocator, VkCudaModuleNV* pModule);
 static VKAPI_ATTR VkResult VKAPI_CALL GetCudaModuleCacheNV(VkDevice device, VkCudaModuleNV module, size_t* pCacheSize,
@@ -1666,6 +1716,7 @@ static VKAPI_ATTR void VKAPI_CALL DestroyCudaModuleNV(VkDevice device, VkCudaMod
 static VKAPI_ATTR void VKAPI_CALL DestroyCudaFunctionNV(VkDevice device, VkCudaFunctionNV function,
                                                         const VkAllocationCallbacks* pAllocator);
 static VKAPI_ATTR void VKAPI_CALL CmdCudaLaunchKernelNV(VkCommandBuffer commandBuffer, const VkCudaLaunchInfoNV* pLaunchInfo);
+#endif  // VK_ENABLE_BETA_EXTENSIONS
 #ifdef VK_USE_PLATFORM_METAL_EXT
 static VKAPI_ATTR void VKAPI_CALL ExportMetalObjectsEXT(VkDevice device, VkExportMetalObjectsInfoEXT* pMetalObjectsInfo);
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -1913,6 +1964,13 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetFramebufferTilePropertiesQCOM(VkDevice 
                                                                        VkTilePropertiesQCOM* pProperties);
 static VKAPI_ATTR VkResult VKAPI_CALL GetDynamicRenderingTilePropertiesQCOM(VkDevice device, const VkRenderingInfo* pRenderingInfo,
                                                                             VkTilePropertiesQCOM* pProperties);
+static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeVectorPropertiesNV(VkPhysicalDevice physicalDevice,
+                                                                                     uint32_t* pPropertyCount,
+                                                                                     VkCooperativeVectorPropertiesNV* pProperties);
+static VKAPI_ATTR VkResult VKAPI_CALL ConvertCooperativeVectorMatrixNV(VkDevice device,
+                                                                       const VkConvertCooperativeVectorMatrixInfoNV* pInfo);
+static VKAPI_ATTR void VKAPI_CALL CmdConvertCooperativeVectorMatrixNV(VkCommandBuffer commandBuffer, uint32_t infoCount,
+                                                                      const VkConvertCooperativeVectorMatrixInfoNV* pInfos);
 static VKAPI_ATTR VkResult VKAPI_CALL SetLatencySleepModeNV(VkDevice device, VkSwapchainKHR swapchain,
                                                             const VkLatencySleepModeInfoNV* pSleepModeInfo);
 static VKAPI_ATTR VkResult VKAPI_CALL LatencySleepNV(VkDevice device, VkSwapchainKHR swapchain,
@@ -1928,6 +1986,15 @@ static VKAPI_ATTR void VKAPI_CALL CmdSetAttachmentFeedbackLoopEnableEXT(VkComman
 static VKAPI_ATTR VkResult VKAPI_CALL GetScreenBufferPropertiesQNX(VkDevice device, const struct _screen_buffer* buffer,
                                                                    VkScreenBufferPropertiesQNX* pProperties);
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+static VKAPI_ATTR void VKAPI_CALL GetClusterAccelerationStructureBuildSizesNV(
+    VkDevice device, const VkClusterAccelerationStructureInputInfoNV* pInfo, VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo);
+static VKAPI_ATTR void VKAPI_CALL CmdBuildClusterAccelerationStructureIndirectNV(
+    VkCommandBuffer commandBuffer, const VkClusterAccelerationStructureCommandsInfoNV* pCommandInfos);
+static VKAPI_ATTR void VKAPI_CALL
+GetPartitionedAccelerationStructuresBuildSizesNV(VkDevice device, const VkPartitionedAccelerationStructureInstancesInputNV* pInfo,
+                                                 VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo);
+static VKAPI_ATTR void VKAPI_CALL CmdBuildPartitionedAccelerationStructuresNV(
+    VkCommandBuffer commandBuffer, const VkBuildPartitionedAccelerationStructureInfoNV* pBuildInfo);
 static VKAPI_ATTR void VKAPI_CALL GetGeneratedCommandsMemoryRequirementsEXT(
     VkDevice device, const VkGeneratedCommandsMemoryRequirementsInfoEXT* pInfo, VkMemoryRequirements2* pMemoryRequirements);
 static VKAPI_ATTR void VKAPI_CALL CmdPreprocessGeneratedCommandsEXT(VkCommandBuffer commandBuffer,
@@ -1956,6 +2023,14 @@ static VKAPI_ATTR void VKAPI_CALL UpdateIndirectExecutionSetShaderEXT(
     const VkWriteIndirectExecutionSetShaderEXT* pExecutionSetWrites);
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(
     VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkCooperativeMatrixFlexibleDimensionsPropertiesNV* pProperties);
+#ifdef VK_USE_PLATFORM_METAL_EXT
+static VKAPI_ATTR VkResult VKAPI_CALL GetMemoryMetalHandleEXT(VkDevice device,
+                                                              const VkMemoryGetMetalHandleInfoEXT* pGetMetalHandleInfo,
+                                                              void** pHandle);
+static VKAPI_ATTR VkResult VKAPI_CALL
+GetMemoryMetalHandlePropertiesEXT(VkDevice device, VkExternalMemoryHandleTypeFlagBits handleType, const void* pHandle,
+                                  VkMemoryMetalHandlePropertiesEXT* pMemoryMetalHandleProperties);
+#endif  // VK_USE_PLATFORM_METAL_EXT
 static VKAPI_ATTR VkResult VKAPI_CALL CreateAccelerationStructureKHR(VkDevice device,
                                                                      const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
                                                                      const VkAllocationCallbacks* pAllocator,
@@ -2248,6 +2323,25 @@ static const std::unordered_map<std::string, void*> name_to_func_ptr_map = {
     {"vkGetDeviceBufferMemoryRequirements", (void*)GetDeviceBufferMemoryRequirements},
     {"vkGetDeviceImageMemoryRequirements", (void*)GetDeviceImageMemoryRequirements},
     {"vkGetDeviceImageSparseMemoryRequirements", (void*)GetDeviceImageSparseMemoryRequirements},
+    {"vkCmdSetLineStipple", (void*)CmdSetLineStipple},
+    {"vkMapMemory2", (void*)MapMemory2},
+    {"vkUnmapMemory2", (void*)UnmapMemory2},
+    {"vkCmdBindIndexBuffer2", (void*)CmdBindIndexBuffer2},
+    {"vkGetRenderingAreaGranularity", (void*)GetRenderingAreaGranularity},
+    {"vkGetDeviceImageSubresourceLayout", (void*)GetDeviceImageSubresourceLayout},
+    {"vkGetImageSubresourceLayout2", (void*)GetImageSubresourceLayout2},
+    {"vkCmdPushDescriptorSet", (void*)CmdPushDescriptorSet},
+    {"vkCmdPushDescriptorSetWithTemplate", (void*)CmdPushDescriptorSetWithTemplate},
+    {"vkCmdSetRenderingAttachmentLocations", (void*)CmdSetRenderingAttachmentLocations},
+    {"vkCmdSetRenderingInputAttachmentIndices", (void*)CmdSetRenderingInputAttachmentIndices},
+    {"vkCmdBindDescriptorSets2", (void*)CmdBindDescriptorSets2},
+    {"vkCmdPushConstants2", (void*)CmdPushConstants2},
+    {"vkCmdPushDescriptorSet2", (void*)CmdPushDescriptorSet2},
+    {"vkCmdPushDescriptorSetWithTemplate2", (void*)CmdPushDescriptorSetWithTemplate2},
+    {"vkCopyMemoryToImage", (void*)CopyMemoryToImage},
+    {"vkCopyImageToMemory", (void*)CopyImageToMemory},
+    {"vkCopyImageToImage", (void*)CopyImageToImage},
+    {"vkTransitionImageLayout", (void*)TransitionImageLayout},
     {"vkDestroySurfaceKHR", (void*)DestroySurfaceKHR},
     {"vkGetPhysicalDeviceSurfaceSupportKHR", (void*)GetPhysicalDeviceSurfaceSupportKHR},
     {"vkGetPhysicalDeviceSurfaceCapabilitiesKHR", (void*)GetPhysicalDeviceSurfaceCapabilitiesKHR},
@@ -2608,12 +2702,14 @@ static const std::unordered_map<std::string, void*> name_to_func_ptr_map = {
     {"vkDestroyPrivateDataSlotEXT", (void*)DestroyPrivateDataSlotEXT},
     {"vkSetPrivateDataEXT", (void*)SetPrivateDataEXT},
     {"vkGetPrivateDataEXT", (void*)GetPrivateDataEXT},
+#ifdef VK_ENABLE_BETA_EXTENSIONS
     {"vkCreateCudaModuleNV", (void*)CreateCudaModuleNV},
     {"vkGetCudaModuleCacheNV", (void*)GetCudaModuleCacheNV},
     {"vkCreateCudaFunctionNV", (void*)CreateCudaFunctionNV},
     {"vkDestroyCudaModuleNV", (void*)DestroyCudaModuleNV},
     {"vkDestroyCudaFunctionNV", (void*)DestroyCudaFunctionNV},
     {"vkCmdCudaLaunchKernelNV", (void*)CmdCudaLaunchKernelNV},
+#endif  // VK_ENABLE_BETA_EXTENSIONS
 #ifdef VK_USE_PLATFORM_METAL_EXT
     {"vkExportMetalObjectsEXT", (void*)ExportMetalObjectsEXT},
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -2739,6 +2835,9 @@ static const std::unordered_map<std::string, void*> name_to_func_ptr_map = {
     {"vkCmdSetDepthClampRangeEXT", (void*)CmdSetDepthClampRangeEXT},
     {"vkGetFramebufferTilePropertiesQCOM", (void*)GetFramebufferTilePropertiesQCOM},
     {"vkGetDynamicRenderingTilePropertiesQCOM", (void*)GetDynamicRenderingTilePropertiesQCOM},
+    {"vkGetPhysicalDeviceCooperativeVectorPropertiesNV", (void*)GetPhysicalDeviceCooperativeVectorPropertiesNV},
+    {"vkConvertCooperativeVectorMatrixNV", (void*)ConvertCooperativeVectorMatrixNV},
+    {"vkCmdConvertCooperativeVectorMatrixNV", (void*)CmdConvertCooperativeVectorMatrixNV},
     {"vkSetLatencySleepModeNV", (void*)SetLatencySleepModeNV},
     {"vkLatencySleepNV", (void*)LatencySleepNV},
     {"vkSetLatencyMarkerNV", (void*)SetLatencyMarkerNV},
@@ -2748,6 +2847,10 @@ static const std::unordered_map<std::string, void*> name_to_func_ptr_map = {
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
     {"vkGetScreenBufferPropertiesQNX", (void*)GetScreenBufferPropertiesQNX},
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+    {"vkGetClusterAccelerationStructureBuildSizesNV", (void*)GetClusterAccelerationStructureBuildSizesNV},
+    {"vkCmdBuildClusterAccelerationStructureIndirectNV", (void*)CmdBuildClusterAccelerationStructureIndirectNV},
+    {"vkGetPartitionedAccelerationStructuresBuildSizesNV", (void*)GetPartitionedAccelerationStructuresBuildSizesNV},
+    {"vkCmdBuildPartitionedAccelerationStructuresNV", (void*)CmdBuildPartitionedAccelerationStructuresNV},
     {"vkGetGeneratedCommandsMemoryRequirementsEXT", (void*)GetGeneratedCommandsMemoryRequirementsEXT},
     {"vkCmdPreprocessGeneratedCommandsEXT", (void*)CmdPreprocessGeneratedCommandsEXT},
     {"vkCmdExecuteGeneratedCommandsEXT", (void*)CmdExecuteGeneratedCommandsEXT},
@@ -2759,6 +2862,10 @@ static const std::unordered_map<std::string, void*> name_to_func_ptr_map = {
     {"vkUpdateIndirectExecutionSetShaderEXT", (void*)UpdateIndirectExecutionSetShaderEXT},
     {"vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV",
      (void*)GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV},
+#ifdef VK_USE_PLATFORM_METAL_EXT
+    {"vkGetMemoryMetalHandleEXT", (void*)GetMemoryMetalHandleEXT},
+    {"vkGetMemoryMetalHandlePropertiesEXT", (void*)GetMemoryMetalHandlePropertiesEXT},
+#endif  // VK_USE_PLATFORM_METAL_EXT
     {"vkCreateAccelerationStructureKHR", (void*)CreateAccelerationStructureKHR},
     {"vkDestroyAccelerationStructureKHR", (void*)DestroyAccelerationStructureKHR},
     {"vkCmdBuildAccelerationStructuresKHR", (void*)CmdBuildAccelerationStructuresKHR},
@@ -3395,6 +3502,64 @@ static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSparseMemoryRequirements(
     VkDevice device, const VkDeviceImageMemoryRequirements* pInfo, uint32_t* pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements2* pSparseMemoryRequirements) {}
 
+static VKAPI_ATTR void VKAPI_CALL CmdSetLineStipple(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
+                                                    uint16_t lineStipplePattern) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdBindIndexBuffer2(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                      VkDeviceSize size, VkIndexType indexType) {}
+
+static VKAPI_ATTR void VKAPI_CALL GetRenderingAreaGranularity(VkDevice device, const VkRenderingAreaInfo* pRenderingAreaInfo,
+                                                              VkExtent2D* pGranularity) {}
+
+static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSubresourceLayout(VkDevice device, const VkDeviceImageSubresourceInfo* pInfo,
+                                                                  VkSubresourceLayout2* pLayout) {}
+
+static VKAPI_ATTR void VKAPI_CALL GetImageSubresourceLayout2(VkDevice device, VkImage image,
+                                                             const VkImageSubresource2* pSubresource,
+                                                             VkSubresourceLayout2* pLayout) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSet(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
+                                                       VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
+                                                       const VkWriteDescriptorSet* pDescriptorWrites) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSetWithTemplate(VkCommandBuffer commandBuffer,
+                                                                   VkDescriptorUpdateTemplate descriptorUpdateTemplate,
+                                                                   VkPipelineLayout layout, uint32_t set, const void* pData) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdSetRenderingAttachmentLocations(VkCommandBuffer commandBuffer,
+                                                                     const VkRenderingAttachmentLocationInfo* pLocationInfo) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdSetRenderingInputAttachmentIndices(
+    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfo* pInputAttachmentIndexInfo) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
+                                                         const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdPushConstants2(VkCommandBuffer commandBuffer, const VkPushConstantsInfo* pPushConstantsInfo) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSet2(VkCommandBuffer commandBuffer,
+                                                        const VkPushDescriptorSetInfo* pPushDescriptorSetInfo) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSetWithTemplate2(
+    VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfo* pPushDescriptorSetWithTemplateInfo) {}
+
+static VKAPI_ATTR VkResult VKAPI_CALL CopyMemoryToImage(VkDevice device, const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo) {
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToMemory(VkDevice device, const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo) {
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToImage(VkDevice device, const VkCopyImageToImageInfo* pCopyImageToImageInfo) {
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL TransitionImageLayout(VkDevice device, uint32_t transitionCount,
+                                                            const VkHostImageLayoutTransitionInfo* pTransitions) {
+    return VK_SUCCESS;
+}
+
 static VKAPI_ATTR void VKAPI_CALL DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface,
                                                     const VkAllocationCallbacks* pAllocator) {}
 
@@ -3700,11 +3865,15 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetSemaphoreFdKHR(VkDevice device, const V
 
 static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSetKHR(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
                                                           VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
-                                                          const VkWriteDescriptorSet* pDescriptorWrites) {}
+                                                          const VkWriteDescriptorSet* pDescriptorWrites) {
+    CmdPushDescriptorSet(commandBuffer, pipelineBindPoint, layout, set, descriptorWriteCount, pDescriptorWrites);
+}
 
 static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSetWithTemplateKHR(VkCommandBuffer commandBuffer,
                                                                       VkDescriptorUpdateTemplate descriptorUpdateTemplate,
-                                                                      VkPipelineLayout layout, uint32_t set, const void* pData) {}
+                                                                      VkPipelineLayout layout, uint32_t set, const void* pData) {
+    CmdPushDescriptorSetWithTemplate(commandBuffer, descriptorUpdateTemplate, layout, set, pData);
+}
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateDescriptorUpdateTemplateKHR(VkDevice device,
                                                                         const VkDescriptorUpdateTemplateCreateInfo* pCreateInfo,
@@ -3867,11 +4036,14 @@ static VKAPI_ATTR void VKAPI_CALL CmdSetFragmentShadingRateKHR(VkCommandBuffer c
                                                                const VkFragmentShadingRateCombinerOpKHR combinerOps[2]) {}
 
 static VKAPI_ATTR void VKAPI_CALL CmdSetRenderingAttachmentLocationsKHR(VkCommandBuffer commandBuffer,
-                                                                        const VkRenderingAttachmentLocationInfoKHR* pLocationInfo) {
+                                                                        const VkRenderingAttachmentLocationInfo* pLocationInfo) {
+    CmdSetRenderingAttachmentLocations(commandBuffer, pLocationInfo);
 }
 
 static VKAPI_ATTR void VKAPI_CALL CmdSetRenderingInputAttachmentIndicesKHR(
-    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfoKHR* pInputAttachmentIndexInfo) {}
+    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfo* pInputAttachmentIndexInfo) {
+    CmdSetRenderingInputAttachmentIndices(commandBuffer, pInputAttachmentIndexInfo);
+}
 
 static VKAPI_ATTR VkResult VKAPI_CALL WaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t presentId,
                                                         uint64_t timeout) {
@@ -3930,6 +4102,14 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPipelineExecutableInternalRepresentatio
     VkDevice device, const VkPipelineExecutableInfoKHR* pExecutableInfo, uint32_t* pInternalRepresentationCount,
     VkPipelineExecutableInternalRepresentationKHR* pInternalRepresentations) {
     return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL MapMemory2KHR(VkDevice device, const VkMemoryMapInfo* pMemoryMapInfo, void** ppData) {
+    return MapMemory2(device, pMemoryMapInfo, ppData);
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL UnmapMemory2KHR(VkDevice device, const VkMemoryUnmapInfo* pMemoryUnmapInfo) {
+    return UnmapMemory2(device, pMemoryUnmapInfo);
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(
@@ -4020,17 +4200,25 @@ static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSparseMemoryRequirementsKHR(
 }
 
 static VKAPI_ATTR void VKAPI_CALL CmdBindIndexBuffer2KHR(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
-                                                         VkDeviceSize size, VkIndexType indexType) {}
+                                                         VkDeviceSize size, VkIndexType indexType) {
+    CmdBindIndexBuffer2(commandBuffer, buffer, offset, size, indexType);
+}
 
-static VKAPI_ATTR void VKAPI_CALL GetRenderingAreaGranularityKHR(VkDevice device, const VkRenderingAreaInfoKHR* pRenderingAreaInfo,
-                                                                 VkExtent2D* pGranularity) {}
+static VKAPI_ATTR void VKAPI_CALL GetRenderingAreaGranularityKHR(VkDevice device, const VkRenderingAreaInfo* pRenderingAreaInfo,
+                                                                 VkExtent2D* pGranularity) {
+    GetRenderingAreaGranularity(device, pRenderingAreaInfo, pGranularity);
+}
 
-static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSubresourceLayoutKHR(VkDevice device, const VkDeviceImageSubresourceInfoKHR* pInfo,
-                                                                     VkSubresourceLayout2KHR* pLayout) {}
+static VKAPI_ATTR void VKAPI_CALL GetDeviceImageSubresourceLayoutKHR(VkDevice device, const VkDeviceImageSubresourceInfo* pInfo,
+                                                                     VkSubresourceLayout2* pLayout) {
+    GetDeviceImageSubresourceLayout(device, pInfo, pLayout);
+}
 
 static VKAPI_ATTR void VKAPI_CALL GetImageSubresourceLayout2KHR(VkDevice device, VkImage image,
-                                                                const VkImageSubresource2KHR* pSubresource,
-                                                                VkSubresourceLayout2KHR* pLayout) {}
+                                                                const VkImageSubresource2* pSubresource,
+                                                                VkSubresourceLayout2* pLayout) {
+    GetImageSubresourceLayout2(device, image, pSubresource, pLayout);
+}
 
 static VKAPI_ATTR void VKAPI_CALL DestroyPipelineBinaryKHR(VkDevice device, VkPipelineBinaryKHR pipelineBinary,
                                                            const VkAllocationCallbacks* pAllocator) {}
@@ -4047,7 +4235,9 @@ static VKAPI_ATTR VkResult VKAPI_CALL ReleaseCapturedPipelineDataKHR(VkDevice de
 }
 
 static VKAPI_ATTR void VKAPI_CALL CmdSetLineStippleKHR(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
-                                                       uint16_t lineStipplePattern) {}
+                                                       uint16_t lineStipplePattern) {
+    CmdSetLineStipple(commandBuffer, lineStippleFactor, lineStipplePattern);
+}
 
 static VKAPI_ATTR VkResult VKAPI_CALL GetCalibratedTimestampsKHR(VkDevice device, uint32_t timestampCount,
                                                                  const VkCalibratedTimestampInfoKHR* pTimestampInfos,
@@ -4056,16 +4246,24 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetCalibratedTimestampsKHR(VkDevice device
 }
 
 static VKAPI_ATTR void VKAPI_CALL CmdBindDescriptorSets2KHR(VkCommandBuffer commandBuffer,
-                                                            const VkBindDescriptorSetsInfoKHR* pBindDescriptorSetsInfo) {}
+                                                            const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo) {
+    CmdBindDescriptorSets2(commandBuffer, pBindDescriptorSetsInfo);
+}
 
 static VKAPI_ATTR void VKAPI_CALL CmdPushConstants2KHR(VkCommandBuffer commandBuffer,
-                                                       const VkPushConstantsInfoKHR* pPushConstantsInfo) {}
+                                                       const VkPushConstantsInfo* pPushConstantsInfo) {
+    CmdPushConstants2(commandBuffer, pPushConstantsInfo);
+}
 
 static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSet2KHR(VkCommandBuffer commandBuffer,
-                                                           const VkPushDescriptorSetInfoKHR* pPushDescriptorSetInfo) {}
+                                                           const VkPushDescriptorSetInfo* pPushDescriptorSetInfo) {
+    CmdPushDescriptorSet2(commandBuffer, pPushDescriptorSetInfo);
+}
 
 static VKAPI_ATTR void VKAPI_CALL CmdPushDescriptorSetWithTemplate2KHR(
-    VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfoKHR* pPushDescriptorSetWithTemplateInfo) {}
+    VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfo* pPushDescriptorSetWithTemplateInfo) {
+    CmdPushDescriptorSetWithTemplate2(commandBuffer, pPushDescriptorSetWithTemplateInfo);
+}
 
 static VKAPI_ATTR void VKAPI_CALL CmdSetDescriptorBufferOffsets2EXT(
     VkCommandBuffer commandBuffer, const VkSetDescriptorBufferOffsetsInfoEXT* pSetDescriptorBufferOffsetsInfo) {}
@@ -4241,12 +4439,6 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetRandROutputDisplayEXT(VkPhysicalDevice 
 }
 
 #endif  // VK_USE_PLATFORM_XLIB_XRANDR_EXT
-static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice physicalDevice,
-                                                                               VkSurfaceKHR surface,
-                                                                               VkSurfaceCapabilities2EXT* pSurfaceCapabilities) {
-    return VK_SUCCESS;
-}
-
 static VKAPI_ATTR VkResult VKAPI_CALL DisplayPowerControlEXT(VkDevice device, VkDisplayKHR display,
                                                              const VkDisplayPowerInfoEXT* pDisplayPowerInfo) {
     return VK_SUCCESS;
@@ -4657,7 +4849,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateHeadlessSurfaceEXT(VkInstance instan
 
 static VKAPI_ATTR void VKAPI_CALL CmdSetLineStippleEXT(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
                                                        uint16_t lineStipplePattern) {
-    CmdSetLineStippleKHR(commandBuffer, lineStippleFactor, lineStipplePattern);
+    CmdSetLineStipple(commandBuffer, lineStippleFactor, lineStipplePattern);
 }
 
 static VKAPI_ATTR void VKAPI_CALL ResetQueryPoolEXT(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery,
@@ -4719,29 +4911,27 @@ static VKAPI_ATTR void VKAPI_CALL CmdSetStencilOpEXT(VkCommandBuffer commandBuff
     CmdSetStencilOp(commandBuffer, faceMask, failOp, passOp, depthFailOp, compareOp);
 }
 
-static VKAPI_ATTR VkResult VKAPI_CALL CopyMemoryToImageEXT(VkDevice device,
-                                                           const VkCopyMemoryToImageInfoEXT* pCopyMemoryToImageInfo) {
-    return VK_SUCCESS;
+static VKAPI_ATTR VkResult VKAPI_CALL CopyMemoryToImageEXT(VkDevice device, const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo) {
+    return CopyMemoryToImage(device, pCopyMemoryToImageInfo);
 }
 
-static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToMemoryEXT(VkDevice device,
-                                                           const VkCopyImageToMemoryInfoEXT* pCopyImageToMemoryInfo) {
-    return VK_SUCCESS;
+static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToMemoryEXT(VkDevice device, const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo) {
+    return CopyImageToMemory(device, pCopyImageToMemoryInfo);
 }
 
-static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToImageEXT(VkDevice device, const VkCopyImageToImageInfoEXT* pCopyImageToImageInfo) {
-    return VK_SUCCESS;
+static VKAPI_ATTR VkResult VKAPI_CALL CopyImageToImageEXT(VkDevice device, const VkCopyImageToImageInfo* pCopyImageToImageInfo) {
+    return CopyImageToImage(device, pCopyImageToImageInfo);
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL TransitionImageLayoutEXT(VkDevice device, uint32_t transitionCount,
-                                                               const VkHostImageLayoutTransitionInfoEXT* pTransitions) {
-    return VK_SUCCESS;
+                                                               const VkHostImageLayoutTransitionInfo* pTransitions) {
+    return TransitionImageLayout(device, transitionCount, pTransitions);
 }
 
 static VKAPI_ATTR void VKAPI_CALL GetImageSubresourceLayout2EXT(VkDevice device, VkImage image,
-                                                                const VkImageSubresource2KHR* pSubresource,
-                                                                VkSubresourceLayout2KHR* pLayout) {
-    GetImageSubresourceLayout2KHR(device, image, pSubresource, pLayout);
+                                                                const VkImageSubresource2* pSubresource,
+                                                                VkSubresourceLayout2* pLayout) {
+    GetImageSubresourceLayout2(device, image, pSubresource, pLayout);
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL ReleaseSwapchainImagesEXT(VkDevice device,
@@ -4807,6 +4997,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPrivateDataEXT(VkDevice device, VkObjectTyp
     GetPrivateData(device, objectType, objectHandle, privateDataSlot, pData);
 }
 
+#ifdef VK_ENABLE_BETA_EXTENSIONS
 static VKAPI_ATTR VkResult VKAPI_CALL CreateCudaModuleNV(VkDevice device, const VkCudaModuleCreateInfoNV* pCreateInfo,
                                                          const VkAllocationCallbacks* pAllocator, VkCudaModuleNV* pModule) {
     unique_lock_t lock(global_lock);
@@ -4834,6 +5025,7 @@ static VKAPI_ATTR void VKAPI_CALL DestroyCudaFunctionNV(VkDevice device, VkCudaF
 
 static VKAPI_ATTR void VKAPI_CALL CmdCudaLaunchKernelNV(VkCommandBuffer commandBuffer, const VkCudaLaunchInfoNV* pLaunchInfo) {}
 
+#endif  // VK_ENABLE_BETA_EXTENSIONS
 #ifdef VK_USE_PLATFORM_METAL_EXT
 static VKAPI_ATTR void VKAPI_CALL ExportMetalObjectsEXT(VkDevice device, VkExportMetalObjectsInfoEXT* pMetalObjectsInfo) {}
 
@@ -5289,6 +5481,20 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetDynamicRenderingTilePropertiesQCOM(VkDe
     return VK_SUCCESS;
 }
 
+static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeVectorPropertiesNV(VkPhysicalDevice physicalDevice,
+                                                                                     uint32_t* pPropertyCount,
+                                                                                     VkCooperativeVectorPropertiesNV* pProperties) {
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL ConvertCooperativeVectorMatrixNV(VkDevice device,
+                                                                       const VkConvertCooperativeVectorMatrixInfoNV* pInfo) {
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR void VKAPI_CALL CmdConvertCooperativeVectorMatrixNV(VkCommandBuffer commandBuffer, uint32_t infoCount,
+                                                                      const VkConvertCooperativeVectorMatrixInfoNV* pInfos) {}
+
 static VKAPI_ATTR VkResult VKAPI_CALL SetLatencySleepModeNV(VkDevice device, VkSwapchainKHR swapchain,
                                                             const VkLatencySleepModeInfoNV* pSleepModeInfo) {
     return VK_SUCCESS;
@@ -5317,6 +5523,19 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetScreenBufferPropertiesQNX(VkDevice devi
 }
 
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+static VKAPI_ATTR void VKAPI_CALL GetClusterAccelerationStructureBuildSizesNV(
+    VkDevice device, const VkClusterAccelerationStructureInputInfoNV* pInfo, VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdBuildClusterAccelerationStructureIndirectNV(
+    VkCommandBuffer commandBuffer, const VkClusterAccelerationStructureCommandsInfoNV* pCommandInfos) {}
+
+static VKAPI_ATTR void VKAPI_CALL
+GetPartitionedAccelerationStructuresBuildSizesNV(VkDevice device, const VkPartitionedAccelerationStructureInstancesInputNV* pInfo,
+                                                 VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) {}
+
+static VKAPI_ATTR void VKAPI_CALL CmdBuildPartitionedAccelerationStructuresNV(
+    VkCommandBuffer commandBuffer, const VkBuildPartitionedAccelerationStructureInfoNV* pBuildInfo) {}
+
 static VKAPI_ATTR void VKAPI_CALL GetGeneratedCommandsMemoryRequirementsEXT(
     VkDevice device, const VkGeneratedCommandsMemoryRequirementsInfoEXT* pInfo, VkMemoryRequirements2* pMemoryRequirements) {}
 
@@ -5365,6 +5584,20 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixFlexible
     return VK_SUCCESS;
 }
 
+#ifdef VK_USE_PLATFORM_METAL_EXT
+static VKAPI_ATTR VkResult VKAPI_CALL GetMemoryMetalHandleEXT(VkDevice device,
+                                                              const VkMemoryGetMetalHandleInfoEXT* pGetMetalHandleInfo,
+                                                              void** pHandle) {
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL
+GetMemoryMetalHandlePropertiesEXT(VkDevice device, VkExternalMemoryHandleTypeFlagBits handleType, const void* pHandle,
+                                  VkMemoryMetalHandlePropertiesEXT* pMemoryMetalHandleProperties) {
+    return VK_SUCCESS;
+}
+
+#endif  // VK_USE_PLATFORM_METAL_EXT
 static VKAPI_ATTR VkResult VKAPI_CALL CreateAccelerationStructureKHR(VkDevice device,
                                                                      const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
                                                                      const VkAllocationCallbacks* pAllocator,

@@ -270,7 +270,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
     RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceFeatures features{};
-    vksc::GetPhysicalDeviceFeatures(gpu(), &features);
+    vksc::GetPhysicalDeviceFeatures(Gpu(), &features);
     const auto supports_pipeline_stat_queries = features.pipelineStatisticsQuery;
 
     auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
@@ -296,7 +296,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
     object_reservation_info2.maxTimestampQueriesPerPool = 10;
     object_reservation_info3.maxTimestampQueriesPerPool = 20;
 
-    bool test_perf_queries = DeviceExtensionSupported(gpu(), nullptr, VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
+    bool test_perf_queries = DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
 
     if (test_perf_queries) {
         PFN_vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR
@@ -306,7 +306,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         ASSERT_TRUE(vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR != nullptr);
 
         uint32_t perf_counter_count = 0;
-        vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(gpu(), 0, &perf_counter_count, nullptr, nullptr);
+        vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(Gpu(), 0, &perf_counter_count, nullptr, nullptr);
         if (perf_counter_count == 0) {
             test_perf_queries = false;
         }
@@ -317,7 +317,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         std::vector<VkPerformanceCounterKHR> perf_counter(perf_counter_count, vku::InitStruct<VkPerformanceCounterKHR>());
         std::vector<VkPerformanceCounterDescriptionKHR> perf_counter_desc(perf_counter_count,
                                                                           vku::InitStruct<VkPerformanceCounterDescriptionKHR>());
-        vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(gpu(), 0, &perf_counter_count, perf_counter.data(),
+        vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(Gpu(), 0, &perf_counter_count, perf_counter.data(),
                                                                         perf_counter_desc.data());
     }
 
@@ -609,12 +609,12 @@ TEST_F(VkSCLayerTest, BindImageMemorySplitInstanceBindRegionCount) {
     vkt::Image image{};
     image.InitNoMemory(*m_device, create_info);
 
-    auto mem_reqs = image.memory_requirements();
+    auto mem_reqs = image.MemoryRequirements();
 
     auto mem_alloc = vku::InitStruct<VkMemoryAllocateInfo>();
     mem_alloc.memoryTypeIndex = 0;
     mem_alloc.allocationSize = mem_reqs.size;
-    const bool memory_found = m_device->phy().SetMemoryType(mem_reqs.memoryTypeBits, &mem_alloc, 0);
+    const bool memory_found = m_device->Physical().SetMemoryType(mem_reqs.memoryTypeBits, &mem_alloc, 0);
     ASSERT_TRUE(memory_found);
 
     VkDeviceMemory memory = VK_NULL_HANDLE;
@@ -675,6 +675,7 @@ TEST_F(VkSCLayerTest, CreateFramebufferMaxFramebufferAttachmentsExceeded) {
 
     VkFramebuffer framebuffer = VK_NULL_HANDLE;
 
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkFramebufferCreateInfo-flags-02778");
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkFramebufferCreateInfo-attachmentCount-00876");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkFramebufferCreateInfo-attachmentCount-05060");
     vksc::CreateFramebuffer(device(), &create_info, nullptr, &framebuffer);
@@ -726,6 +727,6 @@ TEST_F(VkSCLayerTest, FaultCallbackInfoFaultCount) {
     VkDevice device = VK_NULL_HANDLE;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkFaultCallbackInfo-faultCount-05138");
-    vksc::CreateDevice(gpu(), &device_ci, nullptr, &device);
+    vksc::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 }

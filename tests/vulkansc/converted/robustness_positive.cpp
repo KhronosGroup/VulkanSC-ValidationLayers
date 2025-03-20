@@ -49,7 +49,6 @@ TEST_F(PositiveRobustness, WriteDescriptorSetAccelerationStructureNVNullDescript
 TEST_F(PositiveRobustness, BindVertexBuffers2EXTNullDescriptors) {
     TEST_DESCRIPTION("Test nullDescriptor works wih CmdBindVertexBuffers variants");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::nullDescriptor);
@@ -85,8 +84,68 @@ TEST_F(PositiveRobustness, PipelineRobustnessRobustImageAccessExposed) {
     AddRequiredFeature(vkt::Feature::pipelineRobustness);
     RETURN_IF_SKIP(Init());
 
-    VkPipelineRobustnessCreateInfoEXT pipeline_robustness_info = vku::InitStructHelper();
+    VkPipelineRobustnessCreateInfo pipeline_robustness_info = vku::InitStructHelper();
     CreateComputePipelineHelper pipe(*this, &pipeline_robustness_info);
-    pipeline_robustness_info.images = VK_PIPELINE_ROBUSTNESS_IMAGE_BEHAVIOR_ROBUST_IMAGE_ACCESS_EXT;
+    pipeline_robustness_info.images = VK_PIPELINE_ROBUSTNESS_IMAGE_BEHAVIOR_ROBUST_IMAGE_ACCESS;
+    pipe.CreateComputePipeline();
+}
+
+TEST_F(PositiveRobustness, PipelineRobustnessRobustBufferAccess2Supported) {
+    TEST_DESCRIPTION("Create a pipeline using VK_EXT_pipeline_robustness with robustBufferAccess2 being supported");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::pipelineRobustness);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(robustness2_features);
+
+    if (!robustness2_features.robustBufferAccess2) {
+        GTEST_SKIP() << "robustBufferAccess2 is not supported";
+    }
+
+    {
+        VkPipelineRobustnessCreateInfo pipeline_robustness_info = vku::InitStructHelper();
+        CreateComputePipelineHelper pipe(*this, &pipeline_robustness_info);
+        pipeline_robustness_info.storageBuffers = VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2;
+        pipe.CreateComputePipeline();
+    }
+
+    {
+        VkPipelineRobustnessCreateInfo pipeline_robustness_info = vku::InitStructHelper();
+        CreateComputePipelineHelper pipe(*this, &pipeline_robustness_info);
+        pipeline_robustness_info.uniformBuffers = VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2;
+        pipe.CreateComputePipeline();
+    }
+
+    {
+        VkPipelineRobustnessCreateInfo pipeline_robustness_info = vku::InitStructHelper();
+        CreateComputePipelineHelper pipe(*this, &pipeline_robustness_info);
+        pipeline_robustness_info.vertexInputs = VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2;
+        pipe.CreateComputePipeline();
+    }
+}
+
+TEST_F(PositiveRobustness, PipelineRobustnessRobustImageAccess2Supported) {
+    TEST_DESCRIPTION("Create a pipeline using VK_EXT_pipeline_robustness with robustImageAccess2 being supported");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::pipelineRobustness);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(robustness2_features);
+
+    if (!robustness2_features.robustBufferAccess2) {
+        GTEST_SKIP() << "robustBufferAccess2 is not supported";
+    }
+
+    VkPipelineRobustnessCreateInfo pipeline_robustness_info = vku::InitStructHelper();
+    CreateComputePipelineHelper pipe(*this, &pipeline_robustness_info);
+    pipeline_robustness_info.images = VK_PIPELINE_ROBUSTNESS_IMAGE_BEHAVIOR_ROBUST_IMAGE_ACCESS_2;
     pipe.CreateComputePipeline();
 }

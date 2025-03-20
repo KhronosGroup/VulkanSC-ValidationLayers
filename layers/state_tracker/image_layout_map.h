@@ -1,7 +1,7 @@
-/* Copyright (c) 2019-2024 The Khronos Group Inc.
- * Copyright (c) 2019-2024 Valve Corporation
- * Copyright (c) 2019-2024 LunarG, Inc.
- * Copyright (C) 2019-2024 Google Inc.
+/* Copyright (c) 2019-2025 The Khronos Group Inc.
+ * Copyright (c) 2019-2025 Valve Corporation
+ * Copyright (c) 2019-2025 LunarG, Inc.
+ * Copyright (C) 2019-2025 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,9 @@
 
 #include <functional>
 
-#include "containers/range_vector.h"
+#include "containers/range.h"
 #include "containers/subresource_adapter.h"
 #include "utils/vk_layer_utils.h"
-#ifndef SPARSE_CONTAINER_UNIT_TEST
 #include "vulkan/vulkan.h"
 #include "error_message/logging.h"
 
@@ -34,14 +33,13 @@ class Image;
 class ImageView;
 class CommandBuffer;
 }  // namespace vvl
-#endif
 
 namespace image_layout_map {
 const static VkImageLayout kInvalidLayout = VK_IMAGE_LAYOUT_MAX_ENUM;
 
 // Common types for this namespace
 using IndexType = subresource_adapter::IndexType;
-using IndexRange = sparse_container::range<IndexType>;
+using IndexRange = vvl::range<IndexType>;
 using Encoder = subresource_adapter::RangeEncoder;
 using RangeGenerator = subresource_adapter::RangeGenerator;
 
@@ -53,7 +51,8 @@ struct InitialLayoutState {
     InitialLayoutState() : image_view(VK_NULL_HANDLE), aspect_mask(0), label() {}
 };
 
-class ImageSubresourceLayoutMap {
+// Contains all info around an image, its subresources and layout map
+class ImageLayoutRegistry {
   public:
     typedef std::function<bool(const VkImageSubresource&, VkImageLayout, VkImageLayout)> Callback;
 
@@ -118,12 +117,12 @@ class ImageSubresourceLayoutMap {
                                           VkImageLayout layout);
     void SetSubresourceRangeInitialLayout(const vvl::CommandBuffer& cb_state, VkImageLayout layout,
                                           const vvl::ImageView& view_state);
-    bool UpdateFrom(const ImageSubresourceLayoutMap& from);
+    bool UpdateFrom(const ImageLayoutRegistry& from);
     uintptr_t CompatibilityKey() const;
-    const LayoutMap& GetLayoutMap() const { return layouts_; }
-    ImageSubresourceLayoutMap(const vvl::Image& image_state);
-    ~ImageSubresourceLayoutMap() {}
-    const vvl::Image* GetImageView() const { return &image_state_; };
+    const LayoutMap& GetLayoutMap() const { return layout_map_; }
+    ImageLayoutRegistry(const vvl::Image& image_state);
+    ~ImageLayoutRegistry() {}
+    uint32_t GetImageId() const;
 
     // This looks a bit ponderous but kAspectCount is a compile time constant
     VkImageSubresource Decode(IndexType index) const {
@@ -150,7 +149,7 @@ class ImageSubresourceLayoutMap {
 
     bool AnyInRange(RangeGenerator&& gen, std::function<bool(const RangeType& range, const LayoutEntry& state)>&& func) const {
         for (; gen->non_empty(); ++gen) {
-            for (auto pos = layouts_.lower_bound(*gen); (pos != layouts_.end()) && (gen->intersects(pos->first)); ++pos) {
+            for (auto pos = layout_map_.lower_bound(*gen); (pos != layout_map_.end()) && (gen->intersects(pos->first)); ++pos) {
                 if (func(pos->first, pos->second)) {
                     return true;
                 }
@@ -166,7 +165,7 @@ class ImageSubresourceLayoutMap {
   private:
     const vvl::Image& image_state_;
     const Encoder& encoder_;
-    LayoutMap layouts_;
+    LayoutMap layout_map_;
     InitialLayoutStates initial_layout_states_;
 };
 }  // namespace image_layout_map

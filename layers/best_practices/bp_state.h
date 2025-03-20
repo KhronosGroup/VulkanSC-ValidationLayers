@@ -1,7 +1,6 @@
-
-/* Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+/* Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -31,13 +30,12 @@ class BestPractices;
 namespace bp_state {
 class Image : public vvl::Image {
   public:
-    Image(const ValidationStateTracker& dev_data, VkImage handle, const VkImageCreateInfo* create_info,
-          VkFormatFeatureFlags2 features)
+    Image(const vvl::Device& dev_data, VkImage handle, const VkImageCreateInfo* create_info, VkFormatFeatureFlags2 features)
         : vvl::Image(dev_data, handle, create_info, features) {
         SetupUsages();
     }
 
-    Image(const ValidationStateTracker& dev_data, VkImage handle, const VkImageCreateInfo* create_info, VkSwapchainKHR swapchain,
+    Image(const vvl::Device& dev_data, VkImage handle, const VkImageCreateInfo* create_info, VkSwapchainKHR swapchain,
           uint32_t swapchain_index, VkFormatFeatureFlags2 features)
         : vvl::Image(dev_data, handle, create_info, swapchain, swapchain_index, features) {
         SetupUsages();
@@ -78,43 +76,6 @@ class Image : public vvl::Image {
     // and tracking them independently could be misleading.
     // second/uint32_t is last queue family usage
     std::vector<std::vector<Usage>> usages_;
-};
-
-class PhysicalDevice : public vvl::PhysicalDevice {
-  public:
-    PhysicalDevice(VkPhysicalDevice phys_dev) : vvl::PhysicalDevice(phys_dev) {}
-
-    // Track the call state and array sizes for various query functions
-    CALL_STATE vkGetPhysicalDeviceQueueFamilyPropertiesState = UNCALLED;
-    CALL_STATE vkGetPhysicalDeviceQueueFamilyProperties2State = UNCALLED;
-    CALL_STATE vkGetPhysicalDeviceQueueFamilyProperties2KHRState = UNCALLED;
-    CALL_STATE vkGetPhysicalDeviceLayerPropertiesState = UNCALLED;      // Currently unused
-    CALL_STATE vkGetPhysicalDeviceExtensionPropertiesState = UNCALLED;  // Currently unused
-    CALL_STATE vkGetPhysicalDeviceFeaturesState = UNCALLED;
-    CALL_STATE vkGetPhysicalDeviceSurfaceCapabilitiesKHRState = UNCALLED;
-    CALL_STATE vkGetPhysicalDeviceSurfacePresentModesKHRState = UNCALLED;
-    CALL_STATE vkGetPhysicalDeviceSurfaceFormatsKHRState = UNCALLED;
-    uint32_t surface_formats_count = 0;
-    CALL_STATE vkGetPhysicalDeviceDisplayPlanePropertiesKHRState = UNCALLED;
-};
-
-class Swapchain : public vvl::Swapchain {
-  public:
-    Swapchain(ValidationStateTracker& dev_data, const VkSwapchainCreateInfoKHR* create_info, VkSwapchainKHR handle)
-        : vvl::Swapchain(dev_data, create_info, handle) {}
-
-    CALL_STATE vkGetSwapchainImagesKHRState = UNCALLED;
-};
-
-class DeviceMemory : public vvl::DeviceMemory {
-  public:
-    DeviceMemory(VkDeviceMemory handle, const VkMemoryAllocateInfo* allocate_info, uint64_t fake_address,
-                 const VkMemoryType& memory_type, const VkMemoryHeap& memory_heap,
-                 std::optional<vvl::DedicatedBinding>&& dedicated_binding, uint32_t physical_device_count)
-        : vvl::DeviceMemory(handle, allocate_info, fake_address, memory_type, memory_heap, std::move(dedicated_binding),
-                            physical_device_count) {}
-
-    std::optional<float> dynamic_priority;  // VK_EXT_pageable_device_local_memory priority
 };
 
 struct AttachmentInfo {
@@ -221,20 +182,4 @@ class CommandBuffer : public vvl::CommandBuffer {
     vvl::unordered_map<VkEvent, SignalingInfo> event_signaling_state;
 };
 
-class DescriptorPool : public vvl::DescriptorPool {
-  public:
-    DescriptorPool(ValidationStateTracker& dev, const VkDescriptorPool handle, const VkDescriptorPoolCreateInfo* create_info)
-        : vvl::DescriptorPool(dev, handle, create_info) {}
-
-    uint32_t freed_count{0};
-};
-
-class Pipeline : public vvl::Pipeline {
-  public:
-    Pipeline(const ValidationStateTracker& state_data, const VkGraphicsPipelineCreateInfo* create_info,
-             std::shared_ptr<const vvl::PipelineCache>&& pipe_cache, std::shared_ptr<const vvl::RenderPass>&& rpstate,
-             std::shared_ptr<const vvl::PipelineLayout>&& layout);
-
-    const std::vector<AttachmentInfo> access_framebuffer_attachments;
-};
 }  // namespace bp_state

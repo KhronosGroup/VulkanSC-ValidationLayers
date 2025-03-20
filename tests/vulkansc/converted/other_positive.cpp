@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -273,7 +273,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_Vulkan12FeaturesBufferDeviceAddress) {
     RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                        &alloc_flags);
     (void)buffer.Address();
@@ -417,15 +417,8 @@ TEST_F(VkPositiveLayerTest, ExtensionExpressions) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceFragmentShadingRateFeaturesKHR fsr_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(fsr_features);
-    if (!fsr_features.pipelineFragmentShadingRate) {
-        GTEST_SKIP() << "VkPhysicalDeviceFragmentShadingRateFeaturesKHR::pipelineFragmentShadingRate not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &fsr_features));
+    AddRequiredFeature(vkt::Feature::pipelineFragmentShadingRate);
+    RETURN_IF_SKIP(Init());
 
     VkExtent2D fragment_size = {1, 1};
     std::array combiner_ops = {VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR, VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR};
@@ -584,6 +577,9 @@ TEST_F(VkPositiveLayerTest, ExtensionPhysicalDeviceFeatureKHR) {
 
 TEST_F(VkPositiveLayerTest, NoExtensionFromInstanceFunction) {
     TEST_DESCRIPTION("Valid because we instance functions don't know which device it needs");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    // Required to pass in various memory flags without querying for corresponding extensions.
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     VkFormatProperties format_properties;
     // need VK_KHR_sampler_ycbcr_conversion if it was a device function
@@ -619,7 +615,7 @@ TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct0) {
 
 TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct1) {
     TEST_DESCRIPTION(
-        "Use VkBufferUsageFlags2CreateInfoKHR with VkPhysicalDeviceExternalBufferInfo if VK_KHR_maintenance5 is available");
+        "Use VkBufferUsageFlags2CreateInfo with VkPhysicalDeviceExternalBufferInfo if VK_KHR_maintenance5 is available");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
     if (!DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
@@ -627,14 +623,14 @@ TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct1) {
     }
 
 #ifdef _WIN32
-    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else
-    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
 
     // Requires device extension (VK_KHR_maintenance5)
-    VkBufferUsageFlags2CreateInfoKHR bufferUsageFlags2 = vku::InitStructHelper();
-    bufferUsageFlags2.usage = VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT_KHR;
+    VkBufferUsageFlags2CreateInfo bufferUsageFlags2 = vku::InitStructHelper();
+    bufferUsageFlags2.usage = VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT;
 
     VkPhysicalDeviceExternalBufferInfo externalBufferInfo = vku::InitStructHelper(&bufferUsageFlags2);
     externalBufferInfo.handleType = handle_type;
@@ -701,4 +697,23 @@ TEST_F(VkPositiveLayerTest, UnrecognizedFlagOutOfRange2) {
     format_info.type = VK_IMAGE_TYPE_1D;
     format_info.usage = static_cast<VkImageUsageFlags>(0xffffffff);
     vk::GetPhysicalDeviceImageFormatProperties2(Gpu(), &format_info, &format_properties);
+}
+
+TEST_F(VkPositiveLayerTest, PhysicalDeviceLayeredApiVulkanProperties) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(InitFramework());
+    // Don't enable maintenance7 because we are doing this at an instance level
+    // just make sure the extension is there
+    if (!DeviceExtensionSupported(VK_KHR_MAINTENANCE_7_EXTENSION_NAME)) {
+        GTEST_SKIP() << "Did not find the required device extensions";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    VkPhysicalDeviceLayeredApiPropertiesKHR api_props = vku::InitStructHelper();
+    VkPhysicalDeviceLayeredApiPropertiesListKHR api_prop_lists = vku::InitStructHelper();
+    api_prop_lists.layeredApiCount = 1;
+    api_prop_lists.pLayeredApis = &api_props;
+
+    VkPhysicalDeviceProperties2 phys_dev_props_2 = vku::InitStructHelper(&api_prop_lists);
+    vk::GetPhysicalDeviceProperties2(Gpu(), &phys_dev_props_2);
 }

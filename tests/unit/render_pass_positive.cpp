@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,8 +57,8 @@ TEST_F(PositiveRenderPass, InitialLayoutUndefined) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(rp.Handle(), fb.handle(), 32, 32);
     m_command_buffer.EndRenderPass();
+    m_errorMonitor->SetAllowedFailureMsg("SYNC-HAZARD-WRITE-AFTER-WRITE");
     m_command_buffer.BeginRenderPass(rp.Handle(), fb.handle(), 32, 32);
-
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
@@ -203,12 +203,12 @@ TEST_F(PositiveRenderPass, BeginStencilLoadOp) {
     cmdbuf.Begin();
 
     m_depthStencil->ImageMemoryBarrier(cmdbuf, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
-                                       VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
                                        VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                                       VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
                                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-    destImage.ImageMemoryBarrier(cmdbuf, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
-                                 VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 0,
+    destImage.ImageMemoryBarrier(cmdbuf, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0,
+                                 VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     VkImageCopy cregion;
     cregion.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1};
@@ -309,7 +309,6 @@ TEST_F(PositiveRenderPass, DestroyPipeline) {
 TEST_F(PositiveRenderPass, ImagelessFramebufferNonZeroBaseMip) {
     TEST_DESCRIPTION("Use a 1D image view for an imageless framebuffer with base mip level > 0.");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::imagelessFramebuffer);
     RETURN_IF_SKIP(Init());
@@ -327,7 +326,7 @@ TEST_F(PositiveRenderPass, ImagelessFramebufferNonZeroBaseMip) {
     rp.AddColorAttachment(0);
     rp.CreateRenderPass();
 
-    VkFramebufferAttachmentImageInfoKHR fb_attachment_image_info = vku::InitStructHelper();
+    VkFramebufferAttachmentImageInfo fb_attachment_image_info = vku::InitStructHelper();
     fb_attachment_image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     fb_attachment_image_info.width = width;
     fb_attachment_image_info.height = height;
@@ -337,12 +336,12 @@ TEST_F(PositiveRenderPass, ImagelessFramebufferNonZeroBaseMip) {
     fb_attachment_image_info.height = 1;
     fb_attachment_image_info.width = width >> base_mip;
 
-    VkFramebufferAttachmentsCreateInfoKHR fb_attachments_ci = vku::InitStructHelper();
+    VkFramebufferAttachmentsCreateInfo fb_attachments_ci = vku::InitStructHelper();
     fb_attachments_ci.attachmentImageInfoCount = 1;
     fb_attachments_ci.pAttachmentImageInfos = &fb_attachment_image_info;
 
     VkFramebufferCreateInfo fb_ci = vku::InitStructHelper(&fb_attachments_ci);
-    fb_ci.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT_KHR;
+    fb_ci.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
     fb_ci.width = width >> base_mip;
     fb_ci.height = height;
     fb_ci.layers = 1;
@@ -352,21 +351,14 @@ TEST_F(PositiveRenderPass, ImagelessFramebufferNonZeroBaseMip) {
     vkt::Framebuffer fb(*m_device, fb_ci);
     ASSERT_TRUE(fb.initialized());
 
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
-    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    image_ci.extent.width = width;
-    image_ci.extent.height = 1;
-    image_ci.extent.depth = 1;
-    image_ci.arrayLayers = 1;
-    image_ci.mipLevels = 2;
+    auto image_ci = vkt::Image::ImageCreateInfo2D(width, 1, 2, 1, formats[0],
+                                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     image_ci.imageType = VK_IMAGE_TYPE_1D;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.format = formats[0];
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view_obj = image.CreateView(VK_IMAGE_VIEW_TYPE_1D_ARRAY, base_mip, 1, 0, 1);
     VkImageView image_view = image_view_obj.handle();
 
-    VkRenderPassAttachmentBeginInfoKHR rp_attachment_begin_info = vku::InitStructHelper();
+    VkRenderPassAttachmentBeginInfo rp_attachment_begin_info = vku::InitStructHelper();
     rp_attachment_begin_info.attachmentCount = 1;
     rp_attachment_begin_info.pAttachments = &image_view;
     VkRenderPassBeginInfo rp_begin_info = vku::InitStructHelper(&rp_attachment_begin_info);
@@ -498,7 +490,8 @@ TEST_F(PositiveRenderPass, SingleMipTransition) {
     // Create descriptor set and friends.
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
-    OneOffDescriptorSet::Bindings binding_defs = {{2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+    std::vector<VkDescriptorSetLayoutBinding> binding_defs = {
+        {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr}};
     const vkt::DescriptorSetLayout pipeline_dsl(*m_device, binding_defs);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
     OneOffDescriptorSet descriptor_set(m_device, binding_defs);
@@ -540,108 +533,6 @@ TEST_F(PositiveRenderPass, SingleMipTransition) {
 
     depthImage.Layout(VK_IMAGE_LAYOUT_GENERAL);
 
-    m_command_buffer.End();
-}
-
-TEST_F(PositiveRenderPass, ViewMasks) {
-    TEST_DESCRIPTION("Create render pass with view mask, with multiview feature enabled in Vulkan11Features.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::multiview);
-    RETURN_IF_SKIP(Init());
-
-    VkAttachmentDescription2 attach_desc = vku::InitStructHelper();
-    attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
-    attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
-    attach_desc.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-    attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.viewMask = 0x1;
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass;
-    render_pass_ci.attachmentCount = 1;
-    render_pass_ci.pAttachments = &attach_desc;
-
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
-}
-
-TEST_F(PositiveRenderPass, BeginWithViewMasks) {
-    TEST_DESCRIPTION("Begin render pass with view mask and a push descriptor.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::multiview);
-    RETURN_IF_SKIP(Init());
-
-    VkAttachmentDescription2 attach_desc = vku::InitStructHelper();
-    attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
-    attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
-    attach_desc.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-    attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    std::array subpasses = {vku::InitStruct<VkSubpassDescription2>(), vku::InitStruct<VkSubpassDescription2>()};
-    subpasses[0].viewMask = 0x1;
-    subpasses[1].viewMask = 0x1;
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.subpassCount = subpasses.size();
-    render_pass_ci.pSubpasses = subpasses.data();
-    render_pass_ci.attachmentCount = 1;
-    render_pass_ci.pAttachments = &attach_desc;
-
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
-
-    // A compatible framebuffer.
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
-    vkt::ImageView view = image.CreateView();
-    vkt::Framebuffer fb(*m_device, render_pass.handle(), 1, &view.handle());
-
-    VkDescriptorSetLayoutBinding dsl_binding = {};
-    dsl_binding.binding = 2;
-    dsl_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    dsl_binding.descriptorCount = 1;
-    dsl_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    dsl_binding.pImmutableSamplers = NULL;
-
-    const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
-    // Create push descriptor set layout
-    const vkt::DescriptorSetLayout push_ds_layout(*m_device, {dsl_binding},
-                                                  VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
-
-    // Use helper to create graphics pipeline
-    CreatePipelineHelper helper(*this);
-    helper.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&push_ds_layout, &ds_layout});
-    helper.gp_ci_.renderPass = render_pass.handle();
-    helper.CreateGraphicsPipeline();
-
-    const uint32_t data_size = sizeof(float) * 3;
-    vkt::Buffer vbo(*m_device, data_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-
-    VkDescriptorBufferInfo buff_info;
-    buff_info.buffer = vbo.handle();
-    buff_info.offset = 0;
-    buff_info.range = data_size;
-    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-    descriptor_write.dstBinding = 2;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.pTexelBufferView = nullptr;
-    descriptor_write.pBufferInfo = &buff_info;
-    descriptor_write.pImageInfo = nullptr;
-    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptor_write.dstSet = 0;  // Should not cause a validation error
-
-    m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, helper.Handle());
-    vk::CmdPushDescriptorSetKHR(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, helper.pipeline_layout_.handle(), 0, 1,
-                                &descriptor_write);
-    m_command_buffer.BeginRenderPass(render_pass.handle(), fb.handle(), 32, 32);
-    m_command_buffer.NextSubpass();
-    m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
 
@@ -694,63 +585,6 @@ TEST_F(PositiveRenderPass, BeginDedicatedStencilLayout) {
     vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
-}
-
-TEST_F(PositiveRenderPass, QueriesInMultiview) {
-    TEST_DESCRIPTION("Use queries in a render pass instance with multiview enabled.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredFeature(vkt::Feature::multiview);
-    RETURN_IF_SKIP(Init());
-
-    RenderPassSingleSubpass rp(*this);
-    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddColorAttachment(0);
-
-    uint32_t viewMasks[] = {0x3u};
-    uint32_t correlationMasks[] = {0x1u};
-    VkRenderPassMultiviewCreateInfo rpmvci = vku::InitStructHelper();
-    rpmvci.subpassCount = 1;
-    rpmvci.pViewMasks = viewMasks;
-    rpmvci.correlationMaskCount = 1;
-    rpmvci.pCorrelationMasks = correlationMasks;
-
-    rp.CreateRenderPass(&rpmvci);
-
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
-    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_ci.extent.width = 32;
-    image_ci.extent.height = 32;
-    image_ci.extent.depth = 1;
-    image_ci.arrayLayers = 3;
-    image_ci.mipLevels = 2;
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
-    vkt::Image image(*m_device, image_ci, vkt::set_layout);
-    vkt::ImageView view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 3);
-    VkImageView image_view_handle = view.handle();
-
-    vkt::Framebuffer fb(*m_device, rp.Handle(), 1, &image_view_handle);
-
-    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2);
-
-    m_command_buffer.Begin();
-    vk::CmdResetQueryPool(m_command_buffer.handle(), query_pool.handle(), 0, 2);
-
-    m_command_buffer.BeginRenderPass(rp.Handle(), fb.handle(), 32, 32);
-    vk::CmdBeginQuery(m_command_buffer.handle(), query_pool.handle(), 0, 0);
-    vk::CmdEndQuery(m_command_buffer.handle(), query_pool.handle(), 0);
-    m_command_buffer.EndRenderPass();
-
-    vk::CmdCopyQueryPoolResults(m_command_buffer.handle(), query_pool.handle(), 0, 2, buffer.handle(), 0, 4, 0);
-    m_command_buffer.End();
-
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
 }
 
 TEST_F(PositiveRenderPass, StoreOpNoneExt) {
@@ -878,11 +712,22 @@ TEST_F(PositiveRenderPass, FramebufferWithAttachmentsTo3DImageMultipleSubpasses)
         attach_desc[i].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
     }
 
+    VkSubpassDependency dependency;
+    dependency.srcSubpass = 0u;
+    dependency.dstSubpass = 1u;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency.dependencyFlags = 0u;
+
     VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
     rp_info.subpassCount = depth_count;
     rp_info.pSubpasses = subpasses;
     rp_info.attachmentCount = depth_count;
     rp_info.pAttachments = attach_desc;
+    rp_info.dependencyCount = 1u;
+    rp_info.pDependencies = &dependency;
 
     vkt::RenderPass renderpass(*m_device, rp_info);
     vkt::Framebuffer framebuffer(*m_device, renderpass.handle(), depth_count, views, image_info.extent.width,
@@ -978,6 +823,8 @@ TEST_F(PositiveRenderPass, ImageLayoutTransitionOf3dImageWith2dViews) {
     m_command_buffer.BeginRenderPass(rp_1.Handle(), framebuffer_1.handle(), image_info.extent.width, image_info.extent.height);
     m_command_buffer.EndRenderPass();
 
+    m_command_buffer.FullMemoryBarrier();
+
     m_command_buffer.BeginRenderPass(rp_2.Handle(), framebuffer_2.handle(), image_info.extent.width, image_info.extent.height);
     m_command_buffer.EndRenderPass();
 
@@ -1009,8 +856,17 @@ TEST_F(PositiveRenderPass, SubpassWithReadOnlyLayoutWithoutDependency) {
     subpasses[0] = {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 0, 0, 0, nullptr, nullptr, &att_ref_depth_stencil, 0, nullptr};
     subpasses[1] = {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 0, 0, 0, nullptr, nullptr, &att_ref_depth_stencil, 0, nullptr};
 
+    VkSubpassDependency dependency;
+    dependency.srcSubpass = 0u;
+    dependency.dstSubpass = 1u;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.srcAccessMask = 0u;
+    dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency.dependencyFlags = 0u;
+
     VkRenderPassCreateInfo rpci = {
-        VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, size, attachments.data(), size, subpasses.data(), 0, nullptr};
+        VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, size, attachments.data(), size, subpasses.data(), 1, &dependency};
     vkt::RenderPass rp(*m_device, rpci);
 
     // A compatible framebuffer.
@@ -1207,11 +1063,11 @@ TEST_F(PositiveRenderPass, TestDepthStencilRenderPassTransition) {
         "pass. Then create a barrier on both aspect, for this to be valid *both* aspects must have been correctly tracked as "
         "transitioned to the new layout.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
     if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
         GTEST_SKIP() << "At least Vulkan version 1.1 is required";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     const VkFormat ds_format = FindSupportedDepthStencilFormat(m_device->Physical());
     vkt::Image depthImage(*m_device, 32, 32, 1, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
@@ -1311,7 +1167,7 @@ TEST_F(PositiveRenderPass, BeginRenderPassWithRenderPassStriped) {
     VkCommandBufferSubmitInfo cb_submit_info = vku::InitStructHelper(&rp_stripe_submit_info);
     cb_submit_info.commandBuffer = cmd_buffer.handle();
 
-    VkSubmitInfo2KHR submit_info = vku::InitStructHelper();
+    VkSubmitInfo2 submit_info = vku::InitStructHelper();
     submit_info.commandBufferInfoCount = 1;
     submit_info.pCommandBufferInfos = &cb_submit_info;
     vk::QueueSubmit2KHR(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);

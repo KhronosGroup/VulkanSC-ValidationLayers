@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2024 Valve Corporation
- * Copyright (c) 2024 LunarG, Inc.
+ * Copyright (c) 2024-2025 Valve Corporation
+ * Copyright (c) 2024-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,10 +84,11 @@ GeometryKHR &GeometryKHR::SetStride(VkDeviceSize stride) {
 
 GeometryKHR &GeometryKHR::SetTrianglesDeviceVertexBuffer(vkt::Buffer &&vertex_buffer, uint32_t max_vertex,
                                                          VkFormat vertex_format /*= VK_FORMAT_R32G32B32_SFLOAT*/,
-                                                         VkDeviceSize stride /*= 3 * sizeof(float)*/) {
+                                                         VkDeviceSize stride /*= 3 * sizeof(float)*/,
+                                                         VkDeviceSize vertex_buffer_offset /* = 0*/) {
     triangles_.device_vertex_buffer = std::move(vertex_buffer);
     vk_obj_.geometry.triangles.vertexFormat = vertex_format;
-    vk_obj_.geometry.triangles.vertexData.deviceAddress = triangles_.device_vertex_buffer.Address();
+    vk_obj_.geometry.triangles.vertexData.deviceAddress = triangles_.device_vertex_buffer.Address() + vertex_buffer_offset;
     vk_obj_.geometry.triangles.maxVertex = max_vertex;
     vk_obj_.geometry.triangles.vertexStride = stride;
     return *this;
@@ -200,17 +201,18 @@ GeometryKHR &GeometryKHR::AddInstanceDeviceAccelStructRef(const vkt::Device &dev
     // Create instance buffer
 
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
-    vkt::Buffer instances_buffer(
-        device, instances_.vk_instances.size() * sizeof(VkAccelerationStructureInstanceKHR),
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-        kHostVisibleMemProps, &alloc_flags);
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    vkt::Buffer instances_buffer(device, instances_.vk_instances.size() * sizeof(VkAccelerationStructureInstanceKHR),
+                                 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                                     VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                 kHostVisibleMemProps, &alloc_flags);
 
-    auto instance_buffer_ptr = static_cast<VkAccelerationStructureInstanceKHR *>(instances_buffer.memory().Map());
+    auto instance_buffer_ptr = static_cast<VkAccelerationStructureInstanceKHR *>(instances_buffer.Memory().Map());
     for (size_t vk_instance_i = 0; vk_instance_i < instances_.vk_instances.size(); ++vk_instance_i) {
         instance_buffer_ptr[vk_instance_i] = instances_.vk_instances[vk_instance_i];
     }
-    instances_buffer.memory().unmap();
+    instances_buffer.Memory().Unmap();
 
     instances_.buffer = std::move(instances_buffer);
 
@@ -249,8 +251,6 @@ GeometryKHR &GeometryKHR::SetInstanceShaderBindingTableRecordOffset(uint32_t ins
     instances_.vk_instances[instance_i].instanceShaderBindingTableRecordOffset = instance_sbt_record_offset;
     return *this;
 }
-
-GeometryKHR &GeometryKHR::Build() { return *this; }
 
 VkAccelerationStructureBuildRangeInfoKHR GeometryKHR::GetFullBuildRange() const {
     VkAccelerationStructureBuildRangeInfoKHR range_info{};
@@ -326,7 +326,7 @@ VkDeviceAddress AccelerationStructureKHR::GetAccelerationStructureDeviceAddress(
     return as_address;
 }
 
-void AccelerationStructureKHR::Build() {
+void AccelerationStructureKHR::Create() {
     assert(handle() == VK_NULL_HANDLE);
 
     // Create a buffer to store acceleration structure
@@ -334,7 +334,7 @@ void AccelerationStructureKHR::Build() {
         VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
         alloc_flags.flags = buffer_memory_allocate_flags_;
         VkBufferCreateInfo ci = vku::InitStructHelper();
-        ci.size = vk_info_.size;
+        ci.size = vk_info_.offset + vk_info_.size;
         ci.usage = buffer_usage_flags_;
         if (buffer_init_no_mem_) {
             device_buffer_.InitNoMemory(*device_, ci);
@@ -440,6 +440,11 @@ BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetDeviceScratchOffset(VkDeviceAddre
     return *this;
 }
 
+BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetDeviceScratchAdditionalFlags(VkBufferUsageFlags additional_flags) {
+    device_scratch_additional_flags_ = additional_flags;
+    return *this;
+}
+
 BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetEnableScratchBuild(bool build_scratch) {
     build_scratch_ = build_scratch;
     return *this;
@@ -507,22 +512,17 @@ void BuildGeometryInfoKHR::UpdateDstAccelStructSize() {
 }
 
 void BuildGeometryInfoKHR::SetupBuild(bool is_on_device_build, bool use_ppGeometries /*= true*/) {
-    // Build geometries
-    for (auto &geometry : geometries_) {
-        geometry.Build();
-    }
-
     if (update_dst_as_size_before_build_ && !dst_as_->IsNull() && !dst_as_->IsBuilt()) {
         UpdateDstAccelStructSize();
     }
 
     // Build source and destination acceleration structures
     if (!src_as_->IsNull() && !src_as_->IsBuilt()) {
-        src_as_->Build();
+        src_as_->Create();
     }
     vk_info_.srcAccelerationStructure = src_as_->handle();
     if (!dst_as_->IsNull() && !dst_as_->IsBuilt()) {
-        dst_as_->Build();
+        dst_as_->Create();
     }
     vk_info_.dstAccelerationStructure = dst_as_->handle();
 
@@ -542,11 +542,12 @@ void BuildGeometryInfoKHR::SetupBuild(bool is_on_device_build, bool use_ppGeomet
             assert(device_scratch_);  // So far null pointers are not supported
             if (!device_scratch_->initialized()) {
                 VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-                alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+                alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 
                 if (scratch_size > 0) {
                     device_scratch_->init(*device_, scratch_size + as_props.minAccelerationStructureScratchOffsetAlignment,
-                                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                              device_scratch_additional_flags_,
                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_flags);
                 }
             }
@@ -627,7 +628,7 @@ void BuildGeometryInfoKHR::VkCmdBuildAccelerationStructuresIndirectKHR(VkCommand
 
     indirect_buffer_ = std::make_unique<vkt::Buffer>();
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 
     indirect_buffer_->init(*device_, 1 * vk_info_.geometryCount * sizeof(VkAccelerationStructureBuildRangeInfoKHR),
                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps,
@@ -640,8 +641,8 @@ void BuildGeometryInfoKHR::VkCmdBuildAccelerationStructuresIndirectKHR(VkCommand
 
     pGeometries.reserve(geometries_.size());
     for (const auto [i, geometry] : vvl::enumerate(geometries_)) {
-        pGeometries[i] = &geometry->GetVkObj();
-        ranges_info[i] = geometry->GetFullBuildRange();
+        pGeometries[i] = &geometry.GetVkObj();
+        ranges_info[i] = geometry.GetFullBuildRange();
     }
     if (use_null_geometries_) {
         vk_info_.pGeometries = nullptr;
@@ -708,11 +709,11 @@ VkAccelerationStructureBuildSizesInfoKHR BuildGeometryInfoKHR::GetSizeInfo(bool 
     }
 
     for (const auto &[geometry_i, geometry] : vvl::enumerate(geometries_)) {
-        primitives_count[geometry_i] = geometry->GetFullBuildRange().primitiveCount;
+        primitives_count[geometry_i] = geometry.GetFullBuildRange().primitiveCount;
         if (use_ppGeometries) {
-            pGeometries.emplace_back(&geometry->GetVkObj());
+            pGeometries.emplace_back(&geometry.GetVkObj());
         } else {
-            geometries.emplace_back(geometry->GetVkObj());
+            geometries.emplace_back(geometry.GetVkObj());
         }
     }
     vk_info_.geometryCount = static_cast<uint32_t>(geometries_.size());
@@ -740,7 +741,7 @@ VkAccelerationStructureBuildSizesInfoKHR BuildGeometryInfoKHR::GetSizeInfo(bool 
 std::vector<VkAccelerationStructureBuildRangeInfoKHR> BuildGeometryInfoKHR::GetBuildRangeInfosFromGeometries() {
     std::vector<VkAccelerationStructureBuildRangeInfoKHR> range_infos(geometries_.size());
     for (const auto [i, geometry] : vvl::enumerate(geometries_)) {
-        range_infos[i] = geometry->GetFullBuildRange();
+        range_infos[i] = geometry.GetFullBuildRange();
     }
 
     return range_infos;
@@ -766,7 +767,7 @@ void BuildAccelerationStructuresKHR(VkCommandBuffer cmd_buffer, std::vector<Buil
     size_t range_infos_offset = 0;
     size_t pRange_infos_offset = 0;
 
-    for (auto &build_info : infos) {
+    for (BuildGeometryInfoKHR &build_info : infos) {
         build_info.SetupBuild(true);
 
         // Fill current vk_info_ with geometry data in ppGeometries, and get build ranges
@@ -791,7 +792,7 @@ void BuildAccelerationStructuresKHR(VkCommandBuffer cmd_buffer, std::vector<Buil
     vk::CmdBuildAccelerationStructuresKHR(cmd_buffer, static_cast<uint32_t>(vk_infos.size()), vk_infos.data(), pRange_infos.data());
 
     // Clean
-    for (auto &build_info : infos) {
+    for (BuildGeometryInfoKHR &build_info : infos) {
         // pGeometries is going to be destroyed
         build_info.vk_info_.geometryCount = 0;
         build_info.vk_info_.ppGeometries = nullptr;
@@ -852,7 +853,8 @@ void BuildHostAccelerationStructuresKHR(VkDevice device, std::vector<BuildGeomet
 }
 
 namespace blueprint {
-GeometryKHR GeometrySimpleOnDeviceTriangleInfo(const vkt::Device &device, size_t triangles_count) {
+GeometryKHR GeometrySimpleOnDeviceIndexedTriangleInfo(const vkt::Device &device, size_t triangles_count,
+                                                      VkBufferUsageFlags additional_geometry_buffer_flags) {
     assert(triangles_count > 0);
     GeometryKHR triangle_geometry;
 
@@ -860,10 +862,10 @@ GeometryKHR GeometrySimpleOnDeviceTriangleInfo(const vkt::Device &device, size_t
 
     // Allocate vertex and index buffers
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
     const VkBufferUsageFlags buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
-                                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+                                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | additional_geometry_buffer_flags;
 
     vkt::Buffer vertex_buffer(device, 1024, buffer_usage, kHostVisibleMemProps, &alloc_flags);
     vkt::Buffer index_buffer(device, 1024 + 3 * triangles_count * sizeof(uint32_t), buffer_usage, kHostVisibleMemProps,
@@ -885,13 +887,13 @@ GeometryKHR GeometrySimpleOnDeviceTriangleInfo(const vkt::Device &device, size_t
         indices[3 * triangle_i + 2] = 2;
     }
 
-    auto vertex_buffer_ptr = static_cast<float *>(vertex_buffer.memory().Map());
+    auto vertex_buffer_ptr = static_cast<float *>(vertex_buffer.Memory().Map());
     std::copy(vertices.begin(), vertices.end(), vertex_buffer_ptr);
-    vertex_buffer.memory().unmap();
+    vertex_buffer.Memory().Unmap();
 
-    auto index_buffer_ptr = static_cast<uint32_t *>(index_buffer.memory().Map());
+    auto index_buffer_ptr = static_cast<uint32_t *>(index_buffer.Memory().Map());
     std::copy(indices.begin(), indices.end(), index_buffer_ptr);
-    index_buffer.memory().unmap();
+    index_buffer.Memory().Unmap();
 
     // clang-format off
     VkTransformMatrixKHR transform_matrix = {{
@@ -901,9 +903,9 @@ GeometryKHR GeometrySimpleOnDeviceTriangleInfo(const vkt::Device &device, size_t
     }};
     // clang-format on
 
-    auto transform_buffer_ptr = static_cast<VkTransformMatrixKHR *>(transform_buffer.memory().Map());
+    auto transform_buffer_ptr = static_cast<VkTransformMatrixKHR *>(transform_buffer.Memory().Map());
     std::memcpy(transform_buffer_ptr, &transform_matrix, sizeof(transform_matrix));
-    transform_buffer.memory().unmap();
+    transform_buffer.Memory().Unmap();
 
     // Assign vertex and index buffers to out geometry
     triangle_geometry.SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer), uint32_t(vertices.size() / 3) - 1);
@@ -915,7 +917,56 @@ GeometryKHR GeometrySimpleOnDeviceTriangleInfo(const vkt::Device &device, size_t
     return triangle_geometry;
 }
 
-GeometryKHR GeometrySimpleOnHostTriangleInfo() {
+GeometryKHR GeometrySimpleOnDeviceTriangleInfo(const vkt::Device &device, VkBufferUsageFlags additional_geometry_buffer_flags) {
+    GeometryKHR triangle_geometry;
+
+    triangle_geometry.SetType(GeometryKHR::Type::Triangle);
+
+    // Allocate vertex buffer
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+                                            VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
+                                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | additional_geometry_buffer_flags;
+
+    vkt::Buffer vertex_buffer(device, 1024, buffer_usage, kHostVisibleMemProps, &alloc_flags);
+    vkt::Buffer transform_buffer(device, sizeof(VkTransformMatrixKHR), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+    // Fill vertex buffer with triangle data
+    triangle_geometry.SetPrimitiveCount(1);
+    constexpr std::array vertices = {// Vertex 0
+                                     10.0f, 10.0f, 0.0f,
+                                     // Vertex 1
+                                     -10.0f, 10.0f, 0.0f,
+                                     // Vertex 2
+                                     0.0f, -10.0f, 0.0f};
+
+    auto vertex_buffer_ptr = static_cast<float *>(vertex_buffer.Memory().Map());
+    std::copy(vertices.begin(), vertices.end(), vertex_buffer_ptr);
+    vertex_buffer.Memory().Unmap();
+
+    // clang-format off
+    VkTransformMatrixKHR transform_matrix = {{
+        { 1.0f, 0.0f, 0.0f, 0.0f },
+        { 0.0f, 1.0f, 0.0f, 0.0f },
+        { 0.0f, 0.0f, 1.0f, 0.0f },
+    }};
+    // clang-format on
+
+    auto transform_buffer_ptr = static_cast<VkTransformMatrixKHR *>(transform_buffer.Memory().Map());
+    std::memcpy(transform_buffer_ptr, &transform_matrix, sizeof(transform_matrix));
+    transform_buffer.Memory().Unmap();
+
+    // Assign vertex and index buffers to out geometry
+    triangle_geometry.SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer), uint32_t(vertices.size() / 3) - 1);
+    triangle_geometry.SetTrianglesIndexType(VK_INDEX_TYPE_NONE_KHR);
+    triangle_geometry.SetTrianglesTransformBuffer(std::move(transform_buffer));
+    triangle_geometry.SetFlags(VK_GEOMETRY_OPAQUE_BIT_KHR);
+
+    return triangle_geometry;
+}
+
+GeometryKHR GeometrySimpleOnHostIndexedTriangleInfo() {
     GeometryKHR triangle_geometry;
 
     triangle_geometry.SetType(GeometryKHR::Type::Triangle);
@@ -1008,7 +1059,7 @@ GeometryKHR GeometryCubeOnDeviceInfo(const vkt::Device &device) {
 
     // Allocate vertex and index buffers
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
     const VkBufferUsageFlags buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
                                             VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -1017,17 +1068,17 @@ GeometryKHR GeometryCubeOnDeviceInfo(const vkt::Device &device) {
     vkt::Buffer index_buffer(device, sizeof(indices[0]) * indices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
     vkt::Buffer transform_buffer(device, sizeof(VkTransformMatrixKHR), buffer_usage, kHostVisibleMemProps, &alloc_flags);
 
-    auto vertex_buffer_ptr = static_cast<Vertex *>(vertex_buffer.memory().Map());
+    auto vertex_buffer_ptr = static_cast<Vertex *>(vertex_buffer.Memory().Map());
     std::copy(vertices.begin(), vertices.end(), vertex_buffer_ptr);
-    vertex_buffer.memory().unmap();
+    vertex_buffer.Memory().Unmap();
 
-    auto index_buffer_ptr = static_cast<TriangleIndices *>(index_buffer.memory().Map());
+    auto index_buffer_ptr = static_cast<TriangleIndices *>(index_buffer.Memory().Map());
     std::copy(indices.begin(), indices.end(), index_buffer_ptr);
-    index_buffer.memory().unmap();
+    index_buffer.Memory().Unmap();
 
-    auto transform_buffer_ptr = static_cast<VkTransformMatrixKHR *>(transform_buffer.memory().Map());
+    auto transform_buffer_ptr = static_cast<VkTransformMatrixKHR *>(transform_buffer.Memory().Map());
     std::memcpy(transform_buffer_ptr, &transform_matrix, sizeof(transform_matrix));
-    transform_buffer.memory().unmap();
+    transform_buffer.Memory().Unmap();
 
     // Assign vertex and index buffers to out geometry
     cube_geometry.SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer), 8 - 1);
@@ -1039,7 +1090,7 @@ GeometryKHR GeometryCubeOnDeviceInfo(const vkt::Device &device) {
     return cube_geometry;
 }
 
-GeometryKHR GeometrySimpleOnDeviceAABBInfo(const vkt::Device &device) {
+GeometryKHR GeometrySimpleOnDeviceAABBInfo(const vkt::Device &device, VkBufferUsageFlags additional_geometry_buffer_flags) {
     GeometryKHR aabb_geometry;
 
     aabb_geometry.SetType(GeometryKHR::Type::AABB);
@@ -1050,10 +1101,10 @@ GeometryKHR GeometrySimpleOnDeviceAABBInfo(const vkt::Device &device) {
     const VkDeviceSize aabb_buffer_size = sizeof(aabbs[0]) * aabbs.size();
     vkt::Buffer aabb_buffer;
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
     const VkBufferUsageFlags buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
-                                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+                                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | additional_geometry_buffer_flags;
 
     aabb_buffer.init(device, aabb_buffer_size, buffer_usage, kHostVisibleMemProps, &alloc_flags);
 
@@ -1119,7 +1170,7 @@ std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceBottomLevel(c
     auto as = std::make_shared<AccelerationStructureKHR>(&device);
     as->SetSize(size);
     as->SetType(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
-    as->SetDeviceBufferMemoryAllocateFlags(VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR);
+    as->SetDeviceBufferMemoryAllocateFlags(VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT);
     as->SetDeviceBufferMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     as->SetBufferUsageFlags(VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -1143,7 +1194,7 @@ std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceTopLevel(cons
     auto as = std::make_shared<AccelerationStructureKHR>(&device);
     as->SetSize(size);
     as->SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
-    as->SetDeviceBufferMemoryAllocateFlags(VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR);
+    as->SetDeviceBufferMemoryAllocateFlags(VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT);
     as->SetDeviceBufferMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     as->SetBufferUsageFlags(VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -1157,7 +1208,7 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceBottomLevel(const vkt::Devic
     GeometryKHR geometry;
     switch (geometry_type) {
         case GeometryKHR::Type::Triangle:
-            geometry = GeometrySimpleOnDeviceTriangleInfo(device);
+            geometry = GeometrySimpleOnDeviceIndexedTriangleInfo(device);
             break;
         case GeometryKHR::Type::AABB:
             geometry = GeometrySimpleOnDeviceAABBInfo(device);
@@ -1210,7 +1261,7 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostBottomLevel(const vkt::Device 
     std::vector<GeometryKHR> geometries;
     switch (geometry_type) {
         case GeometryKHR::Type::Triangle:
-            geometries.emplace_back(GeometrySimpleOnHostTriangleInfo());
+            geometries.emplace_back(GeometrySimpleOnHostIndexedTriangleInfo());
             break;
         case GeometryKHR::Type::AABB:
             geometries.emplace_back(GeometrySimpleOnHostAABBInfo());
@@ -1301,22 +1352,22 @@ vkt::as::BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostTopLevel(const vkt::D
 
 BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device &device, vkt::Queue &queue, vkt::CommandBuffer &cmd_buffer) {
     // Create acceleration structure
-    cmd_buffer.begin();
+    cmd_buffer.Begin();
     // Build Bottom Level Acceleration Structure
     auto bot_level_accel_struct =
         std::make_shared<vkt::as::BuildGeometryInfoKHR>(vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(device));
     bot_level_accel_struct->BuildCmdBuffer(cmd_buffer);
-    cmd_buffer.end();
+    cmd_buffer.End();
 
     queue.Submit(cmd_buffer);
     device.Wait();
 
-    cmd_buffer.begin();
+    cmd_buffer.Begin();
     // Build Top Level Acceleration Structure
     vkt::as::BuildGeometryInfoKHR top_level_accel_struct =
         vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(device, bot_level_accel_struct);
     top_level_accel_struct.BuildCmdBuffer(cmd_buffer);
-    cmd_buffer.end();
+    cmd_buffer.End();
 
     queue.Submit(cmd_buffer);
     device.Wait();
@@ -1547,14 +1598,14 @@ void Pipeline::BuildSbt() {
     sbt_buffer_info.usage =
         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
     sbt_buffer_.init(*device_, sbt_buffer_info, kHostVisibleMemProps, &alloc_flags);
 
 #ifdef VVL_DEBUG_LOG_SBT
     std::cout << "SBT buffer fill:\n";
 #endif
 
-    void *const sbt_buffer_base_ptr = sbt_buffer_.memory().Map();
+    void *const sbt_buffer_base_ptr = sbt_buffer_.Memory().Map();
     void *sbt_buffer_ptr = sbt_buffer_base_ptr;
     (void)sbt_buffer_base_ptr;
     size_t sbt_buffer_space_left = static_cast<size_t>(sbt_buffer_info.size);
@@ -1821,12 +1872,14 @@ vkt::rt::TraceRaysSbt Pipeline::GetTraceRaysSbt(uint32_t ray_gen_shader_i /*= 0*
     return out;
 }
 
+const vkt::Buffer& Pipeline::GetTraceRaysSbtBuffer() { return sbt_buffer_; }
+
 vkt::Buffer Pipeline::GetTraceRaysSbtIndirectBuffer(uint32_t ray_gen_shader_i, uint32_t width, uint32_t height, uint32_t depth) {
     TraceRaysSbt sbt = GetTraceRaysSbt(ray_gen_shader_i);
 
     vkt::Buffer indirect_rt_buffer(*device_, sizeof(VkTraceRaysIndirectCommand2KHR), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                    vkt::device_address);
-    auto indirect_rt_ptr = (VkTraceRaysIndirectCommand2KHR *)indirect_rt_buffer.memory().Map();
+    auto indirect_rt_ptr = (VkTraceRaysIndirectCommand2KHR *)indirect_rt_buffer.Memory().Map();
     *indirect_rt_ptr = {};
     indirect_rt_ptr->raygenShaderRecordAddress = sbt.ray_gen_sbt.deviceAddress;
     indirect_rt_ptr->raygenShaderRecordSize = sbt.ray_gen_sbt.size;
@@ -1843,7 +1896,7 @@ vkt::Buffer Pipeline::GetTraceRaysSbtIndirectBuffer(uint32_t ray_gen_shader_i, u
     indirect_rt_ptr->height = height;
     indirect_rt_ptr->depth = depth;
 
-    indirect_rt_buffer.memory().unmap();
+    indirect_rt_buffer.Memory().Unmap();
 
     return indirect_rt_buffer;
 }
@@ -1936,6 +1989,8 @@ std::vector<uint8_t> Pipeline::GetRayTracingCaptureReplayShaderGroupHandles() {
     }
     return sbt_host_storage;
 }
+
+std::vector<VkRayTracingShaderGroupCreateInfoKHR> Pipeline::GetRayTracingShaderGroupCreateInfos() { return shader_group_cis_; }
 
 }  // namespace rt
 }  // namespace vkt

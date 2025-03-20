@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,13 +45,12 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
     VkValidationFeatureDisableEXT validation_feature_disables[] = {
         VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT, VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS_EXT,
         VK_VALIDATION_FEATURE_DISABLE_OBJECT_LIFETIMES_EXT, VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT};
-    VkValidationFeaturesEXT validation_features = {};
-    validation_features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+    VkValidationFeaturesEXT validation_features = vku::InitStructHelper(&kDisableMessageLimit);
     validation_features.enabledValidationFeatureCount = 1;
     validation_features.pEnabledValidationFeatures = validation_feature_enables;
     validation_features.disabledValidationFeatureCount = 4;
     validation_features.pDisabledValidationFeatures = validation_feature_disables;
-    RETURN_IF_SKIP(InitFramework(gpu_assisted ? &validation_features : nullptr));
+    RETURN_IF_SKIP(InitFramework(gpu_assisted ? (void *)&validation_features : (void *)&kDisableMessageLimit));
     bool descriptor_indexing = IsExtensionsEnabled(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
 
     if (gpu_assisted && IsPlatformMockICD()) {
@@ -223,17 +222,17 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
     void *allocate_pnext = nullptr;
     VkDescriptorPoolCreateFlags pool_create_flags = 0;
     VkDescriptorSetLayoutCreateFlags layout_create_flags = 0;
-    VkDescriptorBindingFlagsEXT ds_binding_flags[3] = {};
-    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags[1] = {};
+    VkDescriptorBindingFlags ds_binding_flags[3] = {};
+    VkDescriptorSetLayoutBindingFlagsCreateInfo layout_createinfo_binding_flags[1] = {};
     if (descriptor_indexing) {
         ds_binding_flags[0] = 0;
         ds_binding_flags[1] = 0;
-        ds_binding_flags[2] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
+        ds_binding_flags[2] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
 
         layout_createinfo_binding_flags[0] = vku::InitStructHelper();
         layout_createinfo_binding_flags[0].bindingCount = 3;
         layout_createinfo_binding_flags[0].pBindingFlags = ds_binding_flags;
-        layout_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+        layout_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
         pool_create_flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
         layout_pnext = layout_createinfo_binding_flags;
     }
@@ -247,13 +246,12 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
                            },
                            layout_create_flags, layout_pnext, pool_create_flags);
 
-    VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variable_count = vku::InitStructHelper();
+    VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count = vku::InitStructHelper();
     uint32_t desc_counts;
     if (descriptor_indexing) {
         layout_create_flags = 0;
         pool_create_flags = 0;
-        ds_binding_flags[2] =
-            VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
+        ds_binding_flags[2] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
         desc_counts = 6;  // We'll reserve 8 spaces in the layout, but the descriptor will only use 6
         variable_count.descriptorSetCount = 1;
         variable_count.pDescriptorCounts = &desc_counts;
@@ -335,23 +333,23 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
 
         layout(set = 0, binding = 0) uniform accelerationStructureNV topLevelAS;
         layout(set = 0, binding = 1, std430) buffer RayTracingSbo {
-	        uint rgen_index;
-	        uint ahit_index;
-	        uint chit_index;
-	        uint miss_index;
-	        uint intr_index;
-	        uint call_index;
+            uint rgen_index;
+            uint ahit_index;
+            uint chit_index;
+            uint miss_index;
+            uint intr_index;
+            uint call_index;
 
-	        uint rgen_ran;
-	        uint ahit_ran;
-	        uint chit_ran;
-	        uint miss_ran;
-	        uint intr_ran;
-	        uint call_ran;
+            uint rgen_ran;
+            uint ahit_ran;
+            uint chit_ran;
+            uint miss_ran;
+            uint intr_ran;
+            uint call_ran;
 
-	        float result1;
-	        float result2;
-	        float result3;
+            float result1;
+            float result2;
+            float result3;
         } sbo;
         layout(set = 0, binding = 2) uniform texture2D textures[IMAGES_ARRAY_LENGTH];
 
@@ -361,17 +359,17 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
         void main() {
             sbo.rgen_ran = 1;
 
-	        executeCallableNV(0, 3);
-	        sbo.result1 = callableData.x;
+            executeCallableNV(0, 3);
+            sbo.result1 = callableData.x;
 
-	        vec3 origin = vec3(0.0f, 0.0f, -2.0f);
-	        vec3 direction = vec3(0.0f, 0.0f, 1.0f);
+            vec3 origin = vec3(0.0f, 0.0f, -2.0f);
+            vec3 direction = vec3(0.0f, 0.0f, 1.0f);
 
-	        traceNV(topLevelAS, gl_RayFlagsNoneNV, 0xFF, 0, 1, 0, origin, 0.001, direction, 10000.0, 0);
-	        sbo.result2 = payload.x;
+            traceNV(topLevelAS, gl_RayFlagsNoneNV, 0xFF, 0, 1, 0, origin, 0.001, direction, 10000.0, 0);
+            sbo.result2 = payload.x;
 
-	        traceNV(topLevelAS, gl_RayFlagsNoneNV, 0xFF, 0, 1, 0, origin, 0.001, -direction, 10000.0, 0);
-	        sbo.result3 = payload.x;
+            traceNV(topLevelAS, gl_RayFlagsNoneNV, 0xFF, 0, 1, 0, origin, 0.001, -direction, 10000.0, 0);
+            sbo.result3 = payload.x;
 
             if (sbo.rgen_index > 0) {
                 // OOB here:
@@ -389,23 +387,23 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
         #extension GL_NV_ray_tracing : require
 
         layout(set = 0, binding = 1, std430) buffer StorageBuffer {
-	        uint rgen_index;
-	        uint ahit_index;
-	        uint chit_index;
-	        uint miss_index;
-	        uint intr_index;
-	        uint call_index;
+            uint rgen_index;
+            uint ahit_index;
+            uint chit_index;
+            uint miss_index;
+            uint intr_index;
+            uint call_index;
 
-	        uint rgen_ran;
-	        uint ahit_ran;
-	        uint chit_ran;
-	        uint miss_ran;
-	        uint intr_ran;
-	        uint call_ran;
+            uint rgen_ran;
+            uint ahit_ran;
+            uint chit_ran;
+            uint miss_ran;
+            uint intr_ran;
+            uint call_ran;
 
-	        float result1;
-	        float result2;
-	        float result3;
+            float result1;
+            float result2;
+            float result3;
         } sbo;
         layout(set = 0, binding = 2) uniform texture2D textures[IMAGES_ARRAY_LENGTH];
 
@@ -414,9 +412,9 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
         layout(location = 0) rayPayloadInNV vec3 payload;
 
         void main() {
-	        sbo.ahit_ran = 2;
+            sbo.ahit_ran = 2;
 
-	        payload = vec3(0.1234f);
+            payload = vec3(0.1234f);
 
             if (sbo.ahit_index > 0) {
                 // OOB here:
@@ -433,23 +431,23 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
         #extension GL_NV_ray_tracing : require
 
         layout(set = 0, binding = 1, std430) buffer RayTracingSbo {
-	        uint rgen_index;
-	        uint ahit_index;
-	        uint chit_index;
-	        uint miss_index;
-	        uint intr_index;
-	        uint call_index;
+            uint rgen_index;
+            uint ahit_index;
+            uint chit_index;
+            uint miss_index;
+            uint intr_index;
+            uint call_index;
 
-	        uint rgen_ran;
-	        uint ahit_ran;
-	        uint chit_ran;
-	        uint miss_ran;
-	        uint intr_ran;
-	        uint call_ran;
+            uint rgen_ran;
+            uint ahit_ran;
+            uint chit_ran;
+            uint miss_ran;
+            uint intr_ran;
+            uint call_ran;
 
-	        float result1;
-	        float result2;
-	        float result3;
+            float result1;
+            float result2;
+            float result3;
         } sbo;
         layout(set = 0, binding = 2) uniform texture2D textures[IMAGES_ARRAY_LENGTH];
 
@@ -476,23 +474,23 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
         #extension GL_NV_ray_tracing : require
 
         layout(set = 0, binding = 1, std430) buffer RayTracingSbo {
-	        uint rgen_index;
-	        uint ahit_index;
-	        uint chit_index;
-	        uint miss_index;
-	        uint intr_index;
-	        uint call_index;
+            uint rgen_index;
+            uint ahit_index;
+            uint chit_index;
+            uint miss_index;
+            uint intr_index;
+            uint call_index;
 
-	        uint rgen_ran;
-	        uint ahit_ran;
-	        uint chit_ran;
-	        uint miss_ran;
-	        uint intr_ran;
-	        uint call_ran;
+            uint rgen_ran;
+            uint ahit_ran;
+            uint chit_ran;
+            uint miss_ran;
+            uint intr_ran;
+            uint call_ran;
 
-	        float result1;
-	        float result2;
-	        float result3;
+            float result1;
+            float result2;
+            float result3;
         } sbo;
         layout(set = 0, binding = 2) uniform texture2D textures[IMAGES_ARRAY_LENGTH];
 
@@ -518,34 +516,34 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
         #extension GL_NV_ray_tracing : require
 
         layout(set = 0, binding = 1, std430) buffer StorageBuffer {
-	        uint rgen_index;
-	        uint ahit_index;
-	        uint chit_index;
-	        uint miss_index;
-	        uint intr_index;
-	        uint call_index;
+            uint rgen_index;
+            uint ahit_index;
+            uint chit_index;
+            uint miss_index;
+            uint intr_index;
+            uint call_index;
 
-	        uint rgen_ran;
-	        uint ahit_ran;
-	        uint chit_ran;
-	        uint miss_ran;
-	        uint intr_ran;
-	        uint call_ran;
+            uint rgen_ran;
+            uint ahit_ran;
+            uint chit_ran;
+            uint miss_ran;
+            uint intr_ran;
+            uint call_ran;
 
-	        float result1;
-	        float result2;
-	        float result3;
+            float result1;
+            float result2;
+            float result3;
         } sbo;
         layout(set = 0, binding = 2) uniform texture2D textures[IMAGES_ARRAY_LENGTH];
 
         hitAttributeNV vec3 hitValue;
 
         void main() {
-	        sbo.intr_ran = 5;
+            sbo.intr_ran = 5;
 
-	        hitValue = vec3(0.0f, 0.5f, 0.0f);
+            hitValue = vec3(0.0f, 0.5f, 0.0f);
 
-	        reportIntersectionNV(1.0f, 0);
+            reportIntersectionNV(1.0f, 0);
 
             if (sbo.intr_index > 0) {
                 // OOB here:
@@ -562,32 +560,32 @@ void NegativeRayTracingNV::OOBRayTracingShadersTestBodyNV(bool gpu_assisted) {
         #extension GL_NV_ray_tracing : require
 
         layout(set = 0, binding = 1, std430) buffer StorageBuffer {
-	        uint rgen_index;
-	        uint ahit_index;
-	        uint chit_index;
-	        uint miss_index;
-	        uint intr_index;
-	        uint call_index;
+            uint rgen_index;
+            uint ahit_index;
+            uint chit_index;
+            uint miss_index;
+            uint intr_index;
+            uint call_index;
 
-	        uint rgen_ran;
-	        uint ahit_ran;
-	        uint chit_ran;
-	        uint miss_ran;
-	        uint intr_ran;
-	        uint call_ran;
+            uint rgen_ran;
+            uint ahit_ran;
+            uint chit_ran;
+            uint miss_ran;
+            uint intr_ran;
+            uint call_ran;
 
-	        float result1;
-	        float result2;
-	        float result3;
+            float result1;
+            float result2;
+            float result3;
         } sbo;
         layout(set = 0, binding = 2) uniform texture2D textures[IMAGES_ARRAY_LENGTH];
 
         layout(location = 3) callableDataInNV vec3 callableData;
 
         void main() {
-	        sbo.call_ran = 6;
+            sbo.call_ran = 6;
 
-	        callableData = vec3(0.1234f);
+            callableData = vec3(0.1234f);
 
             if (sbo.call_index > 0) {
                 // OOB here:
@@ -1659,7 +1657,7 @@ TEST_F(NegativeRayTracingNV, ValidateCmdBuildAccelerationStructure) {
 
     // invalid scratch buffer (invalid usage)
     VkBufferCreateInfo create_info = vku::InitStructHelper();
-    create_info.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR;
+    create_info.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     const vkt::Buffer bot_level_as_invalid_scratch = bot_level_as.CreateScratchBuffer(*m_device, &create_info);
     m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureInfoNV-scratch-02781");
     vk::CmdBuildAccelerationStructureNV(m_command_buffer.handle(), &bot_level_as_create_info.info, VK_NULL_HANDLE, 0, VK_FALSE,

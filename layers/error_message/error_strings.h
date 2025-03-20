@@ -1,6 +1,6 @@
-/* Copyright (c) 2024 The Khronos Group Inc.
- * Copyright (c) 2024 Valve Corporation
- * Copyright (c) 2024 LunarG, Inc.
+/* Copyright (c) 2024-2025 The Khronos Group Inc.
+ * Copyright (c) 2024-2025 Valve Corporation
+ * Copyright (c) 2024-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
  */
 #pragma once
 
+#include <vulkan/vk_enum_string_helper.h>
+#include <sstream>
 #include <string>
 
 [[maybe_unused]] static std::string string_Attachment(uint32_t attachment) {
@@ -52,8 +54,8 @@
 
 [[maybe_unused]] static std::string string_VkRect2D(VkRect2D rect) {
     std::stringstream ss;
-    ss << "offset.x = " << rect.offset.x << ", offset.y = " << rect.offset.y << ", extent.width = " << rect.extent.width
-       << ", extent.height = " << rect.extent.height;
+    ss << "offset = {" << rect.offset.x << ", " << rect.offset.y << "}, extent = {" << rect.extent.width << ", "
+       << rect.extent.height << "}";
     return ss.str();
 }
 
@@ -83,6 +85,63 @@
 
 [[maybe_unused]] static std::string string_VkPushConstantRange(VkPushConstantRange range) {
     std::stringstream ss;
-    ss << "[" << range.offset << ", " << (range.offset + range.size) << "]";
+    ss << "range [" << range.offset << ", " << (range.offset + range.size) << ") for "
+       << string_VkShaderStageFlags(range.stageFlags);
+    return ss.str();
+}
+
+[[maybe_unused]] static std::string string_VkImageSubresource(VkImageSubresource subresource) {
+    std::stringstream ss;
+    ss << "aspectMask = " << string_VkImageAspectFlags(subresource.aspectMask) << ", mipLevel = " << subresource.mipLevel
+       << ", arrayLayer = " << subresource.arrayLayer;
+    return ss.str();
+}
+
+[[maybe_unused]] static std::string string_VkImageSubresourceLayers(VkImageSubresourceLayers subresource_layers) {
+    std::stringstream ss;
+    ss << "aspectMask = " << string_VkImageAspectFlags(subresource_layers.aspectMask)
+       << ", mipLevel = " << subresource_layers.mipLevel << ", baseArrayLayer = " << subresource_layers.baseArrayLayer
+       << ", layerCount = " << subresource_layers.layerCount;
+    return ss.str();
+}
+
+[[maybe_unused]] static std::string string_VkImageSubresourceRange(VkImageSubresourceRange subresource_range) {
+    std::stringstream ss;
+    ss << "aspectMask = " << string_VkImageAspectFlags(subresource_range.aspectMask)
+       << ", baseMipLevel = " << subresource_range.baseMipLevel << ", levelCount = " << subresource_range.levelCount
+       << ", baseArrayLayer = " << subresource_range.baseArrayLayer << ", layerCount = " << subresource_range.layerCount;
+    return ss.str();
+}
+
+[[maybe_unused]] static std::string string_VkComponentMapping(VkComponentMapping components) {
+    std::stringstream ss;
+    ss << "r swizzle = " << string_VkComponentSwizzle(components.r) << "\n";
+    ss << "g swizzle = " << string_VkComponentSwizzle(components.g) << "\n";
+    ss << "b swizzle = " << string_VkComponentSwizzle(components.b) << "\n";
+    ss << "a swizzle = " << string_VkComponentSwizzle(components.a) << "\n";
+    return ss.str();
+}
+
+[[maybe_unused]] static std::string string_VkBool32(VkBool32 value) { return value ? "VK_TRUE" : "VK_FALSE"; }
+
+// Some VUs use the subset in VkPhysicalDeviceImageFormatInfo2 to refer to an VkImageCreateInfo
+[[maybe_unused]] static std::string string_VkPhysicalDeviceImageFormatInfo2(VkPhysicalDeviceImageFormatInfo2 info) {
+    std::stringstream ss;
+    ss << "format (" << string_VkFormat(info.format) << ")\n";
+    ss << "type (" << string_VkImageType(info.type) << ")\n";
+    ss << "tiling (" << string_VkImageTiling(info.tiling) << ")\n";
+    ss << "usage (" << string_VkImageUsageFlags(info.usage) << ")\n";
+    ss << "flags (" << string_VkImageCreateFlags(info.flags) << ")\n";
+    return ss.str();
+}
+
+// Same thing as VkPhysicalDeviceImageFormatInfo2 but given the actual VkImageCreateInfo
+[[maybe_unused]] static std::string string_VkPhysicalDeviceImageFormatInfo2(VkImageCreateInfo info) {
+    std::stringstream ss;
+    ss << "format (" << string_VkFormat(info.format) << ")\n";
+    ss << "type (" << string_VkImageType(info.imageType) << ")\n";
+    ss << "tiling (" << string_VkImageTiling(info.tiling) << ")\n";
+    ss << "usage (" << string_VkImageUsageFlags(info.usage) << ")\n";
+    ss << "flags (" << string_VkImageCreateFlags(info.flags) << ")\n";
     return ss.str();
 }

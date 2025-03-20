@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +13,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/external_memory_sync.h"
-#include "utils/vk_layer_utils.h"
+#include "utils/math_utils.h"
 #include "generated/enum_flag_bits.h"
 
 class PositiveExternalMemorySync : public ExternalMemorySyncTest {};
@@ -44,6 +44,8 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
     TEST_DESCRIPTION("Basic importing of POXIS handle for memory allocation");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+    // Required to pass in various memory flags without querying for corresponding extensions.
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     IgnoreHandleTypeError(m_errorMonitor);
 
@@ -64,11 +66,11 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
 
     vkt::Buffer buffer(*m_device, buffer_info, vkt::no_mem);
 
-    VkMemoryDedicatedAllocateInfoKHR dedicated_info = vku::InitStructHelper();
+    VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
     dedicated_info.image = VK_NULL_HANDLE;
     dedicated_info.buffer = buffer.handle();
 
-    VkExportMemoryAllocateInfoKHR export_info = vku::InitStructHelper(&dedicated_info);
+    VkExportMemoryAllocateInfo export_info = vku::InitStructHelper(&dedicated_info);
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
@@ -136,10 +138,10 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
 
 #ifdef _WIN32
     const auto ext_mem_extension_name = VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else
     const auto ext_mem_extension_name = VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
-    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
 
     AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
@@ -154,14 +156,13 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     VkExternalBufferPropertiesKHR ebp = {VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES_KHR, nullptr, {0, 0, 0}};
     vk::GetPhysicalDeviceExternalBufferPropertiesKHR(Gpu(), &ebi, &ebp);
     if (!(ebp.externalMemoryProperties.compatibleHandleTypes & handle_type) ||
-        !(ebp.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT_KHR) ||
-        !(ebp.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT_KHR)) {
+        !(ebp.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT) ||
+        !(ebp.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)) {
         GTEST_SKIP() << "External buffer does not support importing and exporting";
     }
 
     // Check if dedicated allocation is required
-    bool dedicated_allocation =
-        ebp.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT_KHR;
+    bool dedicated_allocation = ebp.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT;
     if (dedicated_allocation && !IsExtensionsEnabled(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME)) {
         GTEST_SKIP() << "Dedicated allocation extension not supported";
     }
@@ -172,8 +173,8 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     const VkDeviceSize buffer_size = 1024;
 
     // Create export and import buffers
-    const VkExternalMemoryBufferCreateInfoKHR external_buffer_info = {VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR,
-                                                                      nullptr, handle_type};
+    const VkExternalMemoryBufferCreateInfo external_buffer_info = {VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR,
+                                                                   nullptr, handle_type};
     auto buffer_info = vkt::Buffer::CreateInfo(buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     buffer_info.pNext = &external_buffer_info;
     vkt::Buffer buffer_export(*m_device, buffer_info, vkt::no_mem);
@@ -183,19 +184,18 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer_export.MemoryRequirements(), mem_flags);
 
     // Add export allocation info to pNext chain
-    VkExportMemoryAllocateInfoKHR export_info = {VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR, nullptr, handle_type};
+    VkExportMemoryAllocateInfo export_info = {VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR, nullptr, handle_type};
     alloc_info.pNext = &export_info;
 
     // Add dedicated allocation info to pNext chain if required
-    VkMemoryDedicatedAllocateInfoKHR dedicated_info = {VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO_KHR, nullptr,
-                                                       VK_NULL_HANDLE, buffer_export.handle()};
+    VkMemoryDedicatedAllocateInfo dedicated_info = {VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO_KHR, nullptr, VK_NULL_HANDLE,
+                                                    buffer_export.handle()};
     if (dedicated_allocation) {
         export_info.pNext = &dedicated_info;
     }
 
     // Allocate memory to be exported
-    vkt::DeviceMemory memory_export;
-    memory_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
 
     // Bind exported memory
     buffer_export.BindMemory(memory_export, 0);
@@ -218,11 +218,14 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     VkImportMemoryFdInfoKHR import_info = {VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR, nullptr, handle_type, fd};
 #endif
 
-    // Import memory
+    // Import
+    if (dedicated_allocation) {
+        dedicated_info.buffer = buffer_import;
+        import_info.pNext = &dedicated_info;
+    }
     alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer_import.MemoryRequirements(), mem_flags);
     alloc_info.pNext = &import_info;
-    vkt::DeviceMemory memory_import;
-    memory_import.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_import(*m_device, alloc_info);
 
     // Bind imported memory
     buffer_import.BindMemory(memory_import, 0);
@@ -256,6 +259,8 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
 TEST_F(PositiveExternalMemorySync, BufferDedicatedAllocation) {
     TEST_DESCRIPTION("Create external buffer that requires dedicated allocation.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
+    // Required to pass in various memory flags without querying for corresponding extensions.
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     IgnoreHandleTypeError(m_errorMonitor);
 
@@ -299,8 +304,8 @@ TEST_F(PositiveExternalMemorySync, SyncFdSemaphore) {
 
     VkExternalSemaphoreProperties external_semahpore_props = vku::InitStructHelper();
     vk::GetPhysicalDeviceExternalSemaphoreProperties(Gpu(), &external_semahpore_info, &external_semahpore_props);
-    if (!(external_semahpore_props.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT_KHR) ||
-        !(external_semahpore_props.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR)) {
+    if (!(external_semahpore_props.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) ||
+        !(external_semahpore_props.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT)) {
         GTEST_SKIP() << "External semaphore does not support importing and exporting";
     }
     if (!(external_semahpore_props.compatibleHandleTypes & handle_type)) {
@@ -451,6 +456,8 @@ TEST_F(PositiveExternalMemorySync, ExportFromImportedFence) {
     TEST_DESCRIPTION("Export from fence with imported payload");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME);
+    // Required to pass in various memory flags without querying for corresponding extensions.
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     IgnoreHandleTypeError(m_errorMonitor);
 
@@ -499,6 +506,8 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryWin32BufferDifferentDedicated) {
     TEST_DESCRIPTION("https://gitlab.khronos.org/vulkan/Vulkan-ValidationLayers/-/issues/35");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+    // Required to pass in various memory flags without querying for corresponding extensions.
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     IgnoreHandleTypeError(m_errorMonitor);
 
@@ -516,10 +525,10 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryWin32BufferDifferentDedicated) {
 
     vkt::Buffer buffer(*m_device, buffer_info, vkt::no_mem);
 
-    VkMemoryDedicatedAllocateInfoKHR dedicated_info = vku::InitStructHelper();
+    VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
     dedicated_info.buffer = buffer.handle();
 
-    VkExportMemoryAllocateInfoKHR export_info = vku::InitStructHelper(&dedicated_info);
+    VkExportMemoryAllocateInfo export_info = vku::InitStructHelper(&dedicated_info);
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
@@ -555,6 +564,8 @@ TEST_F(PositiveExternalMemorySync, MultipleExportOpaqueFd) {
     TEST_DESCRIPTION("regression from dEQP-VK.api.external.semaphore.opaque_fd.export_multiple_times_temporary");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+    // Required to pass in various memory flags without querying for corresponding extensions.
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     IgnoreHandleTypeError(m_errorMonitor);
 
@@ -577,6 +588,8 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFdBufferDifferentDedicated) {
     TEST_DESCRIPTION("https://gitlab.khronos.org/vulkan/Vulkan-ValidationLayers/-/issues/35");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+    // Required to pass in various memory flags without querying for corresponding extensions.
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     IgnoreHandleTypeError(m_errorMonitor);
 
@@ -597,11 +610,11 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFdBufferDifferentDedicated) {
 
     vkt::Buffer buffer(*m_device, buffer_info, vkt::no_mem);
 
-    VkMemoryDedicatedAllocateInfoKHR dedicated_info = vku::InitStructHelper();
+    VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
     dedicated_info.image = VK_NULL_HANDLE;
     dedicated_info.buffer = buffer.handle();
 
-    VkExportMemoryAllocateInfoKHR export_info = vku::InitStructHelper(&dedicated_info);
+    VkExportMemoryAllocateInfo export_info = vku::InitStructHelper(&dedicated_info);
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 

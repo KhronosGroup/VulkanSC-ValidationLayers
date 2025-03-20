@@ -32,6 +32,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/buffer_positive.cpp
     converted/command.cpp
     converted/command_positive.cpp
+    converted/cooperative_vector.cpp
+    converted/cooperative_vector_positive.cpp
     converted/copy_buffer_image.cpp
     converted/copy_buffer_image_positive.cpp
     converted/debug_extensions.cpp
@@ -46,6 +48,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/descriptors.cpp
     converted/descriptors_positive.cpp
     converted/device_feature_property.cpp
+    converted/device_feature_property_positive.cpp
     converted/device_generated_commands.cpp
     converted/device_generated_commands_positive.cpp
     converted/device_queue.cpp
@@ -55,6 +58,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/dynamic_rendering_positive.cpp
     converted/dynamic_state.cpp
     converted/dynamic_state_positive.cpp
+    converted/external_memory_metal.cpp
     converted/external_memory_sync.cpp
     converted/external_memory_sync_positive.cpp
     converted/fragment_shading_rate.cpp
@@ -64,13 +68,24 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av.cpp
     converted/gpu_av_buffer_device_address.cpp
     converted/gpu_av_buffer_device_address_positive.cpp
+    converted/gpu_av_cooperative_vector.cpp
+    converted/gpu_av_cooperative_vector_positive.cpp
     converted/gpu_av_debug_printf.cpp
     converted/gpu_av_descriptor_buffer_positive.cpp
+    converted/gpu_av_descriptor_class_general_buffer.cpp
+    converted/gpu_av_descriptor_class_general_buffer_positive.cpp
+    converted/gpu_av_descriptor_class_texel_buffer.cpp
+    converted/gpu_av_descriptor_class_texel_buffer_positive.cpp
     converted/gpu_av_descriptor_indexing.cpp
     converted/gpu_av_descriptor_indexing_positive.cpp
+    converted/gpu_av_descriptor_post_process.cpp
+    converted/gpu_av_descriptor_post_process_positive.cpp
+    converted/gpu_av_image_layout.cpp
+    converted/gpu_av_image_layout_positive.cpp
+    converted/gpu_av_index_buffer.cpp
+    converted/gpu_av_index_buffer_positive.cpp
     converted/gpu_av_indirect_buffer.cpp
-    converted/gpu_av_oob.cpp
-    converted/gpu_av_oob_positive.cpp
+    converted/gpu_av_indirect_buffer_positive.cpp
     converted/gpu_av_positive.cpp
     converted/gpu_av_ray_query.cpp
     converted/gpu_av_ray_query_positive.cpp
@@ -87,18 +102,22 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/image.cpp
     converted/image_drm.cpp
     converted/image_drm_positive.cpp
+    converted/image_layout.cpp
+    converted/image_layout_positive.cpp
     converted/image_positive.cpp
     converted/imageless_framebuffer.cpp
     converted/imageless_framebuffer_positive.cpp
     converted/instance_positive.cpp
     converted/instanceless.cpp
     converted/layer_settings.cpp
+    converted/layer_settings_positive.cpp
     converted/layer_utils_positive.cpp
     converted/memory.cpp
     converted/memory_positive.cpp
     converted/mesh.cpp
     converted/mesh_positive.cpp
     converted/multiview.cpp
+    converted/multiview_positive.cpp
     converted/nvidia_best_practices.cpp
     converted/object_lifetime.cpp
     converted/object_lifetime_positive.cpp
@@ -141,6 +160,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/shader_compute_positive.cpp
     converted/shader_cooperative_matrix.cpp
     converted/shader_cooperative_matrix_positive.cpp
+    converted/shader_debug_info.cpp
     converted/shader_image_access.cpp
     converted/shader_image_access_positive.cpp
     converted/shader_interface.cpp
@@ -169,9 +189,13 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/sync_object_positive.cpp
     converted/sync_val.cpp
     converted/sync_val_positive.cpp
+    converted/sync_val_ray_tracing.cpp
+    converted/sync_val_ray_tracing_positive.cpp
     converted/sync_val_reporting.cpp
     converted/sync_val_semaphore.cpp
     converted/sync_val_semaphore_positive.cpp
+    converted/sync_val_video.cpp
+    converted/sync_val_video_positive.cpp
     converted/sync_val_wsi.cpp
     converted/sync_val_wsi_positive.cpp
     converted/threading.cpp
@@ -182,6 +206,24 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/vertex_input.cpp
     converted/vertex_input_positive.cpp
     converted/video.cpp
+    converted/video_decode.cpp
+    converted/video_decode_av1.cpp
+    converted/video_decode_av1_positive.cpp
+    converted/video_decode_h264.cpp
+    converted/video_decode_h264_positive.cpp
+    converted/video_decode_h265.cpp
+    converted/video_decode_h265_positive.cpp
+    converted/video_decode_positive.cpp
+    converted/video_encode.cpp
+    converted/video_encode_av1.cpp
+    converted/video_encode_av1_positive.cpp
+    converted/video_encode_h264.cpp
+    converted/video_encode_h264_positive.cpp
+    converted/video_encode_h265.cpp
+    converted/video_encode_h265_positive.cpp
+    converted/video_encode_positive.cpp
+    converted/video_encode_quantization_map.cpp
+    converted/video_encode_quantization_map_positive.cpp
     converted/video_positive.cpp
     converted/viewport_inheritance.cpp
     converted/wsi.cpp

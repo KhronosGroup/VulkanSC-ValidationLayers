@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -619,15 +619,15 @@ TEST_F(NegativeSparseBuffer, DISABLED_BufferFlagsFeature) {
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
     buffer_create_info.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
-    CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-flags-00915");
+    CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-00915");
 
     buffer_create_info.flags = VK_BUFFER_CREATE_SPARSE_RESIDENCY_BIT;
     m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-flags-00916");
-    CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-flags-00918");
+    CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-00918");
 
     buffer_create_info.flags = VK_BUFFER_CREATE_SPARSE_ALIASED_BIT;
     m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-flags-00917");
-    CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-flags-00918");
+    CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-00918");
 }
 
 // Not supported in Vulkan SC: sparse resources

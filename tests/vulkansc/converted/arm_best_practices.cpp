@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -116,20 +116,11 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_TooManySamples) {
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-Arm-vkCreateImage-too-large-sample-count");
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-samples-02258");
 
-    VkImageCreateInfo image_info{};
-    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_info.extent = {1920, 1080, 1};
-    image_info.format = VK_FORMAT_R8G8B8A8_UNORM;
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
-    image_info.samples = VK_SAMPLE_COUNT_8_BIT;
-    image_info.arrayLayers = 1;
-    image_info.mipLevels = 1;
-
+    auto image_ci = vkt::Image::ImageCreateInfo2D(1920, 1080, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
+    image_ci.samples = VK_SAMPLE_COUNT_8_BIT;
     VkImage image = VK_NULL_HANDLE;
-    vk::CreateImage(device(), &image_info, nullptr, &image);
-
+    vk::CreateImage(device(), &image_ci, nullptr, &image);
     m_errorMonitor->VerifyFound();
 
     if (image) {
@@ -144,21 +135,12 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_NonTransientMSImage) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     RETURN_IF_SKIP(InitState());
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-Arm-vkCreateImage-non-transient-ms-image");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkCreateImage-non-transient-ms-image");
 
-    VkImageCreateInfo image_info{};
-    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_info.extent = {1920, 1080, 1};
-    image_info.format = VK_FORMAT_R8G8B8A8_UNORM;
-    image_info.imageType = VK_IMAGE_TYPE_2D;
-    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_info.samples = VK_SAMPLE_COUNT_4_BIT;
-    image_info.arrayLayers = 1;
-    image_info.mipLevels = 1;
-
+    auto image_ci = vkt::Image::ImageCreateInfo2D(1920, 1080, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
     VkImage image;
-    vk::CreateImage(device(), &image_info, nullptr, &image);
+    vk::CreateImage(device(), &image_ci, nullptr, &image);
 
     m_errorMonitor->VerifyFound();
 }
@@ -576,7 +558,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_PresentModeTest) {
     InitSwapchainInfo();
 
     VkBool32 supported;
-    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
+    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface.Handle(), &supported);
     if (!supported) {
         GTEST_SKIP() << "Graphics queue does not support present, skipping test";
     }
@@ -587,11 +569,11 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_PresentModeTest) {
     VkSwapchainCreateInfoKHR swapchain_create_info = {};
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchain_create_info.pNext = 0;
-    swapchain_create_info.surface = m_surface;
+    swapchain_create_info.surface = m_surface.Handle();
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
     swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
-    swapchain_create_info.imageExtent = {m_surface_capabilities.minImageExtent.width, m_surface_capabilities.minImageExtent.height};
+    swapchain_create_info.imageExtent = m_surface_capabilities.minImageExtent;
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = imageUsage;
     swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;

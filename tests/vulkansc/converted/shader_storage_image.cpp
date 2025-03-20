@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,11 +15,15 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
-class NegativeShaderStorageImage : public VkLayerTest {};
+class NegativeShaderStorageImage : public VkLayerTest {
+  public:
+    void FormatComponentMismatchTest(std::string spirv_format, VkFormat vk_format);
+};
 
 TEST_F(NegativeShaderStorageImage, MissingFormatRead) {
     // This test case requires SPIR-V debug information
@@ -170,7 +174,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
 
         vk::GetPhysicalDeviceFormatProperties2(Gpu(), (VkFormat)fmt, &fmt_props);
 
-        const bool has_storage = (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT_KHR) != 0;
+        const bool has_storage = (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT) != 0;
         const bool has_read_without_format =
             (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR) != 0;
 
@@ -322,9 +326,9 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
 
         vk::GetPhysicalDeviceFormatProperties2(Gpu(), (VkFormat)fmt, &fmt_props);
 
-        const bool has_storage = (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT_KHR) != 0;
+        const bool has_storage = (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT) != 0;
         const bool has_write_without_format =
-            (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT_KHR) != 0;
+            (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) != 0;
 
         if (!has_storage) continue;
 
@@ -435,13 +439,13 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
         vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipeline.pipeline_layout_.handle(),
                                   0, 1, &ds.set_, 0, nullptr);
 
-        if ((tests[t].props.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT_KHR) == 0) {
+        if ((tests[t].props.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
             m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-OpTypeImage-07027");
         }
         vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
         m_command_buffer.End();
 
-        if ((tests[t].props.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT_KHR) == 0) {
+        if ((tests[t].props.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
             m_errorMonitor->VerifyFound();
         }
     }
@@ -606,7 +610,7 @@ TEST_F(NegativeShaderStorageImage, WriteLessComponent) {
     }
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
         helper.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
-        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+        helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpImageWrite-07112");
 }
@@ -662,7 +666,7 @@ TEST_F(NegativeShaderStorageImage, WriteLessComponentCopyObject) {
     }
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
         helper.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
-        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+        helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpImageWrite-07112");
 }
@@ -730,7 +734,7 @@ TEST_F(NegativeShaderStorageImage, WriteSpecConstantLessComponent) {
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
         helper.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM,
                                                    &specialization_info);
-        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+        helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpImageWrite-07112");
 }
@@ -790,7 +794,7 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteLessComponent) {
     VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
     VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
     vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &fmt_props);
-    if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT_KHR) == 0) {
+    if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
         GTEST_SKIP() << "Format doesn't support storage write without format";
     }
 
@@ -819,9 +823,10 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteLessComponent) {
 TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
-    TEST_DESCRIPTION("Test writing to image unknown format with VK_FORMAT_A8_UNORM_KHR.");
+    TEST_DESCRIPTION("Test writing to image unknown format with VK_FORMAT_A8_UNORM.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderStorageImageWriteWithoutFormat);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
@@ -864,9 +869,16 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
                                          {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                                      });
 
-    const VkFormat format = VK_FORMAT_A8_UNORM_KHR;
+    const VkFormat format = VK_FORMAT_A8_UNORM;
     if (!FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
+    }
+
+    VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+    VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
+    vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &fmt_props);
+    if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
+        GTEST_SKIP() << "Format doesn't support storage write without format";
     }
 
     vkt::Image image(*m_device, 32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT);
@@ -889,4 +901,76 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
     vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
+}
+
+void NegativeShaderStorageImage::FormatComponentMismatchTest(std::string spirv_format, VkFormat vk_format) {
+    RETURN_IF_SKIP(Init());
+    std::string cs_source = R"(
+        #version 450
+        layout(set = 0, binding = 0, )" +
+                            spirv_format + R"() uniform image2D si0;
+        void main() {
+            imageStore(si0, ivec2(0), vec4(0));
+        }
+    )";
+
+    vkt::Image image(*m_device, 4, 4, 1, vk_format, VK_IMAGE_USAGE_STORAGE_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::ImageView image_view = image.CreateView();
+
+    OneOffDescriptorSet descriptor_set(m_device, {
+                                                     {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                 });
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorImageInfo(0, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                            VK_IMAGE_LAYOUT_GENERAL);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-StorageImage-FormatMismatch-ImageView");
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderStorageImage, FormatComponentTypeMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    FormatComponentMismatchTest("rgba32f", VK_FORMAT_B8G8R8A8_UNORM);
+}
+
+TEST_F(NegativeShaderStorageImage, FormatComponentSizeMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+
+    FormatComponentMismatchTest("Rgba8", VK_FORMAT_R8_UNORM);
+}
+
+TEST_F(NegativeShaderStorageImage, FormatComponentWidthMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    FormatComponentMismatchTest("Rgba8", VK_FORMAT_R32G32B32A32_SFLOAT);
+}
+
+TEST_F(NegativeShaderStorageImage, FormatCompatibleMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+
+    FormatComponentMismatchTest("Rgba8", VK_FORMAT_B8G8R8A8_UNORM);
+}
+
+TEST_F(NegativeShaderStorageImage, FormatCompatibleNonSwizzle) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+
+    FormatComponentMismatchTest("R32f", VK_FORMAT_R16G16_UNORM);
 }

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (c) 2015-2024 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -850,11 +850,9 @@ TEST_F(NegativeRayTracingPipeline, DeferredOp) {
     VkShaderObj rgen_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
     VkShaderObj chit_shader(this, chit_src, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2);
 
-    std::vector<VkDescriptorSetLayoutBinding> layout_bindings = {
-        {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, nullptr},
-        {1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, nullptr}};
-
-    const vkt::DescriptorSetLayout ds_layout(*m_device, layout_bindings);
+    const vkt::DescriptorSetLayout ds_layout(
+        *m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, nullptr},
+                    {1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, nullptr}});
     const vkt::PipelineLayout pipeline_layout(*m_device, {&ds_layout});
 
     VkPipelineShaderStageCreateInfo stage_create_info = vku::InitStructHelper();
@@ -963,12 +961,10 @@ TEST_F(NegativeRayTracingPipeline, MaxResources) {
 
     RETURN_IF_SKIP(InitState(nullptr, &ray_tracing_features));
 
-    std::vector<VkDescriptorSetLayoutBinding> layout_bindings = {
-        {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_device->Physical().limits_.maxPerStageResources, VK_SHADER_STAGE_RAYGEN_BIT_KHR,
-         nullptr},
-        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR, nullptr}};
-
-    const vkt::DescriptorSetLayout ds_layout(*m_device, layout_bindings);
+    const vkt::DescriptorSetLayout ds_layout(
+        *m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_device->Physical().limits_.maxPerStageResources,
+                     VK_SHADER_STAGE_RAYGEN_BIT_KHR, nullptr},
+                    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR, nullptr}});
     const vkt::PipelineLayout pipeline_layout(*m_device, {&ds_layout});
     VkShaderObj rgen_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
 
@@ -1197,7 +1193,7 @@ TEST_F(NegativeRayTracingPipeline, PipelineBinaryRayTracingPipeline) {
     raytracing_pipeline_ci.layout = pipeline_layout.handle();
 
     {
-        VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
+        VkPipelineCreateFlags2CreateInfo flags2 = vku::InitStructHelper();
         flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
         raytracing_pipeline_ci.pNext = &flags2;
 
@@ -1246,7 +1242,7 @@ TEST_F(NegativeRayTracingPipeline, PipelineBinaryRayTracingPipeline) {
     }
 
     {
-        VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
+        VkPipelineCreateFlags2CreateInfo flags2 = vku::InitStructHelper();
         flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
         raytracing_pipeline_ci.pNext = &flags2;
 
@@ -1282,7 +1278,7 @@ TEST_F(NegativeRayTracingPipeline, PipelineBinaryRayTracingPipeline) {
         feedback.flags = VK_PIPELINE_CREATION_FEEDBACK_APPLICATION_PIPELINE_CACHE_HIT_BIT |
                          VK_PIPELINE_CREATION_FEEDBACK_BASE_PIPELINE_ACCELERATION_BIT;
 
-        flags2.flags |= VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT_EXT;
+        flags2.flags |= VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT;
         flags2.pNext = &binary_info;
         binary_info.pNext = &feedback_create_info;
 
@@ -1303,4 +1299,40 @@ TEST_F(NegativeRayTracingPipeline, PipelineBinaryRayTracingPipeline) {
     }
 
     vk::DestroyPipelineCache(device(), pipeline_cache, nullptr);
+}
+
+TEST_F(NegativeRayTracingPipeline, GetRayTracingShaderGroupHandles) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline rt_pipe(*this, m_device);
+    rt_pipe.SetGlslRayGenShader(kRayTracingMinimalGlsl);
+    rt_pipe.BuildPipeline();
+
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(rt_pipeline_props);
+
+    const uint32_t sbt_size = rt_pipe.GetRayTracingShaderGroupCreateInfos().size() * rt_pipeline_props.shaderGroupHandleSize;
+    std::vector<uint8_t> sbt_host_storage(sbt_size * 2u);
+    const uint32_t shader_group_count = rt_pipe.GetShaderGroupsCount();
+
+    m_errorMonitor->SetDesiredError("VUID-vkGetRayTracingShaderGroupHandlesKHR-firstGroup-04050");
+    vk::GetRayTracingShaderGroupHandlesKHR(device(), rt_pipe.Handle(), shader_group_count, 0, sbt_size, sbt_host_storage.data());
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkGetRayTracingShaderGroupHandlesKHR-firstGroup-02419");
+    vk::GetRayTracingShaderGroupHandlesKHR(device(), rt_pipe.Handle(), 0, shader_group_count + 1, sbt_size * 2u,
+                                           sbt_host_storage.data());
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkGetRayTracingShaderGroupHandlesKHR-dataSize-02420");
+    vk::GetRayTracingShaderGroupHandlesKHR(device(), rt_pipe.Handle(), 0, shader_group_count, sbt_size - 1u,
+                                           sbt_host_storage.data());
+    m_errorMonitor->VerifyFound();
 }

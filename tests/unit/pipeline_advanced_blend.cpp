@@ -120,7 +120,7 @@ TEST_F(NegativePipelineAdvancedBlend, MaxBlendAttachmentDynamicRendering) {
     }
 
     VkFormat color_formats[3] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
-    VkPipelineRenderingCreateInfoKHR pipeline_rendering_info = vku::InitStructHelper();
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
     pipeline_rendering_info.colorAttachmentCount = 3;
     pipeline_rendering_info.pColorAttachmentFormats = color_formats;
 
@@ -147,7 +147,6 @@ TEST_F(NegativePipelineAdvancedBlend, Properties) {
     TEST_DESCRIPTION("Test VkPipelineColorBlendAdvancedStateCreateInfoEXT with unsupported properties");
 
     AddRequiredExtensions(VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME);
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -184,7 +183,6 @@ TEST_F(NegativePipelineAdvancedBlend, AllOperations) {
     TEST_DESCRIPTION("Create a graphics pipeline with advanced blend when its disabled");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME);
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 

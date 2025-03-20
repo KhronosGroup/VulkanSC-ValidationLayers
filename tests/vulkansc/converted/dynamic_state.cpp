@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +16,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/render_pass_helper.h"
@@ -77,23 +78,17 @@ TEST_F(NegativeDynamicState, LineStippleNotBound) {
         "Run a simple draw calls to validate failure when Line Stipple dynamic state is required but not correctly bound.");
 
     AddRequiredExtensions(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceLineRasterizationFeaturesEXT line_rasterization_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(line_rasterization_features);
-    if (!line_rasterization_features.stippledBresenhamLines || !line_rasterization_features.bresenhamLines) {
-        GTEST_SKIP() << "Stipple Bresenham lines not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::stippledBresenhamLines);
+    AddRequiredFeature(vkt::Feature::bresenhamLines);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    VkPipelineRasterizationLineStateCreateInfoKHR line_state = vku::InitStructHelper();
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE_KHR);
+    VkPipelineRasterizationLineStateCreateInfo line_state = vku::InitStructHelper();
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE);
     pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 
-    line_state.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_BRESENHAM_KHR;
+    line_state.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_BRESENHAM;
     line_state.stippledLineEnable = VK_TRUE;
     line_state.lineStippleFactor = 1;
     line_state.lineStipplePattern = 0;
@@ -120,8 +115,8 @@ TEST_F(NegativeDynamicState, InvalidateStaticPipeline) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    VkPipelineRasterizationLineStateCreateInfoKHR line_state = vku::InitStructHelper();
-    line_state.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_BRESENHAM_KHR;
+    VkPipelineRasterizationLineStateCreateInfo line_state = vku::InitStructHelper();
+    line_state.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_BRESENHAM;
     line_state.stippledLineEnable = VK_TRUE;
     line_state.lineStippleFactor = 1;
     line_state.lineStipplePattern = 0;
@@ -130,7 +125,7 @@ TEST_F(NegativeDynamicState, InvalidateStaticPipeline) {
     name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
 
     CreatePipelineHelper pipe_0(*this);
-    pipe_0.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE_KHR);
+    pipe_0.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE);
     pipe_0.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT);
     pipe_0.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
     pipe_0.rs_state_ci_.pNext = &line_state;
@@ -467,15 +462,15 @@ TEST_F(NegativeDynamicState, ExtendedDynamicStateDisabled) {
 
     CreatePipelineHelper pipe(*this);
     const VkDynamicState dyn_states[] = {
-        VK_DYNAMIC_STATE_CULL_MODE_EXT,           VK_DYNAMIC_STATE_FRONT_FACE_EXT,
-        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT,  VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
-        VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,      VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE_EXT,
-        VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE_EXT,   VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE_EXT,
-        VK_DYNAMIC_STATE_DEPTH_COMPARE_OP_EXT,    VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE_EXT,
-        VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE_EXT, VK_DYNAMIC_STATE_STENCIL_OP_EXT,
+        VK_DYNAMIC_STATE_CULL_MODE,           VK_DYNAMIC_STATE_FRONT_FACE,
+        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,  VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
+        VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,  VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE,
+        VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,   VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
+        VK_DYNAMIC_STATE_DEPTH_COMPARE_OP,    VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE,
+        VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE, VK_DYNAMIC_STATE_STENCIL_OP,
     };
     VkPipelineDynamicStateCreateInfo dyn_state_ci = vku::InitStructHelper();
-    dyn_state_ci.dynamicStateCount = size(dyn_states);
+    dyn_state_ci.dynamicStateCount = size32(dyn_states);
     dyn_state_ci.pDynamicStates = dyn_states;
     pipe.dyn_state_ci_ = dyn_state_ci;
     pipe.vp_state_ci_.viewportCount = 0;
@@ -577,20 +572,21 @@ TEST_F(NegativeDynamicState, ExtendedDynamicStateDuplicate) {
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::extendedDynamicState);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     const VkDynamicState dyn_states[] = {
-        VK_DYNAMIC_STATE_CULL_MODE_EXT,           VK_DYNAMIC_STATE_FRONT_FACE_EXT,
-        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT,  VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
-        VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,      VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE_EXT,
-        VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE_EXT,   VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE_EXT,
-        VK_DYNAMIC_STATE_DEPTH_COMPARE_OP_EXT,    VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE_EXT,
-        VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE_EXT, VK_DYNAMIC_STATE_STENCIL_OP_EXT,
+        VK_DYNAMIC_STATE_CULL_MODE,           VK_DYNAMIC_STATE_FRONT_FACE,
+        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,  VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
+        VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,  VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE,
+        VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,   VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
+        VK_DYNAMIC_STATE_DEPTH_COMPARE_OP,    VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE,
+        VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE, VK_DYNAMIC_STATE_STENCIL_OP,
     };
 
     // Verify dupes of every state.
-    for (size_t i = 0; i < size(dyn_states); ++i) {
+    for (size_t i = 0; i < std::size(dyn_states); ++i) {
         CreatePipelineHelper pipe(*this);
         pipe.AddDynamicState(dyn_states[i]);
         pipe.AddDynamicState(dyn_states[i]);
@@ -616,7 +612,7 @@ TEST_F(NegativeDynamicState, ExtendedDynamicStateBindVertexBuffers) {
 
     // Verify each vkCmdSet command
     CreatePipelineHelper pipe(*this);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
     pipe.vp_state_ci_.viewportCount = 0;
@@ -875,13 +871,13 @@ TEST_F(NegativeDynamicState, ExtendedDynamicStateEnabledNoMultiview) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetViewportWithCount-viewportCount-03395");
     VkViewport viewport = {0, 0, 1, 1, 0.0f, 0.0f};
     VkViewport viewports[] = {viewport, viewport};
-    vk::CmdSetViewportWithCountEXT(commandBuffer.handle(), size(viewports), viewports);
+    vk::CmdSetViewportWithCountEXT(commandBuffer.handle(), size32(viewports), viewports);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetScissorWithCount-scissorCount-03398");
     VkRect2D scissor = {{0, 0}, {1, 1}};
     VkRect2D scissors[] = {scissor, scissor};
-    vk::CmdSetScissorWithCountEXT(commandBuffer.handle(), size(scissors), scissors);
+    vk::CmdSetScissorWithCountEXT(commandBuffer.handle(), size32(scissors), scissors);
     m_errorMonitor->VerifyFound();
 
     commandBuffer.End();
@@ -898,9 +894,9 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState2Disabled) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE_EXT);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE_EXT);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE);
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04868");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
@@ -984,10 +980,10 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState2Enabled) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const VkDynamicState dyn_states[] = {VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE_EXT, VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE_EXT,
-                                         VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE_EXT};
+    const VkDynamicState dyn_states[] = {VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE, VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE,
+                                         VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE};
 
-    for (size_t i = 0; i < size(dyn_states); ++i) {
+    for (size_t i = 0; i < std::size(dyn_states); ++i) {
         // Verify duplicates of every dynamic state.
         {
             CreatePipelineHelper pipe(*this);
@@ -1010,11 +1006,10 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState2Enabled) {
 
             vk::CmdBindPipeline(command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
-            if (dyn_states[i] == VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE_EXT)
+            if (dyn_states[i] == VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE)
                 m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04876");
-            if (dyn_states[i] == VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE_EXT)
-                m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04877");
-            if (dyn_states[i] == VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE_EXT)
+            if (dyn_states[i] == VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE) m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04877");
+            if (dyn_states[i] == VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE)
                 m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04879");
             vk::CmdDraw(command_buffer.handle(), 1, 1, 0, 0);
             m_errorMonitor->VerifyFound();
@@ -1034,7 +1029,7 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState2InvalidateStaticPipeline) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE);
     pipe.CreateGraphicsPipeline();
 
     CreatePipelineHelper pipe_static(*this);
@@ -1448,7 +1443,7 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState3CmdSetFeatureDisabled) {
     }
     {
         m_errorMonitor->SetDesiredError("VUID-vkCmdSetLineRasterizationModeEXT-None-09423");
-        vk::CmdSetLineRasterizationModeEXT(command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_DEFAULT_KHR);
+        vk::CmdSetLineRasterizationModeEXT(command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_DEFAULT);
         m_errorMonitor->VerifyFound();
     }
     {
@@ -1524,7 +1519,8 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState3DuplicateStatePipeline) {
     TEST_DESCRIPTION("VK_EXT_extended_dynamic_state3 Duplicate state in pipeline");
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkDynamicState const dyn_states[] = {VK_DYNAMIC_STATE_TESSELLATION_DOMAIN_ORIGIN_EXT,
@@ -1560,7 +1556,7 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState3DuplicateStatePipeline) {
                                          VK_DYNAMIC_STATE_COVERAGE_REDUCTION_MODE_NV};
 
     // Verify dupes of every state.
-    for (size_t i = 0; i < size(dyn_states); ++i) {
+    for (size_t i = 0; i < std::size(dyn_states); ++i) {
         CreatePipelineHelper pipe(*this);
         pipe.AddDynamicState(dyn_states[i]);
         pipe.AddDynamicState(dyn_states[i]);
@@ -1572,30 +1568,40 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState3DuplicateStatePipeline) {
 
 TEST_F(NegativeDynamicState, DrawNotSetTessellationDomainOrigin) {
     TEST_DESCRIPTION("VK_EXT_extended_dynamic_state3 dynamic state not set before drawing");
+    AddRequiredExtensions(VK_KHR_MAINTENANCE2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::extendedDynamicState3TessellationDomainOrigin);
+    AddRequiredFeature(vkt::Feature::tessellationShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    m_command_buffer.Begin();
-
-    CreatePipelineHelper pipe(*this);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_TESSELLATION_DOMAIN_ORIGIN_EXT);
     VkPipelineTessellationDomainOriginStateCreateInfo tess_domain_ci = vku::InitStructHelper();
     tess_domain_ci.domainOrigin = VK_TESSELLATION_DOMAIN_ORIGIN_LOWER_LEFT;
     VkPipelineTessellationStateCreateInfo tess_ci = vku::InitStructHelper(&tess_domain_ci);
+    tess_ci.patchControlPoints = 4u;
+
+    VkShaderObj tcs(this, kTessellationControlMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
+    VkShaderObj tes(this, kTessellationEvalMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_TESSELLATION_DOMAIN_ORIGIN_EXT);
     pipe.gp_ci_.pTessellationState = &tess_ci;
+    pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), tcs.GetStageCreateInfo(), tes.GetStageCreateInfo(),
+                           pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
-    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07619");
     vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
+
     vk::CmdSetTessellationDomainOriginEXT(m_command_buffer.handle(), VK_TESSELLATION_DOMAIN_ORIGIN_UPPER_LEFT);
     vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_command_buffer.EndRenderPass();
-
     m_command_buffer.End();
 }
 
@@ -1907,6 +1913,7 @@ TEST_F(NegativeDynamicState, DrawNotSetRasterizationStream) {
     TEST_DESCRIPTION("VK_EXT_extended_dynamic_state3 dynamic state not set before drawing");
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::geometryShader);
     AddRequiredFeature(vkt::Feature::geometryStreams);
     AddRequiredFeature(vkt::Feature::extendedDynamicState3RasterizationStream);
     AddRequiredFeature(vkt::Feature::transformFeedback);
@@ -1916,25 +1923,29 @@ TEST_F(NegativeDynamicState, DrawNotSetRasterizationStream) {
     VkPhysicalDeviceTransformFeedbackPropertiesEXT transform_feedback_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(transform_feedback_props);
 
-    m_command_buffer.Begin();
+    VkShaderObj gs(this, kGeometryMinimalGlsl, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
-    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07630");
     vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
+
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetRasterizationStreamEXT-rasterizationStream-07412");
     if (!transform_feedback_props.transformFeedbackRasterizationStreamSelect) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdSetRasterizationStreamEXT-rasterizationStream-07413");
     }
     vk::CmdSetRasterizationStreamEXT(m_command_buffer.handle(), transform_feedback_props.maxTransformFeedbackStreams + 1);
     m_errorMonitor->VerifyFound();
-    m_command_buffer.EndRenderPass();
 
+    m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
 
@@ -2064,13 +2075,13 @@ TEST_F(NegativeDynamicState, DrawNotSetLineRasterizationMode) {
     vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-07418");
-    vk::CmdSetLineRasterizationModeEXT(m_command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_RECTANGULAR_KHR);
+    vk::CmdSetLineRasterizationModeEXT(m_command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_RECTANGULAR);
     m_errorMonitor->VerifyFound();
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-07419");
-    vk::CmdSetLineRasterizationModeEXT(m_command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_BRESENHAM_KHR);
+    vk::CmdSetLineRasterizationModeEXT(m_command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_BRESENHAM);
     m_errorMonitor->VerifyFound();
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-07420");
-    vk::CmdSetLineRasterizationModeEXT(m_command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_RECTANGULAR_SMOOTH_KHR);
+    vk::CmdSetLineRasterizationModeEXT(m_command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_RECTANGULAR_SMOOTH);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
 
@@ -2148,17 +2159,8 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    // VUID-VkPipelineDynamicStateCreateInfo-pDynamicStates-01442
-    CreatePipelineHelper pipe(*this);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
-    m_errorMonitor->SetDesiredError("VUID-VkPipelineDynamicStateCreateInfo-pDynamicStates-01442");
-    pipe.CreateGraphicsPipeline();
-    m_errorMonitor->VerifyFound();
-
     m_command_buffer.Begin();
 
-    // VUID-vkCmdSetVertexInputEXT-vertexBindingDescriptionCount-04791
     {
         VkVertexInputBindingDescription2EXT binding = {
             VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_VERTEX, 1};
@@ -2171,7 +2173,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-vkCmdSetVertexInputEXT-vertexAttributeDescriptionCount-04792
     {
         VkVertexInputBindingDescription2EXT binding = {
             VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_VERTEX, 1};
@@ -2186,7 +2187,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-vkCmdSetVertexInputEXT-binding-04793
     {
         VkVertexInputBindingDescription2EXT binding = {
             VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_VERTEX, 1};
@@ -2197,7 +2197,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-vkCmdSetVertexInputEXT-pVertexBindingDescriptions-04794
     {
         VkVertexInputBindingDescription2EXT bindings[2] = {
             {VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_VERTEX, 1},
@@ -2207,7 +2206,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-vkCmdSetVertexInputEXT-pVertexAttributeDescriptions-04795
     {
         VkVertexInputBindingDescription2EXT binding = {
             VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_VERTEX, 1};
@@ -2219,7 +2217,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-VkVertexInputBindingDescription2EXT-binding-04796
     {
         VkVertexInputBindingDescription2EXT binding = {VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT,
                                                        nullptr,
@@ -2232,7 +2229,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-VkVertexInputBindingDescription2EXT-stride-04797
     {
         VkVertexInputBindingDescription2EXT binding = {VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT,
                                                        nullptr,
@@ -2245,7 +2241,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-VkVertexInputBindingDescription2EXT-divisor-04798
     {
         VkVertexInputBindingDescription2EXT binding = {
             VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_INSTANCE, 0};
@@ -2254,7 +2249,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-VkVertexInputBindingDescription2EXT-divisor-04799
     {
         VkVertexInputBindingDescription2EXT binding = {
             VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_INSTANCE, 2};
@@ -2262,8 +2256,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1, &binding, 0, nullptr);
         m_errorMonitor->VerifyFound();
     }
-
-    // VUID-VkVertexInputAttributeDescription2EXT-location-06228
     {
         VkVertexInputBindingDescription2EXT binding = {
             VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_VERTEX, 1};
@@ -2278,7 +2270,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-VkVertexInputAttributeDescription2EXT-binding-06229
     {
         VkVertexInputBindingDescription2EXT binding = {
             VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_VERTEX, 1};
@@ -2294,7 +2285,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-VkVertexInputAttributeDescription2EXT-offset-06230
     if (m_device->Physical().limits_.maxVertexInputAttributeOffset <
         std::numeric_limits<decltype(m_device->Physical().limits_.maxVertexInputAttributeOffset)>::max()) {
         VkVertexInputBindingDescription2EXT binding = {
@@ -2307,7 +2297,6 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         m_errorMonitor->VerifyFound();
     }
 
-    // VUID-VkVertexInputAttributeDescription2EXT-format-04805
     {
         const VkFormat format = VK_FORMAT_D16_UNORM;
         VkFormatProperties format_props;
@@ -2464,15 +2453,15 @@ void NegativeDynamicState::InitLineRasterizationFeatureDisabled() {
 }
 
 TEST_F(NegativeDynamicState, RasterizationLineModeDefault) {
-    TEST_DESCRIPTION("tests VK_EXT_line_rasterization dynamic state with VK_LINE_RASTERIZATION_MODE_DEFAULT_KHR");
+    TEST_DESCRIPTION("tests VK_EXT_line_rasterization dynamic state with VK_LINE_RASTERIZATION_MODE_DEFAULT");
     RETURN_IF_SKIP(InitLineRasterizationFeatureDisabled());
 
-    // set both from dynamic state, don't need a VkPipelineRasterizationLineStateCreateInfoKHR in pNext
+    // set both from dynamic state, don't need a VkPipelineRasterizationLineStateCreateInfo in pNext
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_RASTERIZATION_MODE_EXT);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT);
-    pipe.line_state_ci_.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_RECTANGULAR_KHR;  // ignored
-    pipe.line_state_ci_.stippledLineEnable = VK_TRUE;                                        // ignored
+    pipe.line_state_ci_.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_RECTANGULAR;  // ignored
+    pipe.line_state_ci_.stippledLineEnable = VK_TRUE;                                    // ignored
     pipe.line_state_ci_.lineStippleFactor = 1;
     pipe.CreateGraphicsPipeline();
 
@@ -2481,7 +2470,7 @@ TEST_F(NegativeDynamicState, RasterizationLineModeDefault) {
     vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     vk::CmdSetLineStippleEnableEXT(m_command_buffer.handle(), VK_TRUE);
-    vk::CmdSetLineRasterizationModeEXT(m_command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_DEFAULT_KHR);
+    vk::CmdSetLineRasterizationModeEXT(m_command_buffer.handle(), VK_LINE_RASTERIZATION_MODE_DEFAULT);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-stippledLineEnable-07498");
     vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
@@ -2495,12 +2484,12 @@ TEST_F(NegativeDynamicState, RasterizationLineModeDefault) {
 }
 
 TEST_F(NegativeDynamicState, RasterizationLineModeRectangular) {
-    TEST_DESCRIPTION("tests VK_EXT_line_rasterization dynamic state with VK_LINE_RASTERIZATION_MODE_RECTANGULAR_KHR");
+    TEST_DESCRIPTION("tests VK_EXT_line_rasterization dynamic state with VK_LINE_RASTERIZATION_MODE_RECTANGULAR");
     RETURN_IF_SKIP(InitLineRasterizationFeatureDisabled());
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT);
-    pipe.line_state_ci_.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_RECTANGULAR_KHR;
+    pipe.line_state_ci_.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_RECTANGULAR;
     pipe.line_state_ci_.stippledLineEnable = VK_TRUE;  // ignored
     pipe.line_state_ci_.lineStippleFactor = 1;
     pipe.CreateGraphicsPipeline();
@@ -2519,12 +2508,12 @@ TEST_F(NegativeDynamicState, RasterizationLineModeRectangular) {
 }
 
 TEST_F(NegativeDynamicState, RasterizationLineModeBresenham) {
-    TEST_DESCRIPTION("tests VK_EXT_line_rasterization dynamic state with VK_LINE_RASTERIZATION_MODE_BRESENHAM_KHR");
+    TEST_DESCRIPTION("tests VK_EXT_line_rasterization dynamic state with VK_LINE_RASTERIZATION_MODE_BRESENHAM");
     RETURN_IF_SKIP(InitLineRasterizationFeatureDisabled());
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT);
-    pipe.line_state_ci_.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_BRESENHAM_KHR;
+    pipe.line_state_ci_.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_BRESENHAM;
     pipe.line_state_ci_.lineStippleFactor = 1;
     pipe.CreateGraphicsPipeline();
 
@@ -2542,12 +2531,12 @@ TEST_F(NegativeDynamicState, RasterizationLineModeBresenham) {
 }
 
 TEST_F(NegativeDynamicState, RasterizationLineModeSmooth) {
-    TEST_DESCRIPTION("tests VK_EXT_line_rasterization dynamic state with VK_LINE_RASTERIZATION_MODE_RECTANGULAR_SMOOTH_KHR");
+    TEST_DESCRIPTION("tests VK_EXT_line_rasterization dynamic state with VK_LINE_RASTERIZATION_MODE_RECTANGULAR_SMOOTH");
     RETURN_IF_SKIP(InitLineRasterizationFeatureDisabled());
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT);
-    pipe.line_state_ci_.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_RECTANGULAR_SMOOTH_KHR;
+    pipe.line_state_ci_.lineRasterizationMode = VK_LINE_RASTERIZATION_MODE_RECTANGULAR_SMOOTH;
     pipe.line_state_ci_.lineStippleFactor = 1;
     pipe.CreateGraphicsPipeline();
 
@@ -2630,8 +2619,8 @@ TEST_F(NegativeDynamicState, MaxFragmentDualSrcAttachmentsDynamicBlendEnable) {
         layout(location = 0) out vec4 c0;
         layout(location = 1) out vec4 c1;
         void main() {
-		    c0 = vec4(0.0f);
-		    c1 = vec4(0.0f);
+            c0 = vec4(0.0f);
+            c1 = vec4(0.0f);
         }
     )glsl";
     VkShaderObj fs(this, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -2680,7 +2669,6 @@ TEST_F(NegativeDynamicState, MaxFragmentDualSrcAttachmentsDynamicBlendEnable) {
 TEST_F(NegativeDynamicState, ColorWriteDisabled) {
     TEST_DESCRIPTION("Validate VK_EXT_color_write_enable VUs when disabled");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -2765,17 +2753,9 @@ TEST_F(NegativeDynamicState, ColorWriteInvalidateStaticPipeline) {
 
 TEST_F(NegativeDynamicState, ColorWriteEnableAttachmentCount) {
     TEST_DESCRIPTION("Invalid usage of attachmentCount for vkCmdSetColorWriteEnableEXT");
-
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
-
-    RETURN_IF_SKIP(InitFramework());
-
-    // Feature required to be supported for extension
-    VkPhysicalDeviceColorWriteEnableFeaturesEXT color_write_features = vku::InitStructHelper();
-    color_write_features.colorWriteEnable = VK_TRUE;
-    VkPhysicalDeviceFeatures2 pd_features2 = vku::InitStructHelper(&color_write_features);
-    RETURN_IF_SKIP(InitState(nullptr, &pd_features2));
+    AddRequiredFeature(vkt::Feature::colorWriteEnable);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // need a valid array to index into
@@ -2807,8 +2787,6 @@ TEST_F(NegativeDynamicState, ColorWriteEnableAttachmentCount) {
 
 TEST_F(NegativeDynamicState, ColorWriteEnableFeature) {
     TEST_DESCRIPTION("Invalid usage of vkCmdSetColorWriteEnableEXT with feature not enabled");
-
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -2887,6 +2865,43 @@ TEST_F(NegativeDynamicState, DiscardRectanglesNotSet) {
     vk::CmdSetDiscardRectangleEXT(m_command_buffer.handle(), 0, 2, discard_rectangles);
     vk::CmdSetDiscardRectangleEXT(m_command_buffer.handle(), 3, 1, discard_rectangles);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07751");
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, DiscardRectanglesNotSetMaxDiscardRectangles) {
+    AddRequiredExtensions(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkPhysicalDeviceDiscardRectanglePropertiesEXT discard_rectangle_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(discard_rectangle_properties);
+    std::vector<VkRect2D> discard_rectangles(discard_rectangle_properties.maxDiscardRectangles);
+
+    if (discard_rectangle_properties.maxDiscardRectangles < 2) {
+        GTEST_SKIP() << "maxDiscardRectangles too small";
+    }
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DISCARD_RECTANGLE_EXT);
+    // VkPipelineDiscardRectangleStateCreateInfoEXT is not used now
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DISCARD_RECTANGLE_ENABLE_EXT);
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdSetDiscardRectangleEnableEXT(m_command_buffer.handle(), VK_TRUE);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-rasterizerDiscardEnable-09236");
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    vk::CmdSetDiscardRectangleEXT(m_command_buffer.handle(), 0, discard_rectangles.size() - 1, discard_rectangles.data());
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-rasterizerDiscardEnable-09236");
     vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -3107,7 +3122,7 @@ TEST_F(NegativeDynamicState, SampleLocations) {
     if ((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
         image_create_info.flags = VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT;
         image_create_info.format = VK_FORMAT_S8_UINT;
-        CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-flags-01533");
+        CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-flags-01533");
     }
 
     const VkFormat depth_format = FindSupportedDepthStencilFormat(Gpu());
@@ -3301,7 +3316,6 @@ TEST_F(NegativeDynamicState, SetViewportParam) {
     m_errorMonitor->VerifyFound();
 
     // core viewport tests
-    using std::vector;
     struct TestCase {
         VkViewport vp;
         std::string vuid;
@@ -3319,7 +3333,7 @@ TEST_F(NegativeDynamicState, SetViewportParam) {
     const auto below_zero = NearestSmaller(0.0f);
     const auto past_one = NearestGreater(1.0f);
 
-    vector<TestCase> test_cases = {
+    std::vector<TestCase> test_cases = {
         {{0.0, 0.0, 0.0, 64.0, 0.0, 1.0}, "VUID-VkViewport-width-01770"},
         {{0.0, 0.0, one_past_max_w, 64.0, 0.0, 1.0}, "VUID-VkViewport-width-01771"},
         {{0.0, 0.0, NAN, 64.0, 0.0, 1.0}, "VUID-VkViewport-width-01770"},
@@ -3458,7 +3472,6 @@ TEST_F(NegativeDynamicState, CmdSetDiscardRectangleEXTOffsets) {
     TEST_DESCRIPTION("Test CmdSetDiscardRectangleEXT with invalid offsets in pDiscardRectangles");
 
     AddRequiredExtensions(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME);
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     VkPhysicalDeviceDiscardRectanglePropertiesEXT discard_rectangle_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(discard_rectangle_properties);
@@ -3514,7 +3527,6 @@ TEST_F(NegativeDynamicState, CmdSetDiscardRectangleEXTRectangleCountOverflow) {
 TEST_F(NegativeDynamicState, CmdSetDiscardRectangleEXTRectangleCount) {
     TEST_DESCRIPTION("Test CmdSetDiscardRectangleEXT with invalid offsets in pDiscardRectangles");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME);
 
     RETURN_IF_SKIP(Init());
@@ -3546,7 +3558,7 @@ TEST_F(NegativeDynamicState, DiscardRectanglesVersion) {
 
     const VkDynamicState dyn_states[] = {VK_DYNAMIC_STATE_DISCARD_RECTANGLE_ENABLE_EXT};
     VkPipelineDynamicStateCreateInfo dyn_state_ci = vku::InitStructHelper();
-    dyn_state_ci.dynamicStateCount = size(dyn_states);
+    dyn_state_ci.dynamicStateCount = size32(dyn_states);
     dyn_state_ci.pDynamicStates = dyn_states;
 
     CreatePipelineHelper pipe(*this);
@@ -3948,9 +3960,7 @@ TEST_F(NegativeDynamicState, ViewportStateIgnored) {
 
 TEST_F(NegativeDynamicState, Viewport) {
     TEST_DESCRIPTION("Test VkPipelineViewportStateCreateInfo viewport and scissor count validation for non-multiViewport");
-
-    VkPhysicalDeviceFeatures features{};
-    RETURN_IF_SKIP(Init(&features));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     if (m_device->Physical().limits_.maxViewports < 3) {
@@ -3963,74 +3973,16 @@ TEST_F(NegativeDynamicState, Viewport) {
     VkRect2D scissors[] = {scissor, scissor};
 
     // test viewport and scissor arrays
-    using std::vector;
     struct TestCase {
         uint32_t viewport_count;
         VkViewport *viewports;
         uint32_t scissor_count;
         VkRect2D *scissors;
 
-        vector<std::string> vuids;
+        std::vector<std::string> vuids;
     };
 
-    vector<TestCase> test_cases = {
-        {2,
-         viewports,
-         1,
-         scissors,
-         {"VUID-VkPipelineViewportStateCreateInfo-viewportCount-01216",
-          "VUID-VkPipelineViewportStateCreateInfo-scissorCount-04134"}},
-        {2,
-         viewports,
-         1,
-         scissors,
-         {"VUID-VkPipelineViewportStateCreateInfo-viewportCount-01216",
-          "VUID-VkPipelineViewportStateCreateInfo-scissorCount-04134"}},
-        {1,
-         viewports,
-         2,
-         scissors,
-         {"VUID-VkPipelineViewportStateCreateInfo-scissorCount-01217",
-          "VUID-VkPipelineViewportStateCreateInfo-scissorCount-04134"}},
-        {2,
-         viewports,
-         2,
-         scissors,
-         {"VUID-VkPipelineViewportStateCreateInfo-viewportCount-01216",
-          "VUID-VkPipelineViewportStateCreateInfo-scissorCount-01217"}},
-        {1, nullptr, 1, scissors, {"VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04130"}},
-        {1, viewports, 1, nullptr, {"VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04131"}},
-        {1,
-         nullptr,
-         1,
-         nullptr,
-         {"VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04130", "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04131"}},
-        {2,
-         nullptr,
-         3,
-         nullptr,
-         {"VUID-VkPipelineViewportStateCreateInfo-viewportCount-01216", "VUID-VkPipelineViewportStateCreateInfo-scissorCount-01217",
-          "VUID-VkPipelineViewportStateCreateInfo-scissorCount-04134", "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04130",
-          "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04131"}},
-        {2,
-         nullptr,
-         2,
-         nullptr,
-         {"VUID-VkPipelineViewportStateCreateInfo-viewportCount-01216", "VUID-VkPipelineViewportStateCreateInfo-scissorCount-01217",
-          "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04130", "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04131"}},
-    };
-
-    for (const auto &test_case : test_cases) {
-        const auto break_vp = [&test_case](CreatePipelineHelper &helper) {
-            helper.vp_state_ci_.viewportCount = test_case.viewport_count;
-            helper.vp_state_ci_.pViewports = test_case.viewports;
-            helper.vp_state_ci_.scissorCount = test_case.scissor_count;
-            helper.vp_state_ci_.pScissors = test_case.scissors;
-        };
-        CreatePipelineHelper::OneshotTest(*this, break_vp, kErrorBit, test_case.vuids);
-    }
-
-    vector<TestCase> dyn_test_cases = {
+    std::vector<TestCase> dyn_test_cases = {
         {0,
          viewports,
          1,
@@ -4098,7 +4050,7 @@ TEST_F(NegativeDynamicState, Viewport) {
     for (const auto &test_case : dyn_test_cases) {
         const auto break_vp = [&](CreatePipelineHelper &helper) {
             VkPipelineDynamicStateCreateInfo dyn_state_ci = vku::InitStructHelper();
-            dyn_state_ci.dynamicStateCount = size(dyn_states);
+            dyn_state_ci.dynamicStateCount = size32(dyn_states);
             dyn_state_ci.pDynamicStates = dyn_states;
             helper.dyn_state_ci_ = dyn_state_ci;
 
@@ -4126,17 +4078,16 @@ TEST_F(NegativeDynamicState, MultiViewport) {
     VkRect2D scissor = {{0, 0}, {64, 64}};
     VkRect2D scissors[] = {scissor, scissor};
 
-    using std::vector;
     struct TestCase {
         uint32_t viewport_count;
         VkViewport *viewports;
         uint32_t scissor_count;
         VkRect2D *scissors;
 
-        vector<std::string> vuids;
+        std::vector<std::string> vuids;
     };
 
-    vector<TestCase> test_cases = {
+    std::vector<TestCase> test_cases = {
         {0,
          viewports,
          2,
@@ -4211,7 +4162,7 @@ TEST_F(NegativeDynamicState, MultiViewport) {
         CreatePipelineHelper::OneshotTest(*this, break_vp, kErrorBit, test_case.vuids);
     }
 
-    vector<TestCase> dyn_test_cases = {
+    std::vector<TestCase> dyn_test_cases = {
         {0,
          viewports,
          2,
@@ -4266,7 +4217,7 @@ TEST_F(NegativeDynamicState, MultiViewport) {
     for (const auto &test_case : dyn_test_cases) {
         const auto break_vp = [&](CreatePipelineHelper &helper) {
             VkPipelineDynamicStateCreateInfo dyn_state_ci = vku::InitStructHelper();
-            dyn_state_ci.dynamicStateCount = size(dyn_states);
+            dyn_state_ci.dynamicStateCount = size32(dyn_states);
             dyn_state_ci.pDynamicStates = dyn_states;
             helper.dyn_state_ci_ = dyn_state_ci;
 
@@ -4882,7 +4833,6 @@ TEST_F(NegativeDynamicState, VertexInputLocationMissing) {
 TEST_F(NegativeDynamicState, MissingCmdSetVertexInput) {
     TEST_DESCRIPTION("Validate VK_EXT_color_write_enable VUs when disabled");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::extendedDynamicState);
@@ -4892,7 +4842,7 @@ TEST_F(NegativeDynamicState, MissingCmdSetVertexInput) {
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -4917,7 +4867,7 @@ TEST_F(NegativeDynamicState, MissingCmdBindVertexBuffers2) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -5549,7 +5499,7 @@ TEST_F(NegativeDynamicState, InterpolateAtSample) {
         layout(location = 0) out vec2 uv;
         void main() {
             uv = vec2(gl_VertexIndex & 1, (gl_VertexIndex >> 1) & 1);
-		    gl_Position = vec4(uv, 0.0f, 1.0f);
+            gl_Position = vec4(uv, 0.0f, 1.0f);
         }
     )glsl";
     static const char fs_src[] = R"glsl(
@@ -5557,7 +5507,7 @@ TEST_F(NegativeDynamicState, InterpolateAtSample) {
         layout(location = 0) out vec4 uFragColor;
         layout(location = 0) in vec2 v;
         void main() {
-		    vec2 sample1 = interpolateAtSample(v, 0);
+            vec2 sample1 = interpolateAtSample(v, 0);
             uFragColor = vec4(0.1f);
         }
     )glsl";
@@ -5736,6 +5686,9 @@ TEST_F(NegativeDynamicState, RebindSamePipeline) {
     if (driver_properties.conformanceVersion.major > 1 || driver_properties.conformanceVersion.minor > 3 ||
         (driver_properties.conformanceVersion.minor == 3 && driver_properties.conformanceVersion.subminor > 7)) {
         GTEST_SKIP() << "conformanceVersion is greater than the version the test requires";
+    }
+    if (driver_properties.conformanceVersion.major == 0) {
+        GTEST_SKIP() << "conformanceVersion is invalid";  // happens in some non-conformant mesa drivers
     }
 
     CreatePipelineHelper pipe(*this);
@@ -5928,7 +5881,7 @@ TEST_F(NegativeDynamicState, RasterizationSamplesDynamicRendering) {
     vkt::Image resolve_image(*m_device, 32u, 32u, 1, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView resolve_image_view = resolve_image.CreateView();
 
-    VkPipelineRenderingCreateInfoKHR pipeline_rendering_info = vku::InitStructHelper();
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
     pipeline_rendering_info.colorAttachmentCount = 1;
     pipeline_rendering_info.pColorAttachmentFormats = &color_format;
 

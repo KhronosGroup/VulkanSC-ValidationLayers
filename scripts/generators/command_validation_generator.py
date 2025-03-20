@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2021-2024 The Khronos Group Inc.
+# Copyright (c) 2021-2025 The Khronos Group Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 import os
 import sys
 from generators.generator_utils import buildListVUID, getVUID
-from generators.vulkan_object import Queues, CommandScope
-from generators.base_generator import BaseGenerator
+from vulkan_object import Queues, CommandScope
+from base_generator import BaseGenerator
 #
 # CommandValidationOutputGenerator - Generate implicit vkCmd validation for CoreChecks
 class CommandValidationOutputGenerator(BaseGenerator):
@@ -34,8 +34,8 @@ class CommandValidationOutputGenerator(BaseGenerator):
 
             /***************************************************************************
             *
-            * Copyright (c) 2021-2024 Valve Corporation
-            * Copyright (c) 2021-2024 LunarG, Inc.
+            * Copyright (c) 2021-2025 Valve Corporation
+            * Copyright (c) 2021-2025 LunarG, Inc.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.

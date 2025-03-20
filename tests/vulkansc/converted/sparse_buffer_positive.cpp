@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2024 The Khronos Group Inc.
- * Copyright (c) 2024 Valve Corporation
- * Copyright (c) 2024 LunarG, Inc.
- * Copyright (c) 2024 Collabora, Inc.
+ * Copyright (c) 2025 The Khronos Group Inc.
+ * Copyright (c) 2025 Valve Corporation
+ * Copyright (c) 2025 LunarG, Inc.
+ * Copyright (c) 2025 Collabora, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -587,11 +587,11 @@ TEST_F(PositiveSparseBuffer, DISABLED_BufferCopiesValidationStressTest2) {
     }
 
     std::vector<VkSparseMemoryBind> buffer_memory_binds(memory_chunks_count);
-    for (auto& [i, mem_bind] : vvl::enumerate(buffer_memory_binds)) {
-        mem_bind->size = memory_size;
-        mem_bind->memory = memory_chunks[i].handle();
-        mem_bind->resourceOffset = i * memory_size;
-        mem_bind->memoryOffset = 0;
+    for (auto [i, mem_bind] : vvl::enumerate(buffer_memory_binds)) {
+        mem_bind.size = memory_size;
+        mem_bind.memory = memory_chunks[i].handle();
+        mem_bind.resourceOffset = i * memory_size;
+        mem_bind.memoryOffset = 0;
     }
 
     std::array<VkSparseBufferMemoryBindInfo, 1> buffer_memory_bind_infos = {};

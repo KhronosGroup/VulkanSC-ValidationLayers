@@ -1,7 +1,8 @@
-/* Copyright (c) 2021-2024 The Khronos Group Inc.
- * Copyright (c) 2021-2024 Valve Corporation
- * Copyright (c) 2021-2024 LunarG, Inc.
- * Copyright (C) 2021-2024 Google Inc.
+/* Copyright (c) 2021-2025 The Khronos Group Inc.
+ * Copyright (c) 2021-2025 Valve Corporation
+ * Copyright (c) 2021-2025 LunarG, Inc.
+ * Copyright (C) 2021-2025 Google Inc.
+ * Modifications Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +42,8 @@ const vvl::unordered_map<VkPipelineStageFlags2, std::string> &GetFeatureNameMap(
         {VK_PIPELINE_STAGE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR, "shadingRate"},
         {VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, "rayTracing"},
         {VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR, "rayTracing"},
+        {VK_PIPELINE_STAGE_2_SUBPASS_SHADER_BIT_HUAWEI, "subpassShading"},
+        {VK_PIPELINE_STAGE_2_INVOCATION_MASK_BIT_HUAWEI, "invocationMask"},
     };
     return feature_name_map;
 }
@@ -979,10 +982,10 @@ static const vvl::unordered_map<QueueError, std::vector<Entry>> &GetBarrierQueue
          }},
         {QueueError::kSubmitQueueMustMatchSrcOrDst,
          {
-             {Key(Struct::VkBufferMemoryBarrier2), "UNASSIGNED-VkBufferMemoryBarrier2-SharingModeExclusive-MatchingQueueFamilies"},
-             {Key(Struct::VkBufferMemoryBarrier), "UNASSIGNED-VkBufferMemoryBarrier-SharingModeExclusive-MatchingQueueFamilies"},
-             {Key(Struct::VkImageMemoryBarrier2), "UNASSIGNED-VkImageMemoryBarrier2-SharingModeExclusive-MatchingQueueFamilies"},
-             {Key(Struct::VkImageMemoryBarrier), "UNASSIGNED-VkImageMemoryBarrier-SharingModeExclusive-MatchingQueueFamilies"},
+             {Key(Struct::VkBufferMemoryBarrier2), "VUID-vkCmdPipelineBarrier2-srcQueueFamilyIndex-10387"},
+             {Key(Struct::VkBufferMemoryBarrier), "VUID-vkCmdPipelineBarrier-srcQueueFamilyIndex-10388"},
+             {Key(Struct::VkImageMemoryBarrier2), "VUID-vkCmdPipelineBarrier2-srcQueueFamilyIndex-10387"},
+             {Key(Struct::VkImageMemoryBarrier), "VUID-vkCmdPipelineBarrier-srcQueueFamilyIndex-10388"},
          }},
     };
     return kBarrierQueueErrors;
@@ -1065,7 +1068,7 @@ const vvl::unordered_map<VkImageLayout, std::array<Entry, 2>> &GetImageLayoutErr
              {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-srcQueueFamilyIndex-07006"},
              {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-srcQueueFamilyIndex-07006"},
          }}},
-        {VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR,
+        {VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ,
          ValueType{{
              {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-srcQueueFamilyIndex-09550"},
              {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-srcQueueFamilyIndex-09550"},
@@ -1099,6 +1102,11 @@ const vvl::unordered_map<VkImageLayout, std::array<Entry, 2>> &GetImageLayoutErr
          ValueType{{
              {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-srcQueueFamilyIndex-07125"},
              {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-srcQueueFamilyIndex-07125"},
+         }}},
+        {VK_IMAGE_LAYOUT_VIDEO_ENCODE_QUANTIZATION_MAP_KHR,
+         ValueType{{
+             {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-srcQueueFamilyIndex-10287"},
+             {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-srcQueueFamilyIndex-10287"},
          }}},
     };
     return kImageLayoutErrors;
@@ -1135,11 +1143,6 @@ static const vvl::unordered_map<BufferError, std::array<Entry, 2>> &GetBufferErr
          {{
              {Key(Struct::VkBufferMemoryBarrier), "VUID-VkBufferMemoryBarrier-size-01188"},
              {Key(Struct::VkBufferMemoryBarrier2), "VUID-VkBufferMemoryBarrier2-size-01188"},
-         }}},
-        {BufferError::kQueueFamilyExternal,
-         {{
-             {Key(Struct::VkBufferMemoryBarrier), "VUID-VkBufferMemoryBarrier-srcQueueFamilyIndex-04087"},
-             {Key(Struct::VkBufferMemoryBarrier2), "VUID-VkBufferMemoryBarrier2-srcQueueFamilyIndex-04087"},
          }}},
     };
     return kBufferErrors;
@@ -1330,7 +1333,7 @@ static const vvl::unordered_map<SubmitError, std::vector<Entry>> &GetSubmitError
          }},
         {SubmitError::kSecondaryCmdNotSimultaneous,
          {
-             {Key(Func::vkQueueSubmit2), "VUID-vkQueueSubmit-pCommandBuffers-00073"},
+             {Key(Func::vkQueueSubmit), "VUID-vkQueueSubmit-pCommandBuffers-00073"},
              {Key(Func::vkQueueSubmit2), "VUID-vkQueueSubmit2-commandBuffer-03877"},
          }},
         {SubmitError::kCmdWrongQueueFamily,

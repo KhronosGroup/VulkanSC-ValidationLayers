@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <spirv-tools/libspirv.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
@@ -150,7 +151,7 @@ TEST_F(PositiveShaderSpirv, GroupDecorations) {
 
     // CreateDescriptorSetLayout
     VkDescriptorSetLayoutBinding dslb[6] = {};
-    size_t dslb_size = size(dslb);
+    size_t dslb_size = std::size(dslb);
     for (size_t i = 0; i < dslb_size; i++) {
         dslb[i].binding = i;
         dslb[i].descriptorCount = 1;
@@ -221,6 +222,27 @@ TEST_F(PositiveShaderSpirv, CapabilityExtension2of2) {
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositiveShaderSpirv, ShaderViewportIndexLayerEXT) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9601");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::multiViewport);
+    AddRequiredFeature(vkt::Feature::shaderOutputViewportIndex);
+    AddRequiredFeature(vkt::Feature::shaderOutputLayer);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    char const *vs_source = R"glsl(
+        #version 450
+        #extension GL_ARB_shader_viewport_layer_array : enable
+        void main() {
+            gl_ViewportIndex = 1;
+        }
+    )glsl";
+
+    // 1.1 target env will produce old ShaderViewportIndexLayerEXT version
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
 }
 
 TEST_F(PositiveShaderSpirv, ShaderDrawParametersWithoutFeature) {
@@ -316,7 +338,6 @@ TEST_F(PositiveShaderSpirv, Std430SpirvOptFlags10) {
     TEST_DESCRIPTION("Reproduces issue 3442 where spirv-opt fails to set layout flags options using Vulkan 1.0");
     // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/3442
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::uniformBufferStandardLayout);
@@ -369,14 +390,9 @@ TEST_F(PositiveShaderSpirv, Std430SpirvOptFlags12) {
     // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/3442
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features12);
-    if (features12.scalarBlockLayout == VK_FALSE || features12.uniformBufferStandardLayout == VK_FALSE) {
-        GTEST_SKIP() << "scalarBlockLayout and uniformBufferStandardLayout are not supported";
-    }
-    RETURN_IF_SKIP(InitState(nullptr, &features12));
+    AddRequiredFeature(vkt::Feature::scalarBlockLayout);
+    AddRequiredFeature(vkt::Feature::uniformBufferStandardLayout);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
@@ -423,7 +439,6 @@ TEST_F(PositiveShaderSpirv, SpecializationWordBoundryOffset) {
 
     // require to make enable logic simpler
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt8);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -545,12 +560,8 @@ TEST_F(PositiveShaderSpirv, SpecializationWordBoundryOffset) {
         reinterpret_cast<void *>(data),
     };
 
-    std::vector<VkDescriptorSetLayoutBinding> bindings = {
-        {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
-
     CreateComputePipelineHelper pipe(*this);
-    pipe.dsl_bindings_.resize(bindings.size());
-    memcpy(pipe.dsl_bindings_.data(), bindings.data(), bindings.size() * sizeof(VkDescriptorSetLayoutBinding));
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_src.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM,
                                              &specialization_info);
     pipe.CreateComputePipeline();
@@ -682,7 +693,7 @@ TEST_F(PositiveShaderSpirv, OpTypeArraySpecConstant) {
     const auto set_info_nospec = [&](CreateComputePipelineHelper &helper) {
         helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1,
                                                    SPV_SOURCE_ASM, nullptr);
-        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+        helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info_nospec, kErrorBit);
 
@@ -690,7 +701,7 @@ TEST_F(PositiveShaderSpirv, OpTypeArraySpecConstant) {
     const auto set_info_spec = [&](CreateComputePipelineHelper &helper) {
         helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1,
                                                    SPV_SOURCE_ASM, &specialization_info);
-        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+        helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info_spec, kErrorBit);
 }
@@ -715,7 +726,7 @@ TEST_F(PositiveShaderSpirv, OpTypeStructRuntimeArray) {
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
         helper.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+        helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
@@ -735,7 +746,7 @@ TEST_F(PositiveShaderSpirv, UnnormalizedCoordinatesNotSampled) {
 
         vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);
 
-        if (!(fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT_KHR)) {
+        if (!(fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT)) {
             GTEST_SKIP() << "R8G8B8A8_UNORM does not support OpImage*Dref* operations";
         }
     }
@@ -775,7 +786,7 @@ TEST_F(PositiveShaderSpirv, UnnormalizedCoordinatesNotSampled) {
 
     CreatePipelineHelper g_pipe(*this);
     g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    g_pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     g_pipe.CreateGraphicsPipeline();
 
     VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -882,7 +893,6 @@ TEST_F(PositiveShaderSpirv, GeometryShaderPassthroughNV) {
 TEST_F(PositiveShaderSpirv, SpecializeInt8) {
     TEST_DESCRIPTION("Test int8 specialization.");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt8);
     RETURN_IF_SKIP(Init());
@@ -934,7 +944,6 @@ TEST_F(PositiveShaderSpirv, SpecializeInt8) {
 TEST_F(PositiveShaderSpirv, SpecializeInt16) {
     TEST_DESCRIPTION("Test int16 specialization.");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt16);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -1033,7 +1042,6 @@ TEST_F(PositiveShaderSpirv, SpecializeInt32) {
 TEST_F(PositiveShaderSpirv, SpecializeInt64) {
     TEST_DESCRIPTION("Test int64 specialization.");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt64);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -1140,7 +1148,6 @@ TEST_F(PositiveShaderSpirv, ShaderFloatControl) {
 
     // Need 1.1 to get SPIR-V 1.3 since OpExecutionModeId was added in SPIR-V 1.2
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -1306,7 +1313,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
 
             const auto set_info = [&](CreatePipelineHelper &helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-                helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+                helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
         }
@@ -1326,7 +1333,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
 
             const auto set_info = [&](CreatePipelineHelper &helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-                helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+                helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
         }
@@ -1372,7 +1379,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
 
             const auto set_info = [&](CreatePipelineHelper &helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-                helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+                helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
         }
@@ -1392,7 +1399,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
 
             const auto set_info = [&](CreatePipelineHelper &helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-                helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+                helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
         }
@@ -1470,7 +1477,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
 
             const auto set_info = [&](CreatePipelineHelper &helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-                helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+                helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
         }
@@ -1490,7 +1497,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
 
             const auto set_info = [&](CreatePipelineHelper &helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-                helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+                helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
         }
@@ -1592,7 +1599,6 @@ TEST_F(PositiveShaderSpirv, SubgroupRotateClustered) {
 TEST_F(PositiveShaderSpirv, ReadShaderClockDevice) {
     TEST_DESCRIPTION("Test VK_KHR_shader_clock");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderDeviceClock);
     RETURN_IF_SKIP(Init());
@@ -1618,7 +1624,6 @@ TEST_F(PositiveShaderSpirv, ReadShaderClockDevice) {
 TEST_F(PositiveShaderSpirv, ReadShaderClockSubgroup) {
     TEST_DESCRIPTION("Test VK_KHR_shader_clock");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderSubgroupClock);
     RETURN_IF_SKIP(Init());
@@ -1710,7 +1715,7 @@ layout(location=0) out vec4 frag_color;
 void main() {
     // Using nonuniformEXT on the index into the image array creates the OpCopyObject instead of an OpLoad, which
     // was causing problems with how constants are identified.
-	frag_color = texture(sampler2D(t[nonuniformEXT(idx)], s), vec2(0.0));
+    frag_color = texture(sampler2D(t[nonuniformEXT(idx)], s), vec2(0.0));
 }
 
     )glsl";
@@ -2029,7 +2034,6 @@ TEST_F(PositiveShaderSpirv, ExtendedTypesEnabled) {
     TEST_DESCRIPTION("Test VK_KHR_shader_subgroup_extended_types.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
@@ -2094,4 +2098,45 @@ TEST_F(PositiveShaderSpirv, RayQueryPositionFetch) {
         }
     )glsl";
     VkShaderObj cs(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+}
+
+TEST_F(PositiveShaderSpirv, ImageGatherOffsetMaintenance8) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::shaderImageGatherExtended);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_8_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance8);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const char *spv_source = R"(
+               OpCapability Shader
+               OpCapability ImageGatherExtended
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %tex DescriptorSet 0
+               OpDecorate %tex Binding 2
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+          %8 = OpTypeImage %float 2D 0 0 0 1 Unknown
+          %9 = OpTypeSampledImage %8
+%_ptr_UniformConstant_9 = OpTypePointer UniformConstant %9
+        %tex = OpVariable %_ptr_UniformConstant_9 UniformConstant
+    %v2float = OpTypeVector %float 2
+    %float_0 = OpConstant %float 0
+         %15 = OpConstantComposite %v2float %float_0 %float_0
+        %int = OpTypeInt 32 1
+      %v2int = OpTypeVector %int 2
+      %int_0 = OpConstant %int 0
+         %19 = OpConstantComposite %v2int %int_0 %int_0
+    %v4float = OpTypeVector %float 4
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+         %12 = OpLoad %9 %tex
+         %21 = OpImageSampleExplicitLod %v4float %12 %15 Lod|Offset %float_0 %19
+               OpReturn
+               OpFunctionEnd
+    )";
+    VkShaderObj const fs(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 }

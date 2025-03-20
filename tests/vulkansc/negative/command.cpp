@@ -70,7 +70,8 @@ TEST_F(VkSCNegativeCommand, CreateCommandPoolInvalidMaxCommandBuffers) {
 TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
     TEST_DESCRIPTION("vkAllocateCommandBuffers - cannot allocate more command buffers from pool than commandPoolMaxCommandBuffers");
 
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitFramework(&kDisableMessageLimit));
+    RETURN_IF_SKIP(InitState());
 
     const uint32_t max_cmd_buffers = 13;
 
@@ -190,15 +191,15 @@ TEST_F(VkSCNegativeCommand, CommandPoolMultipleRecordingNotSupported) {
 
     auto begin_info = vku::InitStruct<VkCommandBufferBeginInfo>();
 
-    cb1.begin();
-    cb_other_pool.begin();
+    cb1.Begin();
+    cb_other_pool.Begin();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBeginCommandBuffer-commandPoolMultipleCommandBuffersRecording-05007");
     vksc::BeginCommandBuffer(cb2.handle(), &begin_info);
     m_errorMonitor->VerifyFound();
 
-    cb1.end();
-    cb_other_pool.end();
+    cb1.End();
+    cb_other_pool.End();
 }
 
 TEST_F(VkSCNegativeCommand, SimulatenousUseNotSupported) {

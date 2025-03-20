@@ -7,7 +7,7 @@
             "sub_dir": "Vulkan-Headers",
             "build_dir": "Vulkan-Headers/build",
             "install_dir": "Vulkan-Headers/build/install",
-            "commit": "v1.3.302"
+            "commit": "v1.4.310"
         },
         {
             "name": "Vulkan-Headers",
@@ -19,7 +19,7 @@
             "cmake_options": [
                 "-DGEN_VULKANSC_COMBINED=ON"
             ],
-            "commit": "vksc1.0.17"
+            "commit": "928fc35c007356f0a4546988fd155ab86f55b4e3"
         },
         {
             "name": "Vulkan-Utility-Libraries",
@@ -28,7 +28,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "v1.3.302",
+            "commit": "v1.4.310",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -43,7 +43,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "vksc1.0.17",
+            "commit": "a8f6e1e379d5e9c2999fdd9da0eade0c04a43812",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -57,7 +57,7 @@
             "sub_dir": "SPIRV-Headers",
             "build_dir": "SPIRV-Headers/build",
             "install_dir": "SPIRV-Headers/build/install",
-            "commit": "cb6b2c32dbfc3257c1e9142a116fe9ee3d9b80a2"
+            "commit": "09913f088a1197aba4aefd300a876b2ebbaa3391"
         },
         {
             "name": "SPIRV-Tools",
@@ -71,7 +71,7 @@
                 "-DSPIRV_SKIP_TESTS=ON",
                 "-DSPIRV_SKIP_EXECUTABLES=OFF"
             ],
-            "commit": "02433568af277324e6d7fe4582b663f14165c563"
+            "commit": "f289d047f49fb60488301ec62bafab85573668cc"
         },
         {
             "name": "robin-hood-hashing",
@@ -123,7 +123,7 @@
             "sub_dir": "glslang",
             "build_dir": "glslang/build",
             "install_dir": "glslang/build/install",
-            "commit": "d0e67c58134377f065a509845ca6b7d463f5b487",
+            "commit": "99ee11b0106b48f06fb9e2a324ba928b8316cc33",
             "cmake_options": [
                 "-DENABLE_OPT=OFF"
             ],
@@ -138,7 +138,7 @@
             "sub_dir": "Vulkan-Loader",
             "build_dir": "Vulkan-Loader/build",
             "install_dir": "Vulkan-Loader/build/install",
-            "commit": "v1.3.302",
+            "commit": "v1.4.310",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -151,7 +151,7 @@
             "sub_dir": "Vulkan-Loader",
             "build_dir": "Vulkan-Loader/build",
             "install_dir": "Vulkan-Loader/build/install",
-            "commit": "vksc1.0.17",
+            "commit": "88a5463f052f4f0fa9fb42f097662ac70a91bdc7",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -164,7 +164,7 @@
             "sub_dir": "Vulkan-Profiles",
             "build_dir": "Vulkan-Profiles/build",
             "install_dir": "Vulkan-Profiles/build/install",
-            "commit": "v1.3.294",
+            "commit": "v1.4.306",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -177,7 +177,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "v1.3.302",
+            "commit": "v1.4.310",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -190,7 +190,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "vksc1.0.17",
+            "commit": "546efccfdbae2d8d803b0459286d026c81c19c69",
             "build_step": "skip",
             "optional": [
                 "tests"

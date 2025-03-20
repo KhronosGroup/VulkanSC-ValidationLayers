@@ -28,7 +28,7 @@ TEST_F(VkSCPortedLayerTest, SpecLinks) {
     RETURN_IF_SKIP(Init());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "registry/VulkanSC/specs");
-    vksc::GetPhysicalDeviceFeatures(gpu(), NULL);
+    vksc::GetPhysicalDeviceFeatures(Gpu(), NULL);
     m_errorMonitor->VerifyFound();
 }
 
@@ -56,7 +56,7 @@ TEST_F(VkSCPortedLayerTest, LeakAnObject) {
     device_ci.pQueueCreateInfos = &queue_ci;
 
     VkDevice leaky_device;
-    ASSERT_EQ(VK_SUCCESS, vksc::CreateDevice(gpu(), &device_ci, nullptr, &leaky_device));
+    ASSERT_EQ(VK_SUCCESS, vksc::CreateDevice(Gpu(), &device_ci, nullptr, &leaky_device));
 
     const VkFenceCreateInfo fence_ci = vku::InitStruct<VkFenceCreateInfo>();
     VkFence leaked_fence;
@@ -80,7 +80,7 @@ TEST_F(VkSCPortedNegativeImage, ImageMisc) {
 
     const VkImageCreateInfo safe_image_ci = DefaultImageInfo();
 
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(gpu(), &safe_image_ci));
+    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &safe_image_ci));
 
     {
         VkImageCreateInfo image_ci = safe_image_ci;
@@ -88,55 +88,55 @@ TEST_F(VkSCPortedNegativeImage, ImageMisc) {
         image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
         image_ci.imageType = VK_IMAGE_TYPE_3D;
         image_ci.extent = {4, 4, 4};
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-samples-02257");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-samples-02257");
 
         image_ci = safe_image_ci;
         image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;  // always has 4 samples support
         image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
         image_ci.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
         image_ci.arrayLayers = 6;
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-samples-02257");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-samples-02257");
 
         image_ci = safe_image_ci;
         image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;  // always has 4 samples support
         image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
         image_ci.tiling = VK_IMAGE_TILING_LINEAR;
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-samples-02257");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-samples-02257");
 
         image_ci = safe_image_ci;
         image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;  // always has 4 samples support
         image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
         image_ci.mipLevels = 2;
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-samples-02257");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-samples-02257");
 
         image_ci = safe_image_ci;
         image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
         image_ci.mipLevels = 1;
         image_ci.tiling = VK_IMAGE_TILING_LINEAR;
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-samples-02257");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-samples-02257");
     }
 
     {
         VkImageCreateInfo image_ci = safe_image_ci;
         image_ci.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         image_ci.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-usage-00963");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-usage-00963");
 
         image_ci.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-usage-00966");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-usage-00966");
 
         image_ci.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
         image_ci.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-usage-00963");
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-usage-00966");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-usage-00966");
     }
 
     // InitialLayout not VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREDEFINED
     {
         VkImageCreateInfo image_ci = safe_image_ci;
         image_ci.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-initialLayout-00993");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-initialLayout-00993");
     }
 
     // Storage usage can't be multisample if feature not set
@@ -146,7 +146,7 @@ TEST_F(VkSCPortedNegativeImage, ImageMisc) {
         VkImageCreateInfo image_ci = safe_image_ci;
         image_ci.usage = VK_IMAGE_USAGE_STORAGE_BIT;
         image_ci.samples = VK_SAMPLE_COUNT_2_BIT;
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-usage-00968");
+        CreateImageTest(image_ci, "VUID-VkImageCreateInfo-usage-00968");
     }
 }
 
@@ -205,9 +205,9 @@ TEST_F(VkSCPortedNegativeMemory, BindMemory) {
         VkMemoryAllocateInfo buffer_alloc_info = vku::InitStruct<VkMemoryAllocateInfo>();
         image_alloc_info.allocationSize = image_mem_reqs.size;
         buffer_alloc_info.allocationSize = buffer_mem_reqs.size;
-        pass = m_device->phy().SetMemoryType(image_mem_reqs.memoryTypeBits, &image_alloc_info, 0);
+        pass = m_device->Physical().SetMemoryType(image_mem_reqs.memoryTypeBits, &image_alloc_info, 0);
         ASSERT_TRUE(pass);
-        pass = m_device->phy().SetMemoryType(buffer_mem_reqs.memoryTypeBits, &buffer_alloc_info, 0);
+        pass = m_device->Physical().SetMemoryType(buffer_mem_reqs.memoryTypeBits, &buffer_alloc_info, 0);
         ASSERT_TRUE(pass);
         VkDeviceMemory image_mem, buffer_mem;
         err = vk::AllocateMemory(device(), &image_alloc_info, NULL, &image_mem);
@@ -251,9 +251,9 @@ TEST_F(VkSCPortedNegativeMemory, BindMemory) {
         // Leave some extra space for alignment wiggle room
         image_alloc_info.allocationSize = image_mem_reqs.size + image_mem_reqs.alignment;
         buffer_alloc_info.allocationSize = buffer_mem_reqs.size + buffer_mem_reqs.alignment;
-        pass = m_device->phy().SetMemoryType(image_mem_reqs.memoryTypeBits, &image_alloc_info, 0);
+        pass = m_device->Physical().SetMemoryType(image_mem_reqs.memoryTypeBits, &image_alloc_info, 0);
         ASSERT_TRUE(pass);
-        pass = m_device->phy().SetMemoryType(buffer_mem_reqs.memoryTypeBits, &buffer_alloc_info, 0);
+        pass = m_device->Physical().SetMemoryType(buffer_mem_reqs.memoryTypeBits, &buffer_alloc_info, 0);
         ASSERT_TRUE(pass);
         VkDeviceMemory image_mem, buffer_mem;
         err = vk::AllocateMemory(device(), &image_alloc_info, NULL, &image_mem);
@@ -341,12 +341,12 @@ TEST_F(VkSCPortedNegativeMemory, BindMemory) {
         // Create a mask of available memory types *not* supported by these resources,
         // and try to use one of them.
         VkPhysicalDeviceMemoryProperties memory_properties = {};
-        vk::GetPhysicalDeviceMemoryProperties(m_device->phy().handle(), &memory_properties);
+        vk::GetPhysicalDeviceMemoryProperties(m_device->Physical().handle(), &memory_properties);
         VkDeviceMemory image_mem, buffer_mem;
 
         uint32_t image_unsupported_mem_type_bits = ((1 << memory_properties.memoryTypeCount) - 1) & ~image_mem_reqs.memoryTypeBits;
         if (image_unsupported_mem_type_bits != 0) {
-            pass = m_device->phy().SetMemoryType(image_unsupported_mem_type_bits, &image_alloc_info, 0);
+            pass = m_device->Physical().SetMemoryType(image_unsupported_mem_type_bits, &image_alloc_info, 0);
             ASSERT_TRUE(pass);
             err = vk::AllocateMemory(device(), &image_alloc_info, NULL, &image_mem);
             ASSERT_EQ(VK_SUCCESS, err);
@@ -360,7 +360,7 @@ TEST_F(VkSCPortedNegativeMemory, BindMemory) {
         uint32_t buffer_unsupported_mem_type_bits =
             ((1 << memory_properties.memoryTypeCount) - 1) & ~buffer_mem_reqs.memoryTypeBits;
         if (buffer_unsupported_mem_type_bits != 0) {
-            pass = m_device->phy().SetMemoryType(buffer_unsupported_mem_type_bits, &buffer_alloc_info, 0);
+            pass = m_device->Physical().SetMemoryType(buffer_unsupported_mem_type_bits, &buffer_alloc_info, 0);
             ASSERT_TRUE(pass);
             err = vk::AllocateMemory(device(), &buffer_alloc_info, NULL, &buffer_mem);
             ASSERT_EQ(VK_SUCCESS, err);

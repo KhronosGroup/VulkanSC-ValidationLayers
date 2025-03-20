@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,7 +86,7 @@ TEST_F(PositiveBuffer, TexelBufferAlignmentIn13) {
     buff_view_ci.range = VK_WHOLE_SIZE;
     buff_view_ci.buffer = buffer.handle();
     buff_view_ci.offset = minTexelBufferOffsetAlignment + block_size;
-    CreateBufferViewTest(*this, &buff_view_ci, {});
+    vkt::BufferView buffer_view(*m_device, buff_view_ci);
 }
 
 // The two PerfGetBufferAddress tests are intended to be used locally to monitor performance of the internal address -> buffer map
@@ -100,7 +100,7 @@ TEST_F(PositiveBuffer, DISABLED_PerfGetBufferAddressWorstCase) {
 
     // Allocate common buffer memory, all buffers will be bound to it so that they have the same starting address
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
     VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&alloc_flags);
     alloc_info.allocationSize = 100 * 4096 * 4096;
     vkt::DeviceMemory buffer_memory(*m_device, alloc_info);
@@ -143,7 +143,7 @@ TEST_F(PositiveBuffer, DISABLED_PerfGetBufferAddressGoodCase) {
 
     // Allocate common buffer memory, all buffers will be bound to it so that they have the same starting address
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
     VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&alloc_flags);
     alloc_info.allocationSize = 100 * 4096 * 4096;
     vkt::DeviceMemory buffer_memory(*m_device, alloc_info);
@@ -217,13 +217,13 @@ TEST_F(PositiveBuffer, BufferViewUsageBasic) {
     vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 
     VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
-    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
+    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT;
 
     VkBufferViewCreateInfo buffer_view_ci = vku::InitStructHelper(&buffer_usage_flags);
     buffer_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     buffer_view_ci.range = VK_WHOLE_SIZE;
     buffer_view_ci.buffer = buffer.handle();
-    CreateBufferViewTest(*this, &buffer_view_ci, {});
+    vkt::BufferView buffer_view(*m_device, buffer_view_ci);
 }
 
 TEST_F(PositiveBuffer, BufferUsageFlags2Subset) {
@@ -233,17 +233,16 @@ TEST_F(PositiveBuffer, BufferUsageFlags2Subset) {
     AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
 
-    vkt::Buffer buffer(*m_device, 32,
-                       VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR | VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT_KHR);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT);
 
     VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
-    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
+    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT;
 
     VkBufferViewCreateInfo buffer_view_ci = vku::InitStructHelper(&buffer_usage_flags);
     buffer_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     buffer_view_ci.range = VK_WHOLE_SIZE;
     buffer_view_ci.buffer = buffer.handle();
-    CreateBufferViewTest(*this, &buffer_view_ci, {});
+    vkt::BufferView buffer_view(*m_device, buffer_view_ci);
 }
 
 TEST_F(PositiveBuffer, BufferUsageFlags2Ignore) {
@@ -254,16 +253,16 @@ TEST_F(PositiveBuffer, BufferUsageFlags2Ignore) {
     RETURN_IF_SKIP(Init());
 
     VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
-    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
+    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT;
 
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&buffer_usage_flags);
     buffer_ci.size = 32;
     buffer_ci.usage = VK_BUFFER_USAGE_PUSH_DESCRIPTORS_DESCRIPTOR_BUFFER_BIT_EXT;
-    CreateBufferTest(*this, &buffer_ci, {});
+    vkt::Buffer buffer(*m_device, buffer_ci, vkt::no_mem);
 
     buffer_ci.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_VIDEO_DECODE_DST_BIT_KHR |
                       VK_BUFFER_USAGE_MICROMAP_BUILD_INPUT_READ_ONLY_BIT_EXT;
-    CreateBufferTest(*this, &buffer_ci, {});
+    vkt::Buffer buffer2(*m_device, buffer_ci, vkt::no_mem);
 }
 
 TEST_F(PositiveBuffer, BufferUsageFlags2Usage) {
@@ -279,8 +278,8 @@ TEST_F(PositiveBuffer, BufferUsageFlags2Usage) {
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&buffer_usage_flags);
     buffer_ci.size = 32;
     buffer_ci.usage = 0;
-    CreateBufferTest(*this, &buffer_ci, {});
+    vkt::Buffer buffer(*m_device, buffer_ci, vkt::no_mem);
 
     buffer_ci.usage = 0xBAD0000;
-    CreateBufferTest(*this, &buffer_ci, {});
+    vkt::Buffer buffer2(*m_device, buffer_ci, vkt::no_mem);
 }

@@ -270,27 +270,17 @@ TEST_F(NegativeSubgroup, ExtendedTypesDisabled) {
     RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test VK_KHR_shader_subgroup_extended_types.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceFloat16Int8FeaturesKHR float16_features = vku::InitStructHelper();
-    VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR extended_types_features = vku::InitStructHelper(&float16_features);
-    auto features2 = GetPhysicalDeviceFeatures2(extended_types_features);
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
+    RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceSubgroupProperties subgroup_prop = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(subgroup_prop);
     if (!(subgroup_prop.supportedOperations & VK_SUBGROUP_FEATURE_ARITHMETIC_BIT) ||
-        !(subgroup_prop.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) || !float16_features.shaderFloat16) {
+        !(subgroup_prop.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT)) {
         GTEST_SKIP() << "Required features not supported";
     }
-
-    // Disabled extended types support, and expect an error
-    extended_types_features.shaderSubgroupExtendedTypes = VK_FALSE;
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
     const vkt::DescriptorSetLayout dsl(*m_device, bindings);
@@ -314,18 +304,11 @@ TEST_F(NegativeSubgroup, ExtendedTypesDisabled) {
 
 TEST_F(NegativeSubgroup, PipelineSubgroupSizeControl) {
     TEST_DESCRIPTION("Test Subgroub Size Control");
-
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceSubgroupSizeControlFeaturesEXT sscf = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(sscf);
-    if (sscf.subgroupSizeControl == VK_FALSE || sscf.computeFullSubgroups == VK_FALSE) {
-        GTEST_SKIP() << "Required features are not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &sscf));
+    AddRequiredFeature(vkt::Feature::subgroupSizeControl);
+    AddRequiredFeature(vkt::Feature::computeFullSubgroups);
+    RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceSubgroupSizeControlPropertiesEXT subgroup_properties = vku::InitStructHelper();
     VkPhysicalDeviceVulkan11Properties props11 = vku::InitStructHelper(&subgroup_properties);
@@ -335,14 +318,14 @@ TEST_F(NegativeSubgroup, PipelineSubgroupSizeControl) {
         GTEST_SKIP() << "Required shader stage not present in requiredSubgroupSizeStages";
     }
 
-    VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT subgroup_size_control = vku::InitStructHelper();
+    VkPipelineShaderStageRequiredSubgroupSizeCreateInfo subgroup_size_control = vku::InitStructHelper();
     subgroup_size_control.requiredSubgroupSize = subgroup_properties.minSubgroupSize;
 
     {
         CreateComputePipelineHelper cs_pipeline(*this);
         cs_pipeline.LateBindPipelineInfo();
         cs_pipeline.cp_ci_.stage.pNext = &subgroup_size_control;
-        cs_pipeline.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT;
+        cs_pipeline.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT;
         m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-pNext-02754");
         cs_pipeline.CreateComputePipeline(false);  // need false to prevent late binding
         m_errorMonitor->VerifyFound();
@@ -360,8 +343,8 @@ TEST_F(NegativeSubgroup, PipelineSubgroupSizeControl) {
         CreateComputePipelineHelper cs_pipeline(*this);
         cs_pipeline.cs_ = std::make_unique<VkShaderObj>(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
         cs_pipeline.LateBindPipelineInfo();
-        cs_pipeline.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT |
-                                         VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT;
+        cs_pipeline.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT |
+                                         VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT;
         m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-flags-02758");
         cs_pipeline.CreateComputePipeline(false);  // need false to prevent late binding
         m_errorMonitor->VerifyFound();
@@ -379,7 +362,7 @@ TEST_F(NegativeSubgroup, PipelineSubgroupSizeControl) {
         CreateComputePipelineHelper cs_pipeline(*this);
         cs_pipeline.cs_ = std::make_unique<VkShaderObj>(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
         cs_pipeline.LateBindPipelineInfo();
-        cs_pipeline.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT;
+        cs_pipeline.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT;
         m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-flags-02759");
         cs_pipeline.CreateComputePipeline(false);  // need false to prevent late binding
         m_errorMonitor->VerifyFound();
@@ -424,17 +407,9 @@ TEST_F(NegativeSubgroup, PipelineSubgroupSizeControl) {
 
 TEST_F(NegativeSubgroup, SubgroupSizeControlFeaturesNotEnabled) {
     TEST_DESCRIPTION("Use subgroup size control features when they are not enabled");
-
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceSubgroupSizeControlFeaturesEXT sscf = vku::InitStructHelper();
-    sscf.subgroupSizeControl = VK_FALSE;
-    sscf.computeFullSubgroups = VK_FALSE;
-
-    VkPhysicalDeviceFeatures2 pd_features2 = vku::InitStructHelper(&sscf);
-    RETURN_IF_SKIP(InitState(nullptr, &pd_features2));
+    RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceVulkan11Properties props11 = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(props11);
@@ -453,13 +428,13 @@ TEST_F(NegativeSubgroup, SubgroupSizeControlFeaturesNotEnabled) {
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.LateBindPipelineInfo();
-    pipe.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT;
+    pipe.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT;
 
     m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-flags-02784");
     pipe.CreateComputePipeline(false);
     m_errorMonitor->VerifyFound();
 
-    pipe.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT;
+    pipe.cp_ci_.stage.flags = VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT;
     m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-flags-02785");
     pipe.CreateComputePipeline(false);
     m_errorMonitor->VerifyFound();
@@ -575,7 +550,7 @@ TEST_F(NegativeSubgroup, SubgroupSizeControlStage) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
-    pipe.shader_stages_[0].flags = VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT;
+    pipe.shader_stages_[0].flags = VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT;
     m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-flags-08988");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
@@ -583,13 +558,9 @@ TEST_F(NegativeSubgroup, SubgroupSizeControlStage) {
 
 TEST_F(NegativeSubgroup, SubgroupUniformControlFlow) {
     TEST_DESCRIPTION("Test SubgroupUniformControlFlow spirv execution mode");
-
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR ssucff = vku::InitStructHelper();
-    ssucff.shaderSubgroupUniformControlFlow = VK_FALSE;
-    RETURN_IF_SKIP(InitState(nullptr, &ssucff));
+    RETURN_IF_SKIP(Init());
 
     const char *source = R"(
                OpCapability Shader
@@ -644,7 +615,7 @@ TEST_F(NegativeSubgroup, ComputeLocalWorkgroupSize) {
         GTEST_SKIP() << "Required shader stage not present in requiredSubgroupSizeStages";
     }
 
-    VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT subgroup_size_control = vku::InitStructHelper();
+    VkPipelineShaderStageRequiredSubgroupSizeCreateInfo subgroup_size_control = vku::InitStructHelper();
     subgroup_size_control.requiredSubgroupSize = subgroup_properties.minSubgroupSize;
 
     uint32_t size = static_cast<uint32_t>(
@@ -727,7 +698,7 @@ TEST_F(NegativeSubgroup, MeshLocalWorkgroupSize) {
         GTEST_SKIP() << "Required shader stage not present in requiredSubgroupSizeStages";
     }
 
-    VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT subgroup_size_control = vku::InitStructHelper();
+    VkPipelineShaderStageRequiredSubgroupSizeCreateInfo subgroup_size_control = vku::InitStructHelper();
     subgroup_size_control.requiredSubgroupSize = subgroup_properties.minSubgroupSize;
 
     if (subgroup_size_control.requiredSubgroupSize * subgroup_properties.maxComputeWorkgroupSubgroups >
@@ -800,7 +771,7 @@ TEST_F(NegativeSubgroup, SubgroupSizeControlFeature) {
 
     VkPhysicalDeviceSubgroupSizeControlPropertiesEXT subgroup_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(subgroup_properties);
-    VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT subgroup_size_control = vku::InitStructHelper();
+    VkPipelineShaderStageRequiredSubgroupSizeCreateInfo subgroup_size_control = vku::InitStructHelper();
     subgroup_size_control.requiredSubgroupSize = subgroup_properties.minSubgroupSize;
 
     CreateComputePipelineHelper pipe(*this);

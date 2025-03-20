@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+/* Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -17,9 +17,9 @@
  * limitations under the License.
  */
 
-#include "generated/chassis.h"
 #include "drawdispatch/drawdispatch_vuids.h"
 #include "core_validation.h"
+#include "generated/vk_extension_helper.h"
 #include "state_tracker/buffer_state.h"
 #include "state_tracker/shader_object_state.h"
 #include "state_tracker/descriptor_sets.h"
@@ -47,52 +47,56 @@ bool CoreChecks::ValidateCmdDrawInstance(const vvl::CommandBuffer &cb_state, uin
     const auto *pipeline_state = cb_state.GetCurrentPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS);
 
     // Verify maxMultiviewInstanceIndex
-    if (cb_state.activeRenderPass && enabled_features.multiview &&
+    if (cb_state.active_render_pass && cb_state.active_render_pass->has_multiview_enabled &&
         ((static_cast<uint64_t>(instanceCount) + static_cast<uint64_t>(firstInstance)) >
          static_cast<uint64_t>(phys_dev_props_core11.maxMultiviewInstanceIndex))) {
         LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
-        objlist.add(cb_state.activeRenderPass->Handle());
+        objlist.add(cb_state.active_render_pass->Handle());
         skip |= LogError(vuid.max_multiview_instance_index_02688, objlist, loc,
                          "renderpass instance has multiview enabled, and maxMultiviewInstanceIndex: %" PRIu32
-                         ", but instanceCount: %" PRIu32 "and firstInstance: %" PRIu32 ".",
+                         ", but instanceCount: %" PRIu32 " and firstInstance: %" PRIu32 ".",
                          phys_dev_props_core11.maxMultiviewInstanceIndex, instanceCount, firstInstance);
     }
 
-    if (pipeline_state && pipeline_state->GraphicsCreateInfo().pVertexInputState) {
-        const auto *vertex_input_divisor_state = vku::FindStructInPNextChain<VkPipelineVertexInputDivisorStateCreateInfoKHR>(
-            pipeline_state->GraphicsCreateInfo().pVertexInputState->pNext);
-        if (vertex_input_divisor_state && phys_dev_ext_props.vtx_attrib_divisor_props.supportsNonZeroFirstInstance == VK_FALSE &&
-            firstInstance != 0u) {
-            for (uint32_t i = 0; i < vertex_input_divisor_state->vertexBindingDivisorCount; ++i) {
-                if (vertex_input_divisor_state->pVertexBindingDivisors[i].divisor != 1u) {
-                    const LogObjectList objlist(cb_state.Handle(), pipeline_state->Handle());
-                    skip |= LogError(vuid.vertex_input_09461, objlist, loc,
-                                     "VkPipelineVertexInputDivisorStateCreateInfoKHR::pVertexBindingDivisors[%" PRIu32
-                                     "].divisor is %" PRIu32 " and firstInstance is %" PRIu32
-                                     ", but supportsNonZeroFirstInstance is VK_FALSE.",
-                                     i, vertex_input_divisor_state->pVertexBindingDivisors[i].divisor, firstInstance);
-                    break;  // only report first instance of the error
+    // supportsNonZeroFirstInstance was added from the EXT to KHR (not 1.4) version of VK_KHR_vertex_attribute_divisor
+    // If not using the KHR or 1.4 version, we don't check for these VUs
+    if (IsExtEnabled(extensions.vk_khr_vertex_attribute_divisor)) {
+        if (pipeline_state && pipeline_state->GraphicsCreateInfo().pVertexInputState) {
+            const auto *vertex_input_divisor_state = vku::FindStructInPNextChain<VkPipelineVertexInputDivisorStateCreateInfo>(
+                pipeline_state->GraphicsCreateInfo().pVertexInputState->pNext);
+            if (vertex_input_divisor_state && phys_dev_props_core14.supportsNonZeroFirstInstance == VK_FALSE &&
+                firstInstance != 0u) {
+                for (uint32_t i = 0; i < vertex_input_divisor_state->vertexBindingDivisorCount; ++i) {
+                    if (vertex_input_divisor_state->pVertexBindingDivisors[i].divisor != 1u) {
+                        const LogObjectList objlist(cb_state.Handle(), pipeline_state->Handle());
+                        skip |= LogError(vuid.vertex_input_09461, objlist, loc,
+                                         "VkPipelineVertexInputDivisorStateCreateInfo::pVertexBindingDivisors[%" PRIu32
+                                         "].divisor is %" PRIu32 " and firstInstance is %" PRIu32
+                                         ", but supportsNonZeroFirstInstance is VK_FALSE.",
+                                         i, vertex_input_divisor_state->pVertexBindingDivisors[i].divisor, firstInstance);
+                        break;  // only report first instance of the error
+                    }
                 }
             }
         }
-    }
 
-    if (!pipeline_state || pipeline_state->IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_EXT)) {
-        if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_VERTEX_INPUT_EXT) &&
-            phys_dev_ext_props.vtx_attrib_divisor_props.supportsNonZeroFirstInstance == VK_FALSE && firstInstance != 0u) {
-            for (const auto &binding_state : cb_state.dynamic_state_value.vertex_bindings) {
-                const auto &desc = binding_state.second.desc;
-                if (desc.divisor != 1u) {
-                    LogObjectList objlist(cb_state.Handle());
-                    if (pipeline_state) {
-                        objlist.add(pipeline_state->Handle());
+        if (!pipeline_state || pipeline_state->IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_EXT)) {
+            if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_VERTEX_INPUT_EXT) &&
+                phys_dev_props_core14.supportsNonZeroFirstInstance == VK_FALSE && firstInstance != 0u) {
+                for (const auto &binding_state : cb_state.dynamic_state_value.vertex_bindings) {
+                    const auto &desc = binding_state.second.desc;
+                    if (desc.divisor != 1u) {
+                        LogObjectList objlist(cb_state.Handle());
+                        if (pipeline_state) {
+                            objlist.add(pipeline_state->Handle());
+                        }
+                        skip |= LogError(vuid.vertex_input_09462, objlist, loc,
+                                         "vkCmdSetVertexInputEXT set pVertexBindingDivisors[%" PRIu32 "] (binding %" PRIu32
+                                         ") divisor as %" PRIu32 ", but firstInstance is %" PRIu32
+                                         " and supportsNonZeroFirstInstance is VK_FALSE.",
+                                         binding_state.second.index, desc.binding, desc.divisor, firstInstance);
+                        break;
                     }
-                    skip |= LogError(vuid.vertex_input_09462, objlist, loc,
-                                     "vkCmdSetVertexInputEXT set pVertexBindingDivisors[%" PRIu32 "] (binding %" PRIu32
-                                     ") divisor as %" PRIu32 ", but firstInstance is %" PRIu32
-                                     " and supportsNonZeroFirstInstance is VK_FALSE.",
-                                     binding_state.second.index, desc.binding, desc.divisor, firstInstance);
-                    break;
                 }
             }
         }
@@ -556,7 +560,7 @@ bool CoreChecks::PreCallValidateCmdDrawIndirectCount(VkCommandBuffer commandBuff
                      error_obj.location.dot(Field::countBufferOffset), "(%" PRIu64 "), is not a multiple of 4.", countBufferOffset);
     }
 
-    if ((device_extensions.vk_khr_draw_indirect_count != kEnabledByCreateinfo) &&
+    if ((extensions.vk_khr_draw_indirect_count != kEnabledByCreateinfo) &&
         ((api_version >= VK_API_VERSION_1_2) && (enabled_features.drawIndirectCount == VK_FALSE))) {
         skip |= LogError("VUID-vkCmdDrawIndirectCount-None-04445", cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS),
                          error_obj.location,
@@ -607,7 +611,7 @@ bool CoreChecks::PreCallValidateCmdDrawIndexedIndirectCount(VkCommandBuffer comm
                          cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), error_obj.location.dot(Field::countBufferOffset),
                          "(%" PRIu64 "), is not a multiple of 4.", countBufferOffset);
     }
-    if ((device_extensions.vk_khr_draw_indirect_count != kEnabledByCreateinfo) &&
+    if ((extensions.vk_khr_draw_indirect_count != kEnabledByCreateinfo) &&
         ((api_version >= VK_API_VERSION_1_2) && (enabled_features.drawIndirectCount == VK_FALSE))) {
         skip |= LogError("VUID-vkCmdDrawIndexedIndirectCount-None-04445", cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS),
                          error_obj.location,
@@ -657,8 +661,7 @@ bool CoreChecks::PreCallValidateCmdDrawIndirectByteCountEXT(VkCommandBuffer comm
                          cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), error_obj.location,
                          "transformFeedback feature is not enabled.");
     }
-    if (IsExtEnabled(device_extensions.vk_ext_transform_feedback) &&
-        !phys_dev_ext_props.transform_feedback_props.transformFeedbackDraw) {
+    if (IsExtEnabled(extensions.vk_ext_transform_feedback) && !phys_dev_ext_props.transform_feedback_props.transformFeedbackDraw) {
         skip |= LogError("VUID-vkCmdDrawIndirectByteCountEXT-transformFeedbackDraw-02288",
                          cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), error_obj.location,
                          "VkPhysicalDeviceTransformFeedbackPropertiesEXT::transformFeedbackDraw is not supported");
@@ -904,6 +907,13 @@ bool CoreChecks::ValidateCmdTraceRaysKHR(const Location &loc, const vvl::Command
                                                             : "VUID-vkCmdTraceRaysKHR-pRayGenShaderBindingTable-03680";
         const char *vuid_binding_table_flag = is_indirect ? "VUID-vkCmdTraceRaysIndirectKHR-pRayGenShaderBindingTable-03681"
                                                           : "VUID-vkCmdTraceRaysKHR-pRayGenShaderBindingTable-03681";
+        // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9368
+        // TODO - waiting for https://gitlab.khronos.org/vulkan/vulkan/-/issues/4173
+        if (const auto buffers = GetBuffersByAddress(pRaygenShaderBindingTable->deviceAddress); buffers.empty()) {
+            skip |= LogError("UNASSIGNED-TraceRays-InvalidRayGenSBTAddress", cb_state.Handle(), table_loc.dot(Field::deviceAddress),
+                             "(0x%" PRIx64 ") does not belong to a valid VkBuffer.",
+                             pRaygenShaderBindingTable->deviceAddress);
+        }
         skip |= ValidateRaytracingShaderBindingTable(cb_state.VkHandle(), table_loc, vuid_single_device_memory,
                                                      vuid_binding_table_flag, *pRaygenShaderBindingTable);
     }
@@ -923,7 +933,7 @@ bool CoreChecks::ValidateCmdTraceRaysKHR(const Location &loc, const vvl::Command
                 skip |= LogError(vuid, cb_state.Handle(), loc.dot(Field::pMissShaderBindingTable),
                                  "is 0 but last bound ray tracing pipeline (%s) was created with flags (%s).",
                                  FormatHandle(pipeline_state->Handle()).c_str(),
-                                 string_VkPipelineCreateFlags2KHR(pipeline_state->create_flags).c_str());
+                                 string_VkPipelineCreateFlags2(pipeline_state->create_flags).c_str());
             }
         }
     }
@@ -1266,6 +1276,10 @@ bool CoreChecks::ValidateActionState(const vvl::CommandBuffer &cb_state, const V
         skip |= ValidateDrawProtectedMemory(last_bound_state, vuid);
         skip |= ValidateDrawDualSourceBlend(last_bound_state, vuid);
 
+        if (cb_state.active_render_pass && cb_state.active_render_pass->UsesDynamicRendering()) {
+            skip |= ValidateDrawDynamicRenderingFsOutputs(last_bound_state, pipeline, *cb_state.active_render_pass, loc);
+        }
+
         if (pipeline) {
             skip |= ValidateDrawPipeline(last_bound_state, *pipeline, vuid);
         } else {
@@ -1300,31 +1314,46 @@ bool CoreChecks::ValidateActionState(const vvl::CommandBuffer &cb_state, const V
     return skip;
 }
 
+// Validate the draw-time state for this descriptor set
+// We can skip validating the descriptor set if "nothing" has changed since the last validation.
+// Same set, no image layout changes, and same "pipeline state" (binding_req_map). If there are
+// any dynamic descriptors, always revalidate rather than caching the values. We currently only
+// apply this optimization if IsManyDescriptors is true, to avoid the overhead of copying the
+// binding_req_map which could potentially be expensive.
+static bool NeedDrawStateValidated(const vvl::CommandBuffer &cb_state, const vvl::DescriptorSet *descriptor_set,
+                                   const LastBound::DescriptorSetSlot &ds_slot, bool disabled_image_layout_validation) {
+    return ds_slot.dynamic_offsets.size() > 0 ||
+           // Revalidate if descriptor set (or contents) has changed
+           ds_slot.validated_set != descriptor_set || ds_slot.validated_set_change_count != descriptor_set->GetChangeCount() ||
+           (!disabled_image_layout_validation &&
+            ds_slot.validated_set_image_layout_change_count != cb_state.image_layout_change_count);
+}
+
 bool CoreChecks::ValidateActionStateDescriptorsPipeline(const LastBound &last_bound_state, const VkPipelineBindPoint bind_point,
                                                         const vvl::Pipeline &pipeline, const vvl::DrawDispatchVuid &vuid) const {
     bool skip = false;
     const vvl::CommandBuffer &cb_state = last_bound_state.cb_state;
 
-    for (const auto &ds : last_bound_state.per_set) {
+    for (const auto &ds_slot : last_bound_state.ds_slots) {
         // TODO - This currently implicitly is checking for VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT being set
         if (pipeline.descriptor_buffer_mode) {
-            if (ds.bound_descriptor_set && !ds.bound_descriptor_set->IsPushDescriptor()) {
-                const LogObjectList objlist(cb_state.Handle(), pipeline.Handle(), ds.bound_descriptor_set->Handle());
+            if (ds_slot.ds_state && !ds_slot.ds_state->IsPushDescriptor()) {
+                const LogObjectList objlist(cb_state.Handle(), pipeline.Handle(), ds_slot.ds_state->Handle());
                 skip |= LogError(vuid.descriptor_buffer_bit_not_set_08115, objlist, vuid.loc(),
                                  "pipeline bound to %s requires a descriptor buffer (because it was created with "
                                  "VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT), but has a bound VkDescriptorSet (%s)",
-                                 string_VkPipelineBindPoint(bind_point), FormatHandle(ds.bound_descriptor_set->Handle()).c_str());
+                                 string_VkPipelineBindPoint(bind_point), FormatHandle(ds_slot.ds_state->Handle()).c_str());
                 break;
             }
 
-        } else if (ds.bound_descriptor_buffer.has_value()) {
+        } else if (ds_slot.descriptor_buffer_binding.has_value()) {
             const LogObjectList objlist(cb_state.Handle(), pipeline.Handle());
             skip |= LogError(vuid.descriptor_buffer_set_offset_missing_08117, objlist, vuid.loc(),
                              "pipeline bound to %s requires a VkDescriptorSet (because it was not created with "
                              "VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT), but has a bound descriptor buffer"
                              " (index=%" PRIu32 " offset=%" PRIu64 ")",
-                             string_VkPipelineBindPoint(bind_point), ds.bound_descriptor_buffer->index,
-                             ds.bound_descriptor_buffer->offset);
+                             string_VkPipelineBindPoint(bind_point), ds_slot.descriptor_buffer_binding->index,
+                             ds_slot.descriptor_buffer_binding->offset);
             break;
         }
     }
@@ -1359,19 +1388,18 @@ bool CoreChecks::ValidateActionStateDescriptorsPipeline(const LastBound &last_bo
                          last_bound_state.DescribeNonCompatibleSet(pipeline.max_active_slot, *pipeline_layout).c_str());
     } else {
         // if the bound set is not compatible, the rest will just be extra redundant errors
-        for (const auto &set_binding_pair : pipeline.active_slots) {
+        for (const auto &[set_index, binding_req_map] : pipeline.active_slots) {
             std::string error_string;
-            uint32_t set_index = set_binding_pair.first;
-            const auto set_info = last_bound_state.per_set[set_index];
-            if (!set_info.bound_descriptor_set) {
+            const auto ds_slot = last_bound_state.ds_slots[set_index];
+            if (!ds_slot.ds_state) {
                 skip |= LogError(vuid.compatible_pipeline_08600, cb_state.GetObjectList(bind_point), vuid.loc(),
                                  "%s uses set #%" PRIu32
                                  " but that set is not bound. (Need to use a command like vkCmdBindDescriptorSets to bind the set)",
                                  FormatHandle(pipeline).c_str(), set_index);
-            } else if (!VerifySetLayoutCompatibility(*set_info.bound_descriptor_set, pipeline_layout->set_layouts,
-                                                     pipeline_layout->Handle(), set_index, error_string)) {
+            } else if (!VerifySetLayoutCompatibility(*ds_slot.ds_state, pipeline_layout->set_layouts, pipeline_layout->Handle(),
+                                                     set_index, error_string)) {
                 // Set is bound but not compatible w/ overlapping pipeline_layout from PSO
-                VkDescriptorSet set_handle = set_info.bound_descriptor_set->VkHandle();
+                VkDescriptorSet set_handle = ds_slot.ds_state->VkHandle();
                 LogObjectList objlist = cb_state.GetObjectList(bind_point);
                 objlist.add(set_handle);
                 objlist.add(pipeline_layout->Handle());
@@ -1381,26 +1409,13 @@ bool CoreChecks::ValidateActionStateDescriptorsPipeline(const LastBound &last_bo
                                  error_string.c_str());
             } else {  // Valid set is bound and layout compatible, validate that it's updated
                 // Pull the set node
-                const auto *descriptor_set = set_info.bound_descriptor_set.get();
+                const auto *descriptor_set = ds_slot.ds_state.get();
                 ASSERT_AND_CONTINUE(descriptor_set);
-                // Validate the draw-time state for this descriptor set
-                // We can skip validating the descriptor set if "nothing" has changed since the last validation.
-                // Same set, no image layout changes, and same "pipeline state" (binding_req_map). If there are
-                // any dynamic descriptors, always revalidate rather than caching the values. We currently only
-                // apply this optimization if IsManyDescriptors is true, to avoid the overhead of copying the
-                // binding_req_map which could potentially be expensive.
-                bool need_validate =
-                    // Revalidate each time if the set has dynamic offsets
-                    set_info.dynamicOffsets.size() > 0 ||
-                    // Revalidate if descriptor set (or contents) has changed
-                    set_info.validated_set != descriptor_set ||
-                    set_info.validated_set_change_count != descriptor_set->GetChangeCount() ||
-                    (!disabled[image_layout_validation] &&
-                     set_info.validated_set_image_layout_change_count != cb_state.image_layout_change_count);
 
+                const bool need_validate =
+                    NeedDrawStateValidated(cb_state, descriptor_set, ds_slot, disabled[image_layout_validation]);
                 if (need_validate) {
-                    skip |= ValidateDrawState(*descriptor_set, set_index, set_binding_pair.second, set_info.dynamicOffsets,
-                                              cb_state, vuid.loc(), vuid);
+                    skip |= ValidateDrawState(*descriptor_set, set_index, binding_req_map, cb_state, vuid.loc(), vuid);
                 }
             }
         }
@@ -1427,19 +1442,18 @@ bool CoreChecks::ValidateActionStateDescriptorsShaderObject(const LastBound &las
                              last_bound_state.DescribeNonCompatibleSet(shader_state->max_active_slot, *shader_state).c_str());
         } else {
             // if the bound set is not copmatible, the rest will just be extra redundant errors
-            for (const auto &set_binding_pair : shader_state->active_slots) {
+            for (const auto &[set_index, binding_req_map] : shader_state->active_slots) {
                 std::string error_string;
-                uint32_t set_index = set_binding_pair.first;
-                const auto set_info = last_bound_state.per_set[set_index];
-                if (!set_info.bound_descriptor_set) {
+                const auto ds_slot = last_bound_state.ds_slots[set_index];
+                if (!ds_slot.ds_state) {
                     const LogObjectList objlist(cb_state.Handle(), shader_state->Handle());
                     skip |= LogError(vuid.compatible_pipeline_08600, objlist, vuid.loc(),
                                      "%s uses set #%" PRIu32 " but that set is not bound.",
                                      FormatHandle(shader_state->Handle()).c_str(), set_index);
-                } else if (!VerifySetLayoutCompatibility(*set_info.bound_descriptor_set, shader_state->set_layouts,
-                                                         shader_state->Handle(), set_index, error_string)) {
+                } else if (!VerifySetLayoutCompatibility(*ds_slot.ds_state, shader_state->set_layouts, shader_state->Handle(),
+                                                         set_index, error_string)) {
                     // Set is bound but not compatible w/ overlapping pipeline_layout from PSO
-                    VkDescriptorSet set_handle = set_info.bound_descriptor_set->VkHandle();
+                    VkDescriptorSet set_handle = ds_slot.ds_state->VkHandle();
                     const LogObjectList objlist(cb_state.Handle(), set_handle, shader_state->Handle());
                     skip |= LogError(vuid.compatible_pipeline_08600, objlist, vuid.loc(),
                                      "%s bound as set #%" PRIu32 " is not compatible with overlapping %s due to: %s",
@@ -1447,24 +1461,13 @@ bool CoreChecks::ValidateActionStateDescriptorsShaderObject(const LastBound &las
                                      error_string.c_str());
                 } else {  // Valid set is bound and layout compatible, validate that it's updated
                     // Pull the set node
-                    const auto *descriptor_set = set_info.bound_descriptor_set.get();
+                    const auto *descriptor_set = ds_slot.ds_state.get();
                     ASSERT_AND_CONTINUE(descriptor_set);
-                    // Validate the draw-time state for this descriptor set
-                    // We can skip validating the descriptor set if "nothing" has changed since the last validation.
-                    // Same set, no image layout changes, and same "pipeline state" (binding_req_map). If there are
-                    // any dynamic descriptors, always revalidate rather than caching the values.
-                    bool need_validate =
-                        // Revalidate each time if the set has dynamic offsets
-                        set_info.dynamicOffsets.size() > 0 ||
-                        // Revalidate if descriptor set (or contents) has changed
-                        set_info.validated_set != descriptor_set ||
-                        set_info.validated_set_change_count != descriptor_set->GetChangeCount() ||
-                        (!disabled[image_layout_validation] &&
-                         set_info.validated_set_image_layout_change_count != cb_state.image_layout_change_count);
 
+                    const bool need_validate =
+                        NeedDrawStateValidated(cb_state, descriptor_set, ds_slot, disabled[image_layout_validation]);
                     if (need_validate) {
-                        skip |= ValidateDrawState(*descriptor_set, set_index, set_binding_pair.second, set_info.dynamicOffsets,
-                                                  cb_state, vuid.loc(), vuid);
+                        skip |= ValidateDrawState(*descriptor_set, set_index, binding_req_map, cb_state, vuid.loc(), vuid);
                     }
                 }
             }

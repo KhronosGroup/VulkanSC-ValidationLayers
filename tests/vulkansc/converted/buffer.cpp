@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -93,7 +93,6 @@ TEST_F(NegativeBuffer, BufferViewObject) {
     // Then destroy view itself and verify that same error is hit
     VkResult err;
 
-    m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-descriptorType-02994");
     RETURN_IF_SKIP(Init());
 
     OneOffDescriptorSet descriptor_set(m_device, {
@@ -107,7 +106,7 @@ TEST_F(NegativeBuffer, BufferViewObject) {
         bvci.format = VK_FORMAT_R32_SFLOAT;
         bvci.range = VK_WHOLE_SIZE;
 
-        err = vk::CreateBufferView(device(), &bvci, NULL, &view);
+        err = vk::CreateBufferView(device(), &bvci, nullptr, &view);
         ASSERT_EQ(VK_SUCCESS, err);
     }
     // First Destroy buffer underlying view which should hit error in CV
@@ -119,13 +118,14 @@ TEST_F(NegativeBuffer, BufferViewObject) {
     descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
     descriptor_write.pTexelBufferView = &view;
 
-    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
+    m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-descriptorType-02994");
+    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Now destroy view itself and verify same error, which is hit in PV this time
-    vk::DestroyBufferView(device(), view, NULL);
+    vk::DestroyBufferView(device(), view, nullptr);
     m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-descriptorType-02994");
-    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
+    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, nullptr);
     m_errorMonitor->VerifyFound();
 }
 
@@ -142,12 +142,7 @@ TEST_F(NegativeBuffer, CreateBufferViewNoMemoryBoundToBuffer) {
     buff_ci.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
     buff_ci.size = 256;
     vkt::Buffer buffer(*m_device, buff_ci, vkt::no_mem);
-
-    VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
-    buff_view_ci.buffer = buffer;
-    buff_view_ci.format = VK_FORMAT_R8_UNORM;
-    buff_view_ci.range = VK_WHOLE_SIZE;
-    vkt::BufferView buffer_view(*m_device, buff_view_ci);
+    vkt::BufferView buffer_view(*m_device, buffer, VK_FORMAT_R8_UNORM);
     m_errorMonitor->VerifyFound();
 }
 
@@ -176,35 +171,35 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoEntries) {
     buff_view_ci.buffer = bad_buffer.handle();
     buff_view_ci.format = format_with_uniform_texel_support;
     buff_view_ci.range = VK_WHOLE_SIZE;
-    CreateBufferViewTest(*this, &buff_view_ci, {"VUID-VkBufferViewCreateInfo-buffer-00932"});
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-buffer-00932");
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 
     // Offset must be less than the size of the buffer, so set it equal to the buffer size to cause an error
     buff_view_ci.buffer = buffer.handle();
     buff_view_ci.offset = buffer.CreateInfo().size;
-    CreateBufferViewTest(*this, &buff_view_ci, {"VUID-VkBufferViewCreateInfo-offset-00925"});
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-00925");
 
     // Offset must be a multiple of VkPhysicalDeviceLimits::minTexelBufferOffsetAlignment so add 1 to ensure it is not
     buff_view_ci.offset = minTexelBufferOffsetAlignment + 1;
-    CreateBufferViewTest(*this, &buff_view_ci, {"VUID-VkBufferViewCreateInfo-offset-02749"});
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-02749");
 
     // Set offset to acceptable value for range tests
     buff_view_ci.offset = minTexelBufferOffsetAlignment;
     // Setting range equal to 0 will cause an error to occur
     buff_view_ci.range = 0;
-    CreateBufferViewTest(*this, &buff_view_ci, {"VUID-VkBufferViewCreateInfo-range-00928"});
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-range-00928");
 
-    uint32_t format_size = vkuFormatElementSize(buff_view_ci.format);
+    const uint32_t format_size = vkuFormatTexelBlockSize(buff_view_ci.format);
     // Range must be a multiple of the element size of format, so add one to ensure it is not
     buff_view_ci.range = format_size + 1;
-    CreateBufferViewTest(*this, &buff_view_ci, {"VUID-VkBufferViewCreateInfo-range-00929"});
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-range-00929");
 
     // Twice the element size of format multiplied by VkPhysicalDeviceLimits::maxTexelBufferElements guarantees range divided by the
     // element size is greater than maxTexelBufferElements, causing failure
     buff_view_ci.range = 2 * static_cast<VkDeviceSize>(format_size) * static_cast<VkDeviceSize>(dev_limits.maxTexelBufferElements);
-    CreateBufferViewTest(*this, &buff_view_ci,
-                         {"VUID-VkBufferViewCreateInfo-range-00930", "VUID-VkBufferViewCreateInfo-offset-00931"});
+    m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-range-00930");
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-00931");
 }
 
 TEST_F(NegativeBuffer, BufferViewCreateInfoFeatures) {
@@ -233,11 +228,11 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoFeatures) {
     buff_view_ci.range = VK_WHOLE_SIZE;
 
     // `buffer` was created using VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT so we can use that for the first buffer test
-    CreateBufferViewTest(*this, &buff_view_ci, {"VUID-VkBufferViewCreateInfo-format-08778"});
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-format-08778");
 
     vkt::Buffer storage_buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
     buff_view_ci.buffer = storage_buffer.handle();
-    CreateBufferViewTest(*this, &buff_view_ci, {"VUID-VkBufferViewCreateInfo-format-08779"});
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-format-08779");
 }
 
 TEST_F(NegativeBuffer, BufferViewMaxTexelBufferElements) {
@@ -262,7 +257,7 @@ TEST_F(NegativeBuffer, BufferViewMaxTexelBufferElements) {
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 
-    uint32_t format_size = vkuFormatElementSize(format_with_uniform_texel_support);
+    const uint32_t format_size = vkuFormatTexelBlockSize(format_with_uniform_texel_support);
     const VkDeviceSize large_resource_size =
         2 * static_cast<VkDeviceSize>(format_size) * static_cast<VkDeviceSize>(dev_limits.maxTexelBufferElements);
     vkt::Buffer large_buffer(*m_device, large_resource_size, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
@@ -275,7 +270,7 @@ TEST_F(NegativeBuffer, BufferViewMaxTexelBufferElements) {
     buff_view_ci.range = VK_WHOLE_SIZE;
 
     // For VK_WHOLE_SIZE, the buffer size - offset must be less than VkPhysicalDeviceLimits::maxTexelBufferElements
-    CreateBufferViewTest(*this, &buff_view_ci, {"VUID-VkBufferViewCreateInfo-range-04059"});
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-range-04059");
 }
 
 TEST_F(NegativeBuffer, TexelBufferAlignmentIn12) {
@@ -304,7 +299,7 @@ TEST_F(NegativeBuffer, TexelBufferAlignmentIn12) {
     buff_view_ci.range = VK_WHOLE_SIZE;
     buff_view_ci.buffer = buffer.handle();
     buff_view_ci.offset = minTexelBufferOffsetAlignment + 1;
-    CreateBufferViewTest(*this, &buff_view_ci, {"VUID-VkBufferViewCreateInfo-offset-02749"});
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-02749");
 }
 
 TEST_F(NegativeBuffer, TexelBufferAlignment) {
@@ -325,27 +320,26 @@ TEST_F(NegativeBuffer, TexelBufferAlignment) {
     buff_view_ci.range = VK_WHOLE_SIZE;
 
     buff_view_ci.offset = 1;
-    std::vector<std::string> expectedErrors;
     if (buff_view_ci.offset < align_props.storageTexelBufferOffsetAlignmentBytes) {
-        expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02750");
+        m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-buffer-02750");
     }
     if (buff_view_ci.offset < align_props.uniformTexelBufferOffsetAlignmentBytes) {
-        expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02751");
+        m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-buffer-02751");
     }
-    CreateBufferViewTest(*this, &buff_view_ci, expectedErrors);
-    expectedErrors.clear();
+    vkt::BufferView buffer_view(*m_device, buff_view_ci);
+    m_errorMonitor->VerifyFound();
 
     buff_view_ci.offset = 4;
     if (buff_view_ci.offset < align_props.storageTexelBufferOffsetAlignmentBytes &&
         !align_props.storageTexelBufferOffsetSingleTexelAlignment) {
-        expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02750");
+        m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-buffer-02750");
     }
     if (buff_view_ci.offset < align_props.uniformTexelBufferOffsetAlignmentBytes &&
         !align_props.uniformTexelBufferOffsetSingleTexelAlignment) {
-        expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02751");
+        m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-buffer-02751");
     }
-    CreateBufferViewTest(*this, &buff_view_ci, expectedErrors);
-    expectedErrors.clear();
+    vkt::BufferView buffer_view2(*m_device, buff_view_ci);
+    m_errorMonitor->VerifyFound();
 
     // Test a 3-component format
     VkFormatProperties format_properties;
@@ -359,18 +353,18 @@ TEST_F(NegativeBuffer, TexelBufferAlignment) {
         buff_view_ci.format = VK_FORMAT_R32G32B32_SFLOAT;
         buff_view_ci.offset = 1;
         if (buff_view_ci.offset < align_props.uniformTexelBufferOffsetAlignmentBytes) {
-            expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02751");
+            m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-buffer-02751");
         }
-        CreateBufferViewTest(*this, &buff_view_ci, expectedErrors);
-        expectedErrors.clear();
+        vkt::BufferView buffer_view3(*m_device, buff_view_ci);
+        m_errorMonitor->VerifyFound();
 
         buff_view_ci.offset = 4;
         if (buff_view_ci.offset < align_props.uniformTexelBufferOffsetAlignmentBytes &&
             !align_props.uniformTexelBufferOffsetSingleTexelAlignment) {
-            expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02751");
+            m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-buffer-02751");
         }
-        CreateBufferViewTest(*this, &buff_view_ci, expectedErrors);
-        expectedErrors.clear();
+        vkt::BufferView buffer_view4(*m_device, buff_view_ci);
+        m_errorMonitor->VerifyFound();
     }
 }
 
@@ -513,7 +507,7 @@ TEST_F(NegativeBuffer, IndexBufferOffset) {
 
     // Test for missing pNext struct for index buffer UINT8 type
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-indexType-08787");
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), 1, VK_INDEX_TYPE_UINT8_KHR);
+    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), 1, VK_INDEX_TYPE_UINT8);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -535,18 +529,18 @@ TEST_F(NegativeBuffer, IndexBuffer2Offset) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     // Set offset over buffer size
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2KHR-offset-08782");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-offset-08782");
     vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), buffer_size + 4, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
     // Set offset to be misaligned with index buffer UINT32 type
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2KHR-offset-08783");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-offset-08783");
     vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 1, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
     // Test for missing pNext struct for index buffer UINT8 type
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2KHR-indexType-08787");
-    vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 1, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT8_KHR);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-indexType-08787");
+    vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 1, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT8);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -568,11 +562,11 @@ TEST_F(NegativeBuffer, IndexBuffer2Size) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2KHR-size-08767");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-size-08767");
     vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 4, 6, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2KHR-size-08768");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-size-08768");
     vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 4, buffer_size, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
@@ -615,13 +609,13 @@ TEST_F(NegativeBuffer, BufferUsageFlags2) {
     vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
     VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
-    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR | VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT_KHR;
+    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT;
 
     VkBufferViewCreateInfo buffer_view_ci = vku::InitStructHelper(&buffer_usage_flags);
     buffer_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     buffer_view_ci.range = VK_WHOLE_SIZE;
     buffer_view_ci.buffer = buffer.handle();
-    CreateBufferViewTest(*this, &buffer_view_ci, {"VUID-VkBufferViewCreateInfo-pNext-08780"});
+    CreateBufferViewTest(buffer_view_ci, "VUID-VkBufferViewCreateInfo-pNext-08780");
 }
 
 TEST_F(NegativeBuffer, BufferUsageFlagsUsage) {
@@ -631,10 +625,10 @@ TEST_F(NegativeBuffer, BufferUsageFlagsUsage) {
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
     buffer_ci.size = 32;
     buffer_ci.usage = 0;
-    CreateBufferTest(*this, &buffer_ci, {"VUID-VkBufferCreateInfo-None-09500"});
+    CreateBufferTest(buffer_ci, "VUID-VkBufferCreateInfo-None-09500");
 
     buffer_ci.usage = 0xBAD0000;
-    CreateBufferTest(*this, &buffer_ci, {"VUID-VkBufferCreateInfo-None-09499"});
+    CreateBufferTest(buffer_ci, "VUID-VkBufferCreateInfo-None-09499");
 }
 
 TEST_F(NegativeBuffer, BufferUsageFlags2Subset) {
@@ -647,13 +641,13 @@ TEST_F(NegativeBuffer, BufferUsageFlags2Subset) {
     vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
 
     VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
-    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
+    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT;
 
     VkBufferViewCreateInfo buffer_view_ci = vku::InitStructHelper(&buffer_usage_flags);
     buffer_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     buffer_view_ci.range = VK_WHOLE_SIZE;
     buffer_view_ci.buffer = buffer.handle();
-    CreateBufferViewTest(*this, &buffer_view_ci, {"VUID-VkBufferViewCreateInfo-pNext-08781"});
+    CreateBufferViewTest(buffer_view_ci, "VUID-VkBufferViewCreateInfo-pNext-08781");
 }
 
 TEST_F(NegativeBuffer, CreateBufferSize) {
@@ -664,7 +658,15 @@ TEST_F(NegativeBuffer, CreateBufferSize) {
     VkBufferCreateInfo info = vku::InitStructHelper();
     info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     info.size = 0;
-    CreateBufferTest(*this, &info, "VUID-VkBufferCreateInfo-size-00912");
+    CreateBufferTest(info, "VUID-VkBufferCreateInfo-size-00912");
+}
+
+TEST_F(NegativeBuffer, NullBufferCreateInfo) {
+    RETURN_IF_SKIP(Init());
+    VkBuffer buffer = VK_NULL_HANDLE;
+    m_errorMonitor->SetDesiredError("VUID-vkCreateBuffer-pCreateInfo-parameter");
+    vk::CreateBuffer(device(), nullptr, nullptr, &buffer);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeBuffer, DedicatedAllocationBufferFlags) {
@@ -682,7 +684,7 @@ TEST_F(NegativeBuffer, DedicatedAllocationBufferFlags) {
     buffer_create_info.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
     buffer_create_info.size = 1024;
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-pNext-01571");
+    CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-pNext-01571");
 }
 
 TEST_F(NegativeBuffer, FillBufferCmdPoolUnsupported) {
@@ -785,7 +787,7 @@ TEST_F(NegativeBuffer, MaxBufferSize) {
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = maintenance4_properties.maxBufferSize + 1;
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-size-06409");
+    CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-size-06409");
 }
 
 TEST_F(NegativeBuffer, MaxBufferSize13) {
@@ -805,5 +807,99 @@ TEST_F(NegativeBuffer, MaxBufferSize13) {
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = props_1_3.maxBufferSize + 1;
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-size-06409");
+    CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-size-06409");
+}
+
+TEST_F(NegativeBuffer, BindIdxBufferWithoutMemory) {
+    RETURN_IF_SKIP(Init());
+
+    VkBufferCreateInfo buff_ci = vku::InitStructHelper();
+    buff_ci.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    buff_ci.size = 256u;
+    vkt::Buffer buffer(*m_device, buff_ci, vkt::no_mem);
+
+    m_command_buffer.Begin();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-buffer-08785");
+    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), 0u, VK_INDEX_TYPE_UINT16);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeBuffer, IdxBufferInvalidType) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkBufferCreateInfo buff_ci = vku::InitStructHelper();
+    buff_ci.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    buff_ci.size = 256u;
+    vkt::Buffer buffer(*m_device, buff_ci);
+
+    m_command_buffer.Begin();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-indexType-08786");
+    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), 0u, VK_INDEX_TYPE_NONE_KHR);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeBuffer, BindVertexBufferWithoutMemory) {
+    RETURN_IF_SKIP(Init());
+
+    VkBufferCreateInfo buff_ci = vku::InitStructHelper();
+    buff_ci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buff_ci.size = 256u;
+    vkt::Buffer buffer(*m_device, buff_ci, vkt::no_mem);
+
+    m_command_buffer.Begin();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers-pBuffers-00628");
+    VkDeviceSize offset = 0u;
+    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0u, 1u, &buffer.handle(), &offset);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeBuffer, BindVertexBuffer2WithoutMemory) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(Init());
+
+    VkBufferCreateInfo buff_ci = vku::InitStructHelper();
+    buff_ci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buff_ci.size = 256u;
+    vkt::Buffer buffer(*m_device, buff_ci, vkt::no_mem);
+
+    m_command_buffer.Begin();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers2-pBuffers-03360");
+    VkDeviceSize offset = 0u;
+    VkDeviceSize size = buff_ci.size;
+    VkDeviceSize stride = 4u;
+    vk::CmdBindVertexBuffers2(m_command_buffer.handle(), 0u, 1u, &buffer.handle(), &offset, &size, &stride);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeBuffer, BindNullVertexBufferWithOffset) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::nullDescriptor);
+    RETURN_IF_SKIP(Init());
+
+    m_command_buffer.Begin();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers2-pBuffers-04112");
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkDeviceSize offset = 4u;
+    VkDeviceSize size = 4u;
+    VkDeviceSize stride = 4u;
+    vk::CmdBindVertexBuffers2(m_command_buffer.handle(), 0u, 1u, &buffer, &offset, &size, &stride);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
 }

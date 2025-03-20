@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2024 The Khronos Group Inc.
- * Copyright (c) 2024 Valve Corporation
- * Copyright (c) 2024 LunarG, Inc.
+ * Copyright (c) 2025 The Khronos Group Inc.
+ * Copyright (c) 2025 Valve Corporation
+ * Copyright (c) 2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -236,28 +236,6 @@ TEST_F(NegativeDeviceFeatureProperty, DISABLED_PromotedFeaturesExtensions12) {
     m_errorMonitor->VerifyFound();
 }
 
-// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
-TEST_F(NegativeDeviceFeatureProperty, DISABLED_PhysicalDeviceFeatures2) {
-    RETURN_IF_SKIP(InitDeviceFeatureProperty());
-    VkPhysicalDeviceFeatures2 pd_features2 = vku::InitStructHelper();
-    m_second_device_ci.pNext = &pd_features2;
-
-    // VUID-VkDeviceCreateInfo-pNext-pNext
-    m_errorMonitor->SetDesiredError("its parent extension VK_KHR_get_physical_device_properties2 has not been enabled");
-    m_errorMonitor->SetUnexpectedError("Failed to create device chain");  // for android loader
-    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeDeviceFeatureProperty, VertexAttributeDivisor) {
-    RETURN_IF_SKIP(InitDeviceFeatureProperty());
-    VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vadf = vku::InitStructHelper();
-    m_second_device_ci.pNext = &vadf;
-    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-pNext");
-    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
-    m_errorMonitor->VerifyFound();
-}
-
 TEST_F(NegativeDeviceFeatureProperty, PhysicalDeviceVulkan11Features) {
     TEST_DESCRIPTION("Use both VkPhysicalDeviceVulkan11Features mixed with the old struct");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -385,83 +363,6 @@ TEST_F(NegativeDeviceFeatureProperty, BufferDeviceAddress) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDeviceFeatureProperty, PhysicalDeviceGlobalPriorityQueryFeaturesKHR) {
-    TEST_DESCRIPTION(
-        "VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR has an EXT and KHR extension that can enable it, but we forgot both");
-    RETURN_IF_SKIP(InitDeviceFeatureProperty());
-    if (!DeviceExtensionSupported(VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME) &&
-        !DeviceExtensionSupported(VK_EXT_GLOBAL_PRIORITY_QUERY_EXTENSION_NAME)) {
-        GTEST_SKIP() << "VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR not supported";
-    }
-    VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR query_feature = vku::InitStructHelper();
-    query_feature.globalPriorityQuery = VK_TRUE;
-    m_second_device_ci.pNext = &query_feature;
-
-    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-pNext");
-    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeDeviceFeatureProperty, MissingExtensionPhysicalDeviceFeature) {
-    TEST_DESCRIPTION("Add feature to vkCreateDevice withouth extension");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitDeviceFeatureProperty());
-    if (!DeviceExtensionSupported(VK_EXT_ASTC_DECODE_MODE_EXTENSION_NAME)) {
-        GTEST_SKIP() << "VK_EXT_astc_decode_mode not supported";
-    }
-    // likely to never be promoted to core
-    VkPhysicalDeviceASTCDecodeFeaturesEXT astc_feature = vku::InitStructHelper();
-    astc_feature.decodeModeSharedExponent = VK_TRUE;
-    m_second_device_ci.pNext = &astc_feature;
-
-    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-pNext");
-    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeDeviceFeatureProperty, MissingExtensionPromoted) {
-    TEST_DESCRIPTION("Add feature to vkCreateDevice withouth extension (for a promoted extension)");
-    SetTargetApiVersion(VK_API_VERSION_1_2);  // VK_KHR_maintenance4 added in 1.3
-    RETURN_IF_SKIP(InitDeviceFeatureProperty());
-    if (!DeviceExtensionSupported(VK_KHR_MAINTENANCE_4_EXTENSION_NAME)) {
-        GTEST_SKIP() << "VK_KHR_maintenance4 not supported";
-    }
-    VkPhysicalDeviceMaintenance4Features maintenance4_feature = vku::InitStructHelper();
-    maintenance4_feature.maintenance4 = VK_TRUE;
-    m_second_device_ci.pNext = &maintenance4_feature;
-
-    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-pNext");
-    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeDeviceFeatureProperty, Features11WithoutVulkan12) {
-    TEST_DESCRIPTION("VkPhysicalDeviceVulkan11Features was added in Vulkan1.2");
-    if (m_instance_api_version < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "Need 1.2 instance support";
-    }
-    app_info_.apiVersion = m_instance_api_version.Value();
-    RETURN_IF_SKIP(InitDeviceFeatureProperty());
-    if (PhysicalDeviceProps().apiVersion > VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "Need 1.0/1.1 device support";
-    }
-
-    VkPhysicalDeviceVulkan11Features features11 = vku::InitStructHelper();
-    m_second_device_ci.pNext = &features11;
-
-    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-pNext");
-    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
-    m_errorMonitor->VerifyFound();
-
-    if (PhysicalDeviceProps().apiVersion == VK_API_VERSION_1_1) {
-        VkPhysicalDeviceVulkan12Properties bad_version_1_1_struct = vku::InitStructHelper();
-        VkPhysicalDeviceProperties2 phys_dev_props_2 = vku::InitStructHelper(&bad_version_1_1_struct);
-        m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceProperties2-pNext-pNext");
-        vk::GetPhysicalDeviceProperties2(Gpu(), &phys_dev_props_2);
-        m_errorMonitor->VerifyFound();
-    }
-}
-
 TEST_F(NegativeDeviceFeatureProperty, Robustness2WithoutRobustness) {
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     RETURN_IF_SKIP(InitDeviceFeatureProperty());
@@ -549,6 +450,71 @@ TEST_F(NegativeDeviceFeatureProperty, PrimitiveFragmentShadingRateMeshShader) {
     m_second_device_ci.pNext = &features2;
 
     m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceMeshShaderFeaturesEXT-primitiveFragmentShadingRateMeshShader-07033");
+    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDeviceFeatureProperty, RobustBufferAccessUpdateAfterBind) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitDeviceFeatureProperty());
+
+    VkPhysicalDeviceDescriptorIndexingProperties di_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(di_props);
+    if (di_props.robustBufferAccessUpdateAfterBind) {
+        GTEST_SKIP() << "robustBufferAccessUpdateAfterBind is VK_TRUE";
+    }
+
+    VkPhysicalDeviceDescriptorIndexingFeatures di_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(di_features);
+    if (!di_features.descriptorBindingUniformBufferUpdateAfterBind) {
+        GTEST_SKIP() << "Features not supported";
+    }
+
+    auto features = vkt::PhysicalDevice(Gpu()).Features();
+    if (!features.robustBufferAccess) {
+        GTEST_SKIP() << "robustBufferAccess not supported";
+    }
+
+    m_second_device_ci.pEnabledFeatures = &features;
+    m_second_device_ci.pNext = &di_features;
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-robustBufferAccess-10247");
+    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDeviceFeatureProperty, RobustBufferAccessUpdateAfterBind12) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(InitDeviceFeatureProperty());
+
+    VkPhysicalDeviceVulkan12Properties props_12 = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(props_12);
+    if (props_12.robustBufferAccessUpdateAfterBind) {
+        GTEST_SKIP() << "robustBufferAccessUpdateAfterBind is VK_TRUE";
+    }
+
+    VkPhysicalDeviceVulkan12Features features_12 = vku::InitStructHelper();
+    auto features = GetPhysicalDeviceFeatures2(features_12);
+    if (!features_12.descriptorBindingUniformBufferUpdateAfterBind) {
+        GTEST_SKIP() << "Features not supported";
+    }
+    features.features.robustBufferAccess = VK_TRUE;
+    m_second_device_ci.pNext = &features;
+    m_second_device_ci.pEnabledFeatures = nullptr;
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-robustBufferAccess-10247");
+    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDeviceFeatureProperty, Create14DeviceDuplicatedFeatures) {
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    RETURN_IF_SKIP(InitDeviceFeatureProperty());
+
+    VkPhysicalDeviceHostImageCopyFeatures features_hic = vku::InitStructHelper();
+    VkPhysicalDeviceVulkan14Features features_14 = vku::InitStructHelper(&features_hic);
+    m_second_device_ci.pNext = &features_14;
+    m_second_device_ci.pEnabledFeatures = nullptr;
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-10360");
     vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
     m_errorMonitor->VerifyFound();
 }

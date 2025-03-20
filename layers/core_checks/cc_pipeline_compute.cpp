@@ -19,7 +19,6 @@
  */
 
 #include <vulkan/vk_enum_string_helper.h>
-#include "generated/chassis.h"
 #include "core_validation.h"
 #include "chassis/chassis_modification_state.h"
 
@@ -28,8 +27,8 @@ bool CoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipeli
                                                        const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
                                                        const ErrorObject &error_obj, PipelineStates &pipeline_states,
                                                        chassis::CreateComputePipelines &chassis_state) const {
-    bool skip = StateTracker::PreCallValidateCreateComputePipelines(device, pipelineCache, count, pCreateInfos, pAllocator,
-                                                                    pPipelines, error_obj, pipeline_states, chassis_state);
+    bool skip = BaseClass::PreCallValidateCreateComputePipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines,
+                                                                 error_obj, pipeline_states, chassis_state);
 
     skip |= ValidateDeviceQueueSupport(error_obj.location);
     for (uint32_t i = 0; i < count; i++) {
@@ -51,7 +50,7 @@ bool CoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipeli
                                                       "VUID-VkComputePipelineCreateInfo-flags-09007");
 
         if (const auto *pipeline_robustness_info =
-                vku::FindStructInPNextChain<VkPipelineRobustnessCreateInfoEXT>(pCreateInfos[i].pNext)) {
+                vku::FindStructInPNextChain<VkPipelineRobustnessCreateInfo>(pCreateInfos[i].pNext)) {
             skip |= ValidatePipelineRobustnessCreateInfo(*pipeline, *pipeline_robustness_info, create_info_loc);
         }
 
@@ -59,8 +58,9 @@ bool CoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipeli
         // check the stateless validation in the pNext chain for the first pipeline. (The core issue is because we parse the SPIR-V
         // at state tracking time, and we state track pipelines first)
         if (i == 0 && chassis_state.stateless_data.pipeline_pnext_module) {
-            skip |= ValidateSpirvStateless(*chassis_state.stateless_data.pipeline_pnext_module, chassis_state.stateless_data,
-                                           create_info_loc.dot(Field::stage).pNext(Struct::VkShaderModuleCreateInfo, Field::pCode));
+            skip |= stateless_spirv_validator.Validate(
+                *chassis_state.stateless_data.pipeline_pnext_module, chassis_state.stateless_data,
+                create_info_loc.dot(Field::stage).pNext(Struct::VkShaderModuleCreateInfo, Field::pCode));
         }
     }
     return skip;
@@ -73,7 +73,7 @@ bool CoreChecks::ValidateComputePipelineDerivatives(PipelineStates &pipeline_sta
     // If create derivative bit is set, check that we've specified a base
     // pipeline correctly, and that the base pipeline was created to allow
     // derivatives.
-    if (pipeline.create_flags & VK_PIPELINE_CREATE_2_DERIVATIVE_BIT_KHR) {
+    if (pipeline.create_flags & VK_PIPELINE_CREATE_2_DERIVATIVE_BIT) {
         std::shared_ptr<const vvl::Pipeline> base_pipeline;
         const auto &pipeline_ci = pipeline.ComputeCreateInfo();
         const VkPipeline base_handle = pipeline_ci.basePipelineHandle;
@@ -91,7 +91,7 @@ bool CoreChecks::ValidateComputePipelineDerivatives(PipelineStates &pipeline_sta
             base_pipeline = Get<vvl::Pipeline>(base_handle);
         }
 
-        if (base_pipeline && !(base_pipeline->create_flags & VK_PIPELINE_CREATE_2_ALLOW_DERIVATIVES_BIT_KHR)) {
+        if (base_pipeline && !(base_pipeline->create_flags & VK_PIPELINE_CREATE_2_ALLOW_DERIVATIVES_BIT)) {
             skip |= LogError("VUID-vkCreateComputePipelines-flags-00696", base_pipeline->Handle(), loc,
                              "base pipeline does not allow derivatives.");
         }

@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,12 @@
 
 #include <string.h>  // memset(), memcmp()
 #include <cassert>
+#include <spirv-tools/libspirv.hpp>
 
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
+
+#include "shader_helper.h"
 
 #define NON_DISPATCHABLE_HANDLE_INIT(create_func, dev, ...)                                                \
     do {                                                                                                   \
@@ -48,6 +51,15 @@
     cls::~cls() noexcept { destroy(); }
 
 namespace vkt {
+
+void Instance::Init(const VkInstanceCreateInfo &info) { ASSERT_EQ(VK_SUCCESS, vk::CreateInstance(&info, NULL, &handle_)); }
+
+void Instance::Destroy() noexcept {
+    if (handle_ != VK_NULL_HANDLE) {
+        vk::DestroyInstance(handle_, nullptr);
+        handle_ = VK_NULL_HANDLE;
+    }
+}
 
 VkPhysicalDeviceProperties PhysicalDevice::Properties() const {
     VkPhysicalDeviceProperties info;
@@ -927,7 +939,7 @@ Semaphore::Semaphore(const Device &dev, VkSemaphoreType type, uint64_t initial_v
         init(dev, vku::InitStruct<VkSemaphoreCreateInfo>());
     } else {
         VkSemaphoreTypeCreateInfo semaphore_type_ci = vku::InitStructHelper();
-        semaphore_type_ci.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
+        semaphore_type_ci.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
         semaphore_type_ci.initialValue = initial_value;
         VkSemaphoreCreateInfo semaphore_ci = vku::InitStructHelper(&semaphore_type_ci);
         init(dev, semaphore_ci);
@@ -1066,6 +1078,23 @@ VkResult QueryPool::Results(uint32_t first, uint32_t count, size_t size, void *d
 
 NON_DISPATCHABLE_HANDLE_DTOR(Buffer, vk::DestroyBuffer)
 
+Buffer::Buffer(Buffer &&rhs) noexcept : NonDispHandle(std::move(rhs)) {
+    create_info_ = std::move(rhs.create_info_);
+    internal_mem_ = std::move(rhs.internal_mem_);
+}
+
+Buffer &Buffer::operator=(Buffer &&rhs) noexcept {
+    if (&rhs == this) {
+        return *this;
+    }
+    destroy();
+    internal_mem_.destroy();
+    NonDispHandle::operator=(std::move(rhs));
+    create_info_ = std::move(rhs.create_info_);
+    internal_mem_ = std::move(rhs.internal_mem_);
+    return *this;
+}
+
 void Buffer::init(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props, void *alloc_info_pnext) {
     InitNoMemory(dev, info);
 
@@ -1174,6 +1203,40 @@ Image::Image(const Device &dev, const VkImageCreateInfo &info, SetLayoutT) : dev
     SetLayout(image_aspect, newLayout);
 }
 
+Image::Image(Image &&rhs) noexcept : NonDispHandle(std::move(rhs)) {
+    device_ = std::move(rhs.device_);
+    rhs.device_ = nullptr;
+
+    create_info_ = std::move(rhs.create_info_);
+    rhs.create_info_ = vku::InitStructHelper();
+
+    internal_mem_ = std::move(rhs.internal_mem_);
+
+    image_layout_ = std::move(rhs.image_layout_);
+    rhs.image_layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
+}
+
+Image &Image::operator=(Image &&rhs) noexcept {
+    if (&rhs == this) {
+        return *this;
+    }
+    destroy();
+    internal_mem_.destroy();
+    NonDispHandle::operator=(std::move(rhs));
+
+    device_ = std::move(rhs.device_);
+    rhs.device_ = nullptr;
+
+    create_info_ = std::move(rhs.create_info_);
+    rhs.create_info_ = vku::InitStructHelper();
+
+    internal_mem_ = std::move(rhs.internal_mem_);
+
+    image_layout_ = std::move(rhs.image_layout_);
+    rhs.image_layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
+    return *this;
+}
+
 void Image::init(const Device &dev, const VkImageCreateInfo &info, VkMemoryPropertyFlags mem_props, void *alloc_info_pnext) {
     InitNoMemory(dev, info);
 
@@ -1209,11 +1272,11 @@ bool Image::IsCompatible(const Device &dev, const VkImageUsageFlags usages, cons
         VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT | VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT |
         VK_FORMAT_FEATURE_2_BLIT_SRC_BIT | VK_FORMAT_FEATURE_2_BLIT_DST_BIT | VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
     if (dev.IsEnabledExtension(VK_IMG_FILTER_CUBIC_EXTENSION_NAME)) {
-        all_feature_flags |= VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_CUBIC_BIT_EXT;
+        all_feature_flags |= VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_CUBIC_BIT;
     }
 
     if (dev.IsEnabledExtension(VK_KHR_MAINTENANCE_1_EXTENSION_NAME)) {
-        all_feature_flags |= VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT_KHR | VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT_KHR;
+        all_feature_flags |= VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT;
     }
 
     if (dev.IsEnabledExtension(VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME)) {
@@ -1221,18 +1284,18 @@ bool Image::IsCompatible(const Device &dev, const VkImageUsageFlags usages, cons
     }
 
     if (dev.IsEnabledExtension(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME)) {
-        all_feature_flags |= VK_FORMAT_FEATURE_2_MIDPOINT_CHROMA_SAMPLES_BIT_KHR |
-                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT_KHR |
-                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT_KHR |
-                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_BIT_KHR |
-                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT_KHR |
-                             VK_FORMAT_FEATURE_2_DISJOINT_BIT_KHR | VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT_KHR;
+        all_feature_flags |= VK_FORMAT_FEATURE_2_MIDPOINT_CHROMA_SAMPLES_BIT |
+                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT |
+                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT |
+                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_BIT |
+                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT |
+                             VK_FORMAT_FEATURE_2_DISJOINT_BIT | VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT;
     }
 
     if (dev.IsEnabledExtension(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
-        all_feature_flags |= VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR |
-                             VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT_KHR |
-                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT_KHR;
+        all_feature_flags |= VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT |
+                             VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT |
+                             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT;
     }
 
     if ((features & all_feature_flags) == 0) return false;  // whole format unsupported
@@ -1397,9 +1460,9 @@ void Image::SetLayout(VkImageAspectFlags aspect, VkImageLayout image_layout) {
     CommandBuffer cmd_buf(*device_, pool);
 
     /* Build command buffer to set image layout in the driver */
-    cmd_buf.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    cmd_buf.Begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     SetLayout(cmd_buf, aspect, image_layout);
-    cmd_buf.end();
+    cmd_buf.End();
 
     auto graphics_queue = device_->QueuesWithGraphicsCapability()[0];
     graphics_queue->Submit(cmd_buf);
@@ -1459,12 +1522,12 @@ VkMemoryRequirements2 AccelerationStructureNV::MemoryRequirements() const {
         (PFN_vkGetAccelerationStructureMemoryRequirementsNV)vk::GetDeviceProcAddr(device(),
                                                                                   "vkGetAccelerationStructureMemoryRequirementsNV");
     assert(vkGetAccelerationStructureMemoryRequirementsNV != nullptr);
-    VkMemoryRequirements2 memoryRequirements = {};
-    VkAccelerationStructureMemoryRequirementsInfoNV memoryRequirementsInfo = vku::InitStructHelper();
-    memoryRequirementsInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV;
-    memoryRequirementsInfo.accelerationStructure = handle();
-    vkGetAccelerationStructureMemoryRequirementsNV(device(), &memoryRequirementsInfo, &memoryRequirements);
-    return memoryRequirements;
+    VkMemoryRequirements2 memory_requirements = vku::InitStructHelper();
+    VkAccelerationStructureMemoryRequirementsInfoNV memory_requirements_info = vku::InitStructHelper();
+    memory_requirements_info.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV;
+    memory_requirements_info.accelerationStructure = handle();
+    vkGetAccelerationStructureMemoryRequirementsNV(device(), &memory_requirements_info, &memory_requirements);
+    return memory_requirements;
 }
 
 VkMemoryRequirements2 AccelerationStructureNV::BuildScratchMemoryRequirements() const {
@@ -1473,13 +1536,13 @@ VkMemoryRequirements2 AccelerationStructureNV::BuildScratchMemoryRequirements() 
                                                                                   "vkGetAccelerationStructureMemoryRequirementsNV");
     assert(vkGetAccelerationStructureMemoryRequirementsNV != nullptr);
 
-    VkAccelerationStructureMemoryRequirementsInfoNV memoryRequirementsInfo = vku::InitStructHelper();
-    memoryRequirementsInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
-    memoryRequirementsInfo.accelerationStructure = handle();
+    VkAccelerationStructureMemoryRequirementsInfoNV memory_requirements_info = vku::InitStructHelper();
+    memory_requirements_info.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
+    memory_requirements_info.accelerationStructure = handle();
 
-    VkMemoryRequirements2 memoryRequirements = {};
-    vkGetAccelerationStructureMemoryRequirementsNV(device(), &memoryRequirementsInfo, &memoryRequirements);
-    return memoryRequirements;
+    VkMemoryRequirements2 memory_requirements = vku::InitStructHelper();
+    vkGetAccelerationStructureMemoryRequirementsNV(device(), &memory_requirements_info, &memory_requirements);
+    return memory_requirements;
 }
 
 void AccelerationStructureNV::init(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory) {
@@ -1528,7 +1591,7 @@ Buffer AccelerationStructureNV::CreateScratchBuffer(const Device &device, VkBuff
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
     void *pNext = nullptr;
     if (buffer_device_address) {
-        alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+        alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
         pNext = &alloc_flags;
     }
 
@@ -1567,6 +1630,33 @@ VkResult Shader::InitTry(const Device &dev, const VkShaderCreateInfoEXT &info) {
 
 Shader::Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint32_t> &spv,
                const VkDescriptorSetLayout *descriptorSetLayout, const VkPushConstantRange *pushConstRange) {
+    VkShaderCreateInfoEXT createInfo = vku::InitStructHelper();
+    createInfo.stage = stage;
+    createInfo.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    createInfo.codeSize = spv.size() * sizeof(spv[0]);
+    createInfo.pCode = spv.data();
+    createInfo.pName = "main";
+    if (descriptorSetLayout) {
+        createInfo.setLayoutCount = 1u;
+        createInfo.pSetLayouts = descriptorSetLayout;
+    }
+    if (pushConstRange) {
+        createInfo.pushConstantRangeCount = 1u;
+        createInfo.pPushConstantRanges = pushConstRange;
+    }
+    init(dev, createInfo);
+}
+
+Shader::Shader(const Device &dev, const VkShaderStageFlagBits stage, const char *code,
+               const VkDescriptorSetLayout *descriptorSetLayout, const VkPushConstantRange *pushConstRange) {
+    spv_target_env spv_env = SPV_ENV_VULKAN_1_0;
+    if (stage == VK_SHADER_STAGE_TASK_BIT_EXT || stage == VK_SHADER_STAGE_MESH_BIT_EXT || stage == VK_SHADER_STAGE_TASK_BIT_NV ||
+        stage == VK_SHADER_STAGE_MESH_BIT_NV) {
+        spv_env = SPV_ENV_VULKAN_1_3;
+    }
+    std::vector<uint32_t> spv;
+    GLSLtoSPV(dev.Physical().limits_, stage, code, spv, spv_env);
+
     VkShaderCreateInfoEXT createInfo = vku::InitStructHelper();
     createInfo.stage = stage;
     createInfo.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
@@ -1742,6 +1832,29 @@ void DescriptorSet::destroy() noexcept {
 }
 DescriptorSet::~DescriptorSet() noexcept { destroy(); }
 
+void DescriptorUpdateTemplate::Init(const Device &dev, const VkDescriptorUpdateTemplateCreateInfo &info) {
+    if (vk::CreateDescriptorUpdateTemplateKHR) {
+        NON_DISPATCHABLE_HANDLE_INIT(vk::CreateDescriptorUpdateTemplateKHR, dev, &info);
+    } else {
+        NON_DISPATCHABLE_HANDLE_INIT(vk::CreateDescriptorUpdateTemplate, dev, &info);
+    }
+}
+
+void DescriptorUpdateTemplate::destroy() noexcept {
+    if (!initialized()) {
+        return;
+    }
+    if (vk::DestroyDescriptorUpdateTemplateKHR) {
+        vk::DestroyDescriptorUpdateTemplateKHR(device(), handle(), nullptr);
+    } else {
+        vk::DestroyDescriptorUpdateTemplate(device(), handle(), nullptr);
+    }
+    handle_ = VK_NULL_HANDLE;
+    internal::NonDispHandle<decltype(handle_)>::destroy();
+}
+
+DescriptorUpdateTemplate::~DescriptorUpdateTemplate() noexcept { destroy(); }
+
 NON_DISPATCHABLE_HANDLE_DTOR(CommandPool, vk::DestroyCommandPool)
 
 void CommandPool::Init(const Device &dev, const VkCommandPoolCreateInfo &info) {
@@ -1801,10 +1914,20 @@ void CommandBuffer::Begin(VkCommandBufferUsageFlags flags) {
     hinfo.queryFlags = 0;
     hinfo.pipelineStatistics = 0;
 
-    begin(&info);
+    Begin(&info);
 }
 
-void CommandBuffer::End() { ASSERT_EQ(VK_SUCCESS, vk::EndCommandBuffer(handle())); }
+void CommandBuffer::End() {
+    VkResult result = vk::EndCommandBuffer(handle());
+    if (result == VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR) {
+        GTEST_MESSAGE_AT_(__FILE__, __LINE__, "", ::testing::TestPartResult::kSkip)
+            << "This test cannot be executed on an implementation that reports VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR in "
+               "vkEndCommandBuffer()";
+        throw testing::AssertionException(testing::TestPartResult(testing::TestPartResult::kSkip, __FILE__, __LINE__, ""));
+    } else {
+        ASSERT_EQ(VK_SUCCESS, result);
+    }
+}
 
 void CommandBuffer::Reset(VkCommandBufferResetFlags flags) { ASSERT_EQ(VK_SUCCESS, vk::ResetCommandBuffer(handle(), flags)); }
 
@@ -1835,7 +1958,7 @@ void CommandBuffer::NextSubpass(VkSubpassContents contents) { vk::CmdNextSubpass
 
 void CommandBuffer::EndRenderPass() { vk::CmdEndRenderPass(handle()); }
 
-void CommandBuffer::BeginRendering(const VkRenderingInfoKHR &renderingInfo) {
+void CommandBuffer::BeginRendering(const VkRenderingInfo &renderingInfo) {
     if (vk::CmdBeginRenderingKHR) {
         vk::CmdBeginRenderingKHR(handle(), &renderingInfo);
     } else {
@@ -1844,11 +1967,11 @@ void CommandBuffer::BeginRendering(const VkRenderingInfoKHR &renderingInfo) {
 }
 
 void CommandBuffer::BeginRenderingColor(const VkImageView imageView, VkRect2D render_area) {
-    VkRenderingAttachmentInfoKHR color_attachment = vku::InitStructHelper();
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageView = imageView;
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    VkRenderingInfoKHR renderingInfo = vku::InitStructHelper();
+    VkRenderingInfo renderingInfo = vku::InitStructHelper();
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &color_attachment;
     renderingInfo.layerCount = 1;
@@ -1865,59 +1988,75 @@ void CommandBuffer::EndRendering() {
     }
 }
 
-void CommandBuffer::BindVertFragShader(const vkt::Shader &vert_shader, const vkt::Shader &frag_shader) {
+void CommandBuffer::BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &frag_shader) {
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[0], &vert_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[1], &frag_shader.handle());
+}
+
+void CommandBuffer::BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &geom_shader, const vkt::Shader &frag_shader) {
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_GEOMETRY_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[0], &vert_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[1], &geom_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[2], &frag_shader.handle());
+}
+
+void CommandBuffer::BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &tesc_shader, const vkt::Shader &tese_shader,
+                                const vkt::Shader &frag_shader) {
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+                                            VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[0], &vert_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[1], &tesc_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[2], &tese_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[3], &frag_shader.handle());
+}
+
+void CommandBuffer::BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &tesc_shader, const vkt::Shader &tese_shader,
+                                const vkt::Shader &geom_shader, const vkt::Shader &frag_shader) {
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
                                             VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
                                             VK_SHADER_STAGE_FRAGMENT_BIT};
-    const VkShaderEXT shaders[] = {vert_shader.handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, frag_shader.handle()};
-    vk::CmdBindShadersEXT(handle(), 5, stages, shaders);
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[0], &vert_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[1], &tesc_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[2], &tese_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[3], &geom_shader.handle());
+    vk::CmdBindShadersEXT(handle(), 1u, &stages[4], &frag_shader.handle());
 }
 
 void CommandBuffer::BindCompShader(const vkt::Shader &comp_shader) {
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
     const VkShaderEXT shaders[] = {comp_shader.handle()};
-    vk::CmdBindShadersEXT(handle(), 1, stages, shaders);
+    vk::CmdBindShadersEXT(handle(), 1u, stages, shaders);
+}
+
+void CommandBuffer::BindMeshShaders(const vkt::Shader &mesh_shader, const vkt::Shader &frag_shader) {
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
+                                            VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_VERTEX_BIT};
+    const VkShaderEXT shaders[] = {VK_NULL_HANDLE, mesh_shader.handle(), frag_shader.handle(), VK_NULL_HANDLE};
+    vk::CmdBindShadersEXT(handle(), 4u, stages, shaders);
+}
+
+void CommandBuffer::BindMeshShaders(const vkt::Shader &task_shader, const vkt::Shader &mesh_shader,
+                                    const vkt::Shader &frag_shader) {
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
+                                            VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_VERTEX_BIT};
+    const VkShaderEXT shaders[] = {task_shader.handle(), mesh_shader.handle(), frag_shader.handle(), VK_NULL_HANDLE};
+    vk::CmdBindShadersEXT(handle(), 4u, stages, shaders);
 }
 
 void CommandBuffer::BeginVideoCoding(const VkVideoBeginCodingInfoKHR &beginInfo) {
-    PFN_vkCmdBeginVideoCodingKHR vkCmdBeginVideoCodingKHR =
-        (PFN_vkCmdBeginVideoCodingKHR)vk::GetDeviceProcAddr(dev_handle_, "vkCmdBeginVideoCodingKHR");
-    assert(vkCmdBeginVideoCodingKHR);
-
-    vkCmdBeginVideoCodingKHR(handle(), &beginInfo);
+    vk::CmdBeginVideoCodingKHR(handle(), &beginInfo);
 }
 
 void CommandBuffer::ControlVideoCoding(const VkVideoCodingControlInfoKHR &controlInfo) {
-    PFN_vkCmdControlVideoCodingKHR vkCmdControlVideoCodingKHR =
-        (PFN_vkCmdControlVideoCodingKHR)vk::GetDeviceProcAddr(dev_handle_, "vkCmdControlVideoCodingKHR");
-    assert(vkCmdControlVideoCodingKHR);
-
-    vkCmdControlVideoCodingKHR(handle(), &controlInfo);
+    vk::CmdControlVideoCodingKHR(handle(), &controlInfo);
 }
 
-void CommandBuffer::DecodeVideo(const VkVideoDecodeInfoKHR &decodeInfo) {
-    PFN_vkCmdDecodeVideoKHR vkCmdDecodeVideoKHR =
-        (PFN_vkCmdDecodeVideoKHR)vk::GetDeviceProcAddr(dev_handle_, "vkCmdDecodeVideoKHR");
-    assert(vkCmdDecodeVideoKHR);
+void CommandBuffer::DecodeVideo(const VkVideoDecodeInfoKHR &decodeInfo) { vk::CmdDecodeVideoKHR(handle(), &decodeInfo); }
 
-    vkCmdDecodeVideoKHR(handle(), &decodeInfo);
-}
+void CommandBuffer::EncodeVideo(const VkVideoEncodeInfoKHR &encodeInfo) { vk::CmdEncodeVideoKHR(handle(), &encodeInfo); }
 
-void CommandBuffer::EncodeVideo(const VkVideoEncodeInfoKHR &encodeInfo) {
-    PFN_vkCmdEncodeVideoKHR vkCmdEncodeVideoKHR =
-        (PFN_vkCmdEncodeVideoKHR)vk::GetDeviceProcAddr(dev_handle_, "vkCmdEncodeVideoKHR");
-    assert(vkCmdEncodeVideoKHR);
-
-    vkCmdEncodeVideoKHR(handle(), &encodeInfo);
-}
-
-void CommandBuffer::EndVideoCoding(const VkVideoEndCodingInfoKHR &endInfo) {
-    PFN_vkCmdEndVideoCodingKHR vkCmdEndVideoCodingKHR =
-        (PFN_vkCmdEndVideoCodingKHR)vk::GetDeviceProcAddr(dev_handle_, "vkCmdEndVideoCodingKHR");
-    assert(vkCmdEndVideoCodingKHR);
-
-    vkCmdEndVideoCodingKHR(handle(), &endInfo);
-}
+void CommandBuffer::EndVideoCoding(const VkVideoEndCodingInfoKHR &endInfo) { vk::CmdEndVideoCodingKHR(handle(), &endInfo); }
 
 void CommandBuffer::Copy(const Buffer &src, const Buffer &dst) {
     assert(src.CreateInfo().size == dst.CreateInfo().size);
@@ -1926,6 +2065,16 @@ void CommandBuffer::Copy(const Buffer &src, const Buffer &dst) {
 }
 
 void CommandBuffer::ExecuteCommands(const CommandBuffer &secondary) { vk::CmdExecuteCommands(handle(), 1, &secondary.handle()); }
+
+// For positive tests, if you run with sync val, ideally want no errors.
+// Many tests need a simple quick way to sync multiple commands
+void CommandBuffer::FullMemoryBarrier() {
+    VkMemoryBarrier mem_barrier = vku::InitStructHelper();
+    mem_barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    mem_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    vk::CmdPipelineBarrier(handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &mem_barrier, 0,
+                           nullptr, 0, nullptr);
+}
 
 void RenderPass::init(const Device &dev, const VkRenderPassCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRenderPass, dev, &info);
@@ -2065,4 +2214,39 @@ IndirectExecutionSet::IndirectExecutionSet(const Device &dev, const VkIndirectEx
     Init(dev, exe_set_ci);
 }
 
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+VkResult Surface::Init(VkInstance instance, const VkWin32SurfaceCreateInfoKHR &info) {
+    VkResult result = vk::CreateWin32SurfaceKHR(instance, &info, nullptr, &handle_);
+    instance_ = instance;
+    return result;
+}
+#endif
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+VkResult Surface::Init(VkInstance instance, const VkMetalSurfaceCreateInfoEXT &info) {
+    VkResult result = vk::CreateMetalSurfaceEXT(instance, &info, nullptr, &handle_);
+    instance_ = instance;
+    return result;
+}
+#endif
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+VkResult Surface::Init(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR &info) {
+    VkResult result = vk::CreateAndroidSurfaceKHR(instance, &info, nullptr, &handle_);
+    instance_ = instance;
+    return result;
+}
+#endif
+#if defined(VK_USE_PLATFORM_XLIB_KHR)
+VkResult Surface::Init(VkInstance instance, const VkXlibSurfaceCreateInfoKHR &info) {
+    VkResult result = vk::CreateXlibSurfaceKHR(instance, &info, nullptr, &handle_);
+    instance_ = instance;
+    return result;
+}
+#endif
+#if defined(VK_USE_PLATFORM_XCB_KHR)
+VkResult Surface::Init(VkInstance instance, const VkXcbSurfaceCreateInfoKHR &info) {
+    VkResult result = vk::CreateXcbSurfaceKHR(instance, &info, nullptr, &handle_);
+    instance_ = instance;
+    return result;
+}
+#endif
 }  // namespace vkt

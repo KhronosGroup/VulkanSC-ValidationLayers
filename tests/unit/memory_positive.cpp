@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2023-2024 The Khronos Group Inc.
- * Copyright (c) 2023-2024 Valve Corporation
- * Copyright (c) 2023-2024 LunarG, Inc.
- * Copyright (c) 2023-2024 Collabora, Inc.
+ * Copyright (c) 2023-2025 The Khronos Group Inc.
+ * Copyright (c) 2023-2025 Valve Corporation
+ * Copyright (c) 2023-2025 LunarG, Inc.
+ * Copyright (c) 2023-2025 Collabora, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ TEST_F(PositiveMemory, MapMemory2) {
 
     vkt::DeviceMemory memory(*m_device, memory_info);
 
-    VkMemoryMapInfoKHR map_info = vku::InitStructHelper();
+    VkMemoryMapInfo map_info = vku::InitStructHelper();
     map_info.memory = memory;
     map_info.offset = 0;
     map_info.size = memory_info.allocationSize;
@@ -104,7 +104,7 @@ TEST_F(PositiveMemory, MapMemoryPlaced) {
     uintptr_t align_1 = map_placed_props.minPlacedMemoryMapAlignment - 1;
     void *addr = reinterpret_cast<void *>((reinterpret_cast<uintptr_t>(reservation) + align_1) & ~align_1);
 
-    VkMemoryMapInfoKHR map_info = vku::InitStructHelper();
+    VkMemoryMapInfo map_info = vku::InitStructHelper();
     map_info.memory = memory;
     map_info.flags = VK_MEMORY_MAP_PLACED_BIT_EXT;
     map_info.offset = 0;
@@ -127,7 +127,7 @@ TEST_F(PositiveMemory, MapMemoryPlaced) {
     /* Write some data and make sure we don't fault */
     memset(pData, 0x5c, allocation_size);
 
-    VkMemoryUnmapInfoKHR unmap_info = vku::InitStructHelper();
+    VkMemoryUnmapInfo unmap_info = vku::InitStructHelper();
     unmap_info.memory = memory;
     unmap_info.flags = VK_MEMORY_UNMAP_RESERVE_BIT_EXT;
 
@@ -167,9 +167,9 @@ TEST_F(PositiveMemory, GetMemoryRequirements2) {
         *m_device, vkt::Buffer::CreateInfo(1024, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT), vkt::no_mem);
 
     // Use extension to get buffer memory requirements
-    VkBufferMemoryRequirementsInfo2KHR buffer_info = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2_KHR, nullptr,
-                                                      buffer.handle()};
-    VkMemoryRequirements2KHR buffer_reqs = {VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2_KHR};
+    VkBufferMemoryRequirementsInfo2 buffer_info = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2_KHR, nullptr,
+                                                   buffer.handle()};
+    VkMemoryRequirements2 buffer_reqs = {VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2_KHR};
     vk::GetBufferMemoryRequirements2KHR(device(), &buffer_info, &buffer_reqs);
 
     // Allocate and bind buffer memory
@@ -188,9 +188,8 @@ TEST_F(PositiveMemory, GetMemoryRequirements2) {
     vkt::Image image(*m_device, image_ci, vkt::no_mem);
 
     // Use extension to get image memory requirements
-    VkImageMemoryRequirementsInfo2KHR image_info = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2_KHR, nullptr,
-                                                    image.handle()};
-    VkMemoryRequirements2KHR image_reqs = {VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2_KHR};
+    VkImageMemoryRequirementsInfo2 image_info = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2_KHR, nullptr, image.handle()};
+    VkMemoryRequirements2 image_reqs = {VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2_KHR};
     vk::GetImageMemoryRequirements2KHR(device(), &image_info, &image_reqs);
 
     // Allocate and bind image memory
@@ -234,8 +233,8 @@ TEST_F(PositiveMemory, BindMemory2) {
     buffer_memory.init(*m_device, vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0));
 
     // Bind buffer memory with extension
-    VkBindBufferMemoryInfoKHR buffer_bind_info = {VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO_KHR, nullptr, buffer.handle(),
-                                                  buffer_memory.handle(), 0};
+    VkBindBufferMemoryInfo buffer_bind_info = {VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO_KHR, nullptr, buffer.handle(),
+                                               buffer_memory.handle(), 0};
     vk::BindBufferMemory2KHR(device(), 1, &buffer_bind_info);
 
     // Create a test image
@@ -253,8 +252,8 @@ TEST_F(PositiveMemory, BindMemory2) {
     image_memory.init(*m_device, vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(), 0));
 
     // Bind image memory with extension
-    VkBindImageMemoryInfoKHR image_bind_info = {VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO_KHR, nullptr, image.handle(),
-                                                image_memory.handle(), 0};
+    VkBindImageMemoryInfo image_bind_info = {VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO_KHR, nullptr, image.handle(),
+                                             image_memory.handle(), 0};
     vk::BindImageMemory2KHR(device(), 1, &image_bind_info);
 
     // Now execute arbitrary commands that use the test buffer and image
@@ -408,23 +407,12 @@ TEST_F(PositiveMemory, BindImageMemoryMultiThreaded) {
         GTEST_SKIP() << "This test can crash drivers with threading issues";
     }
 
-    VkImageCreateInfo image_create_info = vku::InitStructHelper();
-    image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
-    image_create_info.mipLevels = 1;
-    image_create_info.arrayLayers = 1;
-    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_create_info.flags = 0;
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
     // Create an image object, allocate memory, bind memory, and destroy the object
     auto worker_thread = [&]() {
         for (uint32_t i = 0; i < 1000; ++i) {
-            vkt::Image image(*m_device, image_create_info, vkt::no_mem);
+            vkt::Image image(*m_device, image_ci, vkt::no_mem);
 
             VkMemoryRequirements mem_reqs;
             vk::GetImageMemoryRequirements(device(), image, &mem_reqs);
@@ -568,3 +556,108 @@ TEST_F(PositiveMemory, BindMemoryDX12Handle) {
     vk::BindImageMemory(device(), image, memory, 0);
 }
 #endif  // VK_USE_PLATFORM_WIN32_KHR
+
+TEST_F(PositiveMemory, BindMemoryStatusBuffer) {
+    TEST_DESCRIPTION("Use VkBindMemoryStatus when binding buffer to memory.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::maintenance6);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_6_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    if (IsPlatformMockICD()) {
+        GTEST_SKIP() << "Test not supported by MockICD, skipping";
+    }
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
+    buffer_ci.size = 32u;
+    buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    vkt::Buffer buffer;
+    buffer.InitNoMemory(*m_device, buffer_ci);
+
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
+    alloc_info.allocationSize = 32u;
+    vkt::DeviceMemory memory(*m_device, alloc_info);
+
+    VkResult result = VK_RESULT_MAX_ENUM;
+
+    VkBindMemoryStatus bind_memory_status = vku::InitStructHelper();
+    bind_memory_status.pResult = &result;
+
+    VkBindBufferMemoryInfo bind_info = vku::InitStructHelper(&bind_memory_status);
+    bind_info.buffer = buffer;
+    bind_info.memory = memory;
+    bind_info.memoryOffset = 0u;
+    vk::BindBufferMemory2(device(), 1u, &bind_info);
+
+    ASSERT_NE(result, VK_RESULT_MAX_ENUM);
+}
+
+TEST_F(PositiveMemory, BindMemoryStatusImage) {
+    TEST_DESCRIPTION("Use VkBindMemoryStatus when binding image to memory.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::maintenance6);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_6_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    if (IsPlatformMockICD()) {
+        GTEST_SKIP() << "Test not supported by MockICD, skipping";
+    }
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Image image(*m_device, image_ci, vkt::no_mem);
+
+    vkt::DeviceMemory memory;
+    memory.init(*m_device, vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(), 0));
+
+    VkResult result = VK_RESULT_MAX_ENUM;
+
+    VkBindMemoryStatus bind_memory_status = vku::InitStructHelper();
+    bind_memory_status.pResult = &result;
+
+    VkBindImageMemoryInfo bind_info = vku::InitStructHelper(&bind_memory_status);
+    bind_info.image = image;
+    bind_info.memory = memory;
+    bind_info.memoryOffset = 0u;
+    vk::BindImageMemory2(device(), 1u, &bind_info);
+
+    ASSERT_NE(result, VK_RESULT_MAX_ENUM);
+}
+
+TEST_F(PositiveMemory, MapMemoryCoherentAtomSize) {
+    RETURN_IF_SKIP(Init());
+    if (IsPlatformMockICD()) {
+        GTEST_SKIP() << "Test not supported by MockICD, MapMemory will fail ASAN";
+    }
+
+    const VkDeviceSize atom_size = m_device->Physical().limits_.nonCoherentAtomSize;
+    if (atom_size == 1) {
+        // Some platforms have an atomsize of 1 which makes the test meaningless
+        GTEST_SKIP() << "nonCoherentAtomSize is 1";
+    }
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
+    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    buffer_ci.size = 256;
+    vkt::Buffer buffer(*m_device, buffer_ci, vkt::no_mem);
+
+    VkMemoryRequirements mem_reqs;
+    vk::GetBufferMemoryRequirements(device(), buffer, &mem_reqs);
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
+    alloc_info.memoryTypeIndex = 0;
+
+    alloc_info.allocationSize = (atom_size * 4) + 1;
+    bool pass = m_device->Physical().SetMemoryType(mem_reqs.memoryTypeBits, &alloc_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    if (!pass) {
+        GTEST_SKIP() << "Failed to set memory type";
+    }
+    vkt::DeviceMemory mem(*m_device, alloc_info);
+
+    uint8_t *pData;
+    ASSERT_EQ(VK_SUCCESS, vk::MapMemory(device(), mem, 0, VK_WHOLE_SIZE, 0, (void **)&pData));
+    // Offset is atom size, but total memory range is not atom size
+    VkMappedMemoryRange mem_range = vku::InitStructHelper();
+    mem_range.memory = mem;
+    mem_range.offset = atom_size;
+    mem_range.size = VK_WHOLE_SIZE;
+    vk::FlushMappedMemoryRanges(device(), 1, &mem_range);
+    vk::UnmapMemory(device(), mem);
+}

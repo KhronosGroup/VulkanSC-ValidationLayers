@@ -17,13 +17,11 @@
  */
 
 #pragma once
-#include "generated/chassis.h"
 #include "state_tracker/state_tracker.h"
 #include "vulkansc/state_tracker/sc_device_state.h"
 #include "vulkansc/state_tracker/sc_pipeline_state.h"
 #include "vulkansc/state_tracker/sc_cmd_buffer_state.h"
 #include "vulkansc/state_tracker/sc_descriptor_sets.h"
-#include "generated/layer_chassis_dispatch.h"
 #include "error_message/logging.h"
 #include "vulkan/vk_layer.h"
 
@@ -34,39 +32,54 @@ VALSTATETRACK_DERIVED_STATE_OBJECT(VkPipeline, vvl::sc::Pipeline, vvl::Pipeline)
 VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandPool, vvl::sc::CommandPool, vvl::CommandPool);
 VALSTATETRACK_DERIVED_STATE_OBJECT(VkDescriptorPool, vvl::sc::DescriptorPool, vvl::DescriptorPool);
 
+namespace vvl::sc {
+
 template <typename BASE>
-class SCValidationStateTracker : public BASE {
+class Instance : public BASE {
+    using BaseClass = BASE;
+
   public:
+    Instance(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch) {}
+};
+
+template <typename BASE>
+class Device : public BASE {
+    using BaseClass = BASE;
+
+  public:
+    template <typename INSTANCE_BASE>
+    Device(vvl::dispatch::Device* dev, INSTANCE_BASE* instance) : BaseClass(dev, instance) {}
+
     template <typename State, typename HandleType = typename state_object::Traits<State>::HandleType>
     void Add(std::shared_ptr<State>&& state_object) {
-        BASE::template Add<State, HandleType>(std::move(state_object));
+        BaseClass::template Add<State, HandleType>(std::move(state_object));
     }
 
     template <typename State, typename Traits = typename state_object::Traits<State>>
     void Destroy(typename Traits::HandleType handle) {
-        BASE::template Destroy<State, Traits>(handle);
+        BaseClass::template Destroy<State, Traits>(handle);
     }
 
     template <typename State, typename Traits = typename state_object::Traits<State>>
     typename Traits::SharedType Get(typename Traits::HandleType handle) {
-        return BASE::template Get<State, Traits>(handle);
+        return BaseClass::template Get<State, Traits>(handle);
     }
 
     template <typename State, typename Traits = typename state_object::Traits<State>>
     typename Traits::ConstSharedType Get(typename Traits::HandleType handle) const {
-        return BASE::template Get<State, Traits>(handle);
+        return BaseClass::template Get<State, Traits>(handle);
     }
 
     template <typename State, typename Traits = typename state_object::Traits<State>,
               typename ReadLockedType = typename Traits::ReadLockedType>
     ReadLockedType GetRead(typename Traits::HandleType handle) const {
-        return BASE::template GetRead<State, Traits, ReadLockedType>(handle);
+        return BaseClass::template GetRead<State, Traits, ReadLockedType>(handle);
     }
 
     template <typename State, typename Traits = state_object::Traits<State>,
               typename WriteLockedType = typename Traits::WriteLockedType>
     WriteLockedType GetWrite(typename Traits::HandleType handle) {
-        return BASE::template GetWrite<State, Traits, WriteLockedType>(handle);
+        return BaseClass::template GetWrite<State, Traits, WriteLockedType>(handle);
     }
 
     template <typename CreateInfo>
@@ -74,7 +87,7 @@ class SCValidationStateTracker : public BASE {
     void RecyclePipelinePoolEntry(const VkPipelineOfflineCreateInfo* offline_info);
 
     // Functions requiring additional/modified state tracking for Vulkan SC
-    void PostCreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
+    virtual void FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
     virtual std::shared_ptr<vvl::CommandPool> CreateCommandPoolState(VkCommandPool command_pool,
                                                                      const VkCommandPoolCreateInfo* pCreateInfo) override;
     void PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
@@ -255,3 +268,5 @@ class SCValidationStateTracker : public BASE {
         std::atomic_uint32_t private_data_slots{0};
     } sc_reserved_objects_{};
 };
+
+}  // namespace vvl::sc

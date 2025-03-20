@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -546,16 +546,15 @@ TEST_F(NegativeDebugExtensions, DISABLED_SwapchainImagesDebugMarker) {
     RETURN_IF_SKIP(Init());
     RETURN_IF_SKIP(InitSurface());
 
-    SurfaceInformation info = GetSwapchainInfo(m_surface);
+    SurfaceInformation info = GetSwapchainInfo(m_surface.Handle());
     InitSwapchainInfo();
 
     VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
-    swapchain_create_info.surface = m_surface;
+    swapchain_create_info.surface = m_surface.Handle();
     swapchain_create_info.minImageCount = info.surface_capabilities.minImageCount;
     swapchain_create_info.imageFormat = info.surface_formats[0].format;
     swapchain_create_info.imageColorSpace = info.surface_formats[0].colorSpace;
-    swapchain_create_info.imageExtent = {info.surface_capabilities.minImageExtent.width,
-                                         info.surface_capabilities.minImageExtent.height};
+    swapchain_create_info.imageExtent = info.surface_capabilities.minImageExtent;
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -591,4 +590,34 @@ TEST_F(NegativeDebugExtensions, DISABLED_SwapchainImagesDebugMarker) {
         vk::DebugMarkerSetObjectTagEXT(device(), &name_info);
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(NegativeDebugExtensions, MultiObjectBindImage) {
+    TEST_DESCRIPTION("Make sure both VkDeviceMemory and VkImage are displayed in error message");
+    RETURN_IF_SKIP(Init());
+
+    // Create an image, allocate memory, free it, and then try to bind it
+    VkImageCreateInfo image_create_info =
+        vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
+    VkMemoryRequirements mem_reqs = image.MemoryRequirements();
+
+    VkMemoryAllocateInfo mem_alloc = vku::InitStructHelper();
+    // Introduce failure, do NOT set memProps to
+    // VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+    mem_alloc.memoryTypeIndex = 1;
+    mem_alloc.allocationSize = mem_reqs.size;
+    ASSERT_TRUE(m_device->Physical().SetMemoryType(mem_reqs.memoryTypeBits, &mem_alloc, 0));
+
+    vkt::DeviceMemory mem1(*m_device, mem_alloc);
+    vkt::DeviceMemory mem2(*m_device, mem_alloc);
+
+    // Bind first memory object to Image object
+    vk::BindImageMemory(device(), image, mem1, 0);
+
+    // Introduce validation failure, try to bind a different memory object to
+    // the same image object
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkBindImageMemory-image-07460", "Objects: 3");
+    vk::BindImageMemory(device(), image, mem2, 0);
+    m_errorMonitor->VerifyFound();
 }

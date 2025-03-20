@@ -1,4 +1,4 @@
-/* Copyright (c) 2021-2024 The Khronos Group Inc.
+/* Copyright (c) 2021-2025 The Khronos Group Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <vulkan/vulkan_core.h>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -37,7 +38,7 @@ struct Module;
 
 static constexpr uint32_t kInvalidValue = std::numeric_limits<uint32_t>::max();
 
-// Need to find a way to know if actually array lenght of zero, or a runtime array.
+// Need to find a way to know if actually array length of zero, or a runtime array.
 static constexpr uint32_t kRuntimeArray = std::numeric_limits<uint32_t>::max();
 
 // This is the common info for both OpDecorate and OpMemberDecorate
@@ -359,7 +360,6 @@ struct StageInterfaceVariable : public VariableBase {
     const Instruction &base_type;
     const bool is_builtin;
     bool nested_struct;
-    bool physical_storage_buffer;
 
     const std::vector<InterfaceSlot> interface_slots;  // Only for User Defined variables
     const std::vector<uint32_t> builtin_block;
@@ -406,19 +406,21 @@ struct ResourceInterfaceVariable : public VariableBase {
     // most likly will be OpTypeImage, OpTypeStruct, OpTypeSampler, or OpTypeAccelerationStructureKHR
     const Instruction &base_type;
 
-    // This is true if either:
-    // - The descriptor is made up of an OpRuntimeArray
-    // - Not all OpAccessChains pointing to this descriptor or easily determined constant
-    bool is_dynamic_accessed;
-
-    // Sampled Type width of the OpTypeImage the variable points to, 0 if doesn't use the image
-    const uint32_t image_sampled_type_width;
+    // True if the Resource variable itself is runtime descriptor array
+    // Online example to showcase various arrays we do/don't care about here https://godbolt.org/z/h9jhsKaPn
+    bool is_runtime_descriptor_array;
 
     // All info regarding what will be validated from requirements imposed by the pipeline on a descriptor. These
     // can't be checked at pipeline creation time as they depend on the Image or ImageView bound.
     // That is perf-critical code and hashing if 2 variables have same info provides a 20% perf bonus
     struct Info {
-        NumericType image_format_type;
+        // the 'format' operand of OpTypeImage as the corresponding Vulkan Format
+        VkFormat image_format{VK_FORMAT_UNDEFINED};
+        // the 'Sampled Type' operand of OpTypeImage,as a numeric type (float, uint, int)
+        NumericType image_sampled_type_numeric{NumericTypeUnknown};
+        // the 'Sampled Type' operand of OpTypeImage as the bit width (64 is the largest bit width in SPIR-V)
+        uint8_t image_sampled_type_width{0};
+
         spv::Dim image_dim;
         bool is_image_array;
         bool is_multisampled;
@@ -443,10 +445,7 @@ struct ResourceInterfaceVariable : public VariableBase {
         uint32_t access_mask{AccessBit::empty};
     } info;
     uint64_t descriptor_hash = 0;
-    bool IsImage() const { return info.image_format_type != NumericTypeUnknown; }
-
-    // If dealing with an image array, only check the indexes accesses
-    vvl::unordered_set<uint32_t> image_access_chain_indexes;
+    bool IsImage() const { return base_type.Opcode() == spv::OpTypeImage; }
 
     // Type of resource type (vkspec.html#interfaces-resources-storage-class-correspondence)
     bool is_storage_image{false};
@@ -460,10 +459,6 @@ struct ResourceInterfaceVariable : public VariableBase {
 
   protected:
     static const Instruction &FindBaseType(ResourceInterfaceVariable &variable, const Module &module_state);
-    static bool IsDynamicAccessed(ResourceInterfaceVariable &variable, const Module &module_state,
-                                  const AccessChainVariableMap &access_chain_map);
-    static uint32_t FindImageSampledTypeWidth(const Module &module_state, const Instruction &base_type);
-    static NumericType FindImageFormatType(const Module &module_state, const Instruction &base_type);
     static bool IsStorageBuffer(const ResourceInterfaceVariable &variable);
 };
 
@@ -535,6 +530,8 @@ struct EntryPoint {
     bool has_passthrough{false};
     bool has_alpha_to_coverage_variable{false};  // only for Fragment shaders
 
+    bool has_physical_storage_buffer_interface{false};
+
     EntryPoint(const Module &module_state, const Instruction &entrypoint_insn, const ImageAccessMap &image_access_map,
                const AccessChainVariableMap &access_chain_map, const VariableAccessMap &variable_access_map,
                const DebugNameMap &debug_name_map);
@@ -555,13 +552,13 @@ struct EntryPoint {
                                  const AccessChainVariableMap &access_chain_map);
 };
 
-// Info to capture while parsing the SPIR-V, but will only be used by ValidateSpirvStateless and don't need to save after
+// Info to capture while parsing the SPIR-V, but will only be used by SpirvValidator::Validate and don't need to save after
 struct StatelessData {
     // Used if the Shader Module is being passed in VkPipelineShaderStageCreateInfo
     std::shared_ptr<spirv::Module> pipeline_pnext_module;
 
     // These instruction mapping were designed to quickly find the few instructions without having to loop the entire pass
-    // In theory, these could be removed checked during the 2nd pass in ValidateSpirvStateless()
+    // In theory, these could be removed checked during the 2nd pass in SpirvValidator::Validate
     // TODO - Get perf numbers if better to understand if these make sense here
     std::vector<const Instruction *> read_clock_inst;
     std::vector<const Instruction *> atomic_inst;
@@ -622,6 +619,8 @@ struct Module {
         uint32_t builtin_workgroup_size_id = 0;
 
         std::vector<const Instruction *> cooperative_matrix_inst;
+
+        std::vector<const Instruction *> cooperative_vector_inst;
 
         std::vector<spv::Capability> capability_list;
         // Code on the hot path can cache capabilities for fast access.

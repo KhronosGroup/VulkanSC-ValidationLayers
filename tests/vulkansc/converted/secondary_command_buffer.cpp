@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -112,10 +112,10 @@ TEST_F(NegativeSecondaryCommandBuffer, Sync2AsPrimary) {
     secondary.Begin();
     secondary.End();
 
-    VkCommandBufferSubmitInfoKHR cb_info = vku::InitStructHelper();
+    VkCommandBufferSubmitInfo cb_info = vku::InitStructHelper();
     cb_info.commandBuffer = secondary.handle();
 
-    VkSubmitInfo2KHR submit_info = vku::InitStructHelper();
+    VkSubmitInfo2 submit_info = vku::InitStructHelper();
     submit_info.commandBufferInfoCount = 1;
     submit_info.pCommandBufferInfos = &cb_info;
 
@@ -721,7 +721,7 @@ TEST_F(NegativeSecondaryCommandBuffer, NestedCommandBufferRendering) {
     vkt::CommandBuffer secondary1(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     vkt::CommandBuffer secondary2(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
-    VkCommandBufferInheritanceRenderingInfoKHR cbiri = vku::InitStructHelper();
+    VkCommandBufferInheritanceRenderingInfo cbiri = vku::InitStructHelper();
     cbiri.colorAttachmentCount = 1;
     cbiri.pColorAttachmentFormats = &m_render_target_fmt;
     cbiri.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -757,7 +757,7 @@ TEST_F(NegativeSecondaryCommandBuffer, NestedCommandBufferSimultaneousUse) {
     vkt::CommandBuffer secondary1(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     vkt::CommandBuffer secondary2(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
-    VkCommandBufferInheritanceRenderingInfoKHR cbiri = vku::InitStructHelper();
+    VkCommandBufferInheritanceRenderingInfo cbiri = vku::InitStructHelper();
     cbiri.colorAttachmentCount = 1;
     cbiri.pColorAttachmentFormats = &m_render_target_fmt;
     cbiri.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -800,7 +800,7 @@ TEST_F(NegativeSecondaryCommandBuffer, MaxCommandBufferNestingLevel) {
     vkt::CommandBuffer secondary3(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     vkt::CommandBuffer secondary4(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
-    VkCommandBufferInheritanceRenderingInfoKHR cbiri = vku::InitStructHelper();
+    VkCommandBufferInheritanceRenderingInfo cbiri = vku::InitStructHelper();
     cbiri.colorAttachmentCount = 1;
     cbiri.pColorAttachmentFormats = &m_render_target_fmt;
     cbiri.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -829,4 +829,55 @@ TEST_F(NegativeSecondaryCommandBuffer, MaxCommandBufferNestingLevel) {
     vk::CmdExecuteCommands(secondary4.handle(), 1u, &secondary3.handle());
     m_errorMonitor->VerifyFound();
     secondary4.End();
+}
+
+TEST_F(NegativeSecondaryCommandBuffer, MissingInheritedQueriesFeature) {
+    AddRequiredFeature(vkt::Feature::pipelineStatisticsQuery);
+    RETURN_IF_SKIP(Init());
+
+    VkQueryPoolCreateInfo qpci = vkt::QueryPool::CreateInfo(VK_QUERY_TYPE_PIPELINE_STATISTICS, 1);
+    qpci.pipelineStatistics = VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
+    vkt::QueryPool query_pool(*m_device, qpci);
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    VkCommandBufferInheritanceInfo inheritance_info = vku::InitStructHelper();
+    inheritance_info.pipelineStatistics = qpci.pipelineStatistics;
+
+    VkCommandBufferBeginInfo seconary_begin_info = vku::InitStructHelper();
+    seconary_begin_info.pInheritanceInfo = &inheritance_info;
+    secondary.Begin(&seconary_begin_info);
+    secondary.End();
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer.handle(), query_pool.handle(), 0u, 1u);
+    vk::CmdBeginQuery(m_command_buffer.handle(), query_pool.handle(), 0u, 0u);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-commandBuffer-00101");
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1u, &secondary.handle());
+    m_errorMonitor->VerifyFound();
+    vk::CmdEndQuery(m_command_buffer.handle(), query_pool.handle(), 0u);
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeSecondaryCommandBuffer, MissingSimultaniousUseBit) {
+    RETURN_IF_SKIP(Init());
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary.Begin();
+    secondary.End();
+
+    vkt::CommandBuffer primary(*m_device, m_command_pool);
+    primary.Begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
+    vk::CmdExecuteCommands(primary.handle(), 1u, &secondary.handle());
+    primary.End();
+
+    m_command_buffer.Begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1u, &secondary.handle());
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("VUID-vkQueueSubmit-pCommandBuffers-00073");
+    m_default_queue->Submit(primary);
+    m_errorMonitor->VerifyFound();
+
+    m_default_queue->Wait();
 }

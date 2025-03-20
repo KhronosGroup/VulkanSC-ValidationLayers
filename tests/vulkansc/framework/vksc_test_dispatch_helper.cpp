@@ -629,7 +629,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateFramebuffer(VkDevice device, const V
     // Vulkan SC allows maxFramebufferLayers = 1 in certain cases while Vulkan requires 256
     // so we have to skip test cases that rely on higher capabilities
     const uint32_t max_framebuffer_layers =
-        DispatchHelper()->TestCase()->DeviceObj()->phy().properties_.limits.maxFramebufferLayers;
+        DispatchHelper()->TestCase()->DeviceObj()->Physical().properties_.limits.maxFramebufferLayers;
     if (max_framebuffer_layers < 256 && pCreateInfo->layers > max_framebuffer_layers) {
         DispatchHelper()->SkipUnsupportedTest(
             "Test case relies on Vulkan minimum for maxFramebufferLayers but Vulkan SC allows for lower values");
@@ -797,6 +797,14 @@ VKAPI_ATTR VkBool32 VKAPI_CALL TestDispatchHelper::DebugCallback(VkDebugUtilsMes
                 if (tls_skip_message_ == nullptr) {
                     tls_skip_message_ = skip_on_vuid.second;
                 }
+                return VK_FALSE;
+            }
+        }
+        // Check VUIDs that should be ignored
+        for (const auto& ignore_vuid : tls_dispatch_policy_->ignore_vuids_) {
+            if (strstr(callback_data->pMessage, ignore_vuid)) {
+                // Prevent the VUID from causing a test failure
+                self->test_case_->Monitor().SetAllowedFailureMsg(ignore_vuid);
                 return VK_FALSE;
             }
         }

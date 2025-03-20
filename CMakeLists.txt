@@ -1,7 +1,7 @@
 # ~~~
-# Copyright (c) 2014-2024 Valve Corporation
-# Copyright (c) 2014-2024 LunarG, Inc.
-# Copyright (c) 2023-2023 RasterGrid Kft.
+# Copyright (c) 2014-2025 Valve Corporation
+# Copyright (c) 2014-2025 LunarG, Inc.
+# Copyright (c) 2023-2025 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ~~~
-cmake_minimum_required(VERSION 3.17.2)
+cmake_minimum_required(VERSION 3.22.1)
 
 project(VVL LANGUAGES CXX)
 
@@ -102,7 +102,7 @@ if (VVL_ENABLE_TRACY)
         message(FATAL_ERROR "Tracy cannot be used with mimalloc")
     endif()
 
-    if (VVL_TRACY_CALLSTACK STREQUAL "OFF") 
+    if (VVL_TRACY_CALLSTACK STREQUAL "OFF")
         set(VVL_TRACY_CALLSTACK 48)
     endif()
 
@@ -115,6 +115,13 @@ if (VVL_ENABLE_TRACY)
 
     if(VVL_ENABLE_TRACY_CPU_MEMORY)
         add_compile_definitions(VVL_TRACY_CPU_MEMORY)
+    endif()
+
+    if(VVL_ENABLE_TRACY_GPU)
+        add_compile_definitions(
+            VVL_TRACY_GPU
+            TRACY_VK_USE_SYMBOL_TABLE
+        )
     endif()
 endif()
 
@@ -170,12 +177,9 @@ if(${CMAKE_CXX_COMPILER_ID} MATCHES "(GNU|Clang)")
             -Wconversion
             -Wimplicit-fallthrough
             -Wstring-conversion
-        )
-
-        if (CMAKE_BUILD_TYPE MATCHES "Debug")
             # When using tools such as lldb, strings will produce "error: summary string parsing error"
-            add_compile_options(-fstandalone-debug)
-        endif()
+            $<$<CONFIG:Debug>:-fstandalone-debug>
+        )
     endif()
 elseif(MSVC)
     add_compile_options(

@@ -21,12 +21,26 @@
 #include "sync/sync_validation.h"
 #include "vulkansc/state_tracker/sc_state_tracker.h"
 
-class SCSyncValidator : public SCValidationStateTracker<SyncValidator> {
+namespace syncval::sc {
+
+class Instance : public vvl::sc::Instance<syncval::Instance> {
   protected:
-    using BASE = SCValidationStateTracker<SyncValidator>;
+    using BaseClass = vvl::sc::Instance<syncval::Instance>;
 
   public:
-    using StateTracker = SCValidationStateTracker<SyncValidator>;
+    using StateTracker = vvl::sc::Instance<syncval::Instance>;
 
-    SCSyncValidator() {}
-};  // Class SCSyncValidator
+    Instance(vvl::dispatch::Instance *dispatch) : BaseClass(dispatch) {}
+};
+
+class Device : public vvl::sc::Device<SyncValidator> {
+  protected:
+    using BaseClass = vvl::sc::Device<SyncValidator>;
+
+  public:
+    using StateTracker = vvl::sc::Device<SyncValidator>;
+
+    Device(vvl::dispatch::Device *dev, syncval::sc::Instance *instance_vo) : BaseClass(dev, instance_vo) {}
+};
+
+}  // namespace syncval::sc

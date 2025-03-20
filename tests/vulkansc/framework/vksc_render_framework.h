@@ -34,26 +34,26 @@ class VkSCRenderFramework : public VkRenderFramework {
     VkPhysicalDeviceVulkanSC10Features GetVulkanSC10Features() const {
         auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
         auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2>(&sc_10_features);
-        vksc::GetPhysicalDeviceFeatures2(gpu(), &features2);
+        vksc::GetPhysicalDeviceFeatures2(Gpu(), &features2);
         return sc_10_features;
     }
 
     VkPhysicalDeviceVulkanSC10Properties GetVulkanSC10Properties() const {
         auto sc_10_props = vku::InitStruct<VkPhysicalDeviceVulkanSC10Properties>();
         auto props2 = vku::InitStruct<VkPhysicalDeviceProperties2>(&sc_10_props);
-        vksc::GetPhysicalDeviceProperties2(gpu(), &props2);
+        vksc::GetPhysicalDeviceProperties2(Gpu(), &props2);
         return sc_10_props;
     }
 
     VkPhysicalDeviceFeatures GetVulkanFeatures() const {
         VkPhysicalDeviceFeatures features;
-        vksc::GetPhysicalDeviceFeatures(gpu(), &features);
+        vksc::GetPhysicalDeviceFeatures(Gpu(), &features);
         return features;
     }
 
     VkPhysicalDeviceProperties GetVulkanProperties() const {
         VkPhysicalDeviceProperties props;
-        vksc::GetPhysicalDeviceProperties(gpu(), &props);
+        vksc::GetPhysicalDeviceProperties(Gpu(), &props);
         return props;
     }
 
@@ -61,7 +61,7 @@ class VkSCRenderFramework : public VkRenderFramework {
     T GetFeatures() const {
         auto features = vku::InitStruct<T>();
         auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2>(&features);
-        vksc::GetPhysicalDeviceFeatures2(gpu(), &features2);
+        vksc::GetPhysicalDeviceFeatures2(Gpu(), &features2);
         return features;
     }
 
@@ -69,7 +69,7 @@ class VkSCRenderFramework : public VkRenderFramework {
     T GetProperties() const {
         auto props = vku::InitStruct<T>();
         auto props2 = vku::InitStruct<VkPhysicalDeviceProperties2>(&props);
-        vksc::GetPhysicalDeviceProperties2(gpu(), &props2);
+        vksc::GetPhysicalDeviceProperties2(Gpu(), &props2);
         return props;
     }
 

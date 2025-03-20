@@ -1,7 +1,7 @@
-/* Copyright (c) 2019-2024 The Khronos Group Inc.
- * Copyright (c) 2019-2024 Valve Corporation
- * Copyright (c) 2019-2024 LunarG, Inc.
- * Copyright (C) 2019-2024 Google Inc.
+/* Copyright (c) 2019-2025 The Khronos Group Inc.
+ * Copyright (c) 2019-2025 Valve Corporation
+ * Copyright (c) 2019-2025 LunarG, Inc.
+ * Copyright (C) 2019-2025 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,11 @@
  */
 #pragma once
 
+#include <cstddef>
 #include <vector>
-#include "range_vector.h"
-#include "custom_containers.h"
-#ifndef SPARSE_CONTAINER_UNIT_TEST
+#include "containers/range.h"
+#include "containers/range_map.h"
 #include "vulkan/vulkan.h"
-#else
-#include "vk_snippets.h"
-#endif
 
 namespace vvl {
 class Image;
@@ -38,7 +35,7 @@ namespace subresource_adapter {
 class RangeEncoder;
 using IndexType = uint64_t;
 template <typename Element>
-using Range = sparse_container::range<Element>;
+using Range = vvl::range<Element>;
 using IndexRange = Range<IndexType>;
 using WritePolicy = sparse_container::value_precedence;
 using split_op_keep_both = sparse_container::split_op_keep_both;
@@ -479,7 +476,7 @@ enum BothRangeMapMode { kTristate, kSmall, kBig };
 template <typename T, size_t N>
 class BothRangeMap {
     using BigMap = sparse_container::range_map<IndexType, T>;
-    using RangeType = sparse_container::range<IndexType>;
+    using RangeType = vvl::range<IndexType>;
     using SmallMap = sparse_container::small_range_map<IndexType, T, RangeType, N>;
     using SmallMapIterator = typename SmallMap::iterator;
     using SmallMapConstIterator = typename SmallMap::const_iterator;
@@ -765,13 +762,13 @@ class BothRangeMap {
     }
     BigMap* MakeBigMap() {
         if (BigMode()) {
-            return new (&backing_store) BigMap();
+            return new (backing_store) BigMap();
         }
         return nullptr;
     }
     SmallMap* MakeSmallMap(index_type limit) {
         if (SmallMode()) {
-            return new (&backing_store) SmallMap(limit);
+            return new (backing_store) SmallMap(limit);
         }
         return nullptr;
     }
@@ -781,8 +778,7 @@ class BothRangeMap {
     BigMap* big_map_ = nullptr;
     SmallMap* small_map_ = nullptr;
 
-    using Storage = typename std::aligned_union<0, SmallMap, BigMap>::type;
-    Storage backing_store;
+    alignas(std::max(alignof(SmallMap), alignof(BigMap))) std::byte backing_store[std::max(sizeof(SmallMap), sizeof(BigMap))];
 };
 
 }  // namespace subresource_adapter

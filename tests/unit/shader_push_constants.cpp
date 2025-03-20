@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +14,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/shader_object_helper.h"
 
 class NegativeShaderPushConstants : public VkLayerTest {};
 
@@ -54,13 +55,10 @@ TEST_F(NegativeShaderPushConstants, NotDeclared) {
 
 TEST_F(NegativeShaderPushConstants, PipelineRange) {
     TEST_DESCRIPTION("Invalid use of VkPushConstantRange structs.");
-
     RETURN_IF_SKIP(Init());
 
-    VkPhysicalDeviceProperties device_props = {};
-    vk::GetPhysicalDeviceProperties(Gpu(), &device_props);
     // will be at least 256 as required from the spec
-    const uint32_t maxPushConstantsSize = device_props.limits.maxPushConstantsSize;
+    const uint32_t maxPushConstantsSize = m_device->Physical().limits_.maxPushConstantsSize;
 
     VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
     VkPushConstantRange push_constant_range = {0, 0, 4};
@@ -120,6 +118,72 @@ TEST_F(NegativeShaderPushConstants, PipelineRange) {
     pipeline_layout_info.pPushConstantRanges = push_constant_range_duplicate;
     m_errorMonitor->SetDesiredError("VUID-VkPipelineLayoutCreateInfo-pPushConstantRanges-00292");
     vk::CreatePipelineLayout(device(), &pipeline_layout_info, nullptr, &pipeline_layout);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderPushConstants, PipelineRangeShaderObject) {
+    TEST_DESCRIPTION("Invalid use of VkPushConstantRange structs.");
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Shader shader;
+    VkPushConstantRange push_constant_range = {0, 0, 4};
+    const auto spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    VkShaderCreateInfoEXT ci_info = ShaderCreateInfo(spv, VK_SHADER_STAGE_VERTEX_BIT, 0, nullptr, 1, &push_constant_range);
+
+    // stageFlags of 0
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-stageFlags-requiredbitmask");
+    shader.init(*m_device, ci_info);
+    m_errorMonitor->VerifyFound();
+
+    // will be at least 256 as required from the spec
+    const uint32_t maxPushConstantsSize = m_device->Physical().limits_.maxPushConstantsSize;
+
+    // offset over limit
+    push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, maxPushConstantsSize, 8};
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-offset-00294");
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-size-00298");
+    shader.init(*m_device, ci_info);
+    m_errorMonitor->VerifyFound();
+
+    // offset not a multiple of 4
+    push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 1, 8};
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-offset-00295");
+    shader.init(*m_device, ci_info);
+    m_errorMonitor->VerifyFound();
+
+    // size of 0
+    push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, 0};
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-size-00296");
+    shader.init(*m_device, ci_info);
+    m_errorMonitor->VerifyFound();
+
+    // size not a multiple of 4
+    push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, 7};
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-size-00297");
+    shader.init(*m_device, ci_info);
+    m_errorMonitor->VerifyFound();
+
+    // size over limit
+    push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, maxPushConstantsSize + 4};
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-size-00298");
+    shader.init(*m_device, ci_info);
+    m_errorMonitor->VerifyFound();
+
+    // size over limit of non-zero offset
+    push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 4, maxPushConstantsSize};
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-size-00298");
+    shader.init(*m_device, ci_info);
+    m_errorMonitor->VerifyFound();
+
+    push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, maxPushConstantsSize};
+    // Duplicate ranges
+    VkPushConstantRange push_constant_range_duplicate[2] = {push_constant_range, push_constant_range};
+    ci_info.pushConstantRangeCount = 2;
+    ci_info.pPushConstantRanges = push_constant_range_duplicate;
+    m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-pPushConstantRanges-10063");
+    shader.init(*m_device, ci_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -303,8 +367,8 @@ TEST_F(NegativeShaderPushConstants, DrawWithoutUpdate) {
     g_pipe_small_range.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     g_pipe_small_range.pipeline_layout_ci_ = pipeline_layout_info;
 
-    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-07987");
-    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-07987");
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-10069");
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-10069");
     g_pipe_small_range.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 
@@ -483,5 +547,97 @@ TEST_F(NegativeShaderPushConstants, DISABLED_SpecConstantSize) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {}, {push_constant_range});
     m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-layout-07987");
     pipe.CreateComputePipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderPushConstants, ArrayOf8Bit) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9364");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    // storagePushConstant8 is not enabled
+    RETURN_IF_SKIP(Init());
+
+    const char *vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_8bit_storage: enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
+        layout(push_constant) uniform PushConstant {
+            int8_t x[4];
+        } data;
+
+        void main(){
+            gl_Position = vec4(float(data.x[0]) * 0.0);
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storagePushConstant8-06330");  // feature
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");     // capability
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderPushConstants, StructOf8Bit) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9364");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    // storagePushConstant8 is not enabled
+    RETURN_IF_SKIP(Init());
+
+    const char *vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_8bit_storage: enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
+
+        struct Foo {
+            uint a;
+            int8_t b;
+            vec4 c;
+        };
+
+        layout(push_constant) uniform PushConstant {
+            Foo x;
+        } data;
+
+        void main(){
+            gl_Position = data.x.c;
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storagePushConstant8-06330");  // feature
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");     // capability
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderPushConstants, ArrayOfStructOf8Bit) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9364");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    // storagePushConstant8 is not enabled
+    RETURN_IF_SKIP(Init());
+
+    const char *vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_8bit_storage: enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
+
+        struct Foo {
+            uint a;
+            int8_t b[2];
+            vec4 c;
+        };
+
+        layout(push_constant) uniform PushConstant {
+            Foo x[2];
+        } data;
+
+        void main(){
+            gl_Position = data.x[1].c;
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storagePushConstant8-06330");  // feature
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");     // capability
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
     m_errorMonitor->VerifyFound();
 }

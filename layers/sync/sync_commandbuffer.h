@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2024 Valve Corporation
- * Copyright (c) 2019-2024 LunarG, Inc.
+ * Copyright (c) 2019-2025 Valve Corporation
+ * Copyright (c) 2019-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,15 @@
 #pragma once
 
 #include "sync/sync_renderpass.h"
+#include "sync/sync_reporting.h"
 #include "state_tracker/cmd_buffer_state.h"
 
+struct ReportKeyValues;
 class SyncValidator;
+
+namespace syncval {
+class ErrorMessages;
+}  // namespace syncval
 
 class AlternateResourceUsage {
   public:
@@ -28,6 +34,7 @@ class AlternateResourceUsage {
         using Record = std::unique_ptr<RecordBase>;
         virtual Record MakeRecord() const = 0;
         virtual std::ostream &Format(std::ostream &out, const SyncValidator &sync_state) const = 0;
+        virtual vvl::Func GetCommand() const = 0;
         virtual ~RecordBase() {}
     };
 
@@ -41,6 +48,7 @@ class AlternateResourceUsage {
     FormatterState Formatter(const SyncValidator &sync_state) const { return FormatterState(sync_state, *this); };
 
     std::ostream &Format(std::ostream &out, const SyncValidator &sync_state) const { return record_->Format(out, sync_state); };
+    vvl::Func GetCommand() const { return record_->GetCommand(); }
     AlternateResourceUsage() = default;
     AlternateResourceUsage(const RecordBase &record) : record_(record.MakeRecord()) {}
     AlternateResourceUsage(const AlternateResourceUsage &other) : record_() {
@@ -179,26 +187,8 @@ class CommandExecutionContext {
   public:
     using AccessLog = std::vector<ResourceUsageRecord>;
     using CommandBufferSet = std::vector<std::shared_ptr<const vvl::CommandBuffer>>;
-    CommandExecutionContext(const SyncValidator& sync_validator, VkQueueFlags queue_flags)
-        : sync_state_(sync_validator), queue_flags_(queue_flags) {}
+    CommandExecutionContext(const SyncValidator &sync_validator, VkQueueFlags queue_flags);
     virtual ~CommandExecutionContext() = default;
-
-    // Are imported command buffers Submitted (QueueBatchContext), or Executed (CommandBufferAccessContext)
-    enum ExecutionType : int {
-        kExecuted = 0,  // Recorded contexts are integrated into context during vkCmdExecuteCommands
-        kSubmitted = 1  // Recorded contexts are integrated into context during vkQueueSubmit (etc.)
-    };
-
-    virtual ExecutionType Type() const = 0;
-
-    const char *ExecutionTypeString() {
-        const char *type_string[] = {"Executed", "Submitted"};
-        return type_string[Type()];
-    }
-    const char *ExecutionUsageString() {
-        const char *usage_string[] = {"executed_usage", "submitted_usage"};
-        return usage_string[Type()];
-    }
 
     virtual AccessContext *GetCurrentAccessContext() = 0;
     virtual SyncEventsContext *GetCurrentEventsContext() = 0;
@@ -206,22 +196,26 @@ class CommandExecutionContext {
     virtual const SyncEventsContext *GetCurrentEventsContext() const = 0;
     virtual QueueId GetQueueId() const = 0;
     virtual VulkanTypedHandle Handle() const = 0;
-    virtual std::string FormatUsage(ResourceUsageTagEx tag_ex) const = 0;
+    virtual ReportUsageInfo GetReportUsageInfo(ResourceUsageTagEx tag_ex) const = 0;
+    virtual std::string FormatUsage(ResourceUsageTagEx tag_ex, ReportKeyValues &extra_properties) const = 0;
+    virtual void AddUsageRecordExtraProperties(ResourceUsageTag tag, ReportKeyValues &extra_properties) const = 0;
 
-    std::string FormatHazard(const HazardResult &hazard) const;
+    std::string FormatHazard(const HazardResult &hazard, ReportKeyValues &key_values) const;
     bool ValidForSyncOps() const;
     const SyncValidator &GetSyncState() const { return sync_state_; }
+    VkQueueFlags GetQueueFlags() const { return queue_flags_; }
 
   protected:
     const SyncValidator &sync_state_;
+    const syncval::ErrorMessages &error_messages_;
     const VkQueueFlags queue_flags_;
 };
 
 class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProvider {
   public:
     using SyncOpPointer = std::shared_ptr<SyncOpBase>;
-    constexpr static SyncStageAccessIndex kResolveRead = SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_READ;
-    constexpr static SyncStageAccessIndex kResolveWrite = SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE;
+    constexpr static SyncAccessIndex kResolveRead = SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_READ;
+    constexpr static SyncAccessIndex kResolveWrite = SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE;
     constexpr static SyncOrdering kColorResolveOrder = SyncOrdering::kColorAttachment;
     // Although depth resolve runs on the color attachment output stage and uses color accesses, depth accesses
     // still participate in the ordering. That's why using raster and not only color attachment ordering
@@ -256,9 +250,9 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
 
     void Reset();
 
-    std::string FormatUsage(ResourceUsageTagEx tag_ex) const override;
-    std::string FormatUsage(const char *usage_string,
-                            const ResourceFirstAccess &access) const;  //  Only command buffers have "first usage"
+    ReportUsageInfo GetReportUsageInfo(ResourceUsageTagEx tag_ex) const override;
+    std::string FormatUsage(ResourceUsageTagEx tag_ex, ReportKeyValues &extra_properties) const override;
+    void AddUsageRecordExtraProperties(ResourceUsageTag tag, ReportKeyValues &extra_properties) const override;
     AccessContext *GetCurrentAccessContext() override { return current_context_; }
     SyncEventsContext *GetCurrentEventsContext() override { return &events_context_; }
     const AccessContext *GetCurrentAccessContext() const override { return current_context_; }
@@ -284,9 +278,9 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
     bool ValidateDrawDynamicRenderingAttachment(const Location &loc) const;
     void RecordDrawAttachment(ResourceUsageTag tag);
     void RecordDrawDynamicRenderingAttachment(ResourceUsageTag tag);
-    ClearAttachmentInfo GetClearAttachmentInfo(const VkClearAttachment &clear_attachment, const VkClearRect &rect) const;
-    bool ValidateClearAttachment(const Location &loc, const VkClearAttachment &clear_attachment, const VkClearRect &rect) const;
-    void RecordClearAttachment(ResourceUsageTag tag, const VkClearAttachment &clear_attachment, const VkClearRect &rect);
+    bool ValidateClearAttachment(const Location &loc, const VkClearAttachment &clear_attachment, uint32_t clear_rect_index,
+                                 const VkClearRect &clear_rect) const;
+    void RecordClearAttachment(ResourceUsageTag tag, const VkClearAttachment &clear_attachment, const VkClearRect &clear_rect);
 
     ResourceUsageTag RecordNextSubpass(vvl::Func command);
     ResourceUsageTag RecordEndRenderPass(vvl::Func command);
@@ -295,9 +289,6 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
     void RecordExecutedCommandBuffer(const CommandBufferAccessContext &recorded_context);
     void ResolveExecutedCommandBuffer(const AccessContext &recorded_context, ResourceUsageTag offset);
 
-    VkQueueFlags GetQueueFlags() const { return cb_state_ ? cb_state_->GetQueueFlags() : 0; }
-
-    ExecutionType Type() const override { return kExecuted; }
     size_t GetTagCount() const { return access_log_->size(); }
     VulkanTypedHandle Handle() const override {
         if (cb_state_) {
@@ -350,8 +341,13 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
     // As this is passing around a shared pointer to record, move to avoid needless atomics.
     void RecordSyncOp(SyncOpPointer &&sync_op);
 
-    bool ValidateClearAttachment(const Location &loc, const ClearAttachmentInfo &info) const;
-    void RecordClearAttachment(ResourceUsageTag tag, const ClearAttachmentInfo &clear_info);
+    struct ClearAttachmentInfo {
+        const syncval_state::ImageViewState &attachment_view;
+        VkImageAspectFlags aspects_to_clear = 0;
+        VkImageSubresourceRange subresource_range{};
+    };
+    std::optional<ClearAttachmentInfo> GetClearAttachmentInfo(const VkClearAttachment &clear_attachment,
+                                                              const VkClearRect &rect) const;
 
     void CheckCommandTagDebugCheckpoint();
 

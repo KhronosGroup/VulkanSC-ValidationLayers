@@ -31,9 +31,9 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    VkDescriptorBindingFlagsEXT flags[3] = {0, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT,
-                                            VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT};
-    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flags_create_info = vku::InitStructHelper();
+    VkDescriptorBindingFlags flags[3] = {0, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+                                         VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT};
+    VkDescriptorSetLayoutBindingFlagsCreateInfo flags_create_info = vku::InitStructHelper();
     flags_create_info.bindingCount = 3;
     flags_create_info.pBindingFlags = &flags[0];
 
@@ -44,7 +44,7 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
         {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
     };
     VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper(&flags_create_info);
-    ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+    ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
     ds_layout_ci.bindingCount = 3;
     ds_layout_ci.pBindings = &binding[0];
     vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
@@ -55,7 +55,7 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
         {binding[2].descriptorType, binding[2].descriptorCount},
     };
     VkDescriptorPoolCreateInfo dspci = vku::InitStructHelper();
-    dspci.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT;
+    dspci.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
     dspci.poolSizeCount = 3;
     dspci.pPoolSizes = &pool_sizes[0];
     dspci.maxSets = 1;
@@ -194,7 +194,7 @@ TEST_F(NegativeDescriptorIndexing, DISABLED_SetLayoutWithoutExtension) {
     RETURN_IF_SKIP(Init());
 
     VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper();
-    ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+    ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 
     VkDescriptorSetLayout ds_layout = VK_NULL_HANDLE;
 
@@ -211,9 +211,9 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
 
     RETURN_IF_SKIP(Init());
 
-    std::array<VkDescriptorBindingFlagsEXT, 2> flags = {
-        {VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT}};
-    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flags_create_info = vku::InitStructHelper();
+    std::array<VkDescriptorBindingFlags, 2> flags = {
+        {VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT}};
+    VkDescriptorSetLayoutBindingFlagsCreateInfo flags_create_info = vku::InitStructHelper();
     flags_create_info.bindingCount = size32(flags);
     flags_create_info.pBindingFlags = nullptr;
 
@@ -230,7 +230,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
     }
 
     {
-        // VU for VkDescriptorSetLayoutBindingFlagsCreateInfoEXT::bindingCount
+        // VU for VkDescriptorSetLayoutBindingFlagsCreateInfo::bindingCount
         flags_create_info.pBindingFlags = flags.data();
         flags_create_info.bindingCount = 2;
 
@@ -251,7 +251,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
         m_errorMonitor->VerifyFound();
     }
     {
-        ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+        ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
         ds_layout_ci.bindingCount = 0;
         flags_create_info.bindingCount = 0;
         vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
@@ -287,10 +287,10 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
             ds_layout_ci.flags = 0;
             ds_layout_ci.bindingCount = 1;
             flags_create_info.bindingCount = 1;
-            flags[0] = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
+            flags[0] = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
             vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
 
-            VkDescriptorSetVariableDescriptorCountAllocateInfoEXT count_alloc_info = vku::InitStructHelper();
+            VkDescriptorSetVariableDescriptorCountAllocateInfo count_alloc_info = vku::InitStructHelper();
             count_alloc_info.descriptorSetCount = 1;
             // Set variable count larger than what was in the descriptor binding
             uint32_t variable_count = 2;
@@ -312,7 +312,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
             binding.descriptorCount = 3;
             vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
 
-            VkDescriptorSetVariableDescriptorCountAllocateInfoEXT count_alloc_info = vku::InitStructHelper();
+            VkDescriptorSetVariableDescriptorCountAllocateInfo count_alloc_info = vku::InitStructHelper();
             count_alloc_info.descriptorSetCount = 1;
             uint32_t variable_count = 2;
             count_alloc_info.pDescriptorCounts = &variable_count;
@@ -370,12 +370,12 @@ TEST_F(NegativeDescriptorIndexing, SetLayoutBindings) {
 
     VkDescriptorBindingFlags flags[2] = {VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, 0};
 
-    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flags_create_info = vku::InitStructHelper();
+    VkDescriptorSetLayoutBindingFlagsCreateInfo flags_create_info = vku::InitStructHelper();
     flags_create_info.bindingCount = 2;
     flags_create_info.pBindingFlags = flags;
 
     VkDescriptorSetLayoutCreateInfo create_info = vku::InitStructHelper(&flags_create_info);
-    create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+    create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
     create_info.bindingCount = 2;
     create_info.pBindings = bindings;
 

@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+/* Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (C) 2015-2024 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,10 +18,9 @@
 
 #include "stateless/stateless_validation.h"
 
-#include "generated/chassis.h"
-
-bool StatelessValidation::CheckPromotedApiAgainstVulkanVersion(VkInstance instance, const Location &loc,
-                                                               const uint32_t promoted_version) const {
+namespace stateless {
+bool Instance::CheckPromotedApiAgainstVulkanVersion(VkInstance instance, const Location &loc,
+                                                    const uint32_t promoted_version) const {
     bool skip = false;
     if (api_version < promoted_version) {
         skip |= LogError("UNASSIGNED-API-Version-Violation", instance, loc,
@@ -32,8 +31,8 @@ bool StatelessValidation::CheckPromotedApiAgainstVulkanVersion(VkInstance instan
     return skip;
 }
 
-bool StatelessValidation::CheckPromotedApiAgainstVulkanVersion(VkPhysicalDevice pdev, const Location &loc,
-                                                               const uint32_t promoted_version) const {
+bool Instance::CheckPromotedApiAgainstVulkanVersion(VkPhysicalDevice pdev, const Location &loc,
+                                                    const uint32_t promoted_version) const {
     bool skip = false;
     const auto &target_pdev = physical_device_properties_map.find(pdev);
     if (target_pdev != physical_device_properties_map.end()) {
@@ -51,23 +50,13 @@ bool StatelessValidation::CheckPromotedApiAgainstVulkanVersion(VkPhysicalDevice 
     return skip;
 }
 
-bool StatelessValidation::OutputExtensionError(const Location &loc, const vvl::Extensions &exentsions) const {
+bool Instance::OutputExtensionError(const Location &loc, const vvl::Extensions &exentsions) const {
     return LogError("UNASSIGNED-GeneralParameterError-ExtensionNotEnabled", instance, loc,
                     "function required extension %s which has not been enabled.\n", String(exentsions).c_str());
 }
-
-bool StatelessValidation::SupportedByPdev(const VkPhysicalDevice physical_device, vvl::Extension extension, bool skip_gpdp2) const {
-    // We don't know here if the caller cares or not about gpdp2
-    if (instance_extensions.vk_khr_get_physical_device_properties2 || skip_gpdp2) {
-        // Struct is legal IF it's supported
-        const auto &dev_exts_enumerated = device_extensions_enumerated.find(physical_device);
-        if (dev_exts_enumerated == device_extensions_enumerated.end()) return true;
-        auto enum_iter = dev_exts_enumerated->second.find(extension);
-        if (enum_iter != dev_exts_enumerated->second.cend()) {
-            return true;
-        }
-    }
-    return false;
+bool Device::OutputExtensionError(const Location &loc, const vvl::Extensions &exentsions) const {
+    return LogError("UNASSIGNED-GeneralParameterError-ExtensionNotEnabled", device, loc,
+                    "function required extension %s which has not been enabled.\n", String(exentsions).c_str());
 }
 
 static const uint8_t kUtF8OneByteCode = 0xC0;
@@ -120,7 +109,7 @@ static VkStringErrorFlags ValidateVkString(const int max_length, const char *utf
 }
 
 static const int kMaxParamCheckerStringLength = 256;
-bool StatelessValidation::ValidateString(const Location &loc, const char *vuid, const char *validate_string) const {
+bool Context::ValidateString(const Location &loc, const char *vuid, const char *validate_string) const {
     bool skip = false;
 
     VkStringErrorFlags result = ValidateVkString(kMaxParamCheckerStringLength, validate_string);
@@ -128,30 +117,30 @@ bool StatelessValidation::ValidateString(const Location &loc, const char *vuid, 
     if (result == VK_STRING_ERROR_NONE) {
         return skip;
     } else if (result & VK_STRING_ERROR_LENGTH) {
-        skip |= LogError(vuid, device, loc, "exceeds max length %" PRIu32 ".", kMaxParamCheckerStringLength);
+        skip |= log.LogError(vuid, error_obj.handle, loc, "exceeds max length %" PRIu32 ".", kMaxParamCheckerStringLength);
     } else if (result & VK_STRING_ERROR_BAD_DATA) {
-        skip |= LogError(vuid, device, loc, "contains invalid characters or is badly formed.");
+        skip |= log.LogError(vuid, error_obj.handle, loc, "contains invalid characters or is badly formed.");
     }
     return skip;
 }
 
-bool StatelessValidation::ValidateNotZero(bool is_zero, const char *vuid, const Location &loc) const {
+bool Context::ValidateNotZero(bool is_zero, const char *vuid, const Location &loc) const {
     bool skip = false;
     if (is_zero) {
-        skip |= LogError(vuid, device, loc, "is zero.");
+        skip |= log.LogError(vuid, error_obj.handle, loc, "is zero.");
     }
     return skip;
 }
 
-bool StatelessValidation::ValidateRequiredPointer(const Location &loc, const void *value, const char *vuid) const {
+bool Context::ValidateRequiredPointer(const Location &loc, const void *value, const char *vuid) const {
     bool skip = false;
     if (value == nullptr) {
-        skip |= LogError(vuid, device, loc, "is NULL.");
+        skip |= log.LogError(vuid, error_obj.handle, loc, "is NULL.");
     }
     return skip;
 }
 
-bool StatelessValidation::ValidateAllocationCallbacks(const VkAllocationCallbacks &callback, const Location &loc) const {
+bool Context::ValidateAllocationCallbacks(const VkAllocationCallbacks &callback, const Location &loc) const {
     bool skip = false;
     skip |= ValidateRequiredPointer(loc.dot(Field::pfnAllocation), reinterpret_cast<const void *>(callback.pfnAllocation),
                                     "VUID-VkAllocationCallbacks-pfnAllocation-00632");
@@ -176,9 +165,9 @@ bool StatelessValidation::ValidateAllocationCallbacks(const VkAllocationCallback
     return skip;
 }
 
-bool StatelessValidation::ValidateStringArray(const Location &count_loc, const Location &array_loc, uint32_t count,
-                                              const char *const *array, bool count_required, bool array_required,
-                                              const char *count_required_vuid, const char *array_required_vuid) const {
+bool Context::ValidateStringArray(const Location &count_loc, const Location &array_loc, uint32_t count, const char *const *array,
+                                  bool count_required, bool array_required, const char *count_required_vuid,
+                                  const char *array_required_vuid) const {
     bool skip = false;
 
     if ((array == nullptr) || (count == 0)) {
@@ -188,7 +177,7 @@ bool StatelessValidation::ValidateStringArray(const Location &count_loc, const L
         // Verify that strings in the array are not NULL
         for (uint32_t i = 0; i < count; ++i) {
             if (array[i] == nullptr) {
-                skip |= LogError(array_required_vuid, device, array_loc.dot(i), "is NULL.");
+                skip |= log.LogError(array_required_vuid, error_obj.handle, array_loc.dot(i), "is NULL.");
             }
         }
     }
@@ -196,10 +185,46 @@ bool StatelessValidation::ValidateStringArray(const Location &count_loc, const L
     return skip;
 }
 
-bool StatelessValidation::ValidateStructPnext(const Location &loc, const void *next, size_t allowed_type_count,
-                                              const VkStructureType *allowed_types, uint32_t header_version, const char *pnext_vuid,
-                                              const char *stype_vuid, const VkPhysicalDevice physical_device,
-                                              const bool is_const_param) const {
+// We decided in https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/9578 that structs in pNext chains are allowed
+// regardless of the extension. pNext structs all are based on a sType/pNext system (VkBaseInStructure/VkBaseOutStructure) and they
+// can be safely ignored.
+//
+// However.. some structs we determined to warn the user because it might produce subtle effects, but this is the edge case, not the
+// normal case.
+bool Context::ValidatePnextStructExtension(const Location &loc, const VkBaseOutStructure *header) const {
+    bool skip = false;
+    switch (header->sType) {
+        case VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO: {
+            auto buffer_flags2_ci = (const VkBufferUsageFlags2CreateInfo *)header;
+            if (buffer_flags2_ci->usage != 0 && !IsExtEnabled(extensions.vk_khr_maintenance5)) {
+                skip |= log.LogWarning(
+                    "WARNING-VkBufferUsageFlags2CreateInfo-Extension", error_obj.handle, loc.dot(Field::pNext),
+                    "points to a VkBufferUsageFlags2CreateInfo struct but VK_KHR_maintenance5 has not been enabled. "
+                    "Without checking for and enabling the extension, you might have a situation where your buffer usage "
+                    "flags are ignored if the driver doesn't support VK_KHR_maintenance5");
+            }
+        } break;
+
+        case VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO: {
+            auto pipeline_flags2_ci = (const VkPipelineCreateFlags2CreateInfo *)header;
+            if (pipeline_flags2_ci->flags != 0 && !IsExtEnabled(extensions.vk_khr_maintenance5)) {
+                skip |= log.LogWarning(
+                    "WARNING-VkPipelineCreateFlags2CreateInfo-Extension", error_obj.handle, loc.dot(Field::pNext),
+                    "points to a VkPipelineCreateFlags2CreateInfo struct but VK_KHR_maintenance5 has not been enabled. "
+                    "Without checking for and enabling the extension, you might have a situation where your buffer usage "
+                    "flags are ignored if the driver doesn't support VK_KHR_maintenance5");
+            }
+        } break;
+
+        default:
+            break;
+    }
+    return skip;
+}
+
+bool Context::ValidateStructPnext(const Location &loc, const void *next, size_t allowed_type_count,
+                                  const VkStructureType *allowed_types, uint32_t header_version, const char *pnext_vuid,
+                                  const char *stype_vuid, const bool is_const_param) const {
     bool skip = false;
 
     if (next != nullptr) {
@@ -215,7 +240,8 @@ bool StatelessValidation::ValidateStructPnext(const Location &loc, const void *n
         if ((allowed_type_count == 0) && (GetCustomStypeInfo().empty())) {
             std::string message = "must be NULL. ";
             message += disclaimer;
-            skip |= LogError(pnext_vuid, device, pNext_loc, message.c_str(), header_version, pNext_loc.Fields().c_str());
+            skip |=
+                log.LogError(pnext_vuid, error_obj.handle, pNext_loc, message.c_str(), header_version, pNext_loc.Fields().c_str());
         } else {
             const VkStructureType *start = allowed_types;
             const VkStructureType *end = allowed_types + allowed_type_count;
@@ -223,12 +249,13 @@ bool StatelessValidation::ValidateStructPnext(const Location &loc, const void *n
 
             while (current != nullptr) {
                 if ((loc.function != Func::vkCreateInstance || (current->sType != VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO)) &&
-                    (loc.function != Func::vkCreateDevice || (current->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO))) {
+                        (loc.function != Func::vkCreateDevice || (current->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO))) {
                     std::string type_name = string_VkStructureType(current->sType);
                     if (unique_stype_check.find(current->sType) != unique_stype_check.end() && !IsDuplicatePnext(current->sType)) {
                         // stype_vuid will only be null if there are no listed pNext and will hit disclaimer check
-                        skip |= LogError(stype_vuid, device, pNext_loc,
-                                         "chain contains duplicate structure types: %s appears multiple times.", type_name.c_str());
+                        skip |=
+                            log.LogError(stype_vuid, error_obj.handle, pNext_loc,
+                                    "chain contains duplicate structure types: %s appears multiple times.", type_name.c_str());
                     } else {
                         unique_stype_check.insert(current->sType);
                     }
@@ -247,23 +274,22 @@ bool StatelessValidation::ValidateStructPnext(const Location &loc, const void *n
                             if (type_name.compare("Unhandled VkStructureType") == 0) {
                                 std::string message = "chain includes a structure with unknown VkStructureType (%" PRIu32 "). ";
                                 message += disclaimer;
-                                skip |= LogError(pnext_vuid, device, pNext_loc, message.c_str(), current->sType, header_version,
-                                                 pNext_loc.Fields().c_str());
+                                skip |= log.LogError(pnext_vuid, error_obj.handle, pNext_loc, message.c_str(), current->sType,
+                                        header_version, pNext_loc.Fields().c_str());
                             } else {
                                 std::string message = "chain includes a structure with unexpected VkStructureType %s. ";
                                 message += disclaimer;
-                                skip |= LogError(pnext_vuid, device, pNext_loc, message.c_str(), type_name.c_str(), header_version,
-                                                 pNext_loc.Fields().c_str());
+                                skip |= log.LogError(pnext_vuid, error_obj.handle, pNext_loc, message.c_str(), type_name.c_str(),
+                                        header_version, pNext_loc.Fields().c_str());
                             }
                         }
                         // Send Location without pNext field so the pNext() connector can be used
-                        skip |= ValidatePnextStructContents(loc, current, pnext_vuid, physical_device, is_const_param);
-                        if (loc.function == Func::vkGetPhysicalDeviceProperties2 ||
-                            loc.function == Func::vkGetPhysicalDeviceProperties2KHR) {
-                            skip |= ValidatePnextPropertyStructContents(loc, current, pnext_vuid, physical_device, is_const_param);
-                        } else if (loc.function == Func::vkGetPhysicalDeviceFeatures2 ||
-                                   loc.function == Func::vkGetPhysicalDeviceFeatures2KHR || loc.function == Func::vkCreateDevice) {
-                            skip |= ValidatePnextFeatureStructContents(loc, current, pnext_vuid, physical_device, is_const_param);
+                        skip |= ValidatePnextStructContents(loc, current, pnext_vuid, is_const_param);
+                        skip |= ValidatePnextStructExtension(loc, current);
+                        // pNext contents for vkGetPhysicalDeviceProperties2KHR() is no longer checked.
+                        if (loc.function == Func::vkGetPhysicalDeviceFeatures2 ||
+                            loc.function == Func::vkGetPhysicalDeviceFeatures2KHR || loc.function == Func::vkCreateDevice) {
+                            skip |= ValidatePnextFeatureStructContents(loc, current, pnext_vuid, is_const_param);
                         }
                     }
                 }
@@ -275,21 +301,21 @@ bool StatelessValidation::ValidateStructPnext(const Location &loc, const void *n
     return skip;
 }
 
-bool StatelessValidation::ValidateBool32(const Location &loc, VkBool32 value) const {
+bool Context::ValidateBool32(const Location &loc, VkBool32 value) const {
     bool skip = false;
     if ((value != VK_TRUE) && (value != VK_FALSE)) {
-        skip |= LogError("UNASSIGNED-GeneralParameterError-UnrecognizedBool32", device, loc,
-                         "(%" PRIu32
-                         ") is neither VK_TRUE nor VK_FALSE. Applications MUST not pass any other "
-                         "values than VK_TRUE or VK_FALSE into a Vulkan implementation where a VkBool32 is expected.",
-                         value);
+        skip |= log.LogError("UNASSIGNED-GeneralParameterError-UnrecognizedBool32", error_obj.handle, loc,
+                             "(%" PRIu32
+                             ") is neither VK_TRUE nor VK_FALSE. Applications MUST not pass any other "
+                             "values than VK_TRUE or VK_FALSE into a Vulkan implementation where a VkBool32 is expected.",
+                             value);
     }
     return skip;
 }
 
-bool StatelessValidation::ValidateBool32Array(const Location &count_loc, const Location &array_loc, uint32_t count,
-                                              const VkBool32 *array, bool count_required, bool array_required,
-                                              const char *count_required_vuid, const char *array_required_vuid) const {
+bool Context::ValidateBool32Array(const Location &count_loc, const Location &array_loc, uint32_t count, const VkBool32 *array,
+                                  bool count_required, bool array_required, const char *count_required_vuid,
+                                  const char *array_required_vuid) const {
     bool skip = false;
 
     if ((array == nullptr) || (count == 0)) {
@@ -298,11 +324,11 @@ bool StatelessValidation::ValidateBool32Array(const Location &count_loc, const L
     } else {
         for (uint32_t i = 0; i < count; ++i) {
             if ((array[i] != VK_TRUE) && (array[i] != VK_FALSE)) {
-                skip |= LogError(array_required_vuid, device, array_loc.dot(i),
-                                 "(%" PRIu32
-                                 ") is neither VK_TRUE nor VK_FALSE. Applications MUST not pass any other "
-                                 "values than VK_TRUE or VK_FALSE into a Vulkan implementation where a VkBool32 is expected.",
-                                 array[i]);
+                skip |= log.LogError(array_required_vuid, error_obj.handle, array_loc.dot(i),
+                                     "(%" PRIu32
+                                     ") is neither VK_TRUE nor VK_FALSE. Applications MUST not pass any other "
+                                     "values than VK_TRUE or VK_FALSE into a Vulkan implementation where a VkBool32 is expected.",
+                                     array[i]);
             }
         }
     }
@@ -310,25 +336,25 @@ bool StatelessValidation::ValidateBool32Array(const Location &count_loc, const L
     return skip;
 }
 
-bool StatelessValidation::ValidateReservedFlags(const Location &loc, VkFlags value, const char *vuid) const {
+bool Context::ValidateReservedFlags(const Location &loc, VkFlags value, const char *vuid) const {
     bool skip = false;
     if (value != 0) {
-        skip |= LogError(vuid, device, loc, "is %" PRIu32 ", but must be 0.", value);
+        skip |= log.LogError(vuid, error_obj.handle, loc, "is %" PRIu32 ", but must be 0.", value);
     }
     return skip;
 }
 
 // helper to implement validation of both 32 bit and 64 bit flags.
 template <typename FlagTypedef>
-bool StatelessValidation::ValidateFlagsImplementation(const Location &loc, vvl::FlagBitmask flag_bitmask, FlagTypedef all_flags,
-                                                      FlagTypedef value, const FlagType flag_type, const char *vuid,
-                                                      const char *flags_zero_vuid) const {
+bool Context::ValidateFlagsImplementation(const Location &loc, vvl::FlagBitmask flag_bitmask, FlagTypedef all_flags,
+                                          FlagTypedef value, const FlagType flag_type, const char *vuid,
+                                          const char *flags_zero_vuid) const {
     bool skip = false;
 
     const bool required = flag_type == kRequiredFlags || flag_type == kRequiredSingleBit;
     const char *zero_vuid = flag_type == kRequiredFlags ? flags_zero_vuid : vuid;
     if (required && value == 0) {
-        skip |= LogError(zero_vuid, device, loc, "is zero.");
+        skip |= log.LogError(zero_vuid, error_obj.handle, loc, "is zero.");
     }
 
     const auto HasMaxOneBitSet = [](const FlagTypedef f) {
@@ -339,68 +365,68 @@ bool StatelessValidation::ValidateFlagsImplementation(const Location &loc, vvl::
 
     const bool is_bits_type = flag_type == kRequiredSingleBit || flag_type == kOptionalSingleBit;
     if (is_bits_type && !HasMaxOneBitSet(value)) {
-        skip |= LogError(vuid, device, loc, "contains multiple members of %s when only a single value is allowed.",
-                         String(flag_bitmask));
+        skip |= log.LogError(vuid, error_obj.handle, loc, "contains multiple members of %s when only a single value is allowed.",
+                             String(flag_bitmask));
     }
 
     return skip;
 }
 
-bool StatelessValidation::ValidateFlags(const Location &loc, vvl::FlagBitmask flag_bitmask, VkFlags all_flags, VkFlags value,
-                                        const FlagType flag_type, const VkPhysicalDevice physical_device, const char *vuid,
-                                        const char *flags_zero_vuid) const {
+bool Context::ValidateFlags(const Location &loc, vvl::FlagBitmask flag_bitmask, VkFlags all_flags, VkFlags value,
+                            const FlagType flag_type, const char *vuid, const char *flags_zero_vuid) const {
     bool skip = false;
     skip |= ValidateFlagsImplementation<VkFlags>(loc, flag_bitmask, all_flags, value, flag_type, vuid, flags_zero_vuid);
 
-    if (physical_device != VK_NULL_HANDLE && SupportedByPdev(physical_device, vvl::Extension::_VK_KHR_maintenance5, true)) {
+    if (ignore_unknown_enums) {
         return skip;
     }
 
     if ((value & ~all_flags) != 0) {
-        skip |= LogError(vuid, device, loc, "contains flag bits (0x%" PRIx32 ") which are not recognized members of %s.", value,
-                         String(flag_bitmask));
+        skip |=
+            log.LogError(vuid, error_obj.handle, loc, "contains flag bits (0x%" PRIx32 ") which are not recognized members of %s.",
+                         value, String(flag_bitmask));
     }
 
     if (!skip && value != 0) {
-        vvl::Extensions required = IsValidFlagValue(flag_bitmask, value, device_extensions);
-        if (!required.empty() && device != VK_NULL_HANDLE) {
-            // If called from an instance function, there is no device to base extension support off of
-            skip |= LogError(vuid, device, loc, "has %s values (%s) that requires the extensions %s.", String(flag_bitmask),
-                             DescribeFlagBitmaskValue(flag_bitmask, value).c_str(), String(required).c_str());
+        vvl::Extensions required = IsValidFlagValue(flag_bitmask, value);
+        if (!required.empty()) {
+            skip |=
+                log.LogError(vuid, error_obj.handle, loc, "has %s values (%s) that requires the extensions %s.",
+                             String(flag_bitmask), DescribeFlagBitmaskValue(flag_bitmask, value).c_str(), String(required).c_str());
         }
     }
     return skip;
 }
 
-bool StatelessValidation::ValidateFlags(const Location &loc, vvl::FlagBitmask flag_bitmask, VkFlags64 all_flags, VkFlags64 value,
-                                        const FlagType flag_type, const VkPhysicalDevice physical_device, const char *vuid,
-                                        const char *flags_zero_vuid) const {
+bool Context::ValidateFlags(const Location &loc, vvl::FlagBitmask flag_bitmask, VkFlags64 all_flags, VkFlags64 value,
+                            const FlagType flag_type, const char *vuid, const char *flags_zero_vuid) const {
     bool skip = false;
     skip |= ValidateFlagsImplementation<VkFlags64>(loc, flag_bitmask, all_flags, value, flag_type, vuid, flags_zero_vuid);
 
-    if (physical_device != VK_NULL_HANDLE && SupportedByPdev(physical_device, vvl::Extension::_VK_KHR_maintenance5, true)) {
+    if (ignore_unknown_enums) {
         return skip;
     }
 
     if ((value & ~all_flags) != 0) {
-        skip |= LogError(vuid, device, loc, "contains flag bits (0x%" PRIx64 ") which are not recognized members of %s.", value,
-                         String(flag_bitmask));
+        skip |=
+            log.LogError(vuid, error_obj.handle, loc, "contains flag bits (0x%" PRIx64 ") which are not recognized members of %s.",
+                         value, String(flag_bitmask));
     }
 
     if (!skip && value != 0) {
-        vvl::Extensions required = IsValidFlag64Value(flag_bitmask, value, device_extensions);
-        if (!required.empty() && device != VK_NULL_HANDLE) {
-            // If called from an instance function, there is no device to base extension support off of
-            skip |= LogError(vuid, device, loc, "has %s values (%s) that requires the extensions %s.", String(flag_bitmask),
-                             DescribeFlagBitmaskValue64(flag_bitmask, value).c_str(), String(required).c_str());
+        vvl::Extensions required = IsValidFlag64Value(flag_bitmask, value);
+        if (!required.empty()) {
+            skip |= log.LogError(vuid, error_obj.handle, loc, "has %s values (%s) that requires the extensions %s.",
+                                 String(flag_bitmask), DescribeFlagBitmaskValue64(flag_bitmask, value).c_str(),
+                                 String(required).c_str());
         }
     }
     return skip;
 }
 
-bool StatelessValidation::ValidateFlagsArray(const Location &count_loc, const Location &array_loc, vvl::FlagBitmask flag_bitmask,
-                                             VkFlags all_flags, uint32_t count, const VkFlags *array, bool count_required,
-                                             const char *count_required_vuid, const char *array_required_vuid) const {
+bool Context::ValidateFlagsArray(const Location &count_loc, const Location &array_loc, vvl::FlagBitmask flag_bitmask,
+                                 VkFlags all_flags, uint32_t count, const VkFlags *array, bool count_required,
+                                 const char *count_required_vuid, const char *array_required_vuid) const {
     bool skip = false;
 
     if ((array == nullptr) || (count == 0)) {
@@ -410,11 +436,12 @@ bool StatelessValidation::ValidateFlagsArray(const Location &count_loc, const Lo
         // Verify that all VkFlags values in the array
         for (uint32_t i = 0; i < count; ++i) {
             if ((array[i] & (~all_flags)) != 0) {
-                skip |= LogError(array_required_vuid, device, array_loc.dot(i),
-                                 "contains flag bits that are not recognized members of %s.", String(flag_bitmask));
+                skip |= log.LogError(array_required_vuid, error_obj.handle, array_loc.dot(i),
+                                     "contains flag bits that are not recognized members of %s.", String(flag_bitmask));
             }
         }
     }
 
     return skip;
 }
+}  // namespace stateless

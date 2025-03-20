@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -82,6 +82,7 @@ TEST_F(VkLayerTest, VuidHashStability) {
     ASSERT_TRUE(hash_util::VuidHash("VUID-FragDepth-FragDepth-04213") == 0x840af838);
     ASSERT_TRUE(hash_util::VuidHash("VUID-RayTmaxKHR-RayTmaxKHR-04349") == 0x8e67514c);
     ASSERT_TRUE(hash_util::VuidHash("VUID-RuntimeSpirv-SubgroupUniformControlFlowKHR-06379") == 0x2f574188);
+    ASSERT_TRUE(hash_util::VuidHash("VVL-DEBUG-PRINTF") == 0x4fe1fef9);
 }
 
 TEST_F(VkLayerTest, RequiredParameter) {
@@ -173,123 +174,66 @@ TEST_F(VkLayerTest, RequiredParameter) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, SpecLinks) {
+#ifdef ANNOTATED_SPEC_LINK
+TEST_F(VkLayerTest, SpecLinksImplicit) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
-    AddOptionalExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
-    AddOptionalExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-#ifdef ANNOTATED_SPEC_LINK
-    bool test_annotated_spec_link = true;
-#else   // ANNOTATED_SPEC_LINK
-    bool test_annotated_spec_link = false;
-#endif  // ANNOTATED_SPEC_LINK
-
-    std::string spec_version;
-    if (test_annotated_spec_link) {
-        std::string major_version = std::to_string(VK_VERSION_MAJOR(VK_HEADER_VERSION_COMPLETE));
-        std::string minor_version = std::to_string(VK_VERSION_MINOR(VK_HEADER_VERSION_COMPLETE));
-        std::string patch_version = std::to_string(VK_VERSION_PATCH(VK_HEADER_VERSION_COMPLETE));
-        spec_version = "doc/view/" + major_version + "." + minor_version + "." + patch_version + ".0/windows";
-    } else {
-        spec_version = "registry/vulkan/specs";
-    }
+    std::string spec_url_base = ANNOTATED_SPEC_LINK;
+    std::string spec_version =
+        spec_url_base + "chapters/features.html#" + std::string("VUID-vkGetPhysicalDeviceFeatures-pFeatures-parameter");
 
     m_errorMonitor->SetDesiredError(spec_version.c_str());
-    vk::GetPhysicalDeviceFeatures(Gpu(), NULL);
-    m_errorMonitor->VerifyFound();
-
-    // Now generate a 'default' message and check the link
-    bool ycbcr_support =
-        (IsExtensionsEnabled(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME) || (DeviceValidationVersion() >= VK_API_VERSION_1_1));
-    bool maintenance2_support =
-        (IsExtensionsEnabled(VK_KHR_MAINTENANCE_2_EXTENSION_NAME) || (DeviceValidationVersion() >= VK_API_VERSION_1_1));
-
-    if (!((m_device->FormatFeaturesOptimal(VK_FORMAT_R8_UINT) & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) &&
-          (ycbcr_support ^ maintenance2_support))) {
-        GTEST_SKIP() << "Device does not support format and extensions required";
-    }
-
-    VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                                   nullptr,
-                                   0,
-                                   VK_IMAGE_TYPE_2D,
-                                   VK_FORMAT_R8_UINT,
-                                   {128, 128, 1},
-                                   1,
-                                   1,
-                                   VK_SAMPLE_COUNT_1_BIT,
-                                   VK_IMAGE_TILING_OPTIMAL,
-                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                                   VK_SHARING_MODE_EXCLUSIVE,
-                                   0,
-                                   nullptr,
-                                   VK_IMAGE_LAYOUT_UNDEFINED};
-    imageInfo.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-    vkt::Image mutImage(*m_device, imageInfo, vkt::set_layout);
-
-    VkImageViewCreateInfo imgViewInfo = vku::InitStructHelper();
-    imgViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imgViewInfo.format = VK_FORMAT_B8G8R8A8_UNORM;  // different than createImage
-    imgViewInfo.subresourceRange.layerCount = 1;
-    imgViewInfo.subresourceRange.baseMipLevel = 0;
-    imgViewInfo.subresourceRange.levelCount = 1;
-    imgViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imgViewInfo.image = mutImage.handle();
-
-    // VUIDs 01759 and 01760 should generate 'default' spec URLs, to search the registry
-    CreateImageViewTest(*this, &imgViewInfo, "Vulkan-Docs/search");
-}
-
-TEST_F(VkLayerTest, DeviceIDPropertiesUnsupported) {
-    TEST_DESCRIPTION("VkPhysicalDeviceIDProperties cannot be used without extensions in 1.0");
-
-    SetTargetApiVersion(VK_API_VERSION_1_0);
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    if (DeviceValidationVersion() != VK_API_VERSION_1_0) {
-        GTEST_SKIP() << "Test's for 1.0 only";
-    }
-
-    VkPhysicalDeviceIDProperties id_props = vku::InitStructHelper();
-    VkPhysicalDeviceProperties2 props2 = vku::InitStructHelper(&id_props);
-    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceProperties2-pNext-pNext");
-    vk::GetPhysicalDeviceProperties2KHR(Gpu(), &props2);
+    vk::GetPhysicalDeviceFeatures(Gpu(), nullptr);
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UsePnextOnlyStructWithoutExtensionEnabled) {
-    TEST_DESCRIPTION(
-        "Validate that using VkPipelineTessellationDomainOriginStateCreateInfo in VkPipelineTessellationStateCreateInfo.pNext "
-        "in a 1.0 context will generate an error message.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_0);
-    AddRequiredFeature(vkt::Feature::tessellationShader);
+TEST_F(VkLayerTest, SpecLinksExplicit) {
+    TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
-    InitRenderTarget();
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj tcs(this, kTessellationControlMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
-    VkShaderObj tes(this, kTessellationEvalMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
-    VkPipelineInputAssemblyStateCreateInfo iasci{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, nullptr, 0,
-                                                 VK_PRIMITIVE_TOPOLOGY_PATCH_LIST, VK_FALSE};
-    VkPipelineTessellationDomainOriginStateCreateInfo tessellationDomainOriginStateInfo = {
-        VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_DOMAIN_ORIGIN_STATE_CREATE_INFO, VK_NULL_HANDLE,
-        VK_TESSELLATION_DOMAIN_ORIGIN_UPPER_LEFT};
-    VkPipelineTessellationStateCreateInfo tsci{VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
-                                               &tessellationDomainOriginStateInfo, 0, 3};
-    CreatePipelineHelper pipe(*this);
-    pipe.gp_ci_.pTessellationState = &tsci;
-    pipe.gp_ci_.pInputAssemblyState = &iasci;
-    pipe.shader_stages_ = {vs.GetStageCreateInfo(), tcs.GetStageCreateInfo(), tes.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    // one for each struct
-    m_errorMonitor->SetDesiredError("VUID-VkPipelineTessellationStateCreateInfo-pNext-pNext");
-    m_errorMonitor->SetDesiredError("VUID-VkPipelineTessellationStateCreateInfo-pNext-pNext");
-    pipe.CreateGraphicsPipeline();
+    std::string spec_url_base = ANNOTATED_SPEC_LINK;
+    std::string spec_version = spec_url_base + "chapters/resources.html#" + std::string("VUID-VkBufferCreateInfo-size-00912");
+
+    VkBufferCreateInfo info = vku::InitStructHelper();
+    info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    info.size = 0;
+    m_errorMonitor->SetDesiredError(spec_version.c_str());
+    vkt::Buffer buffer(*m_device, info, vkt::no_mem);
     m_errorMonitor->VerifyFound();
 }
+
+#else   // ANNOTATED_SPEC_LINK
+
+TEST_F(VkLayerTest, SpecLinksImplicit) {
+    TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
+    RETURN_IF_SKIP(Init());
+
+    // keep VUID seperate otherwise vk_validation_stats.py will get confused
+    std::string spec_version = "https://docs.vulkan.org/spec/latest/chapters/features.html#" +
+                               std::string("VUID-vkGetPhysicalDeviceFeatures-pFeatures-parameter");
+
+    m_errorMonitor->SetDesiredError(spec_version.c_str());
+    vk::GetPhysicalDeviceFeatures(Gpu(), nullptr);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkLayerTest, SpecLinksExplicit) {
+    TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
+    RETURN_IF_SKIP(Init());
+
+    // keep VUID seperate otherwise vk_validation_stats.py will get confused
+    std::string spec_version =
+        "https://docs.vulkan.org/spec/latest/chapters/resources.html#" + std::string("VUID-VkBufferCreateInfo-size-00912");
+
+    VkBufferCreateInfo info = vku::InitStructHelper();
+    info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    info.size = 0;
+    m_errorMonitor->SetDesiredError(spec_version.c_str());
+    vkt::Buffer buffer(*m_device, info, vkt::no_mem);
+    m_errorMonitor->VerifyFound();
+}
+#endif  // ANNOTATED_SPEC_LINK
 
 TEST_F(VkLayerTest, PnextOnlyStructValidation) {
     TEST_DESCRIPTION("See if checks occur on structs ONLY used in pnext chains.");
@@ -512,7 +456,7 @@ TEST_F(VkLayerTest, UnrecognizedValueBadBool) {
 
     // Not VK_TRUE or VK_FALSE
     sampler_info.anisotropyEnable = 3;
-    CreateSamplerTest(*this, &sampler_info, "UNASSIGNED-GeneralParameterError-UnrecognizedBool32");
+    CreateSamplerTest(sampler_info, "UNASSIGNED-GeneralParameterError-UnrecognizedBool32");
 }
 
 TEST_F(VkLayerTest, UnrecognizedValueMaxEnum) {
@@ -842,7 +786,7 @@ TEST_F(VkLayerTest, InvalidImageCreateFlagWithPhysicalDeviceCount) {
         GTEST_SKIP() << "image format is not supported";
     }
 
-    CreateImageTest(*this, &ici, "VUID-VkImageCreateInfo-physicalDeviceCount-01421");
+    CreateImageTest(ici, "VUID-VkImageCreateInfo-physicalDeviceCount-01421");
 }
 
 TEST_F(VkLayerTest, ZeroBitmask) {
@@ -958,7 +902,7 @@ TEST_F(VkLayerTest, GetCalibratedTimestampsDuplicate) {
 
     uint64_t timestamps[2];
     uint64_t max_deviation;
-    m_errorMonitor->SetDesiredError("VUID-vkGetCalibratedTimestampsEXT-timeDomain-09246");
+    m_errorMonitor->SetDesiredError("VUID-vkGetCalibratedTimestampsKHR-timeDomain-09246");
     vk::GetCalibratedTimestampsEXT(device(), 2, timestamp_infos, timestamps, &max_deviation);
     m_errorMonitor->VerifyFound();
 }
@@ -971,7 +915,7 @@ TEST_F(VkLayerTest, GetCalibratedTimestampsDuplicateKHR) {
 
     uint32_t count = 0;
     vk::GetPhysicalDeviceCalibrateableTimeDomainsKHR(Gpu(), &count, nullptr);
-    std::vector<VkTimeDomainEXT> time_domains(count);
+    std::vector<VkTimeDomainKHR> time_domains(count);
     vk::GetPhysicalDeviceCalibrateableTimeDomainsKHR(Gpu(), &count, time_domains.data());
 
     VkCalibratedTimestampInfoEXT timestamp_infos[2];
@@ -982,7 +926,7 @@ TEST_F(VkLayerTest, GetCalibratedTimestampsDuplicateKHR) {
 
     uint64_t timestamps[2];
     uint64_t max_deviation;
-    m_errorMonitor->SetDesiredError("VUID-vkGetCalibratedTimestampsEXT-timeDomain-09246");
+    m_errorMonitor->SetDesiredError("VUID-vkGetCalibratedTimestampsKHR-timeDomain-09246");
     vk::GetCalibratedTimestampsKHR(device(), 2, timestamp_infos, timestamps, &max_deviation);
     m_errorMonitor->VerifyFound();
 }
@@ -999,16 +943,16 @@ TEST_F(VkLayerTest, GetCalibratedTimestampsQuery) {
     vk::GetPhysicalDeviceCalibrateableTimeDomainsEXT(Gpu(), &count, time_domains.data());
 
     for (uint32_t i = 0; i < count; i++) {
-        if (time_domains[i] == VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT) {
-            GTEST_SKIP() << "Support for VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT";
+        if (time_domains[i] == VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_KHR) {
+            GTEST_SKIP() << "Support for VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_KHR";
         }
     }
     VkCalibratedTimestampInfoEXT timestamp_info = vku::InitStructHelper();
-    timestamp_info.timeDomain = VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT;
+    timestamp_info.timeDomain = VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_KHR;
 
     uint64_t timestamp;
     uint64_t max_deviation;
-    m_errorMonitor->SetDesiredError("VUID-VkCalibratedTimestampInfoEXT-timeDomain-02354");
+    m_errorMonitor->SetDesiredError("VUID-VkCalibratedTimestampInfoKHR-timeDomain-02354");
     vk::GetCalibratedTimestampsEXT(device(), 1, &timestamp_info, &timestamp, &max_deviation);
     m_errorMonitor->VerifyFound();
 }
@@ -1207,20 +1151,6 @@ TEST_F(VkLayerTest, ExtensionXmlDependsLogic3) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, MissingExtensionPhysicalDeviceProperties) {
-    TEST_DESCRIPTION("Don't enable instance extension needed");
-
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init());
-
-    // requires VK_KHR_external_fence_capabilities
-    VkPhysicalDeviceIDPropertiesKHR id_properties = vku::InitStructHelper();
-    VkPhysicalDeviceProperties2 properties2 = vku::InitStructHelper(&id_properties);
-    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceProperties2-pNext-pNext");
-    vk::GetPhysicalDeviceProperties2KHR(Gpu(), &properties2);
-    m_errorMonitor->VerifyFound();
-}
-
 TEST_F(VkLayerTest, InvalidGetExternalBufferPropertiesUsage) {
     TEST_DESCRIPTION("Call vkGetPhysicalDeviceExternalBufferProperties with invalid usage");
 
@@ -1228,9 +1158,9 @@ TEST_F(VkLayerTest, InvalidGetExternalBufferPropertiesUsage) {
     RETURN_IF_SKIP(Init());
 
 #ifdef _WIN32
-    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #else
-    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
 
     VkPhysicalDeviceExternalBufferInfo externalBufferInfo = vku::InitStructHelper();
@@ -1239,9 +1169,11 @@ TEST_F(VkLayerTest, InvalidGetExternalBufferPropertiesUsage) {
 
     VkExternalBufferProperties externalBufferProperties = vku::InitStructHelper();
 
-    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceExternalBufferInfo-None-09499");
-    vk::GetPhysicalDeviceExternalBufferPropertiesKHR(Gpu(), &externalBufferInfo, &externalBufferProperties);
-    m_errorMonitor->VerifyFound();
+    if (!DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
+        m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceExternalBufferInfo-None-09499");
+        vk::GetPhysicalDeviceExternalBufferPropertiesKHR(Gpu(), &externalBufferInfo, &externalBufferProperties);
+        m_errorMonitor->VerifyFound();
+    }
 
     externalBufferInfo.usage = 0u;
     m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceExternalBufferInfo-None-09500");
@@ -1259,29 +1191,6 @@ TEST_F(VkLayerTest, DescriptorBufferNoExtension) {
     buffer_ci.usage = VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
     m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-None-09499");
     vk::CreateBuffer(*m_device, &buffer_ci, nullptr, &buffer);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(VkLayerTest, MissingExtensionStruct) {
-    TEST_DESCRIPTION("Don't add extension but use extended structure");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(Init());
-    if (!DeviceExtensionSupported(VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
-        GTEST_SKIP() << "VK_KHR_maintenance5 not supported";
-    }
-
-    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-
-    // added in VK_KHR_maintenance5
-    VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
-    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
-
-    VkBufferViewCreateInfo buffer_view_ci = vku::InitStructHelper(&buffer_usage_flags);
-    buffer_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
-    buffer_view_ci.range = VK_WHOLE_SIZE;
-    buffer_view_ci.buffer = buffer.handle();
-    m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-pNext-pNext");
-    vkt::BufferView view(*m_device, buffer_view_ci);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1486,7 +1395,8 @@ TEST_F(VkLayerTest, PhysicalDeviceLayeredApiVulkanPropertiesKHR) {
 }
 
 // stype-check off
-TEST_F(VkLayerTest, PhysicalDeviceLayeredApiVulkanPropertiesPNext) {
+// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9185
+TEST_F(VkLayerTest, DISABLED_PhysicalDeviceLayeredApiVulkanPropertiesPNext) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::maintenance7);
@@ -1513,5 +1423,49 @@ TEST_F(VkLayerTest, UnrecognizedEnumExtension) {
     RETURN_IF_SKIP(Init());
     m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-format-parameter");
     vkt::Image image(*m_device, 4, 4, 1, VK_FORMAT_A4B4G4R4_UNORM_PACK16, VK_IMAGE_USAGE_SAMPLED_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkLayerTest, MissingExtensionBufferUsageFlags2CreateInfo) {
+    TEST_DESCRIPTION("Use VkBufferUsageFlags2CreateInfo without the extension");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+
+    // added in VK_KHR_maintenance5
+    VkBufferUsageFlags2CreateInfo buffer_usage_flags = vku::InitStructHelper();
+    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT;
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&buffer_usage_flags);
+    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+    buffer_ci.size = 64;
+    {
+        m_errorMonitor->SetDesiredWarning("WARNING-VkBufferUsageFlags2CreateInfo-Extension");
+        vkt::Buffer buffer(*m_device, buffer_ci, vkt::no_mem);
+        m_errorMonitor->VerifyFound();
+    }
+
+    buffer_ci.pNext = nullptr;
+    vkt::Buffer good_buffer(*m_device, buffer_ci, vkt::no_mem);
+    VkBufferViewCreateInfo buffer_view_ci = vku::InitStructHelper(&buffer_usage_flags);
+    buffer_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    buffer_view_ci.range = VK_WHOLE_SIZE;
+    buffer_view_ci.buffer = good_buffer;
+    m_errorMonitor->SetDesiredWarning("WARNING-VkBufferUsageFlags2CreateInfo-Extension");
+    vkt::BufferView view(*m_device, buffer_view_ci);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkLayerTest, MissingExtensionPipelineCreateFlags2) {
+    TEST_DESCRIPTION("Use VkPipelineCreateFlags2 without the extension");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+
+    // added in VK_KHR_maintenance5
+    VkPipelineCreateFlags2CreateInfo flags2 = vku::InitStructHelper();
+    flags2.flags = VK_PIPELINE_CREATE_2_DISABLE_OPTIMIZATION_BIT;
+
+    CreateComputePipelineHelper pipe(*this, &flags2);
+    m_errorMonitor->SetDesiredWarning("WARNING-VkPipelineCreateFlags2CreateInfo-Extension");
+    pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
 }

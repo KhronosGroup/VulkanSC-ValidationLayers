@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2020-2024 The Khronos Group Inc.
- * Copyright (c) 2020-2024 Valve Corporation
- * Copyright (c) 2020-2024 LunarG, Inc.
+ * Copyright (c) 2020-2025 The Khronos Group Inc.
+ * Copyright (c) 2020-2025 Valve Corporation
+ * Copyright (c) 2020-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,13 +95,13 @@ TEST_F(NegativePortabilitySubset, Image) {
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     ci.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-    CreateImageTest(*this, &ci, "VUID-VkImageCreateInfo-imageView2DOn3DImage-04459");
+    CreateImageTest(ci, "VUID-VkImageCreateInfo-imageView2DOn3DImage-04459");
 
     ci.imageType = VK_IMAGE_TYPE_2D;
     ci.flags = 0;
     ci.samples = VK_SAMPLE_COUNT_2_BIT;
     ci.arrayLayers = 2;
-    CreateImageTest(*this, &ci, "VUID-VkImageCreateInfo-multisampleArrayImage-04460");
+    CreateImageTest(ci, "VUID-VkImageCreateInfo-multisampleArrayImage-04460");
 }
 
 TEST_F(NegativePortabilitySubset, ImageViewFormatSwizzle) {
@@ -141,14 +141,14 @@ TEST_F(NegativePortabilitySubset, ImageViewFormatSwizzle) {
     ci.components.b = VK_COMPONENT_SWIZZLE_R;
     ci.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
     ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    CreateImageViewTest(*this, &ci, "VUID-VkImageViewCreateInfo-imageViewFormatSwizzle-04465");
+    CreateImageViewTest(ci, "VUID-VkImageViewCreateInfo-imageViewFormatSwizzle-04465");
 
     // Verify using VK_COMPONENT_SWIZZLE_R/G/B/A works when imageViewFormatSwizzle == VK_FALSE
     ci.components.r = VK_COMPONENT_SWIZZLE_R;
     ci.components.g = VK_COMPONENT_SWIZZLE_G;
     ci.components.b = VK_COMPONENT_SWIZZLE_B;
     ci.components.a = VK_COMPONENT_SWIZZLE_A;
-    CreateImageViewTest(*this, &ci);
+    vkt::ImageView image_view(*m_device, ci);
 }
 
 TEST_F(NegativePortabilitySubset, ImageViewFormatReinterpretationComponentCount) {
@@ -191,7 +191,7 @@ TEST_F(NegativePortabilitySubset, ImageViewFormatReinterpretationComponentCount)
     // Format might not be supported
     // TODO - Need to figure out which format is supported that hits 04466
     m_errorMonitor->SetUnexpectedError("VUID-VkImageViewCreateInfo-None-02273");
-    CreateImageViewTest(*this, &ci, "VUID-VkImageViewCreateInfo-imageViewFormatReinterpretation-04466");
+    CreateImageViewTest(ci, "VUID-VkImageViewCreateInfo-imageViewFormatReinterpretation-04466");
 }
 
 TEST_F(NegativePortabilitySubset, Sampler) {
@@ -208,7 +208,7 @@ TEST_F(NegativePortabilitySubset, Sampler) {
 
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     sampler_info.mipLodBias = 1.0f;
-    CreateSamplerTest(*this, &sampler_info, "VUID-VkSamplerCreateInfo-samplerMipLodBias-04467");
+    CreateSamplerTest(sampler_info, "VUID-VkSamplerCreateInfo-samplerMipLodBias-04467");
 }
 
 TEST_F(NegativePortabilitySubset, TriangleFans) {
@@ -232,7 +232,7 @@ TEST_F(NegativePortabilitySubset, TriangleFans) {
     pipe.ia_ci_ = VkPipelineInputAssemblyStateCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, nullptr, 0,
                                                          VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN, VK_FALSE};
     pipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
-    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
+    pipe.VertexShaderOnly();
 
     m_errorMonitor->SetDesiredError("VUID-VkPipelineInputAssemblyStateCreateInfo-triangleFans-04452");
     pipe.CreateGraphicsPipeline();
@@ -272,7 +272,7 @@ TEST_F(NegativePortabilitySubset, VertexInputStride) {
     pipe.ia_ci_ = VkPipelineInputAssemblyStateCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, nullptr, 0,
                                                          VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE};
     pipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
-    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
+    pipe.VertexShaderOnly();
 
     m_errorMonitor->SetDesiredError("VUID-VkVertexInputBindingDescription-stride-04456");
     pipe.CreateGraphicsPipeline();
@@ -310,7 +310,7 @@ TEST_F(NegativePortabilitySubset, VertexAttributes) {
     pipe.vi_ci_ = VkPipelineVertexInputStateCreateInfo{
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, nullptr, 0, 1, &vertex_desc, 1, &vertex_attrib};
     pipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
-    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
+    pipe.VertexShaderOnly();
 
     m_errorMonitor->SetDesiredError("VUID-VkVertexInputAttributeDescription-vertexAttributeAccessBeyondStride-04457");
     pipe.CreateGraphicsPipeline();
@@ -385,7 +385,7 @@ TEST_F(NegativePortabilitySubset, DepthStencilState) {
     CreatePipelineHelper pipe(*this);
     pipe.gp_ci_.pDepthStencilState = &depth_stencil_ci;
     pipe.rs_state_ci_.cullMode = VK_CULL_MODE_NONE;
-    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
+    pipe.VertexShaderOnly();
 
     m_errorMonitor->SetDesiredError("VUID-VkPipelineDepthStencilStateCreateInfo-separateStencilMaskRef-04453");
     pipe.CreateGraphicsPipeline();
@@ -608,10 +608,17 @@ TEST_F(VkPortabilitySubsetTest, PortabilitySubsetColorBlendFactor) {
 
 TEST_F(VkPortabilitySubsetTest, InstanceCreateEnumerate) {
     TEST_DESCRIPTION("Validate creating instances with VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR.");
+    std::vector<const char *> enabled_extensions = {VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+                                                    VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME};
+
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+    GTEST_SKIP() << "Android doesn't support Debug Utils";
+#endif
 
     auto ici = GetInstanceCreateInfo();
     ici.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
     ici.enabledExtensionCount = 1;
+    ici.ppEnabledExtensionNames = enabled_extensions.data();
 
     VkInstance local_instance;
 
@@ -620,43 +627,8 @@ TEST_F(VkPortabilitySubsetTest, InstanceCreateEnumerate) {
     m_errorMonitor->VerifyFound();
 
     if (InstanceExtensionSupported(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)) {
-        std::vector<const char *> enabled_extensions = {VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-                                                        VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
-        ici.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
-        ici.ppEnabledExtensionNames = enabled_extensions.data();
-
+        ici.enabledExtensionCount = 2;
         ASSERT_EQ(VK_SUCCESS, vk::CreateInstance(&ici, nullptr, &local_instance));
         vk::DestroyInstance(local_instance, nullptr);
     }
-}
-
-TEST_F(VkPortabilitySubsetTest, FeatureWithoutExtension) {
-    TEST_DESCRIPTION("Make sure can't use portability without VK_KHR_portability_subset");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(Init());
-
-    if (DeviceExtensionSupported(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        GTEST_SKIP() << "Test needs no VK_KHR_portability_subset support";
-    }
-
-    VkPhysicalDevicePortabilitySubsetFeaturesKHR feature = vku::InitStructHelper();
-
-    vkt::PhysicalDevice physical_device(Gpu());
-    vkt::QueueCreateInfoArray queue_info(physical_device.queue_properties_);
-    std::vector<VkDeviceQueueCreateInfo> create_queue_infos;
-    auto qci = queue_info.Data();
-    for (uint32_t i = 0; i < queue_info.Size(); ++i) {
-        if (qci[i].queueCount) {
-            create_queue_infos.push_back(qci[i]);
-        }
-    }
-
-    VkDeviceCreateInfo device_create_info = vku::InitStructHelper(&feature);
-    device_create_info.queueCreateInfoCount = queue_info.Size();
-    device_create_info.pQueueCreateInfos = queue_info.Data();
-    VkDevice testDevice;
-
-    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-pNext");
-    vk::CreateDevice(Gpu(), &device_create_info, NULL, &testDevice);
-    m_errorMonitor->VerifyFound();
 }

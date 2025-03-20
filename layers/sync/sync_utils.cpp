@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2024 Valve Corporation
- * Copyright (c) 2019-2024 LunarG, Inc.
+ * Copyright (c) 2019-2025 Valve Corporation
+ * Copyright (c) 2019-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 namespace sync_utils {
 static constexpr uint32_t kNumPipelineStageBits = sizeof(VkPipelineStageFlags2) * 8;
 
-VkPipelineStageFlags2 DisabledPipelineStages(const DeviceFeatures &features, const DeviceExtensions& device_extensions) {
+VkPipelineStageFlags2 DisabledPipelineStages(const DeviceFeatures &features, const DeviceExtensions &device_extensions) {
     VkPipelineStageFlags2 result = 0;
     if (!features.geometryShader) {
         result |= VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT;
@@ -56,7 +56,15 @@ VkPipelineStageFlags2 DisabledPipelineStages(const DeviceFeatures &features, con
     if (!IsExtEnabled(device_extensions.vk_nv_ray_tracing) && !features.rayTracingPipeline) {
         result |= VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
     }
-    // TODO: VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR
+    if (!IsExtEnabled(device_extensions.vk_nv_ray_tracing) && !IsExtEnabled(device_extensions.vk_khr_acceleration_structure)) {
+        result |= VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+    }
+    if (!features.rayTracingMaintenance1) {
+        result |= VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_COPY_BIT_KHR;
+    }
+    if (!features.micromap) {
+        result |= VK_PIPELINE_STAGE_2_MICROMAP_BUILD_BIT_EXT;
+    }
     return result;
 }
 
@@ -82,8 +90,7 @@ VkPipelineStageFlags2 ExpandPipelineStages(VkPipelineStageFlags2 stage_mask, VkQ
     }
     if (VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT & stage_mask) {
         expanded &= ~VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
-        expanded |= VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_RESOLVE_BIT | VK_PIPELINE_STAGE_2_BLIT_BIT |
-                    VK_PIPELINE_STAGE_2_CLEAR_BIT;
+        expanded |= kAllTransferExpandBits;
     }
     if (VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT & stage_mask) {
         expanded &= ~VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
@@ -202,6 +209,14 @@ std::string StringAccessFlags(VkAccessFlags2 mask) {
     return string_VkAccessFlags2(mask);
 }
 
+void ReplaceExpandBitsWithMetaMask(VkFlags64 &mask, VkFlags64 expand_bits, VkFlags64 meta_mask) {
+    if ((mask & expand_bits) == expand_bits) {
+        mask &= ~expand_bits;
+        mask |= meta_mask;
+    }
+}
+
+// TODO: generate me
 ShaderStageAccesses GetShaderStageAccesses(VkShaderStageFlagBits shader_stage) {
     static const vvl::unordered_map<VkShaderStageFlagBits, ShaderStageAccesses> map = {
         // clang-format off
@@ -209,85 +224,99 @@ ShaderStageAccesses GetShaderStageAccesses(VkShaderStageFlagBits shader_stage) {
             SYNC_VERTEX_SHADER_SHADER_SAMPLED_READ,
             SYNC_VERTEX_SHADER_SHADER_STORAGE_READ,
             SYNC_VERTEX_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_VERTEX_SHADER_UNIFORM_READ
+            SYNC_VERTEX_SHADER_UNIFORM_READ,
+            SYNC_VERTEX_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, {
             SYNC_TESSELLATION_CONTROL_SHADER_SHADER_SAMPLED_READ,
             SYNC_TESSELLATION_CONTROL_SHADER_SHADER_STORAGE_READ,
             SYNC_TESSELLATION_CONTROL_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_TESSELLATION_CONTROL_SHADER_UNIFORM_READ
+            SYNC_TESSELLATION_CONTROL_SHADER_UNIFORM_READ,
+            SYNC_TESSELLATION_CONTROL_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, {
             SYNC_TESSELLATION_EVALUATION_SHADER_SHADER_SAMPLED_READ,
             SYNC_TESSELLATION_EVALUATION_SHADER_SHADER_STORAGE_READ,
             SYNC_TESSELLATION_EVALUATION_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_TESSELLATION_EVALUATION_SHADER_UNIFORM_READ
+            SYNC_TESSELLATION_EVALUATION_SHADER_UNIFORM_READ,
+            SYNC_TESSELLATION_EVALUATION_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_GEOMETRY_BIT, {
             SYNC_GEOMETRY_SHADER_SHADER_SAMPLED_READ,
             SYNC_GEOMETRY_SHADER_SHADER_STORAGE_READ,
             SYNC_GEOMETRY_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_GEOMETRY_SHADER_UNIFORM_READ
+            SYNC_GEOMETRY_SHADER_UNIFORM_READ,
+            SYNC_GEOMETRY_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_FRAGMENT_BIT, {
             SYNC_FRAGMENT_SHADER_SHADER_SAMPLED_READ,
             SYNC_FRAGMENT_SHADER_SHADER_STORAGE_READ,
             SYNC_FRAGMENT_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_FRAGMENT_SHADER_UNIFORM_READ
+            SYNC_FRAGMENT_SHADER_UNIFORM_READ,
+            SYNC_FRAGMENT_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_COMPUTE_BIT, {
             SYNC_COMPUTE_SHADER_SHADER_SAMPLED_READ,
             SYNC_COMPUTE_SHADER_SHADER_STORAGE_READ,
             SYNC_COMPUTE_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_COMPUTE_SHADER_UNIFORM_READ
+            SYNC_COMPUTE_SHADER_UNIFORM_READ,
+            SYNC_COMPUTE_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_RAYGEN_BIT_KHR, {
             SYNC_RAY_TRACING_SHADER_SHADER_SAMPLED_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_RAY_TRACING_SHADER_UNIFORM_READ
+            SYNC_RAY_TRACING_SHADER_UNIFORM_READ,
+            SYNC_RAY_TRACING_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_ANY_HIT_BIT_KHR, {
             SYNC_RAY_TRACING_SHADER_SHADER_SAMPLED_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_RAY_TRACING_SHADER_UNIFORM_READ
+            SYNC_RAY_TRACING_SHADER_UNIFORM_READ,
+            SYNC_RAY_TRACING_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, {
             SYNC_RAY_TRACING_SHADER_SHADER_SAMPLED_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_RAY_TRACING_SHADER_UNIFORM_READ
+            SYNC_RAY_TRACING_SHADER_UNIFORM_READ,
+            SYNC_RAY_TRACING_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_MISS_BIT_KHR, {
             SYNC_RAY_TRACING_SHADER_SHADER_SAMPLED_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_RAY_TRACING_SHADER_UNIFORM_READ
+            SYNC_RAY_TRACING_SHADER_UNIFORM_READ,
+            SYNC_RAY_TRACING_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_INTERSECTION_BIT_KHR, {
             SYNC_RAY_TRACING_SHADER_SHADER_SAMPLED_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_RAY_TRACING_SHADER_UNIFORM_READ
+            SYNC_RAY_TRACING_SHADER_UNIFORM_READ,
+            SYNC_RAY_TRACING_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_CALLABLE_BIT_KHR, {
             SYNC_RAY_TRACING_SHADER_SHADER_SAMPLED_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_READ,
             SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_WRITE,
-            SYNC_RAY_TRACING_SHADER_UNIFORM_READ
+            SYNC_RAY_TRACING_SHADER_UNIFORM_READ,
+            SYNC_RAY_TRACING_SHADER_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_TASK_BIT_EXT, {
             SYNC_TASK_SHADER_EXT_SHADER_SAMPLED_READ,
             SYNC_TASK_SHADER_EXT_SHADER_STORAGE_READ,
             SYNC_TASK_SHADER_EXT_SHADER_STORAGE_WRITE,
-            SYNC_TASK_SHADER_EXT_UNIFORM_READ
+            SYNC_TASK_SHADER_EXT_UNIFORM_READ,
+            SYNC_TASK_SHADER_EXT_ACCELERATION_STRUCTURE_READ,
         }},
         {VK_SHADER_STAGE_MESH_BIT_EXT, {
             SYNC_MESH_SHADER_EXT_SHADER_SAMPLED_READ,
             SYNC_MESH_SHADER_EXT_SHADER_STORAGE_READ,
             SYNC_MESH_SHADER_EXT_SHADER_STORAGE_WRITE,
-            SYNC_MESH_SHADER_EXT_UNIFORM_READ
+            SYNC_MESH_SHADER_EXT_UNIFORM_READ,
+            SYNC_MESH_SHADER_EXT_ACCELERATION_STRUCTURE_READ,
         }},
         // clang-format on
     };

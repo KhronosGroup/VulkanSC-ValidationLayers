@@ -116,7 +116,7 @@ TEST_F(VkSCNegativeImplicit, PipelineCacheInitialDataSizeNotZero) {
     VkDevice device = VK_NULL_HANDLE;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-initialDataSize-arraylength");
-    vksc::CreateDevice(gpu(), &device_ci, nullptr, &device);
+    vksc::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 
     RETURN_IF_SKIP(InitState())
