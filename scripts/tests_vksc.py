@@ -102,13 +102,7 @@ def BuildTools():
     cmake_cmd = f'cmake -S {SRC_DIR} -B {BUILD_DIR} -D CMAKE_BUILD_TYPE=Release '
     cmake_cmd += '-DBUILD_CUBE=NO -DBUILD_VULKANINFO=NO -D INSTALL_ICD=ON -D UPDATE_DEPS=ON'
 
-    # Force disable ASAN to avoid GCC bug
-    tools_env = dict(os.environ)
-    tools_env['CFLAGS'] = ''
-    tools_env['CXXFLAGS'] = ''
-    tools_env['LDFLAGS'] = ''
-
-    common_ci.RunShellCmd(cmake_cmd, env=tools_env)
+    common_ci.RunShellCmd(cmake_cmd)
 
     print("Build Tools")
     build_cmd = f'cmake --build {BUILD_DIR}'

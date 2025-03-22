@@ -190,7 +190,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "546efccfdbae2d8d803b0459286d026c81c19c69",
+            "commit": "00f696a5be7ec9ef02e8269b125756cc814c266b",
             "build_step": "skip",
             "optional": [
                 "tests"
