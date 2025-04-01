@@ -1934,7 +1934,8 @@ bool Context::ValidatePnextStructContents(const Location& loc, const VkBaseOutSt
                 [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkDeviceQueueGlobalPriorityCreateInfo);
                 VkDeviceQueueGlobalPriorityCreateInfo* structure = (VkDeviceQueueGlobalPriorityCreateInfo*)header;
                 skip |= ValidateRangedEnum(pNext_loc.dot(Field::globalPriority), vvl::Enum::VkQueueGlobalPriority,
-                                           structure->globalPriority, kVUIDUndefined);
+                                           structure->globalPriority,
+                                           "VUID-VkDeviceQueueGlobalPriorityCreateInfo-globalPriority-parameter");
             }
         } break;
 
@@ -1948,7 +1949,8 @@ bool Context::ValidatePnextStructContents(const Location& loc, const VkBaseOutSt
                 [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPipelineRasterizationLineStateCreateInfo);
                 VkPipelineRasterizationLineStateCreateInfo* structure = (VkPipelineRasterizationLineStateCreateInfo*)header;
                 skip |= ValidateRangedEnum(pNext_loc.dot(Field::lineRasterizationMode), vvl::Enum::VkLineRasterizationMode,
-                                           structure->lineRasterizationMode, kVUIDUndefined);
+                                           structure->lineRasterizationMode,
+                                           "VUID-VkPipelineRasterizationLineStateCreateInfo-lineRasterizationMode-parameter");
 
                 skip |= ValidateBool32(pNext_loc.dot(Field::stippledLineEnable), structure->stippledLineEnable);
             }
@@ -1962,7 +1964,8 @@ bool Context::ValidatePnextStructContents(const Location& loc, const VkBaseOutSt
                 VkPipelineVertexInputDivisorStateCreateInfo* structure = (VkPipelineVertexInputDivisorStateCreateInfo*)header;
                 skip |= ValidateArray(pNext_loc.dot(Field::vertexBindingDivisorCount), pNext_loc.dot(Field::pVertexBindingDivisors),
                                       structure->vertexBindingDivisorCount, &structure->pVertexBindingDivisors, true, true,
-                                      kVUIDUndefined, kVUIDUndefined);
+                                      "VUID-VkPipelineVertexInputDivisorStateCreateInfo-vertexBindingDivisorCount-arraylength",
+                                      "VUID-VkPipelineVertexInputDivisorStateCreateInfo-pVertexBindingDivisors-parameter");
 
                 if (structure->pVertexBindingDivisors != nullptr) {
                     for (uint32_t vertexBindingDivisorIndex = 0; vertexBindingDivisorIndex < structure->vertexBindingDivisorCount;

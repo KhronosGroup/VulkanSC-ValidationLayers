@@ -2657,7 +2657,7 @@ bool Device::PreCallValidateCmdBindVertexBuffers2(VkCommandBuffer commandBuffer,
 // Checked by chassis: device: kVUIDUndefined
 
 // vkCmdSetLineStipple:
-// Checked by chassis: commandBuffer: kVUIDUndefined
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetLineStipple-commandBuffer-parameter"
 
 bool Device::PreCallValidateMapMemory2(VkDevice device, const VkMemoryMapInfo* pMemoryMapInfo, void** ppData,
                                        const ErrorObject& error_obj) const {
@@ -4168,7 +4168,7 @@ bool Device::PreCallValidateGetPipelineBinaryDataKHR(VkDevice device, const VkPi
 // Checked by chassis: physicalDevice: kVUIDUndefined
 
 // vkCmdSetLineStippleKHR:
-// Checked by chassis: commandBuffer: kVUIDUndefined
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetLineStipple-commandBuffer-parameter"
 
 // vkGetPhysicalDeviceCalibrateableTimeDomainsKHR:
 // Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceCalibrateableTimeDomainsKHR-physicalDevice-parameter"
@@ -5281,7 +5281,7 @@ void Instance::PostCallRecordCreateHeadlessSurfaceEXT(VkInstance instance, const
 }
 
 // vkCmdSetLineStippleEXT:
-// Checked by chassis: commandBuffer: kVUIDUndefined
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetLineStipple-commandBuffer-parameter"
 
 bool Device::PreCallValidateResetQueryPoolEXT(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount,
                                               const ErrorObject& error_obj) const {
