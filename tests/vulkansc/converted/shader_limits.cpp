@@ -324,10 +324,10 @@ TEST_F(NegativeShaderLimits, MaxFragmentDualSrcAttachments) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-maxFragmentDualSrcAttachments-09239");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -383,8 +383,56 @@ TEST_F(NegativeShaderLimits, OffsetMaxComputeSharedMemorySize) {
     )asm";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2,
-                                             SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
+    pipe.CreateComputePipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderLimits, MaxComputeSharedMemorySizeArrayStride) {
+    // need at least SPIR-V 1.4 for SPV_KHR_workgroup_memory_explicit_layout
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::workgroupMemoryExplicitLayout);
+    RETURN_IF_SKIP(Init());
+
+    const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
+
+    // shared X {
+    //     float x1[]; // ArrayStride 16, not 4
+    // };
+    std::stringstream csSource;
+    csSource << R"asm(
+               OpCapability Shader
+               OpCapability WorkgroupMemoryExplicitLayoutKHR
+               OpExtension "SPV_KHR_workgroup_memory_explicit_layout"
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %_
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %_arr_float_uint ArrayStride 16
+               OpDecorate %X Block
+               OpMemberDecorate %X 0 Offset 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %uint_size = OpConstant %uint )asm";
+    csSource << (max_shared_memory_size / 16) + 2;
+    csSource << R"asm(
+%_arr_float_uint = OpTypeArray %float %uint_size
+          %X = OpTypeStruct %_arr_float_uint
+%_ptr_Workgroup_X = OpTypePointer Workgroup %X
+          %_ = OpVariable %_ptr_Workgroup_X Workgroup
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+               OpReturn
+               OpFunctionEnd
+    )asm";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
     pipe.CreateComputePipeline();

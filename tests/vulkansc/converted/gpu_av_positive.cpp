@@ -18,10 +18,14 @@
  * limitations under the License.
  */
 
+#include <vulkan/vulkan_core.h>
+#include <vector>
 #include "../framework/layer_validation_tests.h"
+#include "../framework/buffer_helper.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/gpu_av_helper.h"
+#include "../framework/external_memory_sync.h"
 #include "../../layers/gpuav/shaders/gpuav_shaders_constants.h"
 
 class PositiveGpuAV : public GpuAVTest {};
@@ -46,10 +50,21 @@ VkValidationFeaturesEXT GpuAVTest::GetGpuAvValidationFeatures() {
 }
 
 // This checks any requirements needed for GPU-AV are met otherwise devices not meeting them will "fail" the tests
-void GpuAVTest::InitGpuAvFramework(void *p_next) {
+void GpuAVTest::InitGpuAvFramework(std::vector<VkLayerSettingEXT> layer_settings, bool safe_mode) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
+
+    // We have defaulted GPU-AV to use unsafe mode, but all negative tests need to be "safe" or they will crash
+    if (safe_mode) {
+        layer_settings.emplace_back(
+            VkLayerSettingEXT{OBJECT_LAYER_NAME, "gpuav_safe_mode", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue});
+    }
+
+    VkLayerSettingsCreateInfoEXT layer_setting_ci = vku::InitStructHelper();
+    layer_setting_ci.settingCount = layer_settings.size();
+    layer_setting_ci.pSettings = layer_settings.data();
+
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    validation_features.pNext = p_next;
+    validation_features.pNext = &layer_setting_ci;
     RETURN_IF_SKIP(InitFramework(&validation_features));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
@@ -66,7 +81,7 @@ TEST_F(PositiveGpuAV, DISABLED_ReserveBinding) {
     AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
     AddRequiredFeature(vkt::Feature::inlineUniformBlock);
     RETURN_IF_SKIP(InitGpuAvFramework());
-    RETURN_IF_SKIP(InitState(nullptr));
+    RETURN_IF_SKIP(InitState());
 
     auto ici = GetInstanceCreateInfo();
     VkInstance test_inst;
@@ -116,7 +131,7 @@ TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlock) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
     VkDescriptorBufferInfo buffer_info[1] = {};
-    buffer_info[0].buffer = buffer.handle();
+    buffer_info[0].buffer = buffer;
     buffer_info[0].offset = 0;
     buffer_info[0].range = sizeof(uint32_t);
 
@@ -153,24 +168,21 @@ TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlock) {
         )glsl";
 
     CreateComputePipelineHelper pipe1(*this);
-    pipe1.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe1.cp_ci_.layout = pipeline_layout.handle();
+    pipe1.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe1.cp_ci_.layout = pipeline_layout;
     pipe1.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe1.Handle());
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
-                              &descriptor_set.set_, 0, nullptr);
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe1);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     uint32_t *data = (uint32_t *)buffer.Memory().Map();
     ASSERT_TRUE(*data = test_data);
-    *data = 0;
-    buffer.Memory().Unmap();
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -206,7 +218,7 @@ TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlockAndRecovery) {
                                        0, layout_createinfo_binding_flags, 0, nullptr, &pool_inline_info);
 
     VkDescriptorBufferInfo buffer_info[1] = {};
-    buffer_info[0].buffer = buffer.handle();
+    buffer_info[0].buffer = buffer;
     buffer_info[0].offset = 0;
     buffer_info[0].range = sizeof(uint32_t);
 
@@ -263,19 +275,18 @@ TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlockAndRecovery) {
 
     {
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         // We should still be able to use the layout and create a temporary uninstrumented shader module
-        pipe.cp_ci_.layout = pl_layout.handle();
+        pipe.cp_ci_.layout = pl_layout;
         pipe.CreateComputePipeline();
 
         m_command_buffer.Begin();
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pl_layout.handle(), 0, 1,
-                                  &descriptor_set.set_, 0, nullptr);
-        vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pl_layout, 0, 1, &descriptor_set.set_, 0,
+                                  nullptr);
+        vk::CmdDispatch(m_command_buffer, 1, 1, 1);
         m_command_buffer.End();
-        m_default_queue->Submit(m_command_buffer);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(m_command_buffer);
 
         pl_layout.destroy();
 
@@ -290,18 +301,17 @@ TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlockAndRecovery) {
     {
         const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
-        pipe.cp_ci_.layout = pipeline_layout.handle();
+        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cp_ci_.layout = pipeline_layout;
         pipe.CreateComputePipeline();
 
         m_command_buffer.Begin();
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
-                                  &descriptor_set.set_, 0, nullptr);
-        vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                                  nullptr);
+        vk::CmdDispatch(m_command_buffer, 1, 1, 1);
         m_command_buffer.End();
-        m_default_queue->Submit(m_command_buffer);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(m_command_buffer);
         uint32_t *data = (uint32_t *)buffer.Memory().Map();
         if (*data != test_data) m_errorMonitor->SetError("Using shader after pipeline recovery not functioning as expected");
         *data = 0;
@@ -345,7 +355,7 @@ TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlockUninitialized) {
                                        },
                                        0, nullptr, 0, nullptr, &pool_inline_info);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
     const uint32_t update_value = 0;
@@ -361,19 +371,18 @@ TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlockUninitialized) {
     vk::UpdateDescriptorSets(device(), 1, &descriptor_writes, 0, nullptr);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout.handle();
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
-                              &descriptor_set.set_, 0, nullptr);
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -418,19 +427,19 @@ TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlockUninitializedUpdateAfterBind) {
                                        VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT, &flags_create_info,
                                        VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT, nullptr, &pool_inline_info);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout.handle();
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
-                              &descriptor_set.set_, 0, nullptr);
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     const uint32_t update_value = 0;
@@ -445,8 +454,7 @@ TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlockUninitializedUpdateAfterBind) {
     descriptor_writes.descriptorType = VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK;
     vk::UpdateDescriptorSets(device(), 1, &descriptor_writes, 0, nullptr);
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -485,7 +493,7 @@ TEST_F(PositiveGpuAV, DISABLED_SetSSBOBindDescriptor) {
     VkShaderObj cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
     pipe.CreateComputePipeline();
@@ -496,19 +504,18 @@ TEST_F(PositiveGpuAV, DISABLED_SetSSBOBindDescriptor) {
     vkt::Buffer buffer_0(*m_device, buffer_size, buffer_usage);
     vkt::Buffer buffer_1(*m_device, buffer_size, buffer_usage);
 
-    pipe.descriptor_set_->WriteDescriptorBufferInfo(0, buffer_0.handle(), 0, 1024, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    pipe.descriptor_set_->WriteDescriptorBufferInfo(1, buffer_1.handle(), 0, 1024, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    pipe.descriptor_set_->UpdateDescriptorSets();
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(0, buffer_0, 0, 1024, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(1, buffer_1, 0, 1024, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.UpdateDescriptorSets();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
-                              &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -555,7 +562,7 @@ TEST_F(PositiveGpuAV, DISABLED_SetSSBOPushDescriptor) {
 
     VkComputePipelineCreateInfo pipeline_info = vku::InitStructHelper();
     pipeline_info.flags = 0;
-    pipeline_info.layout = pipeline_layout.handle();
+    pipeline_info.layout = pipeline_layout;
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex = -1;
     pipeline_info.stage = cs.GetStageCreateInfo();
@@ -574,24 +581,22 @@ TEST_F(PositiveGpuAV, DISABLED_SetSSBOPushDescriptor) {
     descriptor_writes[0].dstArrayElement = 0;
     descriptor_writes[0].descriptorCount = 1;
     descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    VkDescriptorBufferInfo buffer_info_0 = {buffer_0.handle(), 0, 1024};
+    VkDescriptorBufferInfo buffer_info_0 = {buffer_0, 0, 1024};
     descriptor_writes[0].pBufferInfo = &buffer_info_0;
 
     descriptor_writes[1] = descriptor_writes[0];
     descriptor_writes[1].dstBinding = 1;
-    VkDescriptorBufferInfo buffer_info_1 = {buffer_1.handle(), 0, 1024};
+    VkDescriptorBufferInfo buffer_info_1 = {buffer_1, 0, 1024};
     descriptor_writes[1].pBufferInfo = &buffer_info_1;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    vk::CmdPushDescriptorSetKHR(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 2,
-                                descriptor_writes);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vk::CmdPushDescriptorSetKHR(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 2, descriptor_writes);
 
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Regression test for semaphore timeout with GPU-AV enabled:
@@ -685,7 +690,7 @@ TEST_F(PositiveGpuAV, DISABLED_MutableBuffer) {
 
     VkComputePipelineCreateInfo pipeline_info = vku::InitStructHelper();
     pipeline_info.flags = 0;
-    pipeline_info.layout = pipeline_layout.handle();
+    pipeline_info.layout = pipeline_layout;
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex = -1;
     pipeline_info.stage = cs.GetStageCreateInfo();
@@ -703,7 +708,7 @@ TEST_F(PositiveGpuAV, DISABLED_MutableBuffer) {
     descriptor_write.dstArrayElement = 0;
     descriptor_write.descriptorCount = 1;
     descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    VkDescriptorBufferInfo buffer_info_0 = {buffer_0.handle(), 0, 1024};
+    VkDescriptorBufferInfo buffer_info_0 = {buffer_0, 0, 1024};
     descriptor_write.pBufferInfo = &buffer_info_0;
 
     vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, nullptr);
@@ -726,15 +731,14 @@ TEST_F(PositiveGpuAV, DISABLED_MutableBuffer) {
     vk::UpdateDescriptorSets(device(), 0, nullptr, 1, &descriptor_copy);
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
-                              &descriptor_set_0.set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set_0.set_, 0,
+                              nullptr);
 
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -771,12 +775,12 @@ TEST_F(PositiveGpuAV, DISABLED_SelectInstrumentedShaders) {
     TEST_DESCRIPTION("Use a bad vertex shader, but don't select it for validation and make sure we don't get a buffer oob warning");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::robustBufferAccess);
-    const VkBool32 value = true;
-    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
-                                       &value};
-    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
-                                                               &setting};
-    RETURN_IF_SKIP(InitGpuAvFramework(&layer_settings_create_info));
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::fragmentStoresAndAtomics);
+
+    std::vector<VkLayerSettingEXT> layer_settings = {
+        {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue}};
+    RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
 
     // Robust buffer access will be on by default
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -787,7 +791,7 @@ TEST_F(PositiveGpuAV, DISABLED_SelectInstrumentedShaders) {
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
 
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    descriptor_set.WriteDescriptorBufferInfo(0, write_buffer.handle(), 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(0, write_buffer, 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
     static const char vertshader[] = R"glsl(
         #version 450
@@ -808,21 +812,20 @@ TEST_F(PositiveGpuAV, DISABLED_SelectInstrumentedShaders) {
     pipe.shader_stages_.clear();
     pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
     pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
-    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.gp_ci_.layout = pipeline_layout;
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
-                              &descriptor_set.set_, 0, nullptr);
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
     // Should not get a warning since buggy vertex shader wasn't instrumented
     m_errorMonitor->ExpectSuccess(kWarningBit | kErrorBit);
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -850,7 +853,7 @@ TEST_F(PositiveGpuAV, DISABLED_DrawingWithUnboundUnusedSet) {
     )glsl";
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView imageView = image.CreateView();
 
@@ -860,7 +863,7 @@ TEST_F(PositiveGpuAV, DISABLED_DrawingWithUnboundUnusedSet) {
                                        {
                                            {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                        });
-    descriptor_set.WriteDescriptorImageInfo(0, imageView, sampler.handle());
+    descriptor_set.WriteDescriptorImageInfo(0, imageView, sampler);
     descriptor_set.UpdateDescriptorSets();
 
     vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -879,12 +882,12 @@ TEST_F(PositiveGpuAV, DISABLED_DrawingWithUnboundUnusedSet) {
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 1, 1,
-                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_, 1, 1, &descriptor_set.set_,
+                              0, nullptr);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
-    vk::CmdDrawIndexedIndirectCountKHR(m_command_buffer.handle(), indexed_indirect_buffer.handle(), 0, count_buffer.handle(), 0, 1,
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdDrawIndexedIndirectCountKHR(m_command_buffer, indexed_indirect_buffer, 0, count_buffer, 0, 1,
                                        sizeof(VkDrawIndexedIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -909,7 +912,6 @@ TEST_F(PositiveGpuAV, DISABLED_FirstInstance) {
         draw_ptr->firstInstance = (i == 3) ? 1 : 0;
         draw_ptr++;
     }
-    draw_buffer.Memory().Unmap();
 
     CreatePipelineHelper pipe(*this);
     pipe.CreateGraphicsPipeline();
@@ -917,12 +919,11 @@ TEST_F(PositiveGpuAV, DISABLED_FirstInstance) {
     VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_command_buffer.Begin(&begin_info);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDrawIndirect(m_command_buffer.handle(), draw_buffer.handle(), 0, 4, sizeof(VkDrawIndirectCommand));
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDrawIndirect(m_command_buffer, draw_buffer, 0, 4, sizeof(VkDrawIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Now with an offset and indexed draw
     vkt::Buffer indexed_draw_buffer(*m_device, 4 * sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -936,152 +937,17 @@ TEST_F(PositiveGpuAV, DISABLED_FirstInstance) {
         indexed_draw_ptr->firstInstance = (i == 3) ? 1 : 0;
         indexed_draw_ptr++;
     }
-    indexed_draw_buffer.Memory().Unmap();
 
     m_command_buffer.Begin(&begin_info);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vkt::Buffer index_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
-    vk::CmdDrawIndexedIndirect(m_command_buffer.handle(), indexed_draw_buffer.handle(), sizeof(VkDrawIndexedIndirectCommand), 3,
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdDrawIndexedIndirect(m_command_buffer, indexed_draw_buffer, sizeof(VkDrawIndexedIndirectCommand), 3,
                                sizeof(VkDrawIndexedIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
-}
-
-// Not supported in Vulkan SC: GPU AV
-TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32) {
-    TEST_DESCRIPTION(
-        "Copy depth buffer to image with all depth values in the [0, 1] legal range. Depth image has format "
-        "VK_FORMAT_D32_SFLOAT.");
-    AddRequiredExtensions(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::uniformAndStorageBuffer8BitAccess);
-    RETURN_IF_SKIP(InitGpuAvFramework());
-    RETURN_IF_SKIP(InitState());
-
-    vkt::Buffer copy_src_buffer(*m_device, sizeof(float) * 64 * 64,
-                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
-
-    float *ptr = static_cast<float *>(copy_src_buffer.Memory().Map());
-    for (size_t i = 0; i < 64 * 64; ++i) {
-        if (i % 2) {
-            ptr[i] = 1.0f;
-        } else {
-            ptr[i] = 0.0f;
-        }
-    }
-    copy_src_buffer.Memory().Unmap();
-
-    vkt::Image copy_dst_image(*m_device, 64, 64, 1, VK_FORMAT_D32_SFLOAT,
-                              VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-    m_command_buffer.Begin();
-
-    VkBufferImageCopy buffer_image_copy_1;
-    buffer_image_copy_1.bufferOffset = 0;
-    buffer_image_copy_1.bufferRowLength = 0;
-    buffer_image_copy_1.bufferImageHeight = 0;
-    buffer_image_copy_1.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
-    buffer_image_copy_1.imageOffset = {0, 0, 0};
-    buffer_image_copy_1.imageExtent = {64, 64, 1};
-
-    vk::CmdCopyBufferToImage(m_command_buffer, copy_src_buffer, copy_dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                             &buffer_image_copy_1);
-
-    VkBufferImageCopy buffer_image_copy_2 = buffer_image_copy_1;
-    buffer_image_copy_2.imageOffset = {32, 32, 0};
-    buffer_image_copy_2.imageExtent = {32, 32, 1};
-
-    vk::CmdCopyBufferToImage(m_command_buffer, copy_src_buffer, copy_dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                             &buffer_image_copy_2);
-
-    m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    vk::DeviceWaitIdle(*m_device);
-}
-
-// Not supported in Vulkan SC: GPU AV
-TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32U8) {
-    TEST_DESCRIPTION(
-        "Copy depth buffer to image with all depth values in the [0, 1] legal range. Depth image has format "
-        "VK_FORMAT_D32_SFLOAT_S8_UINT.");
-    AddRequiredExtensions(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::uniformAndStorageBuffer8BitAccess);
-    RETURN_IF_SKIP(InitGpuAvFramework());
-    RETURN_IF_SKIP(InitState());
-
-    vkt::Buffer copy_src_buffer(*m_device, 5 * 64 * 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                kHostVisibleMemProps);
-
-    auto ptr = static_cast<uint8_t *>(copy_src_buffer.Memory().Map());
-    std::memset(ptr, 0, static_cast<size_t>(copy_src_buffer.CreateInfo().size));
-    for (size_t i = 0; i < 64 * 64; ++i) {
-        auto ptr_float = reinterpret_cast<float *>(ptr + 5 * i);
-        if (i % 2) {
-            *ptr_float = 1.0f;
-        } else {
-            *ptr_float = 0.0f;
-        }
-    }
-
-    copy_src_buffer.Memory().Unmap();
-
-    vkt::Image copy_dst_image(*m_device, 64, 64, 1, VK_FORMAT_D32_SFLOAT_S8_UINT,
-                              VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-    m_command_buffer.Begin();
-
-    VkBufferImageCopy buffer_image_copy;
-    buffer_image_copy.bufferOffset = 0;
-    buffer_image_copy.bufferRowLength = 0;
-    buffer_image_copy.bufferImageHeight = 0;
-    buffer_image_copy.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
-    buffer_image_copy.imageOffset = {33, 33, 0};
-    buffer_image_copy.imageExtent = {31, 31, 1};
-
-    vk::CmdCopyBufferToImage(m_command_buffer, copy_src_buffer, copy_dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                             &buffer_image_copy);
-
-    m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    vk::DeviceWaitIdle(*m_device);
-}
-
-// Not supported in Vulkan SC: GPU AV
-TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageTwoSubmit) {
-    TEST_DESCRIPTION("Make sure resources are managed correctly afer a CopyBufferToImage call.");
-    RETURN_IF_SKIP(InitGpuAvFramework());
-    RETURN_IF_SKIP(InitState());
-
-    vkt::CommandBuffer cb_0(*m_device, m_command_pool);
-    vkt::CommandBuffer cb_1(*m_device, m_command_pool);
-
-    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    vkt::Image image(*m_device, image_ci, vkt::set_layout);
-    vkt::Buffer buffer(*m_device, 4096, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-
-    VkBufferImageCopy region = {};
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {32, 32, 1};
-    region.bufferOffset = 0;
-
-    cb_0.Begin();
-    vk::CmdCopyBufferToImage(cb_0.handle(), buffer.handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &region);
-    cb_0.End();
-    m_default_queue->Submit(cb_0);
-    m_default_queue->Wait();
-
-    cb_1.Begin();
-    cb_1.End();
-    m_default_queue->Submit(cb_1);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -1131,11 +997,7 @@ TEST_P(PositiveGpuAVParameterized, SettingsCombinations) {
         layer_setting = {OBJECT_LAYER_NAME, setting_name, VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &layer_setting_value};
     }
 
-    VkLayerSettingsCreateInfoEXT layer_settings_create_info = vku::InitStructHelper();
-    layer_settings_create_info.settingCount = static_cast<uint32_t>(layer_settings.size());
-    layer_settings_create_info.pSettings = layer_settings.data();
-    RETURN_IF_SKIP(InitGpuAvFramework(&layer_settings_create_info));
-
+    RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
@@ -1149,7 +1011,6 @@ TEST_P(PositiveGpuAVParameterized, SettingsCombinations) {
         draw_ptr->firstInstance = (i == 3) ? 1 : 0;
         draw_ptr++;
     }
-    draw_buffer.Memory().Unmap();
 
     CreatePipelineHelper pipe(*this);
     pipe.rs_state_ci_.lineWidth = 1.0f;
@@ -1158,12 +1019,11 @@ TEST_P(PositiveGpuAVParameterized, SettingsCombinations) {
     VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_command_buffer.Begin(&begin_info);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDrawIndirect(m_command_buffer.handle(), draw_buffer.handle(), 0, 4, sizeof(VkDrawIndirectCommand));
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDrawIndirect(m_command_buffer, draw_buffer, 0, 4, sizeof(VkDrawIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Now with an offset and indexed draw
     vkt::Buffer indexed_draw_buffer(*m_device, 4 * sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -1177,19 +1037,17 @@ TEST_P(PositiveGpuAVParameterized, SettingsCombinations) {
         indexed_draw_ptr->firstInstance = (i == 3) ? 1 : 0;
         indexed_draw_ptr++;
     }
-    indexed_draw_buffer.Memory().Unmap();
 
     m_command_buffer.Begin(&begin_info);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vkt::Buffer index_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
-    vk::CmdDrawIndexedIndirect(m_command_buffer.handle(), indexed_draw_buffer.handle(), sizeof(VkDrawIndexedIndirectCommand), 3,
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdDrawIndexedIndirect(m_command_buffer, indexed_draw_buffer, sizeof(VkDrawIndexedIndirectCommand), 3,
                                sizeof(VkDrawIndexedIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 static std::string GetGpuAvSettingsCombinationTestName(const testing::TestParamInfo<PositiveGpuAVParameterized::ParamType> &info) {
@@ -1258,8 +1116,6 @@ TEST_F(PositiveGpuAV, DISABLED_RestoreUserPushConstants) {
     indirect_draw_parameters.instanceCount = 1;
     indirect_draw_parameters.firstVertex = 0;
     indirect_draw_parameters.firstInstance = 0;
-
-    indirect_draw_parameters_buffer.Memory().Unmap();
 
     constexpr int32_t int_count = 16;
     vkt::Buffer storage_buffer(*m_device, int_count * sizeof(int32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
@@ -1346,35 +1202,31 @@ TEST_F(PositiveGpuAV, DISABLED_RestoreUserPushConstants) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.gp_ci_.layout = pipeline_layout;
     pipe.CreateGraphicsPipeline();
 
     VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_command_buffer.Begin(&begin_info);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
-    vk::CmdPushConstants(m_command_buffer.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, shader_pcr_byte_size,
-                         &push_constants);
-    vk::CmdPushConstants(m_command_buffer.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_FRAGMENT_BIT, shader_pcr_byte_size,
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, shader_pcr_byte_size, &push_constants);
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, shader_pcr_byte_size,
                          shader_pcr_byte_size, &push_constants.storage_buffer__ptr_2);
     // Make sure pushing the same push constants twice does not break internal management
-    vk::CmdPushConstants(m_command_buffer.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, shader_pcr_byte_size,
-                         &push_constants);
-    vk::CmdPushConstants(m_command_buffer.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_FRAGMENT_BIT, shader_pcr_byte_size,
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, shader_pcr_byte_size, &push_constants);
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, shader_pcr_byte_size,
                          shader_pcr_byte_size, &push_constants.storage_buffer__ptr_2);
     // Vertex shader will write 8 values to storage buffer, fragment shader another 8
-    vk::CmdDrawIndirect(m_command_buffer.handle(), indirect_draw_parameters_buffer.handle(), 0, 1, sizeof(VkDrawIndirectCommand));
+    vk::CmdDrawIndirect(m_command_buffer, indirect_draw_parameters_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     auto storage_buffer_ptr = static_cast<int32_t *>(storage_buffer.Memory().Map());
     for (int32_t i = 0; i < int_count; ++i) {
         ASSERT_EQ(storage_buffer_ptr[i], i);
     }
-    storage_buffer.Memory().Unmap();
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -1472,11 +1324,10 @@ TEST_F(PositiveGpuAV, DISABLED_RestoreUserPushConstants2) {
     indirect_draw_parameters.instanceCount = 1;
     indirect_draw_parameters.firstVertex = 0;
     indirect_draw_parameters.firstInstance = 0;
-    indirect_draw_parameters_buffer.Memory().Unmap();
 
     CreatePipelineHelper graphics_pipe(*this);
     graphics_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    graphics_pipe.gp_ci_.layout = graphics_pipeline_layout.handle();
+    graphics_pipe.gp_ci_.layout = graphics_pipeline_layout;
     graphics_pipe.CreateGraphicsPipeline();
 
     // Compute pipeline
@@ -1521,8 +1372,8 @@ TEST_F(PositiveGpuAV, DISABLED_RestoreUserPushConstants2) {
     }
 
     CreateComputePipelineHelper compute_pipe(*this);
-    compute_pipe.cs_ = std::make_unique<VkShaderObj>(this, compute_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    compute_pipe.cp_ci_.layout = compute_pipeline_layout.handle();
+    compute_pipe.cs_ = VkShaderObj(this, compute_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    compute_pipe.cp_ci_.layout = compute_pipeline_layout;
     compute_pipe.CreateComputePipeline();
 
     vkt::Buffer indirect_dispatch_parameters_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -1532,7 +1383,6 @@ TEST_F(PositiveGpuAV, DISABLED_RestoreUserPushConstants2) {
     indirect_dispatch_parameters.x = 1;
     indirect_dispatch_parameters.y = 1;
     indirect_dispatch_parameters.z = 1;
-    indirect_dispatch_parameters_buffer.Memory().Unmap();
 
     // Submit commands
     // ---
@@ -1541,36 +1391,32 @@ TEST_F(PositiveGpuAV, DISABLED_RestoreUserPushConstants2) {
     m_command_buffer.Begin(&begin_info);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipe.Handle());
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipe);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipe);
 
-    vk::CmdPushConstants(m_command_buffer.handle(), graphics_pipeline_layout.handle(),
-                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(graphics_push_constants),
-                         &graphics_push_constants);
+    vk::CmdPushConstants(m_command_buffer, graphics_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(graphics_push_constants), &graphics_push_constants);
 
     // Vertex shader will write 4 values to graphics storage buffer, fragment shader another 4
-    vk::CmdDrawIndirect(m_command_buffer.handle(), indirect_draw_parameters_buffer.handle(), 0, 1, sizeof(VkDrawIndirectCommand));
+    vk::CmdDrawIndirect(m_command_buffer, indirect_draw_parameters_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
     m_command_buffer.EndRenderPass();
 
-    vk::CmdPushConstants(m_command_buffer.handle(), compute_pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                         sizeof(compute_push_constants), &compute_push_constants);
+    vk::CmdPushConstants(m_command_buffer, compute_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compute_push_constants),
+                         &compute_push_constants);
     // Compute shaders will write 8 values to compute storage buffer
-    vk::CmdDispatchIndirect(m_command_buffer.handle(), indirect_dispatch_parameters_buffer.handle(), 0);
+    vk::CmdDispatchIndirect(m_command_buffer, indirect_dispatch_parameters_buffer, 0);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     auto compute_storage_buffer_ptr = static_cast<int32_t *>(compute_storage_buffer.Memory().Map());
     for (int32_t i = 0; i < int_count; ++i) {
         ASSERT_EQ(compute_storage_buffer_ptr[i], int_count + i);
     }
-    compute_storage_buffer.Memory().Unmap();
 
     auto graphics_storage_buffer_ptr = static_cast<int32_t *>(graphics_storage_buffer.Memory().Map());
     for (int32_t i = 0; i < int_count; ++i) {
         ASSERT_EQ(graphics_storage_buffer_ptr[i], i);
     }
-    graphics_storage_buffer.Memory().Unmap();
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -1589,8 +1435,6 @@ TEST_F(PositiveGpuAV, DISABLED_PipelineLayoutMixing) {
     indirect_draw_parameters.firstVertex = 0;
     indirect_draw_parameters.firstInstance = 0;
 
-    indirect_draw_parameters_buffer.Memory().Unmap();
-
     VkPushConstantRange push_constant_ranges = {VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int)};
     VkPipelineLayoutCreateInfo pipe_layout_ci_1 = vku::InitStructHelper();
     pipe_layout_ci_1.pushConstantRangeCount = 1;
@@ -1598,18 +1442,18 @@ TEST_F(PositiveGpuAV, DISABLED_PipelineLayoutMixing) {
     vkt::PipelineLayout pipe_layout_1(*m_device, pipe_layout_ci_1);
 
     CreatePipelineHelper pipe_1(*this);
-    pipe_1.gp_ci_.layout = pipe_layout_1.handle();
+    pipe_1.gp_ci_.layout = pipe_layout_1;
     pipe_1.CreateGraphicsPipeline();
 
     CreatePipelineHelper pipe_2(*this);
     pipe_2.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr};
     pipe_2.CreateGraphicsPipeline();
 
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_USAGE_SAMPLED_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
-    pipe_2.descriptor_set_->WriteDescriptorImageInfo(0, view, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    pipe_2.descriptor_set_->WriteDescriptorImageInfo(0, view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     pipe_2.descriptor_set_->UpdateDescriptorSets();
 
@@ -1619,24 +1463,23 @@ TEST_F(PositiveGpuAV, DISABLED_PipelineLayoutMixing) {
 
     // CmdPushConstants with layout 1 (is associated to pipeline 1, only has a push constant range)
     int dummy = 0;
-    vk::CmdPushConstants(m_command_buffer.handle(), pipe_layout_1.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int), &dummy);
+    vk::CmdPushConstants(m_command_buffer, pipe_layout_1, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int), &dummy);
     // CmdBindDescriptorSets with layout 2 (is associated to pipeline 2, only has a descriptor set, so is incompatible with layout
     // 1)
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_2.pipeline_layout_.handle(), 0, 1,
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_2.pipeline_layout_, 0, 1,
                               &pipe_2.descriptor_set_->set_, 0, nullptr);
 
     // Bind pipeline 1, draw
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_1.Handle());
-    vk::CmdDrawIndirect(m_command_buffer.handle(), indirect_draw_parameters_buffer.handle(), 0, 1, sizeof(VkDrawIndirectCommand));
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_1);
+    vk::CmdDrawIndirect(m_command_buffer, indirect_draw_parameters_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
     // Bind pipeline 2, draw
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_2.Handle());
-    vk::CmdDrawIndirect(m_command_buffer.handle(), indirect_draw_parameters_buffer.handle(), 0, 1, sizeof(VkDrawIndirectCommand));
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_2);
+    vk::CmdDrawIndirect(m_command_buffer, indirect_draw_parameters_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
 
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -1648,7 +1491,7 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubset) {
     const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     vkt::DescriptorSetLayout dsl1(*m_device, binding);
     vkt::DescriptorSetLayout dsl2(*m_device, binding);
-    VkDescriptorSetLayout set_layouts[2] = {dsl1.handle(), dsl2.handle()};
+    VkDescriptorSetLayout set_layouts[2] = {dsl1, dsl2};
 
     VkPipelineLayoutCreateInfo pipeline_layout_ci = vku::InitStructHelper();
     pipeline_layout_ci.pSetLayouts = set_layouts;
@@ -1666,8 +1509,8 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubset) {
         }
     )glsl";
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout_1.handle();
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout_1;
     pipe.CreateComputePipeline();
 
     VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2};
@@ -1678,7 +1521,7 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubset) {
     vkt::DescriptorPool pool(*m_device, ds_pool_ci);
 
     VkDescriptorSetAllocateInfo allocate_info = vku::InitStructHelper();
-    allocate_info.descriptorPool = pool.handle();
+    allocate_info.descriptorPool = pool;
     allocate_info.descriptorSetCount = 2;
     allocate_info.pSetLayouts = set_layouts;
 
@@ -1686,7 +1529,7 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubset) {
     vk::AllocateDescriptorSets(device(), &allocate_info, descriptor_sets);
 
     vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    VkDescriptorBufferInfo buffer_info = {buffer.handle(), 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo buffer_info = {buffer, 0, VK_WHOLE_SIZE};
 
     VkWriteDescriptorSet descriptor_writes[2];
     descriptor_writes[0] = vku::InitStructHelper();
@@ -1706,15 +1549,14 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubset) {
     VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_command_buffer.Begin(&begin_info);
 
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_2.handle(), 0, 2,
-                              descriptor_sets, 0, nullptr);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_2, 0, 2, descriptor_sets, 0,
+                              nullptr);
 
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
 
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -1725,7 +1567,7 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubsetWithUnboundDescriptorSe
 
     const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     vkt::DescriptorSetLayout dsl1(*m_device, binding);
-    VkDescriptorSetLayout set_layouts[3] = {dsl1.handle(), dsl1.handle(), dsl1.handle()};
+    VkDescriptorSetLayout set_layouts[3] = {dsl1, dsl1, dsl1};
 
     VkPipelineLayoutCreateInfo pipeline_layout_ci = vku::InitStructHelper();
     pipeline_layout_ci.pSetLayouts = set_layouts;
@@ -1747,8 +1589,8 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubsetWithUnboundDescriptorSe
         }
     )glsl";
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout_1.handle();
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout_1;
     pipe.CreateComputePipeline();
 
     VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2};
@@ -1759,7 +1601,7 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubsetWithUnboundDescriptorSe
     vkt::DescriptorPool pool(*m_device, ds_pool_ci);
 
     VkDescriptorSetAllocateInfo allocate_info = vku::InitStructHelper();
-    allocate_info.descriptorPool = pool.handle();
+    allocate_info.descriptorPool = pool;
     allocate_info.descriptorSetCount = 2;
     allocate_info.pSetLayouts = set_layouts;
 
@@ -1767,7 +1609,7 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubsetWithUnboundDescriptorSe
     vk::AllocateDescriptorSets(device(), &allocate_info, descriptor_sets);
 
     vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    VkDescriptorBufferInfo buffer_info = {buffer.handle(), 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo buffer_info = {buffer, 0, VK_WHOLE_SIZE};
 
     VkWriteDescriptorSet descriptor_writes[2];
     descriptor_writes[0] = vku::InitStructHelper();
@@ -1788,17 +1630,16 @@ TEST_F(PositiveGpuAV, DISABLED_SharedPipelineLayoutSubsetWithUnboundDescriptorSe
     m_command_buffer.Begin(&begin_info);
 
     // Only bind descriptor sets at indices 0 and 2
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_2.handle(), 0, 1,
-                              &descriptor_sets[0], 0, nullptr);
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_2.handle(), 2, 1,
-                              &descriptor_sets[1], 0, nullptr);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_2, 0, 1, &descriptor_sets[0], 0,
+                              nullptr);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_2, 2, 1, &descriptor_sets[1], 0,
+                              nullptr);
 
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
 
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -1812,14 +1653,14 @@ TEST_F(PositiveGpuAV, DISABLED_DestroyedPipelineLayout) {
     CreatePipelineHelper pipe(*this);
     {
         const vkt::PipelineLayout doomed_pipeline_layout(*m_device);
-        pipe.gp_ci_.layout = doomed_pipeline_layout.handle();
+        pipe.gp_ci_.layout = doomed_pipeline_layout;
         pipe.CreateGraphicsPipeline();
     }
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
@@ -1827,6 +1668,7 @@ TEST_F(PositiveGpuAV, DISABLED_DestroyedPipelineLayout) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_DestroyedPipelineLayout2) {
     TEST_DESCRIPTION("Have a descriptor set that needs to be bound as well so GPU-AV can use that");
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
@@ -1842,7 +1684,7 @@ TEST_F(PositiveGpuAV, DISABLED_DestroyedPipelineLayout2) {
 
     vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
-    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
@@ -1851,16 +1693,16 @@ TEST_F(PositiveGpuAV, DISABLED_DestroyedPipelineLayout2) {
     {
         const vkt::PipelineLayout doomed_pipeline_layout(*m_device, {&descriptor_set.layout_});
         pipe.shader_stages_[0] = vs.GetStageCreateInfo();
-        pipe.gp_ci_.layout = doomed_pipeline_layout.handle();
+        pipe.gp_ci_.layout = doomed_pipeline_layout;
         pipe.CreateGraphicsPipeline();
     }
 
     m_command_buffer.Begin();
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
-                              &descriptor_set.set_, 0, nullptr);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
@@ -1934,33 +1776,32 @@ TEST_F(PositiveGpuAV, DISABLED_DISABLED_DeviceGeneratedCommandsIES) {
     pipe_flags2.flags = VK_PIPELINE_CREATE_2_INDIRECT_BINDABLE_BIT_EXT;
     CreateComputePipelineHelper init_pipe(*this, &pipe_flags2);
     init_pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
-    init_pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source_1, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    init_pipe.cs_ = VkShaderObj(this, shader_source_1, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     init_pipe.CreateComputePipeline();
 
     CreateComputePipelineHelper pipe_1(*this, &pipe_flags2);
     pipe_1.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
-    pipe_1.cs_ = std::make_unique<VkShaderObj>(this, shader_source_2, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    pipe_1.cs_ = VkShaderObj(this, shader_source_2, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     pipe_1.CreateComputePipeline();
 
     CreateComputePipelineHelper pipe_2(*this, &pipe_flags2);
     pipe_2.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
-    pipe_2.cs_ = std::make_unique<VkShaderObj>(this, shader_source_3, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    pipe_2.cs_ = VkShaderObj(this, shader_source_3, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     pipe_2.CreateComputePipeline();
 
-    vkt::IndirectExecutionSet exe_set(*m_device, init_pipe.Handle(), 3);
+    vkt::IndirectExecutionSet exe_set(*m_device, init_pipe, 3);
     VkWriteIndirectExecutionSetPipelineEXT write_exe_sets[2];
     write_exe_sets[0] = vku::InitStructHelper();
     write_exe_sets[0].index = 1;
-    write_exe_sets[0].pipeline = pipe_1.Handle();
+    write_exe_sets[0].pipeline = pipe_1;
     write_exe_sets[1] = vku::InitStructHelper();
     write_exe_sets[1].index = 2;
-    write_exe_sets[1].pipeline = pipe_2.Handle();
-    vk::UpdateIndirectExecutionSetPipelineEXT(device(), exe_set.handle(), 2, write_exe_sets);
+    write_exe_sets[1].pipeline = pipe_2;
+    vk::UpdateIndirectExecutionSetPipelineEXT(device(), exe_set, 2, write_exe_sets);
 
     vkt::Buffer ssbo_buffer(*m_device, 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    init_pipe.descriptor_set_->WriteDescriptorBufferInfo(0, ssbo_buffer.handle(), 0, VK_WHOLE_SIZE,
-                                                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    init_pipe.descriptor_set_->UpdateDescriptorSets();
+    init_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, ssbo_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    init_pipe.descriptor_set_.UpdateDescriptorSets();
 
     VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
     allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
@@ -1969,8 +1810,8 @@ TEST_F(PositiveGpuAV, DISABLED_DISABLED_DeviceGeneratedCommandsIES) {
     VkDeviceSize pre_process_size = 0;
     {
         VkGeneratedCommandsMemoryRequirementsInfoEXT dgc_mem_reqs = vku::InitStructHelper();
-        dgc_mem_reqs.indirectCommandsLayout = command_layout.handle();
-        dgc_mem_reqs.indirectExecutionSet = exe_set.handle();
+        dgc_mem_reqs.indirectCommandsLayout = command_layout;
+        dgc_mem_reqs.indirectExecutionSet = exe_set;
         dgc_mem_reqs.maxSequenceCount = 1;
         VkMemoryRequirements2 mem_reqs2 = vku::InitStructHelper();
         vk::GetGeneratedCommandsMemoryRequirementsEXT(device(), &dgc_mem_reqs, &mem_reqs2);
@@ -1989,12 +1830,11 @@ TEST_F(PositiveGpuAV, DISABLED_DISABLED_DeviceGeneratedCommandsIES) {
     indirect_command_ptr->x = 1;
     indirect_command_ptr->y = 1;
     indirect_command_ptr->z = 1;
-    block_buffer.Memory().Unmap();
 
     VkGeneratedCommandsInfoEXT generated_commands_info = vku::InitStructHelper();
     generated_commands_info.shaderStages = VK_SHADER_STAGE_COMPUTE_BIT;
-    generated_commands_info.indirectExecutionSet = exe_set.handle();
-    generated_commands_info.indirectCommandsLayout = command_layout.handle();
+    generated_commands_info.indirectExecutionSet = exe_set;
+    generated_commands_info.indirectCommandsLayout = command_layout;
     generated_commands_info.indirectAddressSize = sizeof(uint32_t) + sizeof(VkDispatchIndirectCommand);
     generated_commands_info.indirectAddress = block_buffer.Address();
     generated_commands_info.preprocessAddress = pre_process_buffer.Address();
@@ -2003,14 +1843,13 @@ TEST_F(PositiveGpuAV, DISABLED_DISABLED_DeviceGeneratedCommandsIES) {
     generated_commands_info.maxSequenceCount = 1;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, init_pipe.Handle());
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, init_pipe.pipeline_layout_.handle(), 0, 1,
-                              &init_pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdExecuteGeneratedCommandsEXT(m_command_buffer.handle(), false, &generated_commands_info);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, init_pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, init_pipe.pipeline_layout_, 0, 1,
+                              &init_pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdExecuteGeneratedCommandsEXT(m_command_buffer, false, &generated_commands_info);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -2061,11 +1900,377 @@ TEST_F(PositiveGpuAV, DISABLED_BasicMeshShader) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDrawMeshTasksEXT(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDrawMeshTasksEXT(m_command_buffer, 1, 1, 1);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_DualShaderLibrary) {
+    TEST_DESCRIPTION("Create library with both vert and frag shader in it");
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {}, {});
+
+    CreatePipelineHelper combined_lib(*this);
+    combined_lib.gpl_info.emplace(vku::InitStruct<VkGraphicsPipelineLibraryCreateInfoEXT>());
+    combined_lib.gpl_info->flags = VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT |
+                                   VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT |
+                                   VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT;
+
+    combined_lib.gp_ci_ = vku::InitStructHelper(&combined_lib.gpl_info);
+    combined_lib.gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
+    combined_lib.gp_ci_.pVertexInputState = &combined_lib.vi_ci_;
+    combined_lib.gp_ci_.pInputAssemblyState = &combined_lib.ia_ci_;
+    combined_lib.gp_ci_.pViewportState = &combined_lib.vp_state_ci_;
+    combined_lib.gp_ci_.pRasterizationState = &combined_lib.rs_state_ci_;
+    combined_lib.gp_ci_.pMultisampleState = &combined_lib.ms_ci_;
+    combined_lib.gp_ci_.renderPass = RenderPass();
+    combined_lib.gp_ci_.subpass = 0;
+    combined_lib.gp_ci_.layout = pipeline_layout;
+
+    const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    vkt::GraphicsPipelineLibraryStage vs_stage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
+    const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+    vkt::GraphicsPipelineLibraryStage fs_stage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    combined_lib.shader_stages_ = {vs_stage.stage_ci, fs_stage.stage_ci};
+    combined_lib.gp_ci_.stageCount = combined_lib.shader_stages_.size();
+    combined_lib.gp_ci_.pStages = combined_lib.shader_stages_.data();
+
+    combined_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo();
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    VkPipeline libraries[2] = {
+        combined_lib,
+        frag_out_lib,
+    };
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = size32(libraries);
+    link_info.pLibraries = libraries;
+
+    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
+    exe_pipe_ci.layout = pipeline_layout;
+    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    ASSERT_TRUE(exe_pipe.initialized());
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_DualShaderLibraryInline) {
+    TEST_DESCRIPTION("Create library with both vert and frag shader in it");
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {}, {});
+
+    CreatePipelineHelper combined_lib(*this);
+    combined_lib.gpl_info.emplace(vku::InitStruct<VkGraphicsPipelineLibraryCreateInfoEXT>());
+    combined_lib.gpl_info->flags = VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT |
+                                   VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT |
+                                   VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT;
+
+    combined_lib.gp_ci_ = vku::InitStructHelper(&combined_lib.gpl_info);
+    combined_lib.gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
+    combined_lib.gp_ci_.pVertexInputState = &combined_lib.vi_ci_;
+    combined_lib.gp_ci_.pInputAssemblyState = &combined_lib.ia_ci_;
+    combined_lib.gp_ci_.pViewportState = &combined_lib.vp_state_ci_;
+    combined_lib.gp_ci_.pRasterizationState = &combined_lib.rs_state_ci_;
+    combined_lib.gp_ci_.pMultisampleState = &combined_lib.ms_ci_;
+    combined_lib.gp_ci_.renderPass = RenderPass();
+    combined_lib.gp_ci_.subpass = 0;
+    combined_lib.gp_ci_.layout = pipeline_layout;
+
+    combined_lib.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    combined_lib.gp_ci_.stageCount = combined_lib.shader_stages_.size();
+    combined_lib.gp_ci_.pStages = combined_lib.shader_stages_.data();
+
+    combined_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo();
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    VkPipeline libraries[2] = {
+        combined_lib,
+        frag_out_lib,
+    };
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = size32(libraries);
+    link_info.pLibraries = libraries;
+
+    // Destroy VkShaderModule as not required to have when linking
+    vs.destroy();
+    fs.destroy();
+
+    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
+    exe_pipe_ci.layout = pipeline_layout;
+    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    ASSERT_TRUE(exe_pipe.initialized());
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_FailedSampler) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9916");
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
+    VkSampler sampler_handle;
+
+    struct Alloc {
+        static VKAPI_ATTR void *VKAPI_CALL alloc(void *, size_t, size_t, VkSystemAllocationScope) { return nullptr; };
+        static VKAPI_ATTR void *VKAPI_CALL reallocFunc(void *, void *, size_t, size_t, VkSystemAllocationScope) { return nullptr; };
+        static VKAPI_ATTR void VKAPI_CALL freeFunc(void *, void *){};
+    };
+    const VkAllocationCallbacks bad_allocator = {nullptr, Alloc::alloc, Alloc::reallocFunc, Alloc::freeFunc, nullptr, nullptr};
+
+    // Will not return VK_SUCCESS on real device (tested by CTS) and need to ignore
+    vk::CreateSampler(device(), &sampler_info, &bad_allocator, &sampler_handle);
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_ImportFenceWait) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9706");
+    AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const auto handle_types = FindSupportedExternalFenceHandleTypes(Gpu(), VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT);
+    if ((handle_types & VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT) == 0) {
+        GTEST_SKIP() << "VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT is not exportable";
+    }
+
+    int handle = 0;
+
+    VkExportFenceCreateInfo export_info = vku::InitStructHelper();
+    export_info.handleTypes = VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT;
+    const VkFenceCreateInfo create_info = vku::InitStructHelper(&export_info);
+    vkt::Fence fence(*m_device, create_info);
+    fence.ExportHandle(handle, VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT);
+    fence.ImportHandle(handle, VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT);
+
+    VkSubmitInfo submit = vku::InitStructHelper();
+    submit.commandBufferCount = 0;
+    submit.waitSemaphoreCount = 0;
+    submit.signalSemaphoreCount = 0;
+    vk::QueueSubmit(m_default_queue->handle(), 1, &submit, fence);
+    vk::WaitForFences(device(), 1, &fence.handle(), VK_TRUE, 1000000000);
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_EmptySubmit) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9706");
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Fence fence(*m_device);
+    VkSubmitInfo submit = vku::InitStructHelper();
+    submit.commandBufferCount = 0;
+    submit.waitSemaphoreCount = 0;
+    submit.signalSemaphoreCount = 0;
+    vk::QueueSubmit(m_default_queue->handle(), 1, &submit, fence);
+    vk::WaitForFences(device(), 1, &fence.handle(), VK_TRUE, 1000000000);
+    m_device->Wait();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_ValidationBufferSuballocations) {
+    TEST_DESCRIPTION("Make sure sub-allocating inside buffers used for validation purposes does not blow up");
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    constexpr uint32_t num_vertices = 12;
+    std::vector<uint32_t> indicies(num_vertices);
+    for (uint32_t i = 0; i < num_vertices; i++) {
+        indicies[i] = num_vertices - 1 - i;
+    }
+    vkt::Buffer index_buffer = vkt::IndexBuffer(*m_device, std::move(indicies));
+
+    VkDrawIndexedIndirectCommand draw_params{};
+    draw_params.indexCount = 3;
+    draw_params.instanceCount = 1;
+    draw_params.firstIndex = 0;
+    draw_params.vertexOffset = 0;
+    draw_params.firstInstance = 0;
+    vkt::Buffer draw_params_buffer = vkt::IndirectBuffer<VkDrawIndexedIndirectCommand>(*m_device, {draw_params});
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+    m_command_buffer.Begin(&begin_info);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    for (uint32_t i = 0; i < 1025; i++) {
+        vk::CmdDrawIndexedIndirect(m_command_buffer, draw_params_buffer, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+    }
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    vk::ResetCommandBuffer(m_command_buffer, 0);
+
+    m_command_buffer.Begin(&begin_info);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    for (uint32_t i = 0; i < 1025; i++) {
+        vk::CmdDrawIndexedIndirect(m_command_buffer, draw_params_buffer, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+    }
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_MixDynamicNormalRenderPass) {
+    TEST_DESCRIPTION("Test mixing Dynamic rendering and normal renderpass to stress Restore pipeline logic");
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::fragmentStoresAndAtomics);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::Buffer ssbo_buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    OneOffDescriptorSet descriptor_set1(m_device, {
+                                                      {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                  });
+    OneOffDescriptorSet descriptor_set2(m_device, {
+                                                      {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                  });
+    descriptor_set1.WriteDescriptorBufferInfo(0, ssbo_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set1.UpdateDescriptorSets();
+    descriptor_set2.WriteDescriptorBufferInfo(0, ssbo_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set2.UpdateDescriptorSets();
+
+    VkShaderStageFlags all_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+    VkPushConstantRange pc_ranges = {all_stages, 0, 16};
+    const vkt::PipelineLayout g_pipeline_layout(*m_device, {&descriptor_set1.layout_}, {pc_ranges});
+    const vkt::PipelineLayout c_pipeline_layout(*m_device, {&descriptor_set2.layout_}, {pc_ranges});
+
+    char const *shader_source = R"glsl(
+        #version 450
+        layout(push_constant) uniform PushConstants {
+            uint a[4];
+        } pc;
+
+        layout(set = 0, binding = 0) buffer SSBO { uint b; };
+        void main() {
+            b = pc.a[0];
+        }
+    )glsl";
+
+    VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, shader_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    CreatePipelineHelper g_pipe(*this);
+    g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    g_pipe.gp_ci_.layout = g_pipeline_layout;
+    g_pipe.CreateGraphicsPipeline();
+
+    VkFormat rendering_format = GetRenderTargetFormat();
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 1;
+    pipeline_rendering_info.pColorAttachmentFormats = &rendering_format;
+
+    CreatePipelineHelper dr_pipe(*this, &pipeline_rendering_info);
+    dr_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    dr_pipe.gp_ci_.layout = g_pipeline_layout;
+    dr_pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
+    dr_pipe.CreateGraphicsPipeline();
+
+    CreateComputePipelineHelper c_pipe(*this);
+    c_pipe.cp_ci_.layout = c_pipeline_layout;
+    c_pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    c_pipe.CreateComputePipeline();
+
+    vkt::Buffer dispatch_params_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                                       kHostVisibleMemProps);
+    auto &indirect_dispatch_parameters = *static_cast<VkDispatchIndirectCommand *>(dispatch_params_buffer.Memory().Map());
+    indirect_dispatch_parameters.x = 1u;
+    indirect_dispatch_parameters.y = 1u;
+    indirect_dispatch_parameters.z = 1u;
+
+    VkDrawIndexedIndirectCommand draw_params{3, 1, 0, 0, 0};
+    vkt::Buffer draw_params_buffer = vkt::IndirectBuffer<VkDrawIndexedIndirectCommand>(*m_device, {draw_params});
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(
+        m_width, m_height, 1, 1, rendering_format,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Image rendering_image(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView rendering_view = rendering_image.CreateView();
+
+    uint32_t dummy = 0;
+    m_command_buffer.Begin();
+    vk::CmdPushConstants(m_command_buffer, g_pipeline_layout, all_stages, 0, 4, &dummy);
+
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, c_pipeline_layout, 0, 1, &descriptor_set1.set_, 0,
+                              nullptr);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipeline_layout, 0, 1, &descriptor_set2.set_, 0,
+                              nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, c_pipe);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe);
+
+    vk::CmdPushConstants(m_command_buffer, g_pipeline_layout, all_stages, 4, 4, &dummy);
+    vk::CmdDispatchIndirect(m_command_buffer, dispatch_params_buffer, 0u);
+
+    vk::CmdPushConstants(m_command_buffer, g_pipeline_layout, all_stages, 8, 4, &dummy);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vkt::Buffer index_buffer = vkt::IndexBuffer<uint32_t>(*m_device, {0, std::numeric_limits<uint32_t>::max(), 42});
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdPushConstants(m_command_buffer, g_pipeline_layout, all_stages, 0, 4, &dummy);
+    vk::CmdDrawIndexedIndirect(m_command_buffer, draw_params_buffer, 0, 1, 0);
+    m_command_buffer.EndRenderPass();
+
+    vk::CmdDispatchIndirect(m_command_buffer, dispatch_params_buffer, 0u);
+
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, c_pipeline_layout, 0, 1, &descriptor_set2.set_, 0,
+                              nullptr);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipeline_layout, 0, 1, &descriptor_set1.set_, 0,
+                              nullptr);
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, dr_pipe);
+    vk::CmdPushConstants(m_command_buffer, g_pipeline_layout, all_stages, 4, 4, &dummy);
+    m_command_buffer.BeginRenderingColor(rendering_view, GetRenderTargetArea());
+    vk::CmdPushConstants(m_command_buffer, g_pipeline_layout, all_stages, 8, 4, &dummy);
+    vk::CmdDrawIndexedIndirect(m_command_buffer, draw_params_buffer, 0, 1, 0);
+    m_command_buffer.EndRendering();
+
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe);
+    vk::CmdPushConstants(m_command_buffer, g_pipeline_layout, all_stages, 0, 4, &dummy);
+    vk::CmdDrawIndexedIndirect(m_command_buffer, draw_params_buffer, 0, 1, 0);
+    m_command_buffer.EndRenderPass();
+
+    m_command_buffer.BeginRenderingColor(rendering_view, GetRenderTargetArea());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, dr_pipe);
+    vk::CmdDrawIndexedIndirect(m_command_buffer, draw_params_buffer, 0, 1, 0);
+    m_command_buffer.EndRendering();
+
+    vk::CmdDispatchIndirect(m_command_buffer, dispatch_params_buffer, 0u);
+
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }

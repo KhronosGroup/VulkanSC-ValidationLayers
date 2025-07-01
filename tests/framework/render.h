@@ -30,7 +30,8 @@
 
 #include <vector>
 
-using vkt::MakeVkHandles;
+struct InstanceExtensions;
+struct DeviceExtensions;
 
 static constexpr uint64_t kWaitTimeout{10000000000};  // 10 seconds in ns
 static constexpr VkDeviceSize kZeroDeviceSize{0};
@@ -49,6 +50,9 @@ struct SurfaceContext {
 #endif
 #if defined(VK_USE_PLATFORM_XCB_KHR)
     xcb_connection_t *m_surface_xcb_conn{};
+#endif
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+    WaylandContext m_wayland_context{};
 #endif
 #if defined(VK_USE_PLATFORM_METAL_EXT)
     void *caMetalLayer{};
@@ -198,15 +202,10 @@ class VkRenderFramework : public VkTestFramework {
     VkInstance instance_;
     VkPhysicalDevice gpu_ = VK_NULL_HANDLE;
     VkPhysicalDeviceProperties physDevProps_;
-    // This set of required features is used for the features query.
-    // If any required feature is not available, test will fail
-    vkt::FeatureRequirements required_features_;
-    // This is the set of features that will be enabled.
-    // The same features added to required_features_ are added here.
-    // But when querying features, required_features_ will be filled with all
-    // available features. Hence, if used to create a device, the required_features_ set
-    // would *also* enable available features, when we just want to enable required features.
-    vkt::FeatureRequirements features_to_enable_;
+    // This set of required and optional features is used for the features query.
+    // If any required feature is not available, test will fail.
+    // Then all required features and supported optional features are used for device creation.
+    vkt::FeatureRequirements requested_features_;
     bool all_queue_count_ = false;
 
     uint32_t m_gpu_index;
@@ -268,6 +267,9 @@ class VkRenderFramework : public VkTestFramework {
     vkt::Framebuffer *m_framebuffer;
     std::vector<vkt::ImageView> m_render_target_views;   // color attachments but not depth
     std::vector<VkImageView> m_framebuffer_attachments;  // all attachments, can be consumed directly by the API
+
+    InstanceExtensions *m_instance_extensions = nullptr;
+    DeviceExtensions *m_device_extensions = nullptr;
 
     // Add ext_name, the names of all instance extensions required by ext_name, and return true if ext_name is supported. If the
     // extension is not supported, no extension names are added for instance creation. `ext_name` can refer to a device or instance

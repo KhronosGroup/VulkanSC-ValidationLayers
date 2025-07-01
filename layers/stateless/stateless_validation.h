@@ -21,8 +21,6 @@
 #include <vulkan/vulkan_core.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
 #include "generated/error_location_helper.h"
-#include "sync/sync_utils.h"
-#include "utils/vk_layer_utils.h"
 #include "chassis/validation_object.h"
 #include "generated/device_features.h"
 
@@ -546,12 +544,12 @@ class Device : public vvl::base::Device {
                                     const Location &loc) const;
     bool ValidatePipelineRenderingCreateInfo(const Context &context, const VkPipelineRenderingCreateInfo &rendering_struct,
                                              const Location &loc) const;
-    bool ValidateCreateGraphicsPipelinesFlags(const VkPipelineCreateFlags2KHR flags, const Location &flags_loc) const;
+    bool ValidateCreateGraphicsPipelinesFlags(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const;
     bool manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                        const VkGraphicsPipelineCreateInfo *pCreateInfos,
                                                        const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
                                                        const Context &context) const;
-    bool ValidateCreateComputePipelinesFlags(const VkPipelineCreateFlags2KHR flags, const Location &flags_loc) const;
+    bool ValidateCreateComputePipelinesFlags(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const;
     bool manual_PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                       const VkComputePipelineCreateInfo *pCreateInfos,
                                                       const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
@@ -585,6 +583,16 @@ class Device : public vvl::base::Device {
     bool manual_PreCallValidateCreateBufferView(VkDevice device, const VkBufferViewCreateInfo *pCreateInfo,
                                                 const VkAllocationCallbacks *pAllocator, VkBufferView *pBufferView,
                                                 const Context &context) const;
+    bool ValidateCreateBufferFlags(const VkBufferCreateFlags flags, const Location &flag_loc) const;
+    bool ValidateCreateBufferBufferDeviceAddress(const VkBufferCreateInfo &create_info, const Location &create_info_loc) const;
+
+    bool ValidateDependencyInfo(const Context &context, const VkDependencyInfo &dep_info, const Location &loc) const;
+    bool manual_PreCallValidateCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo *pDependencyInfo,
+                                                   const Context &context) const;
+    bool manual_PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfo *pDependencyInfo,
+                                            const Context &context) const;
+    bool manual_PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
+                                              const VkDependencyInfo *pDependencyInfos, const Context &context) const;
 
 #ifdef VK_USE_PLATFORM_METAL_EXT
     bool ExportMetalObjectsPNextUtil(VkExportMetalObjectTypeFlagBitsEXT bit, const char *vuid, const Location &loc,
@@ -704,8 +712,8 @@ class Device : public vvl::base::Device {
                                                                           const VkAccelerationStructureNV *pAccelerationStructures,
                                                                           VkQueryType queryType, VkQueryPool queryPool,
                                                                           uint32_t firstQuery, const Context &context) const;
-    bool ValidateCreateRayTracingPipelinesFlagsNV(const VkPipelineCreateFlags2KHR flags, const Location &flags_loc) const;
-    bool ValidateCreateRayTracingPipelinesFlagsKHR(const VkPipelineCreateFlags2KHR flags, const Location &flags_loc) const;
+    bool ValidateCreateRayTracingPipelinesFlagsNV(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const;
+    bool ValidateCreateRayTracingPipelinesFlagsKHR(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const;
     bool manual_PreCallValidateCreateRayTracingPipelinesNV(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                            const VkRayTracingPipelineCreateInfoNV *pCreateInfos,
                                                            const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
@@ -992,6 +1000,8 @@ class Device : public vvl::base::Device {
     bool manual_PreCallValidateCmdBeginRendering(VkCommandBuffer commandBuffer, const VkRenderingInfo *pRenderingInfo,
                                                  const Context &context) const;
 
+    bool ValidateRenderingAttachmentFeedbackLoopInfo(VkCommandBuffer commandBuffer, const VkRenderingAttachmentInfo &attachment,
+                                                     const Location &rendering_attachment_loc) const;
     bool ValidateBeginRenderingColorAttachment(VkCommandBuffer commandBuffer, const VkRenderingInfo &rendering_info,
                                                const Location &rendering_info_loc) const;
     bool ValidateBeginRenderingDepthAttachment(VkCommandBuffer commandBuffer, const VkRenderingInfo &rendering_info,

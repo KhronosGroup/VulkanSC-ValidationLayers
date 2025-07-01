@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,7 +48,7 @@ TEST_F(NegativePipelineBinary, GetPipelineKey) {
 
         VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
         compute_create_info.stage = cs.GetStageCreateInfo();
-        compute_create_info.layout = pipeline_layout.handle();
+        compute_create_info.layout = pipeline_layout;
 
         VkPipelineBinaryInfoKHR pipeline_binary_info = vku::InitStructHelper();
         pipeline_binary_info.binaryCount = 1;
@@ -93,7 +93,7 @@ TEST_F(NegativePipelineBinary, ReleaseCapturedDataAllocator) {
 
     VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
     compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
+    compute_create_info.layout = pipeline_layout;
 
     VkPipelineCreateFlags2CreateInfo flags2 = vku::InitStructHelper();
     flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
@@ -136,7 +136,7 @@ TEST_F(NegativePipelineBinary, ReleaseCapturedData) {
 
     {
         VkReleaseCapturedPipelineDataInfoKHR data_info = vku::InitStructHelper();
-        data_info.pipeline = pipe.Handle();
+        data_info.pipeline = pipe;
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkReleaseCapturedPipelineDataInfoKHR-pipeline-09613");
         vk::ReleaseCapturedPipelineDataKHR(device(), &data_info, nullptr);
@@ -188,7 +188,7 @@ TEST_F(NegativePipelineBinary, Destroy) {
     const VkAllocationCallbacks allocator = {nullptr, Alloc::alloc, Alloc::reallocFunc, Alloc::freeFunc, nullptr, nullptr};
 
     VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pipeline = pipe.Handle();
+    binary_create_info.pipeline = pipe;
 
     VkPipelineBinaryHandlesInfoKHR handles_info = vku::InitStructHelper();
     handles_info.pipelineBinaryCount = 1;
@@ -240,7 +240,7 @@ TEST_F(NegativePipelineBinary, ComputePipeline) {
         pipe.CreateComputePipeline(true, true);
 
         VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-        binary_create_info.pipeline = pipe.Handle();
+        binary_create_info.pipeline = pipe;
 
         VkPipelineBinaryHandlesInfoKHR handles_info = vku::InitStructHelper();
         handles_info.pipelineBinaryCount = 1;
@@ -276,7 +276,7 @@ TEST_F(NegativePipelineBinary, ComputePipeline) {
         pipe.CreateComputePipeline(true, true);
 
         VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-        binary_create_info.pipeline = pipe.Handle();
+        binary_create_info.pipeline = pipe;
 
         VkPipelineBinaryHandlesInfoKHR handles_info = vku::InitStructHelper();
         handles_info.pipelineBinaryCount = 1;
@@ -338,7 +338,6 @@ TEST_F(NegativePipelineBinary, GraphicsPipeline) {
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(Gpu());
 
     m_depthStencil->Init(*m_device, m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    m_depthStencil->SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     InitRenderTarget(&depth_image_view.handle());
 
@@ -512,7 +511,7 @@ TEST_F(NegativePipelineBinary, Creation1) {
     pipe.CreateComputePipeline(true, true);
 
     VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pipeline = pipe.Handle();
+    binary_create_info.pipeline = pipe;
 
     VkPipelineBinaryKHR pipeline_binary;
     VkPipelineBinaryHandlesInfoKHR handles_info = vku::InitStructHelper();
@@ -540,13 +539,13 @@ TEST_F(NegativePipelineBinary, Creation2) {
     pipe.CreateComputePipeline(true, true);
 
     VkReleaseCapturedPipelineDataInfoKHR release_info = vku::InitStructHelper();
-    release_info.pipeline = pipe.Handle();
+    release_info.pipeline = pipe;
 
     VkResult err = vk::ReleaseCapturedPipelineDataKHR(device(), &release_info, nullptr);
     ASSERT_EQ(VK_SUCCESS, err);
 
     VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pipeline = pipe.Handle();
+    binary_create_info.pipeline = pipe;
 
     VkPipelineBinaryKHR pipeline_binary;
     VkPipelineBinaryHandlesInfoKHR handles_info = vku::InitStructHelper();
@@ -582,7 +581,7 @@ TEST_F(NegativePipelineBinary, Creation3) {
 
     VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
     compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
+    compute_create_info.layout = pipeline_layout;
 
     VkPipelineCreateFlags2CreateInfo flags2 = vku::InitStructHelper();
     flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
@@ -633,7 +632,7 @@ TEST_F(NegativePipelineBinary, Creation4) {
     m_errorMonitor->VerifyFound();
 
     // test > 0
-    binary_create_info.pipeline = pipe.Handle();
+    binary_create_info.pipeline = pipe;
     binary_create_info.pPipelineCreateInfo = &pipeline_create_info;
 
     VkPhysicalDevicePipelineBinaryPropertiesKHR pipeline_binary_properties = vku::InitStructHelper();
@@ -669,7 +668,7 @@ TEST_F(NegativePipelineBinary, Creation5) {
     pipe.CreateComputePipeline(true, true);
 
     VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pipeline = pipe.Handle();
+    binary_create_info.pipeline = pipe;
 
     VkPipelineBinaryHandlesInfoKHR handles_info = vku::InitStructHelper();
 
@@ -730,7 +729,7 @@ TEST_F(NegativePipelineBinary, CreateCacheControl) {
 
     VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
     compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
+    compute_create_info.layout = pipeline_layout;
 
     VkPipelineCreateFlags2CreateInfo flags2 = vku::InitStructHelper();
     flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
@@ -765,7 +764,7 @@ TEST_F(NegativePipelineBinary, InvalidPNext) {
 
     VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
     compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
+    compute_create_info.layout = pipeline_layout;
 
     VkPipelineBinaryInfoKHR pipeline_binary_info = vku::InitStructHelper();
     pipeline_binary_info.binaryCount = 0;

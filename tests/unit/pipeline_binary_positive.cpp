@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ TEST_F(PositivePipelineBinary, CreateBinaryFromPipeline) {
     pipe.CreateComputePipeline(true, true);
 
     VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pipeline = pipe.Handle();
+    binary_create_info.pipeline = pipe;
 
     VkPipelineBinaryKHR pipeline_binary;
     VkPipelineBinaryHandlesInfoKHR handles_info = vku::InitStructHelper();
@@ -67,7 +67,7 @@ TEST_F(PositivePipelineBinary, CreateBinaryFromData) {
         pipe.CreateComputePipeline(true, true);
 
         VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-        binary_create_info.pipeline = pipe.Handle();
+        binary_create_info.pipeline = pipe;
 
         VkPipelineBinaryHandlesInfoKHR handles_info = vku::InitStructHelper();
         handles_info.pPipelineBinaries = nullptr;
@@ -157,7 +157,7 @@ TEST_F(PositivePipelineBinary, GetPipelineKey) {
 
     VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
     compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
+    compute_create_info.layout = pipeline_layout;
 
     VkPipelineBinaryInfoKHR pipeline_binary_info = vku::InitStructHelper();
     pipeline_binary_info.binaryCount = 0;

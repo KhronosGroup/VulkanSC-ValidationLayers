@@ -14,7 +14,6 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/ray_tracing_objects.h"
-#include "../framework/shader_helper.h"
 #include "../framework/gpu_av_helper.h"
 
 class NegativeGpuAVRayTracing : public GpuAVRayTracingTest {};
@@ -71,7 +70,6 @@ TEST_F(NegativeGpuAVRayTracing, CmdTraceRaysIndirect) {
 
     uint8_t *ray_query_dimensions_buffer_1_ptr = (uint8_t *)trace_rays_big_width.Memory().Map();
     std::memcpy(ray_query_dimensions_buffer_1_ptr, &trace_rays_dim, sizeof(trace_rays_dim));
-    trace_rays_big_width.Memory().Unmap();
 
     trace_rays_dim = {1, rt_pipeline_props.maxRayDispatchInvocationCount + 1, 1};
 
@@ -80,7 +78,6 @@ TEST_F(NegativeGpuAVRayTracing, CmdTraceRaysIndirect) {
 
     uint8_t *ray_query_dimensions_buffer_2_ptr = (uint8_t *)trace_rays_big_height.Memory().Map();
     std::memcpy(ray_query_dimensions_buffer_2_ptr, &trace_rays_dim, sizeof(trace_rays_dim));
-    trace_rays_big_height.Memory().Unmap();
 
     trace_rays_dim = {1, 1, rt_pipeline_props.maxRayDispatchInvocationCount + 1};
 
@@ -89,12 +86,11 @@ TEST_F(NegativeGpuAVRayTracing, CmdTraceRaysIndirect) {
 
     uint8_t *ray_query_dimensions_buffer_3_ptr = (uint8_t *)trace_ray_big_depth.Memory().Map();
     std::memcpy(ray_query_dimensions_buffer_3_ptr, &trace_rays_dim, sizeof(trace_rays_dim));
-    trace_ray_big_depth.Memory().Unmap();
 
     m_command_buffer.Begin();
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
 
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
 
@@ -126,9 +122,7 @@ TEST_F(NegativeGpuAVRayTracing, CmdTraceRaysIndirect) {
                                 &trace_rays_sbt.callable_sbt, trace_ray_big_depth.Address());
 
     m_command_buffer.End();
-
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -218,8 +212,7 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
     vkt::Buffer uniform_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
     auto data = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
     data[0] = rt_params_buffer.Address();
-    uniform_buffer.Memory().Unmap();
-    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer.handle(), 0, 16, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, 16, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
@@ -256,7 +249,7 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
     m_command_buffer.Begin();
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
     vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);

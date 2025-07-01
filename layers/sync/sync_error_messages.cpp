@@ -18,261 +18,31 @@
 #include "sync/sync_error_messages.h"
 #include "sync/sync_commandbuffer.h"
 #include "sync/sync_image.h"
-#include "sync/sync_reporting.h"
 #include "sync/sync_validation.h"
 #include "error_message/error_strings.h"
 #include "state_tracker/buffer_state.h"
 #include "state_tracker/descriptor_sets.h"
-#include "utils/text_utils.h"
-using text::Format;
+#include "state_tracker/pipeline_state.h"
 
 #include <cassert>
 #include <cinttypes>
-#include <cstdarg>
 #include <sstream>
-
-static const char* string_SyncHazard(SyncHazard hazard) {
-    switch (hazard) {
-        case SyncHazard::NONE:
-            return "NONE";
-            break;
-        case SyncHazard::READ_AFTER_WRITE:
-            return "READ_AFTER_WRITE";
-            break;
-        case SyncHazard::WRITE_AFTER_READ:
-            return "WRITE_AFTER_READ";
-            break;
-        case SyncHazard::WRITE_AFTER_WRITE:
-            return "WRITE_AFTER_WRITE";
-            break;
-        case SyncHazard::READ_RACING_WRITE:
-            return "READ_RACING_WRITE";
-            break;
-        case SyncHazard::WRITE_RACING_WRITE:
-            return "WRITE_RACING_WRITE";
-            break;
-        case SyncHazard::WRITE_RACING_READ:
-            return "WRITE_RACING_READ";
-            break;
-        case SyncHazard::READ_AFTER_PRESENT:
-            return "READ_AFTER_PRESENT";
-            break;
-        case SyncHazard::WRITE_AFTER_PRESENT:
-            return "WRITE_AFTER_PRESENT";
-            break;
-        case SyncHazard::PRESENT_AFTER_WRITE:
-            return "PRESENT_AFTER_WRITE";
-            break;
-        case SyncHazard::PRESENT_AFTER_READ:
-            return "PRESENT_AFTER_READ";
-            break;
-        default:
-            assert(0);
-    }
-    return "INVALID HAZARD";
-}
-
-// Given that access is hazardous, we check if at least stage or access part of it is covered
-// by the synchronization. If applied synchronization covers at least stage or access component
-// then we can provide more precise message by focusing on the other component.
-static std::pair<bool, bool> GetPartialProtectedInfo(const SyncAccessInfo& access, const SyncAccessFlags& write_barriers,
-                                                     const CommandExecutionContext& context) {
-    const auto protected_stage_access_pairs = ConvertSyncAccessesToCompactVkForm(
-        write_barriers, context.GetQueueFlags(), context.GetSyncState().enabled_features, context.GetSyncState().extensions);
-    bool is_stage_protected = false;
-    bool is_access_protected = false;
-    for (const auto& protected_stage_access : protected_stage_access_pairs) {
-        if (protected_stage_access.first & access.stage_mask) {
-            is_stage_protected = true;
-        }
-        if (protected_stage_access.second & access.access_mask) {
-            is_access_protected = true;
-        }
-    }
-    return std::make_pair(is_stage_protected, is_access_protected);
-}
-
-static void FormatCommonMessage(const HazardResult& hazard, const std::string& resouce_description, const vvl::Func command,
-                                const ReportKeyValues& key_values, const CommandExecutionContext& context,
-                                const syncval::AdditionalMessageInfo& additional_info, std::stringstream& ss) {
-    const SyncHazard hazard_type = hazard.Hazard();
-    const SyncHazardInfo hazard_info = GetSyncHazardInfo(hazard_type);
-
-    const SyncAccessInfo& access = syncAccessInfoByAccessIndex()[hazard.State().access_index];
-    const SyncAccessInfo& prior_access = syncAccessInfoByAccessIndex()[hazard.State().prior_access_index];
-
-    const SyncAccessFlags write_barriers = hazard.State().access_state->GetWriteBarriers();
-    const VkPipelineStageFlags2 read_barriers = hazard.State().access_state->GetReadBarriers(hazard.State().prior_access_index);
-
-    // TODO: BOTTOM_OF_PIPE part will go away when syncval switches internally to use NONE/ALL for everything
-    const bool missing_synchronization = (hazard_info.IsPriorWrite() && write_barriers.none()) ||
-                                         (hazard_info.IsPriorRead() && (read_barriers == VK_PIPELINE_STAGE_2_NONE ||
-                                                                        read_barriers == VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT));
-
-    // Brief description of what happened
-    ss << string_SyncHazard(hazard_type) << " hazard detected";
-    if (!additional_info.hazard_overview.empty()) {
-        ss << ": " << additional_info.hazard_overview;
-    }
-    ss << ". ";
-    ss << (additional_info.access_initiator.empty() ? vvl::String(command) : additional_info.access_initiator);
-    ss << " ";
-    if (!additional_info.access_action.empty()) {
-        ss << additional_info.access_action;
-    } else {
-        ss << (hazard_info.IsWrite() ? "writes to" : "reads");
-    }
-    ss << " " << resouce_description << ", which was previously ";
-    if (hazard_info.IsPriorWrite()) {
-        if (prior_access.access_index == SYNC_IMAGE_LAYOUT_TRANSITION) {
-            ss << "written during an image layout transition initiated by ";
-        } else {
-            ss << "written by ";
-        }
-    } else {
-        ss << "read by ";
-    }
-    if (hazard.Tag() == kInvalidTag) {
-        // Invalid tag for prior access means the same command performed ILT before loadOp access
-        ss << "the same command";
-    } else {
-        const ReportUsageInfo usage_info = context.GetReportUsageInfo(hazard.TagEx());
-        if (usage_info.command == command) {
-            ss << "another ";
-        }
-        ss << vvl::String(usage_info.command);
-        if (const auto* debug_region = key_values.FindProperty(kPropertyPriorDebugRegion)) {
-            ss << "[" << *debug_region << "]";
-        }
-        if (usage_info.command == command) {
-            ss << " command";
-        }
-    }
-    if (!additional_info.brief_description_end_text.empty()) {
-        ss << " " << additional_info.brief_description_end_text;
-    }
-    ss << ". ";
-
-    // Additional information before synchronization section.
-    if (!additional_info.pre_synchronization_text.empty()) {
-        ss << additional_info.pre_synchronization_text;
-    }
-
-    // Synchronization information
-    ss << "\n";
-    if (missing_synchronization) {
-        const char* access_type = hazard_info.IsWrite() ? "write" : "read";
-        const char* prior_access_type = hazard_info.IsPriorWrite() ? "write" : "read";
-
-        auto get_special_access_name = [](SyncAccessIndex access) -> const char* {
-            if (access == SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_ACQUIRE_READ_SYNCVAL) {
-                return "swapchain image acquire operation";
-            } else if (access == SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_PRESENTED_SYNCVAL) {
-                return "swapchain present operation";
-            } else if (access == SYNC_IMAGE_LAYOUT_TRANSITION) {
-                return "layout transition";
-            } else if (access == SYNC_QUEUE_FAMILY_OWNERSHIP_TRANSFER) {
-                return "ownership transfer";
-            }
-            return nullptr;
-        };
-
-        ss << "No sufficient synchronization is present to ensure that a ";
-        if (const char* special_access_name = get_special_access_name(access.access_index)) {
-            ss << special_access_name;
-        } else {
-            assert(access.access_mask != VK_ACCESS_2_NONE);
-            assert(access.stage_mask != VK_PIPELINE_STAGE_2_NONE);
-            ss << access_type << " (" << string_VkAccessFlagBits2(access.access_mask) << ") at ";
-            ss << string_VkPipelineStageFlagBits2(access.stage_mask);
-        }
-
-        ss << " does not conflict with a prior ";
-        if (const char* special_access_name = get_special_access_name(prior_access.access_index)) {
-            ss << special_access_name;
-        } else {
-            assert(prior_access.access_mask != VK_ACCESS_2_NONE);
-            assert(prior_access.stage_mask != VK_PIPELINE_STAGE_2_NONE);
-            ss << prior_access_type;
-            if (prior_access.access_mask != access.access_mask) {
-                ss << " (" << string_VkAccessFlags2(prior_access.access_mask) << ")";
-            } else {
-                ss << " of the same type";
-            }
-            ss << " at ";
-            if (prior_access.stage_mask == access.stage_mask) {
-                ss << "the same stage";
-            } else {
-                ss << string_VkPipelineStageFlagBits2(prior_access.stage_mask);
-            }
-        }
-        ss << ".";
-    } else if (hazard_info.IsPriorWrite()) {  // RAW/WAW hazards
-        ss << "The current synchronization allows ";
-        ss << FormatSyncAccesses(write_barriers, context.GetQueueFlags(), context.GetSyncState().enabled_features,
-                                 context.GetSyncState().extensions, false);
-        ss << ", but to prevent this hazard, ";
-        auto [is_stage_protected, is_access_protected] = GetPartialProtectedInfo(access, write_barriers, context);
-        if (is_access_protected) {
-            ss << "it must allow these accesses at ";
-            ss << string_VkPipelineStageFlagBits2(access.stage_mask) << ".";
-        } else if (access.access_mask != VK_ACCESS_2_NONE) {
-            ss << "it must allow ";
-            ss << string_VkAccessFlagBits2(access.access_mask) << " accesses at ";
-            ss << string_VkPipelineStageFlagBits2(access.stage_mask) << ".";
-        } else {
-            // TODO: analyse exact form of synchronization is needed or specific options to use
-            ss << "it must protect layout transition accesses.";
-        }
-    } else {  // WAR hazard
-        ss << "The current synchronization defines the destination stage mask as ";
-        ss << string_VkPipelineStageFlags2(read_barriers);
-        ss << ", but to prevent this hazard, it must include ";
-        ss << string_VkPipelineStageFlagBits2(access.stage_mask) << ".";
-    }
-
-    // Give a hint for WAR hazard
-    if (IsValueIn(hazard_type, {WRITE_AFTER_READ, WRITE_RACING_READ, PRESENT_AFTER_READ})) {
-        ss << "\nVulkan insight: an execution dependency is sufficient to prevent this hazard.";
-    }
-}
 
 namespace syncval {
 
-ErrorMessages::ErrorMessages(vvl::Device& validator)
-    : validator_(validator),
-      extra_properties_(validator_.syncval_settings.message_extra_properties),
-      pretty_print_extra_(validator_.syncval_settings.message_extra_properties_pretty_print) {}
+ErrorMessages::ErrorMessages(SyncValidator& validator) : validator_(validator) {}
 
 std::string ErrorMessages::Error(const HazardResult& hazard, const CommandExecutionContext& context, vvl::Func command,
-                                 const std::string& resouce_description, const char* message_type,
+                                 const std::string& resource_description, const char* message_type,
                                  const AdditionalMessageInfo& additional_info) const {
-    ReportKeyValues key_values;
-    context.FormatHazard(hazard, key_values);
-    key_values.Add(kPropertyMessageType, message_type);
-    key_values.Add(kPropertyHazardType, string_SyncHazard(hazard.Hazard()));
-    key_values.Add(kPropertyCommand, vvl::String(command));
-    for (const auto& kv : additional_info.properties.key_values) {
-        key_values.Add(kv.key, kv.value);
-    }
+    std::string message = FormatErrorMessage(hazard, context, command, resource_description, additional_info);
 
     if (validator_.syncval_settings.message_extra_properties) {
-        context.AddUsageRecordExtraProperties(hazard.Tag(), key_values);
-    }
-
-    std::stringstream ss;
-    FormatCommonMessage(hazard, resouce_description, command, key_values, context, additional_info, ss);
-
-    if (!additional_info.message_end_text.empty()) {
-        ss << additional_info.message_end_text;
-    }
-
-    std::string message = ss.str();
-    if (extra_properties_) {
         if (!message.empty() && message.back() != '\n') {
             message += '\n';
         }
-        message += key_values.GetExtraPropertiesSection(pretty_print_extra_);
+        const ReportProperties properties = GetErrorMessageProperties(hazard, context, command, message_type, additional_info);
+        message += properties.FormatExtraPropertiesSection();
     }
     return message;
 }
@@ -304,6 +74,28 @@ std::string ErrorMessages::BufferCopyError(const HazardResult& hazard, const Com
     additional_info.message_end_text = ss.str();
 
     return Error(hazard, cb_context, command, resource_description, "BufferCopyError", additional_info);
+}
+
+std::string ErrorMessages::AccelerationStructureError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
+                                                      const vvl::Func command, const std::string& resource_description,
+                                                      const ResourceAccessRange range, VkAccelerationStructureKHR as,
+                                                      const Location& as_location) const {
+    AdditionalMessageInfo additional_info;
+
+    std::stringstream ss;
+    ss << "The buffer backs ";
+    ss << as_location.Fields();
+    ss << " (" << validator_.FormatHandle(as) << "). ";
+    additional_info.pre_synchronization_text = ss.str();
+
+    std::stringstream ss2;
+    ss2 << "\nBuffer access region: {\n";
+    ss2 << "  offset = " << range.begin << "\n";
+    ss2 << "  size = " << range.end - range.begin << "\n";
+    ss2 << "}\n";
+    additional_info.message_end_text += ss2.str();
+
+    return Error(hazard, cb_context, command, resource_description, "AccelerationStructureError", additional_info);
 }
 
 std::string ErrorMessages::ImageCopyResolveBlitError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
@@ -620,13 +412,9 @@ std::string ErrorMessages::ImageBarrierError(const HazardResult& hazard, const C
     std::stringstream ss;
     ss << "\npImageMemoryBarriers[" << barrier.barrier_index << "]: {\n";
     ss << "  source accesses = "
-       << FormatSyncAccesses(barrier.barrier.src_access_scope, context.GetQueueFlags(), context.GetSyncState().enabled_features,
-                             context.GetSyncState().extensions, false)
-       << ",\n";
+       << FormatSyncAccesses(barrier.barrier.src_access_scope, context.GetSyncState(), context.GetQueueFlags(), false) << ",\n";
     ss << "  destination accesses = "
-       << FormatSyncAccesses(barrier.barrier.dst_access_scope, context.GetQueueFlags(), context.GetSyncState().enabled_features,
-                             context.GetSyncState().extensions, false)
-       << ",\n";
+       << FormatSyncAccesses(barrier.barrier.dst_access_scope, context.GetSyncState(), context.GetQueueFlags(), false) << ",\n";
     ss << "  srcStageMask = " << string_VkPipelineStageFlags2(barrier.barrier.src_exec_scope.mask_param) << ",\n";
     ss << "  dstStageMask = " << string_VkPipelineStageFlags2(barrier.barrier.dst_exec_scope.mask_param) << ",\n";
     ss << "}\n";
@@ -637,53 +425,51 @@ std::string ErrorMessages::ImageBarrierError(const HazardResult& hazard, const C
 
 std::string ErrorMessages::FirstUseError(const HazardResult& hazard, const CommandExecutionContext& exec_context,
                                          const CommandBufferAccessContext& recorded_context, uint32_t command_buffer_index) const {
-    const ReportUsageInfo report_info = recorded_context.GetReportUsageInfo(hazard.RecordedAccess()->TagEx());
-    const ReportUsageInfo exec_info = exec_context.GetReportUsageInfo(hazard.TagEx());
+    const ResourceUsageInfo prior_usage_info = exec_context.GetResourceUsageInfo(hazard.TagEx());
+    const ResourceUsageInfo recorded_usage_info = recorded_context.GetResourceUsageInfo(hazard.RecordedAccess()->TagEx());
 
     AdditionalMessageInfo additional_info;
     additional_info.properties.Add(kPropertyCommandBufferIndex, command_buffer_index);
 
     std::stringstream ss;
-    ss << vvl::String(report_info.command);
-    if (!report_info.debug_region_name.empty()) {
-        ss << "[" << report_info.debug_region_name << "]";
+    ss << vvl::String(recorded_usage_info.command);
+    if (!recorded_usage_info.debug_region_name.empty()) {
+        ss << "[" << recorded_usage_info.debug_region_name << "]";
     }
-    if (exec_info.queue) {
+    if (exec_context.Handle().type == kVulkanObjectTypeQueue) {
         ss << " (from " << validator_.FormatHandle(recorded_context.Handle());
         ss << " submitted on the current ";
-        ss << validator_.FormatHandle(exec_info.queue->Handle()) << ")";
-        additional_info.properties.Add(kPropertySubmitIndex, exec_info.submit_index);
-        additional_info.properties.Add(kPropertyBatchIndex, exec_info.batch_index);
-    } else {
+        ss << validator_.FormatHandle(exec_context.Handle()) << ")";
+    } else {  // primary command buffer executes secondary one
+        assert(exec_context.Handle().type == kVulkanObjectTypeCommandBuffer);
         ss << " (from the secondary " << validator_.FormatHandle(recorded_context.Handle()) << ")";
     }
     additional_info.access_initiator = ss.str();
 
     std::stringstream ss2;
-    if (exec_context.Handle().type == kVulkanObjectTypeQueue) {
-        if (exec_info.cb) {
-            ss2 << "(from " << validator_.FormatHandle(exec_info.cb->Handle());
-            ss2 << " submitted on " << validator_.FormatHandle(exec_context.Handle()) << ")";
+    if (prior_usage_info.queue) {
+        if (prior_usage_info.cb) {
+            ss2 << "(from " << validator_.FormatHandle(prior_usage_info.cb->Handle());
+            ss2 << " submitted on " << validator_.FormatHandle(prior_usage_info.queue->Handle()) << ")";
         } else {  // QueuePresent case (not recorded into command buffer)
-            ss2 << "(submitted on " << validator_.FormatHandle(exec_context.Handle()) << ")";
+            ss2 << "(submitted on " << validator_.FormatHandle(prior_usage_info.queue->Handle()) << ")";
         }
-    } else {  // primary command buffer executes secondary one
-        assert(exec_context.Handle().type == kVulkanObjectTypeCommandBuffer);
+    } else if (prior_usage_info.cb) {
         // TODO: distinuish between "native" primary command buffer commands and
         // command recorded from the secondary command buffers.
-        ss2 << "(from the primary " << validator_.FormatHandle(exec_context.Handle()) << ")";
+        ss2 << "(from the primary " << validator_.FormatHandle(prior_usage_info.cb->Handle()) << ")";
     }
     additional_info.brief_description_end_text = ss2.str();
 
-    if (!report_info.debug_region_name.empty()) {
-        additional_info.properties.Add(kPropertyDebugRegion, report_info.debug_region_name);
+    if (!recorded_usage_info.debug_region_name.empty()) {
+        additional_info.properties.Add(kPropertyDebugRegion, recorded_usage_info.debug_region_name);
     }
 
     // Use generic "resource" when resource handle is not specified for some reason (likely just a missing code).
     // TODO: specify resources in EndRenderPass (NegativeSyncVal.QSOBarrierHazard).
     const std::string resource_description =
-        report_info.resource_handle ? validator_.FormatHandle(report_info.resource_handle) : "resource";
-    return Error(hazard, exec_context, report_info.command, resource_description, "SubmitTimeError", additional_info);
+        recorded_usage_info.resource_handle ? validator_.FormatHandle(recorded_usage_info.resource_handle) : "resource";
+    return Error(hazard, exec_context, recorded_usage_info.command, resource_description, "SubmitTimeError", additional_info);
 }
 
 std::string ErrorMessages::PresentError(const HazardResult& hazard, const QueueBatchContext& batch_context, vvl::Func command,

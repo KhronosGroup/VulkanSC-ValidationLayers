@@ -18,7 +18,6 @@
 #include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
-#include "../framework/shader_object_helper.h"
 
 class NegativeGeometryTessellation : public VkLayerTest {};
 
@@ -30,13 +29,12 @@ TEST_F(NegativeGeometryTessellation, StageMaskGsTsEnabled) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    std::vector<const char *> device_extension_names;
     auto features = m_device->Physical().Features();
     // Make sure gs & ts are disabled
     features.geometryShader = false;
     features.tessellationShader = false;
     // The sacrificial device object
-    vkt::Device test_device(Gpu(), device_extension_names, &features);
+    vkt::Device test_device(Gpu(), m_device_extension_names, &features);
 
     VkCommandPoolCreateInfo pool_create_info = vku::InitStructHelper();
     pool_create_info.queueFamilyIndex = test_device.graphics_queue_node_index_;
@@ -440,9 +438,9 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGsShaderObject) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     SetDefaultDynamicStatesExclude();
-    vk::CmdBindShadersEXT(m_command_buffer.handle(), 5, stages, shaders);
+    vk::CmdBindShadersEXT(m_command_buffer, 5, stages, shaders);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpVariable-08746");
-    vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRendering();
     m_command_buffer.End();
@@ -1001,7 +999,7 @@ TEST_F(NegativeGeometryTessellation, PatchControlPoints)
     vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
 
     VkDescriptorSet descriptorSet;
-    err = vk::AllocateDescriptorSets(device(), ds_pool.handle(),
+    err = vk::AllocateDescriptorSets(device(), ds_pool,
 VK_DESCRIPTOR_SET_USAGE_NON_FREE, 1, &ds_layout.handle(), &descriptorSet);
     ASSERT_EQ(VK_SUCCESS, err);
 
@@ -1048,7 +1046,7 @@ VK_DESCRIPTOR_SET_USAGE_NON_FREE, 1, &ds_layout.handle(), &descriptorSet);
         gp_ci.pDepthStencilState = NULL;
         gp_ci.pColorBlendState = NULL;
         gp_ci.flags = VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
-        gp_ci.layout = pipeline_layout.handle();
+        gp_ci.layout = pipeline_layout;
         gp_ci.renderPass = RenderPass();
 
     VkPipelineCacheCreateInfo pc_ci = vku::InitStructHelper();
@@ -1607,9 +1605,9 @@ TEST_F(NegativeGeometryTessellation, WritingToLayerWithSingleFramebufferLayer) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_errorMonitor->SetDesiredWarning("Undefined-Value-Layer-Written");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -1656,10 +1654,10 @@ TEST_F(NegativeGeometryTessellation, DrawDynamicPrimitiveTopology) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     // Invalid - matches the Geometry output, but we need to match the input
-    vk::CmdSetPrimitiveTopologyEXT(m_command_buffer.handle(), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdSetPrimitiveTopologyEXT(m_command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicPrimitiveTopologyUnrestricted-07500");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();

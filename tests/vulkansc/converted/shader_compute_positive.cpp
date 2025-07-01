@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,8 +56,7 @@ TEST_F(PositiveShaderCompute, WorkGroupSizePrecedenceOverLocalSize) {
         )";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_ASM);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
@@ -108,8 +107,8 @@ TEST_F(PositiveShaderCompute, WorkGroupSizeSpecConstantUnder) {
     specialization_info.pData = &data;
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_ASM, &specialization_info);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM,
+                                 &specialization_info);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
@@ -140,8 +139,7 @@ TEST_F(PositiveShaderCompute, WorkGroupSizeLocalSizeId) {
         )";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
-                                                   SPV_SOURCE_ASM);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
@@ -192,8 +190,8 @@ TEST_F(PositiveShaderCompute, WorkGroupSizeLocalSizeIdSpecConstant) {
     specialization_info.pData = &data;
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
-                                                   SPV_SOURCE_ASM, &specialization_info);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM,
+                                 &specialization_info);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
@@ -235,8 +233,7 @@ TEST_F(PositiveShaderCompute, WorkGroupSizePrecedenceOverLocalSizeId) {
         )";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
-                                                   SPV_SOURCE_ASM);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
@@ -267,7 +264,7 @@ TEST_F(PositiveShaderCompute, SharedMemorySpecConstantOp) {
     )glsl";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+        helper.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
@@ -296,7 +293,7 @@ TEST_F(PositiveShaderCompute, SharedMemory) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.CreateComputePipeline();
 }
 

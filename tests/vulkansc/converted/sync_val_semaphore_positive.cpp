@@ -1,9 +1,9 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
 // See vksc_convert_tests.py for modifications
 
-/* Copyright (c) 2024 The Khronos Group Inc.
- * Copyright (c) 2024 Valve Corporation
- * Copyright (c) 2024 LunarG, Inc.
+/* Copyright (c) 2024-2025 The Khronos Group Inc.
+ * Copyright (c) 2024-2025 Valve Corporation
+ * Copyright (c) 2024-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,10 @@
  */
 
 #include <thread>
-#include "../framework/layer_validation_tests.h"
+#include "../framework/sync_val_tests.h"
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 #include "../framework/external_memory_sync.h"
+#endif  // VK_USE_PLATFORM_WIN32_KHR
 
 struct PositiveSyncValTimelineSemaphore : public VkSyncValTest {};
 
@@ -628,7 +630,7 @@ TEST_F(PositiveSyncValTimelineSemaphore, ExternalSemaphoreWaitBeforeSignal) {
     }
 
     constexpr auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-    if (!SemaphoreExportImportSupported(Gpu(), handle_type)) {
+    if (!SemaphoreExportImportSupported(Gpu(), VK_SEMAPHORE_TYPE_TIMELINE, handle_type)) {
         GTEST_SKIP() << "Semaphore does not support export and import through Win32 handle";
     }
 

@@ -48,7 +48,7 @@ TEST_F(NegativeLayerSettings, CustomStypeStructString) {
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
     VkBufferViewCreateInfo bvci = vku::InitStructHelper(&custom_struct);  // Add custom struct through pNext
-    bvci.buffer = buffer.handle();
+    bvci.buffer = buffer;
     bvci.format = VK_FORMAT_R32_SFLOAT;
     bvci.range = VK_WHOLE_SIZE;
     vkt::BufferView buffer_view(*m_device, bvci);
@@ -111,7 +111,7 @@ TEST_F(NegativeLayerSettings, CustomStypeStructStringArray) {
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
     VkBufferViewCreateInfo bvci = vku::InitStructHelper(&custom_struct_b);  // Add custom struct through pNext
-    bvci.buffer = buffer.handle();
+    bvci.buffer = buffer;
     bvci.format = VK_FORMAT_R32_SFLOAT;
     bvci.range = VK_WHOLE_SIZE;
     vkt::BufferView buffer_view(*m_device, bvci);
@@ -153,7 +153,7 @@ TEST_F(NegativeLayerSettings, CustomStypeStructIntegerArray) {
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
     VkBufferViewCreateInfo bvci = vku::InitStructHelper(&custom_struct_b);  // Add custom struct through pNext
-    bvci.buffer = buffer.handle();
+    bvci.buffer = buffer;
     bvci.format = VK_FORMAT_R32_SFLOAT;
     bvci.range = VK_WHOLE_SIZE;
     vkt::BufferView buffer_view(*m_device, bvci);
@@ -261,6 +261,37 @@ TEST_F(NegativeLayerSettings, DuplicateMessageLimitDisable) {
         vk::GetPhysicalDeviceProperties2KHR(Gpu(), &properties2);
         m_errorMonitor->VerifyFound();
     }
+}
+
+// stype-check off
+TEST_F(NegativeLayerSettings, DuplicateMessageLimitLastWarning) {
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+    uint32_t value = 3;
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "duplicate_message_limit", VK_LAYER_SETTING_TYPE_UINT32_EXT, 1, &value};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+
+    // Create an invalid pNext structure to trigger the stateless validation warning
+    VkBaseOutStructure bogus_struct{};
+    bogus_struct.sType = static_cast<VkStructureType>(0x33333333);
+    VkPhysicalDeviceProperties2KHR properties2 = vku::InitStructHelper(&bogus_struct);
+
+    // Should get the first three errors just fine
+    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceProperties2-pNext-pNext");
+    vk::GetPhysicalDeviceProperties2KHR(Gpu(), &properties2);
+    m_errorMonitor->VerifyFound();
+    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceProperties2-pNext-pNext");
+    vk::GetPhysicalDeviceProperties2KHR(Gpu(), &properties2);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError(
+        "Warning - This VUID has now been reported 3 times, which is the duplicated_message_limit value, this will be the last "
+        "time reporting it");
+    vk::GetPhysicalDeviceProperties2KHR(Gpu(), &properties2);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeLayerSettings, VuidIdFilterString) {

@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (C) 2015-2024 Google Inc.
+/* Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (C) 2015-2025 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -19,6 +19,7 @@
  */
 #pragma once
 #include "state_tracker/state_object.h"
+#include "containers/small_vector.h"
 
 enum QueryState {
     QUERYSTATE_UNKNOWN,    // Initial state.
@@ -48,11 +49,13 @@ class QueryPool : public StateObject {
           supported_video_profile(std::move(supp_video_profile)),
           video_encode_feedback_flags(enabled_video_encode_feedback_flags),
           query_states_(pCreateInfo->queryCount) {
+        const QueryState initial_state =
+            (pCreateInfo->flags & VK_QUERY_POOL_CREATE_RESET_BIT_KHR) ? QUERYSTATE_RESET : QUERYSTATE_UNKNOWN;
         for (uint32_t i = 0; i < pCreateInfo->queryCount; ++i) {
             auto perf_size = n_perf_pass > 0 ? n_perf_pass : 1;
             query_states_[i].reserve(perf_size);
             for (uint32_t p = 0; p < perf_size; p++) {
-                query_states_[i].emplace_back(QUERYSTATE_UNKNOWN);
+                query_states_[i].emplace_back(initial_state);
             }
         }
     }

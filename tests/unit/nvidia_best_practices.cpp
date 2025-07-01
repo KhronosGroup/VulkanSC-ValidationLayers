@@ -175,8 +175,8 @@ TEST_F(VkNvidiaBestPracticesLayerTest, QueueBindSparse_NotAsync) {
 
     VkQueue graphics_queue = VK_NULL_HANDLE;
     VkQueue transfer_queue = VK_NULL_HANDLE;
-    vk::GetDeviceQueue(test_device.handle(), general_queue_ci.queueFamilyIndex, 0, &graphics_queue);
-    vk::GetDeviceQueue(test_device.handle(), transfer_queue_ci.queueFamilyIndex, 0, &transfer_queue);
+    vk::GetDeviceQueue(test_device, general_queue_ci.queueFamilyIndex, 0, &graphics_queue);
+    vk::GetDeviceQueue(test_device, transfer_queue_ci.queueFamilyIndex, 0, &transfer_queue);
 
     VkBufferCreateInfo sparse_buffer_ci = vku::InitStructHelper();
     sparse_buffer_ci.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
@@ -206,12 +206,12 @@ TEST_F(VkNvidiaBestPracticesLayerTest, QueueBindSparse_NotAsync) {
     VkSparseMemoryBind bind = {};
     bind.resourceOffset = 0;
     bind.size = sparse_buffer_ci.size;
-    bind.memory = sparse_memory.handle();
+    bind.memory = sparse_memory;
     bind.memoryOffset = 0;
     bind.flags = 0;
 
     VkSparseBufferMemoryBindInfo sparse_buffer_bind = {};
-    sparse_buffer_bind.buffer = sparse_buffer.handle();
+    sparse_buffer_bind.buffer = sparse_buffer;
     sparse_buffer_bind.bindCount = 1;
     sparse_buffer_bind.pBinds = &bind;
 
@@ -272,12 +272,11 @@ TEST_F(VkNvidiaBestPracticesLayerTest, AccelerationStructure_NotAsync) {
 
         // Those 3 are triggered when allocating memory for the destination acceleration structure buffer and the scratch buffer.
         // This is expected.
-        m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkAllocateMemory-small-allocation");
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkBindBufferMemory-small-dedicated-allocation");
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-NVIDIA-AllocateMemory-SetPriority");
 
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-AccelerationStructure-NotAsync");
-        build_geometry_info.BuildCmdBuffer(cmd_buffer.handle());
+        build_geometry_info.BuildCmdBuffer(cmd_buffer);
 
         if (queue == compute_queue) {
             m_errorMonitor->Finish();
@@ -397,15 +396,15 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindMemory_NoPriority) {
 
     {
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-BindMemory-NoPriority");
-        vk::BindBufferMemory(test_device.handle(), buffer_a.handle(), memory.handle(), 0);
+        vk::BindBufferMemory(test_device, buffer_a, memory, 0);
         m_errorMonitor->VerifyFound();
     }
 
-    vk::SetDeviceMemoryPriorityEXT(test_device.handle(), memory.handle(), 0.5f);
+    vk::SetDeviceMemoryPriorityEXT(test_device, memory, 0.5f);
 
     {
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-BindMemory-NoPriority");
-        vk::BindBufferMemory(test_device.handle(), buffer_b.handle(), memory.handle(), 0);
+        vk::BindBufferMemory(test_device, buffer_b, memory, 0);
         m_errorMonitor->Finish();
     }
 }
@@ -466,7 +465,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindMemory_StaticPriority) {
     vkt::DeviceMemory memory(test_device, memory_ai);
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-BindMemory-NoPriority");
-    vk::BindBufferMemory(test_device.handle(), buffer_b.handle(), memory.handle(), 0);
+    vk::BindBufferMemory(test_device, buffer_b, memory, 0);
     m_errorMonitor->Finish();
 }
 
@@ -615,15 +614,15 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipeline_SwitchTessGeometryMesh) {
     {
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-Pipeline-SortAndBind");
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-BindPipeline-SwitchTessGeometryMesh");
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vsPipe.Handle());
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vsPipe);
         m_errorMonitor->Finish();
     }
     {
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-Pipeline-SortAndBind");
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-BindPipeline-SwitchTessGeometryMesh");
         for (int i = 0; i < 10; ++i) {
-            vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vgsPipe.Handle());
-            vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vsPipe.Handle());
+            vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vgsPipe);
+            vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vsPipe);
         }
         m_errorMonitor->VerifyFound();
     }
@@ -648,7 +647,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirection) {
     vkt::Image image(*m_device, image_ci);
 
     VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
-    image_view_ci.image = image.handle();
+    image_view_ci.image = image;
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     image_view_ci.format = depth_format;
     // rendering to layer index 1
@@ -658,7 +657,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirection) {
 
     VkRenderingAttachmentInfo depth_attachment = vku::InitStructHelper();
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    depth_attachment.imageView = depth_image_view.handle();
+    depth_attachment.imageView = depth_image_view;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
@@ -680,7 +679,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirection) {
     discard_barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
     discard_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     discard_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    discard_barrier.image = image.handle();
+    discard_barrier.image = image;
     discard_barrier.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 1,
                                         VK_REMAINING_ARRAY_LAYERS};
 
@@ -689,7 +688,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirection) {
     discard_barrier2.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
     discard_barrier2.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     discard_barrier2.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    discard_barrier2.image = image.handle();
+    discard_barrier2.image = image;
     discard_barrier2.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 1,
                                          VK_REMAINING_ARRAY_LAYERS};
 
@@ -705,100 +704,99 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirection) {
     pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_COMPARE_OP);
     pipe.CreateGraphicsPipeline();
 
-    auto cmd = m_command_buffer.handle();
     m_command_buffer.Begin();
 
-    vk::CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdSetDepthTestEnable(cmd, VK_TRUE);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdSetDepthTestEnable(m_command_buffer, VK_TRUE);
 
     {
         SCOPED_TRACE("Unbalance");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 90; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 90; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 10; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 10; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->Finish();
     }
     {
         SCOPED_TRACE("Balance");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->VerifyFound();
 
-        vk::CmdEndRendering(cmd);  // need to actually end rendering
+        vk::CmdEndRendering(m_command_buffer);  // need to actually end rendering
     }
 
     {
         // This should miss because BeginRendering uses LOAD_OP_CLEAR
         SCOPED_TRACE("Balance with end rendering");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->Finish();
     }
 
     {
         SCOPED_TRACE("Clear before balance");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdClearAttachments(cmd, 1, &attachment, 1, &clear_rect);
+        vk::CmdClearAttachments(m_command_buffer, 1, &attachment, 1, &clear_rect);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->Finish();
     }
 
     {
         SCOPED_TRACE("Balance before clear");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdClearAttachments(cmd, 1, &attachment, 1, &clear_rect);
+        vk::CmdClearAttachments(m_command_buffer, 1, &attachment, 1, &clear_rect);
         m_errorMonitor->VerifyFound();
 
-        vk::CmdEndRendering(cmd);  // need to actually end rendering
+        vk::CmdEndRendering(m_command_buffer);  // need to actually end rendering
     }
 
     m_command_buffer.End();
@@ -822,7 +820,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionDepth) {
     vkt::Image image(*m_device, image_ci);
 
     VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
-    image_view_ci.image = image.handle();
+    image_view_ci.image = image;
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     image_view_ci.format = depth_format;
     // rendering to layer index 1
@@ -832,7 +830,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionDepth) {
 
     VkRenderingAttachmentInfo depth_attachment = vku::InitStructHelper();
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    depth_attachment.imageView = depth_image_view.handle();
+    depth_attachment.imageView = depth_image_view;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
@@ -846,7 +844,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionDepth) {
     discard_barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
     discard_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     discard_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    discard_barrier.image = image.handle();
+    discard_barrier.image = image;
     discard_barrier.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 1,
                                         VK_REMAINING_ARRAY_LAYERS};
 
@@ -855,13 +853,9 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionDepth) {
     discard_barrier2.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
     discard_barrier2.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     discard_barrier2.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    discard_barrier2.image = image.handle();
+    discard_barrier2.image = image;
     discard_barrier2.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 1,
                                          VK_REMAINING_ARRAY_LAYERS};
-
-    VkDependencyInfo discard_dependency_info = vku::InitStructHelper();
-    discard_dependency_info.imageMemoryBarrierCount = 1;
-    discard_dependency_info.pImageMemoryBarriers = &discard_barrier2;
 
     auto set_desired_failure_msg = [this] {
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-Zcull-LessGreaterRatio");
@@ -875,117 +869,117 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionDepth) {
     pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_COMPARE_OP);
     pipe.CreateGraphicsPipeline();
 
-    auto cmd = m_command_buffer.handle();
     m_command_buffer.Begin();
 
-    vk::CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdSetDepthTestEnable(cmd, VK_TRUE);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdSetDepthTestEnable(m_command_buffer, VK_TRUE);
 
     {
         SCOPED_TRACE("Load previous scope");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->VerifyFound();
 
-        vk::CmdEndRendering(cmd);  // need to actually end rendering
+        vk::CmdEndRendering(m_command_buffer);  // need to actually end rendering
     }
 
     {
         SCOPED_TRACE("Transition to discard");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
 
-        vk::CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
-                               nullptr, 1, &discard_barrier);
+        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+                               nullptr, 0, nullptr, 1, &discard_barrier);
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->Finish();
     }
 
     {
         SCOPED_TRACE("Transition to discard 2");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
 
-        vk::CmdPipelineBarrier2(cmd, &discard_dependency_info);
+        m_command_buffer.Barrier(discard_barrier2);
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->Finish();
     }
 
     {
         SCOPED_TRACE("Balance before discard");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
 
         set_desired_failure_msg();
-        vk::CmdPipelineBarrier2(cmd, &discard_dependency_info);
+        m_command_buffer.Barrier(discard_barrier2);
         m_errorMonitor->VerifyFound();
     }
 
     {
         SCOPED_TRACE("Transfer clear to discard");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
 
         VkClearDepthStencilValue ds_value{};
-        vk::CmdClearDepthStencilImage(cmd, image.handle(), VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1, &discard_barrier.subresourceRange);
+        vk::CmdClearDepthStencilImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1,
+                                      &discard_barrier.subresourceRange);
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->Finish();
     }
 
@@ -1010,7 +1004,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionSubresource) {
     vkt::Image image(*m_device, image_ci);
 
     VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
-    image_view_ci.image = image.handle();
+    image_view_ci.image = image;
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     image_view_ci.format = depth_format;
     // rendering to layer index 1
@@ -1020,7 +1014,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionSubresource) {
 
     VkRenderingAttachmentInfo depth_attachment = vku::InitStructHelper();
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    depth_attachment.imageView = depth_image_view.handle();
+    depth_attachment.imageView = depth_image_view;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
@@ -1034,7 +1028,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionSubresource) {
     discard_barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
     discard_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     discard_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    discard_barrier.image = image.handle();
+    discard_barrier.image = image;
     discard_barrier.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 1,
                                         VK_REMAINING_ARRAY_LAYERS};
 
@@ -1043,7 +1037,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionSubresource) {
     discard_barrier2.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
     discard_barrier2.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     discard_barrier2.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    discard_barrier2.image = image.handle();
+    discard_barrier2.image = image;
     discard_barrier2.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 1,
                                          VK_REMAINING_ARRAY_LAYERS};
 
@@ -1059,28 +1053,28 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionSubresource) {
     pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_COMPARE_OP);
     pipe.CreateGraphicsPipeline();
 
-    auto cmd = m_command_buffer.handle();
     m_command_buffer.Begin();
 
-    vk::CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdSetDepthTestEnable(cmd, VK_TRUE);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdSetDepthTestEnable(m_command_buffer, VK_TRUE);
 
     {
         SCOPED_TRACE("Transfer clear to validate");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
 
         set_desired_failure_msg();
         VkClearDepthStencilValue ds_value{};
-        vk::CmdClearDepthStencilImage(cmd, image.handle(), VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1, &discard_barrier.subresourceRange);
+        vk::CmdClearDepthStencilImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1,
+                                      &discard_barrier.subresourceRange);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1089,24 +1083,24 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionSubresource) {
     {
         SCOPED_TRACE("Transfer clear with VK_REMAINING_ARRAY_LAYERS");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
 
         VkClearDepthStencilValue ds_value{};
-        vk::CmdClearDepthStencilImage(cmd, image.handle(), VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1,
+        vk::CmdClearDepthStencilImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1,
                                       &discard_barrier.subresourceRange);
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->Finish();
     }
 
@@ -1115,24 +1109,24 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipelineZcullDirectionSubresource) {
     {
         SCOPED_TRACE("Transfer clear with VK_REMAINING_MIP_LEVELS");
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_LESS);
+        for (int i = 0; i < 60; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
 
         VkClearDepthStencilValue ds_value{};
-        vk::CmdClearDepthStencilImage(cmd, image.handle(), VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1,
+        vk::CmdClearDepthStencilImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1,
                                       &discard_barrier.subresourceRange);
 
-        vk::CmdBeginRendering(cmd, &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
-        vk::CmdSetDepthCompareOp(cmd, VK_COMPARE_OP_GREATER);
-        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer.handle(), 0, 0, 0, 0);
+        vk::CmdSetDepthCompareOp(m_command_buffer, VK_COMPARE_OP_GREATER);
+        for (int i = 0; i < 40; ++i) vk::CmdDraw(m_command_buffer, 0, 0, 0, 0);
 
         set_desired_failure_msg();
-        vk::CmdEndRendering(cmd);
+        vk::CmdEndRendering(m_command_buffer);
         m_errorMonitor->Finish();
     }
 
@@ -1151,12 +1145,11 @@ TEST_F(VkNvidiaBestPracticesLayerTest, ClearColor_NotCompressed) {
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-DrawState-ClearCmdBeforeDraw");
     };
 
-    vkt::Image image(*m_device, m_width, m_height, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image(*m_device, m_width, m_height, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView image_view = image.CreateView();
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
-    color_attachment.imageView = image_view.handle();
+    color_attachment.imageView = image_view;
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1185,7 +1178,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, ClearColor_NotCompressed) {
     VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
 
     m_command_buffer.Begin();
-    vk::CmdBeginRendering(m_command_buffer.handle(), &begin_rendering_info);
+    vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
 
     {
         set_desired();
@@ -1193,42 +1186,42 @@ TEST_F(VkNvidiaBestPracticesLayerTest, ClearColor_NotCompressed) {
 
         for (int i = 0; i < 16 + 1; ++i) {
             clear.clearValue.color.float32[3] += 0.05f;
-            vk::CmdClearAttachments(m_command_buffer.handle(), 1, &clear, 1, &clear_rect);
+            vk::CmdClearAttachments(m_command_buffer, 1, &clear, 1, &clear_rect);
         }
         m_errorMonitor->VerifyFound();
     }
     {
         set_desired();
         set_clear_color({1.0f, 1.0f, 1.0f, 1.0f});
-        vk::CmdClearAttachments(m_command_buffer.handle(), 1, &clear, 1, &clear_rect);
+        vk::CmdClearAttachments(m_command_buffer, 1, &clear, 1, &clear_rect);
         m_errorMonitor->Finish();
     }
     {
         set_desired();
         set_clear_color({0.0f, 0.0f, 0.0f, 0.0f});
-        vk::CmdClearAttachments(m_command_buffer.handle(), 1, &clear, 1, &clear_rect);
+        vk::CmdClearAttachments(m_command_buffer, 1, &clear, 1, &clear_rect);
         m_errorMonitor->Finish();
     }
     {
         set_desired();
         set_clear_color({0.9f, 1.0f, 1.0f, 1.0f});
-        vk::CmdClearAttachments(m_command_buffer.handle(), 1, &clear, 1, &clear_rect);
+        vk::CmdClearAttachments(m_command_buffer, 1, &clear, 1, &clear_rect);
         m_errorMonitor->VerifyFound();
     }
 
-    vk::CmdEndRendering(m_command_buffer.handle());
+    vk::CmdEndRendering(m_command_buffer);
 
     {
         set_desired();
-        vk::CmdBeginRendering(m_command_buffer.handle(), &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
         m_errorMonitor->Finish();
-        vk::CmdEndRendering(m_command_buffer.handle());
+        vk::CmdEndRendering(m_command_buffer);
     }
     {
         color_attachment.clearValue.color.float32[0] = 0.55f;
 
         set_desired();
-        vk::CmdBeginRendering(m_command_buffer.handle(), &begin_rendering_info);
+        vk::CmdBeginRendering(m_command_buffer, &begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1246,7 +1239,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BeginCommandBuffer_OneTimeSubmit) {
     vkt::CommandPool command_pool(*m_device, command_pool_ci);
 
     VkCommandBufferAllocateInfo allocate_info = vku::InitStructHelper();
-    allocate_info.commandPool = command_pool.handle();
+    allocate_info.commandPool = command_pool;
     allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocate_info.commandBufferCount = 1;
     vkt::CommandBuffer command_buffer0(*m_device, allocate_info);
@@ -1264,7 +1257,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BeginCommandBuffer_OneTimeSubmit) {
         m_default_queue->Submit(command_buffer0);
         m_device->Wait();
 
-        vk::BeginCommandBuffer(command_buffer0.handle(), &begin_info);
+        vk::BeginCommandBuffer(command_buffer0, &begin_info);
         m_errorMonitor->VerifyFound();
     }
     {
@@ -1278,7 +1271,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BeginCommandBuffer_OneTimeSubmit) {
             m_device->Wait();
         }
 
-        vk::BeginCommandBuffer(command_buffer1.handle(), &begin_info);
+        vk::BeginCommandBuffer(command_buffer1, &begin_info);
         m_errorMonitor->Finish();
     }
     {
@@ -1291,7 +1284,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BeginCommandBuffer_OneTimeSubmit) {
         m_default_queue->Submit(command_buffer2);
         m_device->Wait();
 
-        vk::BeginCommandBuffer(command_buffer2.handle(), &begin_info);
+        vk::BeginCommandBuffer(command_buffer2, &begin_info);
         m_errorMonitor->Finish();
     }
 }

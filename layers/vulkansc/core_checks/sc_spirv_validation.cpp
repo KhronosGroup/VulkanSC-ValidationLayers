@@ -40,10 +40,10 @@
 #include "vulkansc/core_checks/sc_core_validation.h"
 #include "vulkansc/state_tracker/sc_pipeline_state.h"
 #include "state_tracker/shader_module.h"
-#include "utils/vk_layer_utils.h"
 #include "generated/enum_flag_bits.h"
 #include "generated/spirv_grammar_helper.h"
 #include "state_tracker/shader_instruction.h"
+#include "utils/math_utils.h"
 
 namespace core::sc {
 

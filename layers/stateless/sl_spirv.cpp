@@ -20,7 +20,8 @@
 
 #include "sl_spirv.h"
 #include "generated/spirv_grammar_helper.h"
-
+#include "chassis/dispatch_object.h"
+#include "state_tracker/shader_module.h"
 #include <inttypes.h>
 #include <set>
 
@@ -56,6 +57,19 @@ static void GetVariableInfo(const spirv::Module &module_state, const spirv::Inst
     }
 }
 
+SpirvValidator::SpirvValidator(DebugReport *debug_report, const vvl::StatelessDeviceData &stateless_device_data)
+    : Logger(debug_report),
+      api_version(stateless_device_data.api_version),
+      extensions(stateless_device_data.extensions),
+      phys_dev_props(stateless_device_data.phys_dev_props),
+      phys_dev_props_core11(stateless_device_data.phys_dev_props_core11),
+      phys_dev_props_core12(stateless_device_data.phys_dev_props_core12),
+      phys_dev_props_core13(stateless_device_data.phys_dev_props_core13),
+      phys_dev_props_core14(stateless_device_data.phys_dev_props_core14),
+      phys_dev_ext_props(stateless_device_data.phys_dev_ext_props),
+      enabled_features(stateless_device_data.enabled_features),
+      special_supported(stateless_device_data.special_supported) {}
+
 // stateless spirv == doesn't require pipeline state and/or shader object info
 // Originally the goal was to move more validation to vkCreateShaderModule time in case the driver decided to parse an invalid
 // SPIR-V here, while that is likely not the case anymore, a bigger reason for checking here is to save on memory. There is a lot of
@@ -69,9 +83,8 @@ bool SpirvValidator::Validate(const spirv::Module &module_state, const spirv::St
     skip |= ValidateAtomicsTypes(module_state, stateless_data, loc);
     skip |= ValidateVariables(module_state, loc);
 
-    if (enabled_features.transformFeedback) {
-        skip |= ValidateTransformFeedbackDecorations(module_state, loc);
-    }
+    skip |= ValidateTransformFeedbackDecorations(module_state, loc);
+    skip |= ValidateRelaxedExtendedInstruction(module_state, stateless_data, loc);
 
     // The following tries to limit the number of passes through the shader module.
     // It save a good amount of memory and complex state tracking to just check these in a 2nd pass
@@ -87,11 +100,8 @@ bool SpirvValidator::Validate(const spirv::Module &module_state, const spirv::St
         skip |= ValidateShaderStageInputOutputLimits(module_state, *entry_point, stateless_data, loc);
         skip |= ValidateShaderFloatControl(module_state, *entry_point, stateless_data, loc);
         skip |= ValidateExecutionModes(module_state, *entry_point, stateless_data, loc);
-        skip |= ValidatePhysicalStorageBuffers(module_state, *entry_point, loc);
         skip |= ValidateConservativeRasterization(module_state, *entry_point, stateless_data, loc);
-        if (enabled_features.transformFeedback) {
-            skip |= ValidateTransformFeedbackEmitStreams(module_state, *entry_point, stateless_data, loc);
-        }
+        skip |= ValidateTransformFeedbackEmitStreams(module_state, *entry_point, stateless_data, loc);
     }
     return skip;
 }
@@ -374,7 +384,7 @@ bool SpirvValidator::ValidateVariables(const spirv::Module &module_state, const 
         // The other checks need to take into account the format features and so
         // we apply that in the descriptor set matching validation code (see
         // descriptor_sets.cpp).
-        if (!has_format_feature2) {
+        if (!special_supported.vk_khr_format_feature_flags2) {
             skip |= ValidateShaderStorageImageFormatsVariables(module_state, *insn, loc);
         }
     }
@@ -387,13 +397,12 @@ bool SpirvValidator::Validate8And16BitStorage(const spirv::Module &module_state,
                                               const Location &loc) const {
     bool skip = false;
 
-    const uint32_t storage_class = var_insn.StorageClass();
-
-    const spirv::Instruction *type_pointer = module_state.FindDef(var_insn.Word(1));
-    const spirv::Instruction *type = module_state.FindDef(type_pointer->Word(3));
     // type will either be a float, int, or struct and if struct need to traverse it
+    const spirv::Instruction *type = module_state.GetVariablePointerType(var_insn);
     VariableInstInfo info;
     GetVariableInfo(module_state, type, info);
+
+    const uint32_t storage_class = var_insn.StorageClass();
 
     if (info.has_8bit) {
         if (!enabled_features.storageBuffer8BitAccess &&
@@ -461,7 +470,7 @@ bool SpirvValidator::ValidateShaderStorageImageFormatsVariables(const spirv::Mod
     // to trigger the error.
     assert(insn.Opcode() == spv::OpVariable);
     // spirv-val validates this is an OpTypePointer
-    const spirv::Instruction *pointer_def = module_state.FindDef(insn.Word(1));
+    const spirv::Instruction *pointer_def = module_state.FindDef(insn.TypeId());
     if (pointer_def->Word(2) != spv::StorageClassUniformConstant) {
         return skip;  // Vulkan Spec says storage image must be UniformConstant
     }
@@ -482,7 +491,7 @@ bool SpirvValidator::ValidateShaderStorageImageFormatsVariables(const spirv::Mod
             return skip;
         }
 
-        const uint32_t var_id = insn.Word(2);
+        const uint32_t var_id = insn.ResultId();
         const auto decorations = module_state.GetDecorationSet(var_id);
 
         if (!enabled_features.shaderStorageImageReadWithoutFormat && !decorations.Has(spirv::DecorationSet::nonreadable_bit)) {
@@ -507,6 +516,10 @@ bool SpirvValidator::ValidateShaderStorageImageFormatsVariables(const spirv::Mod
 
 bool SpirvValidator::ValidateTransformFeedbackDecorations(const spirv::Module &module_state, const Location &loc) const {
     bool skip = false;
+
+    if (!enabled_features.transformFeedback) {
+        return skip;
+    }
 
     std::vector<const spirv::Instruction *> xfb_streams;
     std::vector<const spirv::Instruction *> xfb_buffers;
@@ -608,7 +621,7 @@ bool SpirvValidator::ValidateTransformFeedbackDecorations(const spirv::Module &m
 bool SpirvValidator::ValidateTransformFeedbackEmitStreams(const spirv::Module &module_state, const spirv::EntryPoint &entrypoint,
                                                           const spirv::StatelessData &stateless_data, const Location &loc) const {
     bool skip = false;
-    if (entrypoint.stage != VK_SHADER_STAGE_GEOMETRY_BIT) {
+    if (!enabled_features.transformFeedback || entrypoint.stage != VK_SHADER_STAGE_GEOMETRY_BIT) {
         return skip;  // GeometryStreams are only used in Geomtry Shaders
     }
 
@@ -641,6 +654,18 @@ bool SpirvValidator::ValidateTransformFeedbackEmitStreams(const spirv::Module &m
                          emitted_streams_size);
     }
 
+    return skip;
+}
+
+bool SpirvValidator::ValidateRelaxedExtendedInstruction(const spirv::Module &module_state,
+                                                        const spirv::StatelessData &stateless_data, const Location &loc) const {
+    bool skip = false;
+    if (!enabled_features.shaderRelaxedExtendedInstruction && stateless_data.has_ext_inst_with_forward_refs) {
+        skip |= LogError("VUID-RuntimeSpirv-shaderRelaxedExtendedInstruction-10773", module_state.handle(), loc,
+                         "SPIR-V uses OpExtInstWithForwardRefsKHR but shaderRelaxedExtendedInstruction was not enabled.\nWhen "
+                         "using VK_KHR_shader_non_semantic_info (how you can map SPIR-V back to your source language) this "
+                         "instruction is required when dealing with forward reference to a pointer.");
+    }
     return skip;
 }
 
@@ -1302,26 +1327,6 @@ bool SpirvValidator::ValidateExecutionModes(const spirv::Module &module_state, c
                          "SPIR-V uses DerivativeGroupQuadsKHR in a %s shader, but meshAndTaskShaderDerivatives is not supported.",
                          string_VkShaderStageFlagBits(stage));
         }
-    }
-
-    return skip;
-}
-
-bool SpirvValidator::ValidatePhysicalStorageBuffers(const spirv::Module &module_state, const spirv::EntryPoint &entrypoint,
-                                                    const Location &loc) const {
-    bool skip = false;
-
-    // https://gitlab.khronos.org/spirv/SPIR-V/-/issues/779
-    // This will likely not get resolved for awhile as it will be a LOT of testing and currently it "just works" for simple cases,
-    // but should warn users if trying to do this.
-    // We need to check at vkCreateShaderModule time as we have found some drivers will crash here (from our VVL tests).
-    if (entrypoint.has_physical_storage_buffer_interface) {
-        skip |= LogWarning(
-            "WARNING-PhysicalStorageBuffer-interface", module_state.handle(), loc,
-            "(SPIR-V Interface) Is trying to use PhysicalStorageBuffer as an Input/Output User-Defined Variable in (%s). This "
-            "has unresolved specification discussion and is undefined and caution should be taken. Advice is to use "
-            "int64 or uvec2 instead to pass the pointer betweeen stages.",
-            string_VkShaderStageFlagBits(entrypoint.stage));
     }
 
     return skip;

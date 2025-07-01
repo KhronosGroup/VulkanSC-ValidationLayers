@@ -1,6 +1,6 @@
-/* Copyright (c) 2024 The Khronos Group Inc.
- * Copyright (c) 2024 Valve Corporation
- * Copyright (c) 2024 LunarG, Inc.
+/* Copyright (c) 2025 The Khronos Group Inc.
+ * Copyright (c) 2025 Valve Corporation
+ * Copyright (c) 2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
+#include "../framework/sync_val_tests.h"
 #include <thread>
-#include "../framework/layer_validation_tests.h"
 
 struct PositiveSyncValWsi : public VkSyncValTest {};
 
@@ -58,12 +58,8 @@ TEST_F(PositiveSyncValWsi, PresentAfterSubmit2AutomaticVisibility) {
     layout_transition.subresourceRange.baseArrayLayer = 0;
     layout_transition.subresourceRange.layerCount = 1;
 
-    VkDependencyInfo dep_info = vku::InitStructHelper();
-    dep_info.imageMemoryBarrierCount = 1;
-    dep_info.pImageMemoryBarriers = &layout_transition;
-
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier2(m_command_buffer, &dep_info);
+    m_command_buffer.Barrier(layout_transition);
     m_command_buffer.End();
 
     m_default_queue->Submit2(m_command_buffer, vkt::Wait(acquire_semaphore, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT),
@@ -136,12 +132,8 @@ TEST_F(PositiveSyncValWsi, PresentAfterSubmitNoneDstStage) {
     layout_transition.image = swapchain_images[image_index];
     layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    VkDependencyInfo dep_info = vku::InitStructHelper();
-    dep_info.imageMemoryBarrierCount = 1;
-    dep_info.pImageMemoryBarriers = &layout_transition;
-
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier2(m_command_buffer, &dep_info);
+    m_command_buffer.Barrier(layout_transition);
     m_command_buffer.End();
 
     // The goal of this test is to use QueueSubmit API (not QueueSubmit2) to
@@ -214,7 +206,12 @@ TEST_F(PositiveSyncValWsi, ThreadedSubmitAndFenceWaitAndPresent) {
     // Main thread submits empty batches and presents images
     {
         vkt::Semaphore acquire_semaphore(*m_device);
-        vkt::Semaphore submit_semaphore(*m_device);
+
+        std::vector<vkt::Semaphore> submit_semaphores;
+        for (size_t i = 0; i < swapchain_images.size(); i++) {
+            submit_semaphores.emplace_back(*m_device);
+        }
+
         vkt::Fence fence(*m_device);
 
         for (int i = 0; i < N; i++) {
@@ -222,8 +219,8 @@ TEST_F(PositiveSyncValWsi, ThreadedSubmitAndFenceWaitAndPresent) {
             {
                 std::unique_lock<std::mutex> lock(queue_mutex);
                 m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT),
-                                        vkt::Signal(submit_semaphore), fence);
-                m_default_queue->Present(m_swapchain, image_index, submit_semaphore);
+                                        vkt::Signal(submit_semaphores[image_index]), fence);
+                m_default_queue->Present(m_swapchain, image_index, submit_semaphores[image_index]);
             }
             vk::WaitForFences(device(), 1, &fence.handle(), VK_TRUE, kWaitTimeout);
             vk::ResetFences(device(), 1, &fence.handle());
@@ -423,7 +420,7 @@ TEST_F(PositiveSyncValWsi, RecreateImage) {
 
         auto &dst_image = dst_images[image_index];
         dst_image.destroy();
-        dst_image = vkt::Image(*m_device, width, height, 1, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+        dst_image = vkt::Image(*m_device, width, height, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
         VkBufferImageCopy region = {};
         region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -439,13 +436,9 @@ TEST_F(PositiveSyncValWsi, RecreateImage) {
         layout_transition.image = dst_image;
         layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-        VkDependencyInfo dep_info = vku::InitStructHelper();
-        dep_info.imageMemoryBarrierCount = 1;
-        dep_info.pImageMemoryBarriers = &layout_transition;
-
         auto &command_buffer = command_buffers[image_index];
         command_buffer.Begin();
-        vk::CmdPipelineBarrier2(command_buffer, &dep_info);
+        command_buffer.Barrier(layout_transition);
         vk::CmdCopyBufferToImage(command_buffer, src_buffer, dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
         command_buffer.End();
 

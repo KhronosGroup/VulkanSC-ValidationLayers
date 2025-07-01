@@ -32,8 +32,6 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/buffer_positive.cpp
     converted/command.cpp
     converted/command_positive.cpp
-    converted/cooperative_vector.cpp
-    converted/cooperative_vector_positive.cpp
     converted/copy_buffer_image.cpp
     converted/copy_buffer_image_positive.cpp
     converted/debug_extensions.cpp
@@ -52,6 +50,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/device_generated_commands.cpp
     converted/device_generated_commands_positive.cpp
     converted/device_queue.cpp
+    converted/device_queue_positive.cpp
     converted/dynamic_rendering.cpp
     converted/dynamic_rendering_local_read.cpp
     converted/dynamic_rendering_local_read_positive.cpp
@@ -70,6 +69,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_buffer_device_address_positive.cpp
     converted/gpu_av_cooperative_vector.cpp
     converted/gpu_av_cooperative_vector_positive.cpp
+    converted/gpu_av_copies.cpp
+    converted/gpu_av_copies_positive.cpp
     converted/gpu_av_debug_printf.cpp
     converted/gpu_av_descriptor_buffer_positive.cpp
     converted/gpu_av_descriptor_class_general_buffer.cpp
@@ -80,8 +81,6 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_descriptor_indexing_positive.cpp
     converted/gpu_av_descriptor_post_process.cpp
     converted/gpu_av_descriptor_post_process_positive.cpp
-    converted/gpu_av_image_layout.cpp
-    converted/gpu_av_image_layout_positive.cpp
     converted/gpu_av_index_buffer.cpp
     converted/gpu_av_index_buffer_positive.cpp
     converted/gpu_av_indirect_buffer.cpp
@@ -95,6 +94,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_shader_object_positive.cpp
     converted/gpu_av_spirv.cpp
     converted/gpu_av_spirv_positive.cpp
+    converted/gpu_av_vertex_attribute_fetch.cpp
     converted/graphics_library.cpp
     converted/graphics_library_positive.cpp
     converted/host_image_copy.cpp
@@ -160,6 +160,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/shader_compute_positive.cpp
     converted/shader_cooperative_matrix.cpp
     converted/shader_cooperative_matrix_positive.cpp
+    converted/shader_cooperative_vector.cpp
+    converted/shader_cooperative_vector_positive.cpp
     converted/shader_debug_info.cpp
     converted/shader_image_access.cpp
     converted/shader_image_access_positive.cpp
@@ -168,6 +170,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/shader_limits.cpp
     converted/shader_limits_positive.cpp
     converted/shader_mesh.cpp
+    converted/shader_mesh_positive.cpp
     converted/shader_object.cpp
     converted/shader_object_positive.cpp
     converted/shader_push_constants.cpp
@@ -214,6 +217,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/video_decode_h265.cpp
     converted/video_decode_h265_positive.cpp
     converted/video_decode_positive.cpp
+    converted/video_decode_vp9.cpp
+    converted/video_decode_vp9_positive.cpp
     converted/video_encode.cpp
     converted/video_encode_av1.cpp
     converted/video_encode_av1_positive.cpp

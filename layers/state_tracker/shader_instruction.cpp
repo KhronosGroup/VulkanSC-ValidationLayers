@@ -183,6 +183,11 @@ spv::BuiltIn Instruction::GetBuiltIn() const {
 
 bool Instruction::IsArray() const { return (Opcode() == spv::OpTypeArray || Opcode() == spv::OpTypeRuntimeArray); }
 
+bool Instruction::IsNonPtrAccessChain() const {
+    const uint32_t opcode = Opcode();
+    return opcode == spv::OpAccessChain || opcode == spv::OpInBoundsAccessChain;
+}
+
 bool Instruction::IsAccessChain() const {
     const uint32_t opcode = Opcode();
     return opcode == spv::OpAccessChain || opcode == spv::OpPtrAccessChain || opcode == spv::OpInBoundsAccessChain ||
@@ -202,8 +207,6 @@ spv::StorageClass Instruction::StorageClass() const {
     spv::StorageClass storage_class = spv::StorageClassMax;
     switch (Opcode()) {
         case spv::OpTypePointer:
-            storage_class = static_cast<spv::StorageClass>(Word(2));
-            break;
         case spv::OpTypeForwardPointer:
             storage_class = static_cast<spv::StorageClass>(Word(2));
             break;
@@ -224,7 +227,12 @@ void Instruction::Fill(const std::vector<uint32_t>& words) {
     UpdateDebugInfo();
 }
 
-void Instruction::UpdateWord(uint32_t index, uint32_t data) { words_[index] = data; }
+void Instruction::UpdateWord(uint32_t index, uint32_t data) {
+    words_[index] = data;
+#ifndef NDEBUG
+    d_words_[index] = data;
+#endif
+}
 
 void Instruction::AppendWord(uint32_t word) {
     words_.emplace_back(word);

@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -89,7 +89,7 @@ TEST_F(PositiveThreading, UpdateDescriptorUpdateAfterBindNoCollision) {
     data.device = device();
     data.descriptorSet = descriptor_set.set_;
     data.binding = 0;
-    data.buffer = buffer.handle();
+    data.buffer = buffer;
     std::atomic<bool> bailout{false};
     data.bailout = &bailout;
     m_errorMonitor->SetBailout(data.bailout);
@@ -102,7 +102,7 @@ TEST_F(PositiveThreading, UpdateDescriptorUpdateAfterBindNoCollision) {
     data2.device = device();
     data2.descriptorSet = descriptor_set.set_;
     data2.binding = 1;
-    data2.buffer = buffer.handle();
+    data2.buffer = buffer;
     data2.bailout = &bailout;
 
     UpdateDescriptor(&data2);
@@ -132,7 +132,7 @@ TEST_F(PositiveThreading, UpdateDescriptorUnusedWhilePendingNoCollision) {
     data.device = device();
     data.descriptorSet = descriptor_set.set_;
     data.binding = 0;
-    data.buffer = buffer.handle();
+    data.buffer = buffer;
     std::atomic<bool> bailout{false};
     data.bailout = &bailout;
     m_errorMonitor->SetBailout(data.bailout);
@@ -145,7 +145,7 @@ TEST_F(PositiveThreading, UpdateDescriptorUnusedWhilePendingNoCollision) {
     data2.device = device();
     data2.descriptorSet = descriptor_set.set_;
     data2.binding = 1;
-    data2.buffer = buffer.handle();
+    data2.buffer = buffer;
     data2.bailout = &bailout;
 
     UpdateDescriptor(&data2);
@@ -224,7 +224,7 @@ TEST_F(PositiveThreading, DebugObjectNames) {
     vkt::Buffer buffer(*m_device, 256u, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     VkDescriptorBufferInfo buffer_info;
-    buffer_info.buffer = buffer.handle();
+    buffer_info.buffer = buffer;
     buffer_info.offset = 0u;
     buffer_info.range = 256u;
 
@@ -267,7 +267,7 @@ TEST_F(PositiveThreading, DebugObjectNames) {
     const auto bind_descriptor = [&]() {
         m_command_buffer.Begin();
         for (uint32_t i = 0; i < count; ++i) {
-            vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0u, 1u,
+            vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0u, 1u,
                                       &descriptor_sets[i], 0u, nullptr);
         }
         m_command_buffer.End();
@@ -306,7 +306,7 @@ TEST_F(PositiveThreading, Queue) {
     vk::GetDeviceQueue(device(), queue_family, queue_index, &queue_h);
     vkt::Queue queue_o(queue_h, queue_family);
 
-    const VkCommandBufferAllocateInfo cbai = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, nullptr, command_pool.handle(),
+    const VkCommandBufferAllocateInfo cbai = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, nullptr, command_pool,
                                               VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1};
     vkt::CommandBuffer mock_cmdbuff(*m_device, cbai);
     const VkCommandBufferBeginInfo cbbi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr,
@@ -349,4 +349,36 @@ TEST_F(PositiveThreading, Queue) {
     for (auto &t : threads) t.join();
 
     vk::QueueWaitIdle(queue_h);
+}
+
+TEST_F(PositiveThreading, GetPhysicalDeviceFeatures) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9931");
+    VkInstanceCreateInfo instance_ci = GetInstanceCreateInfo();
+
+    // mimics --gtest_repeat=100 which is needed to reproduce constantly
+    for (uint32_t repeat = 0; repeat < 100; repeat++) {
+        VkInstance instance;
+        vk::CreateInstance(&instance_ci, nullptr, &instance);
+
+        const uint32_t thread_count = 4u;
+
+        uint32_t physical_device_count;
+        vk::EnumeratePhysicalDevices(instance, &physical_device_count, nullptr);
+        std::vector<VkPhysicalDevice> physical_devices(physical_device_count);
+        vk::EnumeratePhysicalDevices(instance, &physical_device_count, physical_devices.data());
+
+        const auto &thread = [&](uint32_t id) {
+            VkPhysicalDeviceFeatures features;
+            vk::GetPhysicalDeviceFeatures(physical_devices[id % physical_device_count], &features);
+        };
+        std::array<std::thread, thread_count> threads;
+        for (uint32_t i = 0u; i < thread_count; ++i) {
+            threads[i] = std::thread(thread, i);
+        }
+        for (auto &t : threads) {
+            t.join();
+        }
+
+        vk::DestroyInstance(instance, nullptr);
+    }
 }

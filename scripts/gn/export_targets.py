@@ -240,13 +240,15 @@ IGNORED_INCLUDES = {
     b'vulkan_xcb.h',
     b'vulkan_xlib.h',
     b'vulkan_xlib_xrandr.h',
+    b'vulkan_ohos.h',
     # rapidjson adds these include stubs into their documentation
     # comments. Since the script doesn't skip comments they are
     # erroneously marked as valid includes
     b'rapidjson/...',
     # Validation layers support building with robin hood hashing, but we are not enabling that
     # See http://anglebug.com/42264327
-    b'robin_hood.h',
+    # Update: Validation layers now use parallel hashmap, but still it is not wanted in BUILD.gn
+    b'parallel_hashmap/phmap.h',
     # Validation layers optionally use mimalloc
     b'mimalloc-new-delete.h',
     # From the Vulkan-Loader

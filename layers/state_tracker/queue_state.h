@@ -27,12 +27,14 @@
 #include <vector>
 #include <string>
 #include "error_message/error_location.h"
+#include "chassis/dispatch_object.h"
 
 namespace vvl {
 
 class CommandBuffer;
-class Device;
+class DeviceState;
 class Queue;
+class QueueSubState;
 
 struct CommandBufferSubmission {
     std::shared_ptr<vvl::CommandBuffer> cb;
@@ -58,12 +60,16 @@ struct CommandBufferSubmission {
 struct QueueSubmission {
     QueueSubmission(const Location &loc_) : loc(loc_), completed(), waiter(completed.get_future()) {}
 
-    bool end_batch{false};
+    bool is_last_submission{false};
     std::vector<vvl::CommandBufferSubmission> cb_submissions{};
 
     std::vector<SemaphoreInfo> wait_semaphores;
     std::vector<SemaphoreInfo> signal_semaphores;
     std::shared_ptr<Fence> fence;
+    bool has_external_fence = false;
+    // Swapchain handle if this submission represents QueuePresent request
+    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+
     LocationCapture loc;
     uint64_t seq{0};
     uint32_t perf_submit_pass{0};
@@ -97,14 +103,12 @@ static inline std::chrono::time_point<std::chrono::steady_clock> GetCondWaitTime
 
 struct PreSubmitResult {
     uint64_t last_submission_seq = 0;
-
-    bool has_external_fence = false;
-    uint64_t submission_with_external_fence_seq = 0;
+    uint64_t submission_seq = 0;
 };
 
-class Queue : public StateObject {
+class Queue : public StateObject, public SubStateManager<QueueSubState> {
   public:
-    Queue(Device &dev_data, VkQueue handle, uint32_t family_index, uint32_t queue_index, VkDeviceQueueCreateFlags flags,
+    Queue(DeviceState &dev_data, VkQueue handle, uint32_t family_index, uint32_t queue_index, VkDeviceQueueCreateFlags flags,
           const VkQueueFamilyProperties &queueFamilyProperties)
         : StateObject(handle, kVulkanObjectTypeQueue),
           queue_family_index(family_index),
@@ -119,7 +123,7 @@ class Queue : public StateObject {
     VkQueue VkHandle() const { return handle_.Cast<VkQueue>(); }
 
     // called from the various PreCallRecordQueueSubmit() methods
-    virtual PreSubmitResult PreSubmit(std::vector<QueueSubmission> &&submissions);
+    PreSubmitResult PreSubmit(std::vector<QueueSubmission> &&submissions);
     // called from the various PostCallRecordQueueSubmit() methods
     void PostSubmit();
 
@@ -137,6 +141,9 @@ class Queue : public StateObject {
     // Find a timeline wait that does not have a resolving signal submitted yet.
     // Check submissions up to and including until_seq.
     std::optional<SemaphoreInfo> FindTimelineWaitWithoutResolvingSignal(uint64_t until_seq) const;
+
+    // VVL needs helps to retire submsissions on present-only queue that does not use explicit host synchronization
+    void UpdatePresentOnlyQueueProgress(const DeviceState &device_state);
 
   public:
     // Queue family index. As queueFamilyIndex parameter in vkGetDeviceQueue.
@@ -160,11 +167,16 @@ class Queue : public StateObject {
     // Access to this variable relies on external queue synchronization.
     bool found_unbalanced_cmdbuf_label = false;
 
+    // If at any point this queue was used for specific queue operations
+    bool is_used_for_presentation = false;     // QueuePresent
+    bool is_used_for_regular_submits = false;  // QueueSubmit and QueueBindSparse
+
   protected:
     // called from the various PostCallRecordQueueSubmit() methods
-    virtual void PostSubmit(QueueSubmission &submission) {}
+    void PostSubmit(QueueSubmission &submission);
+
     // called when the worker thread decides a submissions has finished executing
-    virtual void Retire(QueueSubmission &submission);
+    void Retire(QueueSubmission &submission);
 
   private:
     uint32_t timeline_wait_count_ = 0;
@@ -175,7 +187,7 @@ class Queue : public StateObject {
     QueueSubmission *NextSubmission();
     LockGuard Lock() const { return LockGuard(lock_); }
 
-    Device &dev_data_;
+    DeviceState &dev_data_;
 
     // state related to submitting to the queue, all data members must
     // be accessed with lock_ held
@@ -187,5 +199,24 @@ class Queue : public StateObject {
     mutable std::mutex lock_;
     // condition to wake up the queue's thread
     std::condition_variable cond_;
+};
+
+class QueueSubState {
+  public:
+    explicit QueueSubState(Queue &q) : base(q) {}
+    QueueSubState(const QueueSubState &) = delete;
+    QueueSubState &operator=(const QueueSubState &) = delete;
+
+    virtual ~QueueSubState() {}
+    virtual void Destroy() {}
+
+    virtual void PreSubmit(std::vector<QueueSubmission> &submissions) {}
+    virtual void PostSubmit(std::deque<QueueSubmission> &submissions_) {}
+    virtual void Retire(QueueSubmission &submission) {}
+
+    VulkanTypedHandle Handle() const { return base.Handle(); }
+    VkQueue VkHandle() const { return base.VkHandle(); }
+
+    Queue &base;
 };
 }  // namespace vvl

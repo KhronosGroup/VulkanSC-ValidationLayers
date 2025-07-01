@@ -16,7 +16,6 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/android_hardware_buffer.h"
-#include "generated/vk_extension_helper.h"
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 
@@ -55,7 +54,7 @@ TEST_F(PositiveAndroidHardwareBuffer, MemoryRequirements) {
 
     // Should be able to bind memory with no error
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
-    vk::BindBufferMemory(device(), buffer.handle(), memory, 0);
+    vk::BindBufferMemory(device(), buffer, memory, 0);
 }
 
 TEST_F(PositiveAndroidHardwareBuffer, DepthStencil) {
@@ -102,7 +101,7 @@ TEST_F(PositiveAndroidHardwareBuffer, DepthStencil) {
     }
 
     VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
-    memory_dedicated_info.image = ds_image.handle();
+    memory_dedicated_info.image = ds_image;
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
     VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper(&memory_dedicated_info);
@@ -114,7 +113,7 @@ TEST_F(PositiveAndroidHardwareBuffer, DepthStencil) {
     }
 
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
-    vk::BindImageMemory(device(), ds_image.handle(), memory, 0);
+    vk::BindImageMemory(device(), ds_image, memory, 0);
 }
 
 TEST_F(PositiveAndroidHardwareBuffer, BindBufferMemory) {
@@ -134,11 +133,11 @@ TEST_F(PositiveAndroidHardwareBuffer, BindBufferMemory) {
 
     // Try to get memory requirements prior to binding memory
     VkMemoryRequirements mem_reqs;
-    vk::GetBufferMemoryRequirements(device(), buffer.handle(), &mem_reqs);
+    vk::GetBufferMemoryRequirements(device(), buffer, &mem_reqs);
 
     // Test bind memory 2 extension
     VkBufferMemoryRequirementsInfo2 buffer_mem_reqs2 = vku::InitStructHelper();
-    buffer_mem_reqs2.buffer = buffer.handle();
+    buffer_mem_reqs2.buffer = buffer;
     VkMemoryRequirements2 mem_reqs2 = vku::InitStructHelper();
     vk::GetBufferMemoryRequirements2(device(), &buffer_mem_reqs2, &mem_reqs2);
 
@@ -162,7 +161,7 @@ TEST_F(PositiveAndroidHardwareBuffer, BindBufferMemory) {
     }
 
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
-    vk::BindBufferMemory(device(), buffer.handle(), memory, 0);
+    vk::BindBufferMemory(device(), buffer, memory, 0);
 }
 
 TEST_F(PositiveAndroidHardwareBuffer, ExportBuffer) {
@@ -182,7 +181,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportBuffer) {
     vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
 
     VkMemoryRequirements mem_reqs;
-    vk::GetBufferMemoryRequirements(device(), buffer.handle(), &mem_reqs);
+    vk::GetBufferMemoryRequirements(device(), buffer, &mem_reqs);
 
     VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
     memory_dedicated_info.image = VK_NULL_HANDLE;
@@ -201,7 +200,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportBuffer) {
     }
 
     vkt::DeviceMemory memory(*m_device, memory_info);
-    vk::BindBufferMemory(device(), buffer.handle(), memory, 0);
+    vk::BindBufferMemory(device(), buffer, memory, 0);
 
     // Export memory to AHB
     AHardwareBuffer *ahb = nullptr;
@@ -240,7 +239,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportImage) {
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
-    memory_dedicated_info.image = image.handle();
+    memory_dedicated_info.image = image;
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
     VkExportMemoryAllocateInfo export_memory_info = vku::InitStructHelper(&memory_dedicated_info);
@@ -259,7 +258,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportImage) {
     }
 
     vkt::DeviceMemory memory(*m_device, memory_info);
-    vk::BindImageMemory(device(), image.handle(), memory, 0);
+    vk::BindImageMemory(device(), image, memory, 0);
 
     // Export memory to AHB
     AHardwareBuffer *ahb = nullptr;
@@ -318,7 +317,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalImage) {
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
-    memory_dedicated_info.image = image.handle();
+    memory_dedicated_info.image = image;
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
     VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper(&memory_dedicated_info);
@@ -330,7 +329,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalImage) {
     }
 
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
-    vk::BindImageMemory(device(), image.handle(), memory, 0);
+    vk::BindImageMemory(device(), image, memory, 0);
 }
 
 TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
@@ -386,7 +385,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
-    memory_dedicated_info.image = image.handle();
+    memory_dedicated_info.image = image;
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
     VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper(&memory_dedicated_info);
@@ -398,7 +397,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
     }
 
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
-    vk::BindImageMemory(device(), image.handle(), memory, 0);
+    vk::BindImageMemory(device(), image, memory, 0);
 }
 
 TEST_F(PositiveAndroidHardwareBuffer, DeviceImageMemoryReq) {

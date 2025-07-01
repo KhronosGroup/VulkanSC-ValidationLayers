@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
@@ -296,7 +297,7 @@ TEST_F(PositivePipelineTopology, PointSizeStructMemberWritten) {
     };
 
     CreatePipelineHelper pipe(*this);
-    pipe.shader_stages_ = {vs->GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.pipeline_layout_ci_ = pipeline_layout_info;
     pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
     pipe.vi_ci_.pVertexBindingDescriptions = input_binding;
@@ -312,12 +313,11 @@ TEST_F(PositivePipelineTopology, PolygonModeValid) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    std::vector<const char *> device_extension_names;
     auto features = m_device->Physical().Features();
     // Artificially disable support for non-solid fill modes
     features.fillModeNonSolid = false;
     // The sacrificial device object
-    vkt::Device test_device(Gpu(), device_extension_names, &features);
+    vkt::Device test_device(Gpu(), m_device_extension_names, &features);
 
     VkAttachmentReference attach = {};
     attach.layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -358,8 +358,8 @@ TEST_F(PositivePipelineTopology, PolygonModeValid) {
         CreatePipelineHelper pipe(*this);
         pipe.device_ = &test_device;
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-        pipe.gp_ci_.layout = pipeline_layout.handle();
-        pipe.gp_ci_.renderPass = render_pass.handle();
+        pipe.gp_ci_.layout = pipeline_layout;
+        pipe.gp_ci_.renderPass = render_pass;
         // Set polygonMode to a good value
         rs_ci.polygonMode = VK_POLYGON_MODE_FILL;
         pipe.gp_ci_.pRasterizationState = &rs_ci;
@@ -449,8 +449,8 @@ TEST_F(PositivePipelineTopology, Rasterizer) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(RenderPass(), Framebuffer(), 32, 32, m_renderPassClearValues.size(),
                                      m_renderPassClearValues.data());
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
@@ -483,21 +483,20 @@ TEST_F(PositivePipelineTopology, LineTopologyClasses) {
     cb.Begin();
     cb.BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindPipeline(cb.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindVertexBuffers(cb.handle(), 0, 1, &vbo.handle(), &kZeroDeviceSize);
-    vk::CmdSetPrimitiveTopologyEXT(cb.handle(), VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY);
-    vk::CmdDraw(cb.handle(), 1, 1, 0, 0);
+    vk::CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindVertexBuffers(cb, 0, 1, &vbo.handle(), &kZeroDeviceSize);
+    vk::CmdSetPrimitiveTopologyEXT(cb, VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY);
+    vk::CmdDraw(cb, 1, 1, 0, 0);
 
     cb.EndRenderPass();
 
     cb.End();
 }
 
-TEST_F(PositivePipelineTopology, PointSizeDynamicAndUnestricted) {
+TEST_F(PositivePipelineTopology, PointSizeDynamicAndUnrestricted) {
     TEST_DESCRIPTION(
         "Create a pipeline using TOPOLOGY_POINT_LIST but do not set PointSize in vertex shader, but it is valid with both dynamic "
         "state and dynamicPrimitiveTopologyUnrestricted is true.");
-
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::extendedDynamicState);
@@ -507,28 +506,23 @@ TEST_F(PositivePipelineTopology, PointSizeDynamicAndUnestricted) {
     VkPhysicalDeviceExtendedDynamicState3PropertiesEXT dynamic_state_3_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(dynamic_state_3_props);
     if (!dynamic_state_3_props.dynamicPrimitiveTopologyUnrestricted) {
-        GTEST_SKIP() << "dynamicPrimitiveTopologyUnrestricted is VK_TRUE";
+        GTEST_SKIP() << "dynamicPrimitiveTopologyUnrestricted is VK_FALSE";
     }
 
-    static const char *vs_source = R"glsl(
-        #version 450
-        void main() {
-            gl_PointSize = 1.0;
-        }
-    )glsl";
-    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    CreatePipelineHelper pipe(*this);
+    pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
+    pipe.CreateGraphicsPipeline();
 
-    const VkDynamicState dyn_state = VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY;
-    VkPipelineDynamicStateCreateInfo dyn_state_ci = vku::InitStructHelper();
-    dyn_state_ci.dynamicStateCount = 1;
-    dyn_state_ci.pDynamicStates = &dyn_state;
-
-    auto set_info = [&](CreatePipelineHelper &helper) {
-        helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        helper.dyn_state_ci_ = dyn_state_ci;
-        helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-    };
-    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdSetPrimitiveTopologyEXT(m_command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositivePipelineTopology, PointSizeMaintenance5) {
@@ -584,4 +578,42 @@ TEST_F(PositivePipelineTopology, PrimitiveTopologyListRestartDynamic) {
     pipe.ia_ci_.primitiveRestartEnable = VK_TRUE;
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositivePipelineTopology, PatchListTopology) {
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddOptionalExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    AddRequiredFeature(vkt::Feature::tessellationShader);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkPhysicalDeviceExtendedDynamicState3PropertiesEXT dynamic_state_3_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(dynamic_state_3_props);
+    if (!dynamic_state_3_props.dynamicPrimitiveTopologyUnrestricted) {
+        GTEST_SKIP() << "dynamicPrimitiveTopologyUnrestricted is VK_FALSE";
+    }
+
+    VkShaderObj tcs(this, kTessellationControlMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
+    VkShaderObj tes(this, kTessellationEvalMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+
+    VkPipelineInputAssemblyStateCreateInfo iasci{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, nullptr, 0,
+                                                 VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE};
+    VkPipelineTessellationStateCreateInfo tsci{VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, nullptr, 0, 3};
+
+    CreatePipelineHelper pipe(*this);
+    pipe.gp_ci_.pTessellationState = &tsci;
+    pipe.gp_ci_.pInputAssemblyState = &iasci;
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo(), tcs.GetStageCreateInfo(),
+                           tes.GetStageCreateInfo()};
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdSetPrimitiveTopologyEXT(m_command_buffer, VK_PRIMITIVE_TOPOLOGY_PATCH_LIST);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

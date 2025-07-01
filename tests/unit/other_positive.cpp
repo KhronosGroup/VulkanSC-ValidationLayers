@@ -12,8 +12,6 @@
  */
 
 #include "../framework/layer_validation_tests.h"
-#include "generated/vk_extension_helper.h"
-
 #include <cstdlib>
 
 class VkPositiveLayerTest : public VkLayerTest {};
@@ -283,8 +281,7 @@ TEST_F(VkPositiveLayerTest, EnumeratePhysicalDeviceGroups) {
     TEST_DESCRIPTION("Test using VkPhysicalDevice handles obtained with vkEnumeratePhysicalDeviceGroups");
 
 #ifdef __linux__
-    if (std::getenv("NODEVICE_SELECT") == nullptr)
-    {
+    if (std::getenv("NODEVICE_SELECT") == nullptr) {
         // Currently due to a bug in MESA this test will fail.
         // https://gitlab.freedesktop.org/mesa/mesa/-/commit/4588453815c58ec848b0ff6f18a08836e70f55df
         //
@@ -443,7 +440,6 @@ TEST_F(VkPositiveLayerTest, AllowedDuplicateStype) {
 
 TEST_F(VkPositiveLayerTest, ExtensionsInCreateInstance) {
     TEST_DESCRIPTION("Test to see if instance extensions are called during CreateInstance.");
-
     // See https://github.com/KhronosGroup/Vulkan-Loader/issues/537 for more details.
     // This is specifically meant to ensure a crash encountered in profiles does not occur, but also to
     // attempt to ensure that no extension calls have been added to CreateInstance hooks.
@@ -451,24 +447,15 @@ TEST_F(VkPositiveLayerTest, ExtensionsInCreateInstance) {
     //       and the loader will _not_ crash (e.g., nvidia, android seem to not crash in this case, but AMD does).
     //       So, this test will only catch an erroneous extension _if_ run on HW/a driver that crashes in this use
     //       case.
-
-    for (const auto &ext : InstanceExtensions::GetInfoMap()) {
-        // Add all "real" instance extensions
-        if (InstanceExtensionSupported(String(ext.first))) {
-            bool version_required = false;
-            for (const auto &req : ext.second.requirements) {
-                std::string name(req.name);
-                if (name.find("VK_VERSION") != std::string::npos) {
-                    version_required = true;
-                    break;
-                }
-            }
-            if (!version_required) {
-                m_instance_extension_names.emplace_back(String(ext.first));
-            }
-        }
-    }
-
+    AddOptionalExtensions(VK_KHR_SURFACE_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_DISPLAY_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
 }
 
@@ -497,7 +484,7 @@ TEST_F(VkPositiveLayerTest, ExclusiveScissorVersionCount) {
 
     m_command_buffer.Begin();
     VkBool32 exclusiveScissorEnable = VK_TRUE;
-    vk::CmdSetExclusiveScissorEnableNV(m_command_buffer.handle(), 0u, 1u, &exclusiveScissorEnable);
+    vk::CmdSetExclusiveScissorEnableNV(m_command_buffer, 0u, 1u, &exclusiveScissorEnable);
     m_command_buffer.End();
 }
 
@@ -633,11 +620,13 @@ TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct1) {
     vk::GetPhysicalDeviceExternalBufferProperties(Gpu(), &externalBufferInfo, &externalBufferProperties);
 }
 
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10208
 TEST_F(VkPositiveLayerTest, TimelineSemaphoreWithVulkan11) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8308");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_NV_LOW_LATENCY_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_PRESENT_ID_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 }
 

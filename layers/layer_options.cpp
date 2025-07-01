@@ -19,6 +19,7 @@
 #include "layer_options.h"
 #include <vulkan/vulkan_core.h>
 #include "chassis/validation_object.h"
+#include "containers/span.h"
 #include "error_message/log_message_type.h"
 #include "error_message/logging.h"
 #include "error_message/error_location.h"
@@ -26,7 +27,6 @@
 #include "utils/hash_util.h"
 #include <cstring>
 #include <string>
-#include <unordered_set>
 #include <vector>
 #include <vulkan/layer/vk_layer_settings.hpp>
 
@@ -168,12 +168,11 @@ const char *VK_LAYER_CUSTOM_STYPE_LIST = "custom_stype_list";
 const char *VK_LAYER_ENABLE_MESSAGE_LIMIT = "enable_message_limit";
 const char *VK_LAYER_DUPLICATE_MESSAGE_LIMIT = "duplicate_message_limit";
 
-// GloablSettings
+// Global settings
 // ---
 const char *VK_LAYER_FINE_GRAINED_LOCKING = "fine_grained_locking";
 // Debug settings used for internal development
 const char *VK_LAYER_DEBUG_DISABLE_SPIRV_VAL = "debug_disable_spirv_val";
-const char *VK_LAYER_DEBUG_STABLE_MESSAGES = "debug_stable_messages";
 
 // DebugPrintf (which is now part of GPU-AV internally)
 // ---
@@ -188,17 +187,15 @@ const char *VK_LAYER_PRINTF_BUFFER_SIZE = "printf_buffer_size";
 // GPU-AV
 // ---
 const char *VK_LAYER_GPUAV_ENABLE = "gpuav_enable";
+const char *VK_LAYER_GPUAV_SAFE_MODE = "gpuav_safe_mode";
 const char *VK_LAYER_GPUAV_SHADER_INSTRUMENTATION = "gpuav_shader_instrumentation";
 const char *VK_LAYER_GPUAV_DESCRIPTOR_CHECKS = "gpuav_descriptor_checks";
-const char *VK_LAYER_GPUAV_WARN_ON_ROBUST_OOB = "gpuav_warn_on_robust_oob";
 const char *VK_LAYER_GPUAV_BUFFER_ADDRESS_OOB = "gpuav_buffer_address_oob";
-const char *VK_LAYER_GPUAV_MAX_BUFFER_DEVICE_ADDRESSES = "gpuav_max_buffer_device_addresses";
 const char *VK_LAYER_GPUAV_VALIDATE_RAY_QUERY = "gpuav_validate_ray_query";
-// Post Process are designed to allow the user to "assume" the access is valid and want to know after the GPU executes what
-// happened. These are much lighter checks and can be used while the rest of GPU-AV is turned off
 const char *VK_LAYER_GPUAV_POST_PROCESS_DESCRIPTOR_INDEXING = "gpuav_post_process_descriptor_indexing";
 const char *VK_LAYER_GPUAV_VERTEX_ATTRIBUTE_FETCH_OOB = "gpuav_vertex_attribute_fetch_oob";
 const char *VK_LAYER_GPUAV_SELECT_INSTRUMENTED_SHADERS = "gpuav_select_instrumented_shaders";
+const char *VK_LAYER_GPUAV_SHADERS_TO_INSTRUMENT = "gpuav_shaders_to_instrument";
 
 const char *VK_LAYER_GPUAV_BUFFERS_VALIDATION = "gpuav_buffers_validation";
 const char *VK_LAYER_GPUAV_INDIRECT_DRAWS_BUFFERS = "gpuav_indirect_draws_buffers";
@@ -206,10 +203,16 @@ const char *VK_LAYER_GPUAV_INDIRECT_DISPATCHES_BUFFERS = "gpuav_indirect_dispatc
 const char *VK_LAYER_GPUAV_INDIRECT_TRACE_RAYS_BUFFERS = "gpuav_indirect_trace_rays_buffers";
 const char *VK_LAYER_GPUAV_BUFFER_COPIES = "gpuav_buffer_copies";
 const char *VK_LAYER_GPUAV_INDEX_BUFFERS = "gpuav_index_buffers";
-const char *VK_LAYER_GPUAV_IMAGE_LAYOUT = "gpuav_image_layout";
 
-const char *VK_LAYER_GPUAV_RESERVE_BINDING_SLOT = "gpuav_reserve_binding_slot";
-const char *VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT = "gpuav_vma_linear_output";
+// Keep removed warning until October 2025 SDK is released
+const char *REMOVED_GPUAV_IMAGE_LAYOUT = "gpuav_image_layout";
+
+const char *VK_LAYER_GPUAV_FORCE_ON_ROBUSTNESS = "gpuav_force_on_robustness";
+
+// Plan to remove after deprecated for July 2025 SDK
+const char *DEPRECATED_VK_LAYER_GPUAV_RESERVE_BINDING_SLOT = "gpuav_reserve_binding_slot";
+const char *DEPRECATED_VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT = "gpuav_vma_linear_output";
+const char *DEPRECATED_VK_LAYER_GPUAV_MAX_BUFFER_DEVICE_ADDRESSES = "gpuav_max_buffer_device_addresses";
 
 const char *VK_LAYER_GPUAV_DEBUG_DISABLE_ALL = "gpuav_debug_disable_all";
 const char *VK_LAYER_GPUAV_DEBUG_VALIDATE_INSTRUMENTED_SHADERS = "gpuav_debug_validate_instrumented_shaders";
@@ -222,7 +225,6 @@ const char *VK_LAYER_GPUAV_DEBUG_PRINT_INSTRUMENTATION_INFO = "gpuav_debug_print
 const char *VK_LAYER_SYNCVAL_SUBMIT_TIME_VALIDATION = "syncval_submit_time_validation";
 const char *VK_LAYER_SYNCVAL_SHADER_ACCESSES_HEURISTIC = "syncval_shader_accesses_heuristic";
 const char *VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES = "syncval_message_extra_properties";
-const char *VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES_PRETTY_PRINT = "syncval_message_extra_properties_pretty_print";
 
 // Message Formatting
 // ---
@@ -238,7 +240,6 @@ const char *DEPRECATED_VK_LAYER_GPUAV_VALIDATE_COPIES = "gpuav_validate_copies";
 const char *DEPRECATED_VK_LAYER_GPUAV_VALIDATE_INDIRECT_BUFFER = "gpuav_validate_indirect_buffer";
 const char *DEPRECATED_VK_LAYER_RESERVE_BINDING_SLOT = "reserve_binding_slot";
 const char *DEPRECATED_GPUAV_VMA_LINEAR_OUTPUT = "vma_linear_output";
-const char *DEPRECATED_GPUAV_WARN_ON_ROBUST_OOB = "warn_on_robust_oob";
 const char *DEPRECATED_GPUAV_SELECT_INSTRUMENTED_SHADERS = "select_instrumented_shaders";
 
 // These were deprecated after the 1.3.283 SDK release
@@ -248,7 +249,7 @@ const char *DEPRECATED_VK_LAYER_VALIDATE_SYNC_QUEUE_SUBMIT = "sync_queue_submit"
 #if !defined(BUILD_SELF_VVL)
 
 // Set the local disable flag for the appropriate VALIDATION_CHECK_DISABLE enum
-void SetValidationDisable(CHECK_DISABLED &disable_data, const ValidationCheckDisables disable_id) {
+void SetValidationDisable(ValidationDisabled &disable_data, const ValidationCheckDisables disable_id) {
     switch (disable_id) {
         case VALIDATION_CHECK_DISABLE_COMMAND_BUFFER_STATE:
             disable_data[command_buffer_state] = true;
@@ -268,7 +269,7 @@ void SetValidationDisable(CHECK_DISABLED &disable_data, const ValidationCheckDis
 }
 
 // Set the local disable flag for a single VK_VALIDATION_FEATURE_DISABLE_* flag
-void SetValidationFeatureDisable(CHECK_DISABLED &disable_data, const VkValidationFeatureDisableEXT feature_disable) {
+void SetValidationFeatureDisable(ValidationDisabled &disable_data, const VkValidationFeatureDisableEXT feature_disable) {
     switch (feature_disable) {
         case VK_VALIDATION_FEATURE_DISABLE_SHADERS_EXT:
             disable_data[shader_validation] = true;
@@ -301,7 +302,7 @@ void SetValidationFeatureDisable(CHECK_DISABLED &disable_data, const VkValidatio
 }
 
 // Set the local enable flag for the appropriate VALIDATION_CHECK_ENABLE enum
-void SetValidationEnable(CHECK_ENABLED &enable_data, const ValidationCheckEnables enable_id) {
+void SetValidationEnable(ValidationEnabled &enable_data, const ValidationCheckEnables enable_id) {
     switch (enable_id) {
         case VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_ARM:
             enable_data[vendor_specific_arm] = true;
@@ -327,7 +328,7 @@ void SetValidationEnable(CHECK_ENABLED &enable_data, const ValidationCheckEnable
 }
 
 // Set the local enable flag for a single VK_VALIDATION_FEATURE_ENABLE_* flag
-void SetValidationFeatureEnable(CHECK_ENABLED &enable_data, const VkValidationFeatureEnableEXT feature_enable) {
+void SetValidationFeatureEnable(ValidationEnabled &enable_data, const VkValidationFeatureEnableEXT feature_enable) {
     switch (feature_enable) {
         case VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT:
             enable_data[gpu_validation] = true;
@@ -350,7 +351,7 @@ void SetValidationFeatureEnable(CHECK_ENABLED &enable_data, const VkValidationFe
 }
 
 // Set the local disable flag for settings specified through the VK_EXT_validation_flags extension
-void SetValidationFlags(CHECK_DISABLED &disables, const VkValidationFlagsEXT *val_flags_struct) {
+void SetValidationFlags(ValidationDisabled &disables, const VkValidationFlagsEXT *val_flags_struct) {
     for (uint32_t i = 0; i < val_flags_struct->disabledValidationCheckCount; ++i) {
         switch (val_flags_struct->pDisabledValidationChecks[i]) {
             case VK_VALIDATION_CHECK_SHADERS_EXT:
@@ -367,7 +368,7 @@ void SetValidationFlags(CHECK_DISABLED &disables, const VkValidationFlagsEXT *va
 }
 
 // Process Validation Features flags specified through the ValidationFeature extension
-void SetValidationFeatures(CHECK_DISABLED &disable_data, CHECK_ENABLED &enable_data,
+void SetValidationFeatures(ValidationDisabled &disable_data, ValidationEnabled &enable_data,
                            const VkValidationFeaturesEXT *val_features_struct) {
     for (uint32_t i = 0; i < val_features_struct->disabledValidationFeatureCount; ++i) {
         SetValidationFeatureDisable(disable_data, val_features_struct->pDisabledValidationFeatures[i]);
@@ -399,7 +400,7 @@ std::string GetNextToken(std::string *token_list, const std::string &delimiter, 
 }
 
 // Given a string representation of a list of enable enum values, call the appropriate setter function
-void SetLocalEnableSetting(std::string list_of_enables, const std::string &delimiter, CHECK_ENABLED &enables) {
+void SetLocalEnableSetting(std::string list_of_enables, const std::string &delimiter, ValidationEnabled &enables) {
     size_t pos = 0;
     std::string token;
     while (list_of_enables.length() != 0) {
@@ -419,7 +420,7 @@ void SetLocalEnableSetting(std::string list_of_enables, const std::string &delim
 }
 
 // Given a string representation of a list of disable enum values, call the appropriate setter function
-void SetLocalDisableSetting(std::string list_of_disables, const std::string &delimiter, CHECK_DISABLED &disables) {
+void SetLocalDisableSetting(std::string list_of_disables, const std::string &delimiter, ValidationDisabled &disables) {
     size_t pos = 0;
     std::string token;
     while (list_of_disables.length() != 0) {
@@ -588,15 +589,17 @@ static void ValidateLayerSettingsProvided(const VkLayerSettingsCreateInfoEXT *la
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(DEPRECATED_VK_LAYER_VALIDATE_GPU_BASED, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
+        } else if (strcmp(VK_LAYER_GPUAV_SAFE_MODE, setting.pSettingName) == 0) {
+            required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_GPUAV_SHADER_INSTRUMENTATION, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_GPUAV_DESCRIPTOR_CHECKS, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
-        } else if (strcmp(VK_LAYER_GPUAV_WARN_ON_ROBUST_OOB, setting.pSettingName) == 0) {
+        } else if (strcmp(VK_LAYER_GPUAV_FORCE_ON_ROBUSTNESS, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_GPUAV_BUFFER_ADDRESS_OOB, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
-        } else if (strcmp(VK_LAYER_GPUAV_MAX_BUFFER_DEVICE_ADDRESSES, setting.pSettingName) == 0) {
+        } else if (strcmp(DEPRECATED_VK_LAYER_GPUAV_MAX_BUFFER_DEVICE_ADDRESSES, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_UINT32_EXT;
         } else if (strcmp(VK_LAYER_GPUAV_VALIDATE_RAY_QUERY, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
@@ -604,6 +607,8 @@ static void ValidateLayerSettingsProvided(const VkLayerSettingsCreateInfoEXT *la
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_GPUAV_SELECT_INSTRUMENTED_SHADERS, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
+        } else if (strcmp(VK_LAYER_GPUAV_SHADERS_TO_INSTRUMENT, setting.pSettingName) == 0) {
+            required_type = VK_LAYER_SETTING_TYPE_STRING_EXT;
         } else if (strcmp(VK_LAYER_GPUAV_BUFFERS_VALIDATION, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_GPUAV_INDIRECT_DRAWS_BUFFERS, setting.pSettingName) == 0) {
@@ -616,19 +621,15 @@ static void ValidateLayerSettingsProvided(const VkLayerSettingsCreateInfoEXT *la
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_GPUAV_INDEX_BUFFERS, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
-        } else if (strcmp(VK_LAYER_GPUAV_IMAGE_LAYOUT, setting.pSettingName) == 0) {
+        } else if (strcmp(DEPRECATED_VK_LAYER_GPUAV_RESERVE_BINDING_SLOT, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
-        } else if (strcmp(VK_LAYER_GPUAV_RESERVE_BINDING_SLOT, setting.pSettingName) == 0) {
-            required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
-        } else if (strcmp(VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT, setting.pSettingName) == 0) {
+        } else if (strcmp(DEPRECATED_VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_SYNCVAL_SUBMIT_TIME_VALIDATION, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_SYNCVAL_SHADER_ACCESSES_HEURISTIC, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES, setting.pSettingName) == 0) {
-            required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
-        } else if (strcmp(VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES_PRETTY_PRINT, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(VK_LAYER_MESSAGE_FORMAT_JSON, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
@@ -651,8 +652,6 @@ static void ValidateLayerSettingsProvided(const VkLayerSettingsCreateInfoEXT *la
         } else if (strcmp(DEPRECATED_VK_LAYER_RESERVE_BINDING_SLOT, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(DEPRECATED_GPUAV_VMA_LINEAR_OUTPUT, setting.pSettingName) == 0) {
-            required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
-        } else if (strcmp(DEPRECATED_GPUAV_WARN_ON_ROBUST_OOB, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
         } else if (strcmp(DEPRECATED_GPUAV_SELECT_INSTRUMENTED_SHADERS, setting.pSettingName) == 0) {
             required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
@@ -680,7 +679,7 @@ static void ValidateLayerSettingsProvided(const VkLayerSettingsCreateInfoEXT *la
     }
 }
 
-static void SetValidationSetting(VkuLayerSettingSet layer_setting_set, CHECK_DISABLED &disable_data,
+static void SetValidationSetting(VkuLayerSettingSet layer_setting_set, ValidationDisabled &disable_data,
                                  const DisableFlags feature_disable, const char *setting) {
     if (vkuHasLayerSetting(layer_setting_set, setting)) {
         bool enabled = true;
@@ -689,8 +688,8 @@ static void SetValidationSetting(VkuLayerSettingSet layer_setting_set, CHECK_DIS
     }
 }
 
-static void SetValidationSetting(VkuLayerSettingSet layer_setting_set, CHECK_ENABLED &enable_data, const EnableFlags feature_enable,
-                                 const char *setting) {
+static void SetValidationSetting(VkuLayerSettingSet layer_setting_set, ValidationEnabled &enable_data,
+                                 const EnableFlags feature_enable, const char *setting) {
     if (vkuHasLayerSetting(layer_setting_set, setting)) {
         bool enabled = true;
         vkuGetLayerSettingValue(layer_setting_set, setting, enabled);
@@ -782,11 +781,6 @@ static void ProcessDebugReportSettings(ConfigAndEnvSettings *settings_data, VkuL
     }
     const bool is_stdout = log_filename.compare("stdout") == 0;
 
-    // Debug mode to simplify comparison of error messages between application runs
-    if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_DEBUG_STABLE_MESSAGES)) {
-        vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_DEBUG_STABLE_MESSAGES, debug_report->debug_stable_messages);
-    }
-
     // Default
     std::vector<std::string> debug_actions_list = {"VK_DBG_LAYER_ACTION_DEFAULT", "VK_DBG_LAYER_ACTION_LOG_MSG"};
 #ifdef WIN32
@@ -872,14 +866,6 @@ static void ProcessDebugReportSettings(ConfigAndEnvSettings *settings_data, VkuL
                 "DebugPrintf logs to the Information message severity, enabling Information level logging otherwise the message "
                 "will not be seen.");
             report_flags |= kInformationBit;
-        }
-        // If any non-stdout DebugPrintf is being used, just turn off duplicate_message_limit, it will prevent people thinking
-        // DebugPrintf is broken because nothing is printing.
-        if (!settings_data->gpuav_settings->debug_printf_to_stdout && debug_report->duplicate_message_limit != 0) {
-            debug_report->duplicate_message_limit = 0;
-            setting_warnings.emplace_back("DebugPrintf logs can possibly print many times, but duplicate_message_limit is set to " +
-                                          std::to_string(debug_report->duplicate_message_limit) +
-                                          ", setting enable_message_limit to false so all logs are printed.");
         }
     }
 
@@ -1036,6 +1022,10 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
     }
 
     GpuAVSettings &gpuav_settings = *settings_data->gpuav_settings;
+    if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_SAFE_MODE)) {
+        vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_GPUAV_SAFE_MODE, gpuav_settings.safe_mode);
+    }
+
     bool shader_instrumentation_enabled = true;
     if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_SHADER_INSTRUMENTATION)) {
         vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_GPUAV_SHADER_INSTRUMENTATION, shader_instrumentation_enabled);
@@ -1058,27 +1048,9 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
                                     gpuav_settings.shader_instrumentation.vertex_attribute_fetch_oob);
         }
 
-        if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_WARN_ON_ROBUST_OOB)) {
-            vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_GPUAV_WARN_ON_ROBUST_OOB, gpuav_settings.warn_on_robust_oob);
-        } else if (vkuHasLayerSetting(layer_setting_set, DEPRECATED_GPUAV_WARN_ON_ROBUST_OOB)) {
-            vkuGetLayerSettingValue(layer_setting_set, DEPRECATED_GPUAV_WARN_ON_ROBUST_OOB, gpuav_settings.warn_on_robust_oob);
-            setting_warnings.emplace_back("Deprecated " + std::string(DEPRECATED_GPUAV_WARN_ON_ROBUST_OOB) +
-                                          " setting was set, use " + std::string(VK_LAYER_GPUAV_WARN_ON_ROBUST_OOB) + " instead.");
-        }
-
         if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_BUFFER_ADDRESS_OOB)) {
             vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_GPUAV_BUFFER_ADDRESS_OOB,
                                     gpuav_settings.shader_instrumentation.buffer_device_address);
-        }
-        if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_MAX_BUFFER_DEVICE_ADDRESSES)) {
-            const uint32_t default_max_bda_in_use = gpuav_settings.max_bda_in_use;
-            vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_GPUAV_MAX_BUFFER_DEVICE_ADDRESSES, gpuav_settings.max_bda_in_use);
-            if (gpuav_settings.max_bda_in_use == 0) {
-                gpuav_settings.max_bda_in_use = default_max_bda_in_use;
-                setting_warnings.emplace_back(std::string(VK_LAYER_GPUAV_MAX_BUFFER_DEVICE_ADDRESSES) +
-                                              " was set to zero, which is invalid, setting to the default of " +
-                                              std::to_string(default_max_bda_in_use));
-            }
         }
 
         if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_VALIDATE_RAY_QUERY)) {
@@ -1095,6 +1067,13 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
             setting_warnings.emplace_back("Deprecated " + std::string(DEPRECATED_GPUAV_SELECT_INSTRUMENTED_SHADERS) +
                                           " setting was set, use " + std::string(VK_LAYER_GPUAV_SELECT_INSTRUMENTED_SHADERS) +
                                           " instead.");
+        }
+        if (gpuav_settings.select_instrumented_shaders) {
+            std::vector<std::string> shaders_to_instrument;
+            if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_SHADERS_TO_INSTRUMENT)) {
+                vkuGetLayerSettingValues(layer_setting_set, VK_LAYER_GPUAV_SHADERS_TO_INSTRUMENT, shaders_to_instrument);
+            }
+            gpuav_settings.SetShaderSelectionRegexes(std::move(shaders_to_instrument));
         }
 
         // No need to enable shader instrumentation options is no instrumentation is done
@@ -1135,26 +1114,40 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
         }
     }
 
-    if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_IMAGE_LAYOUT)) {
-        vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_GPUAV_IMAGE_LAYOUT, gpuav_settings.validate_image_layout);
+    if (vkuHasLayerSetting(layer_setting_set, REMOVED_GPUAV_IMAGE_LAYOUT)) {
+        setting_warnings.emplace_back("Deprecated " + std::string(REMOVED_GPUAV_IMAGE_LAYOUT) + " setting was removed.");
     }
 
-    if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_RESERVE_BINDING_SLOT)) {
+    if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_FORCE_ON_ROBUSTNESS)) {
+        vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_GPUAV_FORCE_ON_ROBUSTNESS, gpuav_settings.force_on_robustness);
+    }
+
+    if (vkuHasLayerSetting(layer_setting_set, DEPRECATED_VK_LAYER_GPUAV_RESERVE_BINDING_SLOT)) {
         SetValidationSetting(layer_setting_set, settings_data->enables, gpu_validation_reserve_binding_slot,
-                             VK_LAYER_GPUAV_RESERVE_BINDING_SLOT);
+                             DEPRECATED_VK_LAYER_GPUAV_RESERVE_BINDING_SLOT);
+        setting_warnings.emplace_back("Deprecated " + std::string(DEPRECATED_VK_LAYER_GPUAV_RESERVE_BINDING_SLOT) +
+                                      " setting was set, this setting will be remove after the July 2025 SDK is published.");
     } else if (vkuHasLayerSetting(layer_setting_set, DEPRECATED_VK_LAYER_RESERVE_BINDING_SLOT)) {
         SetValidationSetting(layer_setting_set, settings_data->enables, gpu_validation_reserve_binding_slot,
                              DEPRECATED_VK_LAYER_RESERVE_BINDING_SLOT);
         setting_warnings.emplace_back("Deprecated " + std::string(DEPRECATED_VK_LAYER_RESERVE_BINDING_SLOT) +
-                                      " setting was set, use " + std::string(VK_LAYER_GPUAV_RESERVE_BINDING_SLOT) + " instead.");
+                                      " setting was set, this setting will be remove after the July 2025 SDK is published.");
     }
 
-    if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT)) {
-        vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT, gpuav_settings.vma_linear_output);
-    } else if (vkuHasLayerSetting(layer_setting_set, DEPRECATED_GPUAV_VMA_LINEAR_OUTPUT)) {
+    if (vkuHasLayerSetting(layer_setting_set, DEPRECATED_VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT)) {
+        vkuGetLayerSettingValue(layer_setting_set, DEPRECATED_VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT, gpuav_settings.vma_linear_output);
+        setting_warnings.emplace_back("Deprecated " + std::string(DEPRECATED_VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT) +
+                                      " setting was set, this setting will be remove after the July 2025 SDK is published.");
+    }
+    if (vkuHasLayerSetting(layer_setting_set, DEPRECATED_GPUAV_VMA_LINEAR_OUTPUT)) {
         vkuGetLayerSettingValue(layer_setting_set, DEPRECATED_GPUAV_VMA_LINEAR_OUTPUT, gpuav_settings.vma_linear_output);
-        setting_warnings.emplace_back("Deprecated " + std::string(DEPRECATED_GPUAV_VMA_LINEAR_OUTPUT) + " setting was set, use " +
-                                      std::string(VK_LAYER_GPUAV_VMA_LINEAR_OUTPUT) + " instead.");
+        setting_warnings.emplace_back("Deprecated " + std::string(DEPRECATED_GPUAV_VMA_LINEAR_OUTPUT) +
+                                      " setting was set, this setting will be remove after the July 2025 SDK is published.");
+    }
+    if (vkuHasLayerSetting(layer_setting_set, DEPRECATED_VK_LAYER_GPUAV_MAX_BUFFER_DEVICE_ADDRESSES)) {
+        setting_warnings.emplace_back("Deprecated " + std::string(DEPRECATED_VK_LAYER_GPUAV_MAX_BUFFER_DEVICE_ADDRESSES) +
+                                      " setting was set, but is has been deprecated and has no effect. It will be removed after "
+                                      "the July 2025 SDK is published.");
     }
 
     if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_GPUAV_DEBUG_VALIDATE_INSTRUMENTED_SHADERS)) {
@@ -1230,9 +1223,11 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
                                 syncval_settings.message_extra_properties);
     }
 
-    if (vkuHasLayerSetting(layer_setting_set, VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES_PRETTY_PRINT)) {
-        vkuGetLayerSettingValue(layer_setting_set, VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES_PRETTY_PRINT,
-                                syncval_settings.message_extra_properties_pretty_print);
+    const char *REMOVED_VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES_PRETTY_PRINT = "syncval_message_extra_properties_pretty_print";
+    if (vkuHasLayerSetting(layer_setting_set, REMOVED_VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES_PRETTY_PRINT)) {
+        setting_warnings.emplace_back(std::string(REMOVED_VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES_PRETTY_PRINT) +
+                                      " was removed. The main purpose of the extra properties section is to filter syncval error "
+                                      "messages. The priority is to have a fixed and easy-to-parse layout.");
     }
 
     const auto *validation_features_ext = vku::FindStructInPNextChain<VkValidationFeaturesEXT>(settings_data->create_info);
@@ -1295,9 +1290,6 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
     // In this case, we want to emulate supporting only for DebugPrintf with GPU-AV disabled
     if (settings_data->enables[debug_printf_validation]) {
         gpuav_settings.debug_printf_enabled = true;
-        if (!settings_data->enables[gpu_validation]) {
-            gpuav_settings.SetOnlyDebugPrintf();
-        }
     } else if (gpuav_settings.debug_printf_enabled) {
         // enabled the new way, but chassis uses this to create Validation Object
         settings_data->enables[debug_printf_validation] = true;
@@ -1338,6 +1330,11 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
             // enabled the new way, but chassis uses this to create Validation Object
             settings_data->enables[gpu_validation] = true;
         }
+    }
+
+    // After checking the various ways to enable both DebugPrintf and GPU-AV, disable non-DebugPrintf portion if not used
+    if (settings_data->enables[debug_printf_validation] && !settings_data->enables[gpu_validation]) {
+        gpuav_settings.SetOnlyDebugPrintf();
     }
 
     // if app is setting VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT, we can use this to disable it for debugging

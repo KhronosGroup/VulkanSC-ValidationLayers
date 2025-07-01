@@ -132,7 +132,7 @@ TEST_F(NegativePortabilitySubset, ImageViewFormatSwizzle) {
 
     VkImageViewCreateInfo ci = vku::InitStructHelper();
     ci.flags = 0;
-    ci.image = image.handle();
+    ci.image = image;
     ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     // Incorrect swizzling due to portability
@@ -179,7 +179,7 @@ TEST_F(NegativePortabilitySubset, ImageViewFormatReinterpretationComponentCount)
 
     VkImageViewCreateInfo ci = vku::InitStructHelper();
     ci.flags = 0;
-    ci.image = image.handle();
+    ci.image = image;
     ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     ci.format = VK_FORMAT_B10G11R11_UFLOAT_PACK32;
     // Incorrect swizzling due to portability
@@ -224,7 +224,6 @@ TEST_F(NegativePortabilitySubset, TriangleFans) {
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(Gpu());
     m_depthStencil->Init(*m_device, m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    m_depthStencil->SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     InitRenderTarget(&depth_image_view.handle());
 
@@ -257,7 +256,6 @@ TEST_F(NegativePortabilitySubset, VertexInputStride) {
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(Gpu());
     m_depthStencil->Init(*m_device, m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    m_depthStencil->SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     InitRenderTarget(&depth_image_view.handle());
 
@@ -291,7 +289,6 @@ TEST_F(NegativePortabilitySubset, VertexAttributes) {
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(Gpu());
     m_depthStencil->Init(*m_device, m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    m_depthStencil->SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     InitRenderTarget(&depth_image_view.handle());
 
@@ -372,7 +369,6 @@ TEST_F(NegativePortabilitySubset, DepthStencilState) {
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(Gpu());
     m_depthStencil->Init(*m_device, m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    m_depthStencil->SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     InitRenderTarget(&depth_image_view.handle());
 
@@ -450,8 +446,7 @@ TEST_F(VkPortabilitySubsetTest, UpdateDescriptorSets) {
     vkt::Sampler sampler(*m_device, sampler_info);
 
     constexpr VkFormat img_format = VK_FORMAT_R8G8B8A8_UNORM;
-    vkt::Image image(*m_device, 32, 32, 1, img_format, VK_IMAGE_USAGE_SAMPLED_BIT);
-    image.Layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkt::Image image(*m_device, 32, 32, img_format, VK_IMAGE_USAGE_SAMPLED_BIT);
     OneOffDescriptorSet descriptor_set(m_device,
                                        {
                                            {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -461,8 +456,8 @@ TEST_F(VkPortabilitySubsetTest, UpdateDescriptorSets) {
     vkt::ImageView view(*m_device, image_view_create_info);
 
     VkDescriptorImageInfo img_info = {};
-    img_info.sampler = sampler.handle();
-    img_info.imageView = view.handle();
+    img_info.sampler = sampler;
+    img_info.imageView = view;
     img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkWriteDescriptorSet descriptor_writes[2] = {};
@@ -594,13 +589,13 @@ TEST_F(VkPortabilitySubsetTest, PortabilitySubsetColorBlendFactor) {
     m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkColorBlendEquationEXT-constantAlphaColorBlendFactors-07362");
-    vk::CmdSetColorBlendEquationEXT(m_command_buffer.handle(), 0u, 1u, &color_blend_equation);
+    vk::CmdSetColorBlendEquationEXT(m_command_buffer, 0u, 1u, &color_blend_equation);
     m_errorMonitor->VerifyFound();
 
     color_blend_equation.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
     color_blend_equation.dstColorBlendFactor = VK_BLEND_FACTOR_CONSTANT_ALPHA;
     m_errorMonitor->SetDesiredError("VUID-VkColorBlendEquationEXT-constantAlphaColorBlendFactors-07363");
-    vk::CmdSetColorBlendEquationEXT(m_command_buffer.handle(), 0u, 1u, &color_blend_equation);
+    vk::CmdSetColorBlendEquationEXT(m_command_buffer, 0u, 1u, &color_blend_equation);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();

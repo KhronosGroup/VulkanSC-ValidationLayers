@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (C) 2015-2024 Google Inc.
+/* Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (C) 2015-2025 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +18,13 @@
  */
 #include "state_tracker/queue_state.h"
 #include "state_tracker/cmd_buffer_state.h"
+#include "state_tracker/state_tracker.h"
+#include "state_tracker/image_state.h"
+#include "state_tracker/wsi_state.h"
+#include "containers/small_vector.h"
+#include "containers/small_container.h"
+
+#include "profiling/profiling.h"
 
 void vvl::QueueSubmission::BeginUse() {
     for (SemaphoreInfo &wait : wait_semaphores) {
@@ -51,23 +58,27 @@ void vvl::QueueSubmission::EndUse() {
 
 vvl::PreSubmitResult vvl::Queue::PreSubmit(std::vector<vvl::QueueSubmission> &&submissions) {
     if (!submissions.empty()) {
-        submissions.back().end_batch = true;
+        submissions.back().is_last_submission = true;
+    }
+    for (auto &item : sub_states_) {
+        item.second->PreSubmit(submissions);
     }
     PreSubmitResult result;
     for (QueueSubmission &submission : submissions) {
         for (CommandBufferSubmission &cb_submission : submission.cb_submissions) {
             auto cb_guard = cb_submission.cb->WriteLock();
-            for (CommandBuffer *secondary_cmd_buffer : cb_submission.cb->linkedCommandBuffers) {
+            for (CommandBuffer *secondary_cmd_buffer : cb_submission.cb->linked_command_buffers) {
                 auto secondary_guard = secondary_cmd_buffer->WriteLock();
-                secondary_cmd_buffer->IncrementResources();
+                secondary_cmd_buffer->submit_count++;
             }
-            cb_submission.cb->IncrementResources();
-            cb_submission.cb->Submit(VkHandle(), submission.perf_submit_pass, submission.loc.Get());
+            cb_submission.cb->submit_count++;
+            cb_submission.cb->Submit(*this, submission.perf_submit_pass, submission.loc.Get());
         }
         // seq_ is atomic so we don't need a lock until updating the deque below.
         // Note that this relies on the external synchonization requirements for the
         // VkQueue
         submission.seq = ++seq_;
+        result.submission_seq = submission.seq;
         submission.BeginUse();
         for (SemaphoreInfo &wait : submission.wait_semaphores) {
             wait.semaphore->EnqueueWait(SubmissionReference(this, submission.seq), wait.payload);
@@ -80,8 +91,7 @@ vvl::PreSubmitResult vvl::Queue::PreSubmit(std::vector<vvl::QueueSubmission> &&s
 
         if (submission.fence) {
             if (submission.fence->EnqueueSignal(this, submission.seq)) {
-                result.has_external_fence = true;
-                result.submission_with_external_fence_seq = submission.seq;
+                submission.has_external_fence = true;
             }
         }
         {
@@ -171,11 +181,63 @@ std::optional<vvl::SemaphoreInfo> vvl::Queue::FindTimelineWaitWithoutResolvingSi
     }
     // Step 2. Query each timeline wait (read-locks Semaphore)
     for (const SemaphoreInfo &wait_info : timeline_waits) {
+        if (wait_info.semaphore->Scope() != vvl::Semaphore::kInternal) {
+            // For external semaphore we can't track the signal. The conservative assumption
+            // for false positive free validation is that the signal is available, so skip
+            // this semaphore.
+            continue;
+        }
         if (!wait_info.semaphore->HasResolvingTimelineSignal(wait_info.payload)) {
             return wait_info;
         }
     }
     return {};
+}
+
+// The submissions on present-only queue can be retired without explicit fence/semaphore sync.
+// For example, application's main loop uses AcquireNextImage and also waits on the frame fence
+// to sync with the main app queue (different than a present one). This ensures completion of
+// previous presentations even we do not submit any sync primitives on the present-only queue.
+//
+// VVL needs helps to retire submsissions in such scenarios because by default it expects host
+// sync command (such as WaitForFences) to have guarantee that submission has been completed.
+//
+// This implementation assumes that if error-free program has more active present requests than
+// swapchain images, then at least the oldest present request was completed and corresponding
+// image was re-acquired (and it got pushed to the present queue again).
+void vvl::Queue::UpdatePresentOnlyQueueProgress(const DeviceState &device_state) {
+    uint64_t seq_to_advance_to = 0;
+    {
+        auto guard = Lock();
+        assert(is_used_for_presentation && !is_used_for_regular_submits);
+        small_unordered_map<VkSwapchainKHR, uint32_t, 4> active_presentations;
+        for (const QueueSubmission &submission : submissions_) {
+            assert(submission.swapchain != VK_NULL_HANDLE);
+            active_presentations[submission.swapchain]++;
+        }
+        // Search for the swapchain with too many enqueued presentation requests
+        VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+        for (const auto &[handle, count] : active_presentations) {
+            if (auto swapchain_state = device_state.Get<Swapchain>(handle)) {
+                if (count > swapchain_state->images.size()) {
+                    swapchain = handle;
+                    break;
+                }
+            }
+        }
+        // Get seq to retire the oldest presentation submissions.
+        if (swapchain != VK_NULL_HANDLE) {
+            for (const QueueSubmission &submission : submissions_) {
+                if (submission.swapchain == swapchain) {
+                    seq_to_advance_to = submission.seq;
+                    break;
+                }
+            }
+        }
+    }
+    if (seq_to_advance_to) {
+        Notify(seq_to_advance_to);
+    }
 }
 
 void vvl::Queue::Destroy() {
@@ -190,6 +252,9 @@ void vvl::Queue::Destroy() {
         dead_thread->join();
         dead_thread.reset();
     }
+    for (auto &item : sub_states_) {
+        item.second->Destroy();
+    }
     StateObject::Destroy();
 }
 
@@ -197,6 +262,19 @@ void vvl::Queue::PostSubmit() {
     auto guard = Lock();
     if (!submissions_.empty()) {
         PostSubmit(submissions_.back());
+    }
+}
+
+void vvl::Queue::PostSubmit(QueueSubmission &submission) {
+    for (auto &item : sub_states_) {
+        item.second->PostSubmit(submissions_);
+    }
+
+    // If dealing with external fences, the app might call vkWaitForFences, but might not and we might not know when the queue
+    // submission is done. If we find adding a "big lock" here is slow for real cases, we could have something run in a background
+    // thread calling vkGetFenceStatus to check for us. (This would require a good thing to test against)
+    if (submission.has_external_fence) {
+        submission.fence->NotifyAndWait(submission.loc.Get());
     }
 }
 
@@ -238,6 +316,9 @@ void vvl::Queue::Retire(QueueSubmission &submission) {
         }
         return false;
     };
+    for (auto &item : sub_states_) {
+        item.second->Retire(submission);
+    }
     submission.EndUse();
     for (auto &wait : submission.wait_semaphores) {
         wait.semaphore->RetireWait(this, wait.payload, submission.loc.Get(), true);
@@ -245,7 +326,7 @@ void vvl::Queue::Retire(QueueSubmission &submission) {
     }
     for (CommandBufferSubmission &cb_submission : submission.cb_submissions) {
         auto cb_guard = cb_submission.cb->WriteLock();
-        for (CommandBuffer *secondary_cmd_buffer : cb_submission.cb->linkedCommandBuffers) {
+        for (CommandBuffer *secondary_cmd_buffer : cb_submission.cb->linked_command_buffers) {
             auto secondary_guard = secondary_cmd_buffer->WriteLock();
             secondary_cmd_buffer->Retire(submission.perf_submit_pass, is_query_updated_after);
         }
@@ -260,6 +341,8 @@ void vvl::Queue::Retire(QueueSubmission &submission) {
 }
 
 void vvl::Queue::ThreadFunc() {
+    VVL_TracySetThreadName(__FUNCTION__);
+
     QueueSubmission *submission = nullptr;
 
     // Roll this queue forward, one submission at a time.

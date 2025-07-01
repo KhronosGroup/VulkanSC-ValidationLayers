@@ -10,8 +10,9 @@
  */
 
 #include "ray_tracing_objects.h"
+#include "containers/container_utils.h"
 
-#include "utils/vk_layer_utils.h"
+#include "utils/math_utils.h"
 
 // #define VVL_DEBUG_LOG_SBT
 #ifdef VVL_DEBUG_LOG_SBT
@@ -1289,8 +1290,8 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostBottomLevel(const vkt::Device 
 }
 
 vkt::as::BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceTopLevel(const vkt::Device &device,
-                                                                      std::shared_ptr<BuildGeometryInfoKHR> on_device_blas) {
-    assert(on_device_blas->GetDstAS()->IsBuilt());
+                                                                      const vkt::as::AccelerationStructureKHR &on_device_blas) {
+    assert(on_device_blas.IsBuilt());
 
     BuildGeometryInfoKHR out_build_info(&device);
 
@@ -1300,7 +1301,7 @@ vkt::as::BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceTopLevel(const vkt:
 
     // Set geometry to one instance pointing to bottom level acceleration structure
     std::vector<GeometryKHR> geometries;
-    geometries.emplace_back(GeometrySimpleDeviceInstance(device, on_device_blas->GetDstAS()->handle()));
+    geometries.emplace_back(GeometrySimpleDeviceInstance(device, on_device_blas.handle()));
     out_build_info.SetGeometries(std::move(geometries));
     out_build_info.SetBuildRanges(out_build_info.GetBuildRangeInfosFromGeometries());
 
@@ -1354,9 +1355,8 @@ BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device &device, vkt::Queue
     // Create acceleration structure
     cmd_buffer.Begin();
     // Build Bottom Level Acceleration Structure
-    auto bot_level_accel_struct =
-        std::make_shared<vkt::as::BuildGeometryInfoKHR>(vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(device));
-    bot_level_accel_struct->BuildCmdBuffer(cmd_buffer);
+    vkt::as::BuildGeometryInfoKHR bot_level_accel_struct = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(device);
+    bot_level_accel_struct.BuildCmdBuffer(cmd_buffer);
     cmd_buffer.End();
 
     queue.Submit(cmd_buffer);
@@ -1365,7 +1365,7 @@ BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device &device, vkt::Queue
     cmd_buffer.Begin();
     // Build Top Level Acceleration Structure
     vkt::as::BuildGeometryInfoKHR top_level_accel_struct =
-        vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(device, bot_level_accel_struct);
+        vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(device, *bot_level_accel_struct.GetDstAS());
     top_level_accel_struct.BuildCmdBuffer(cmd_buffer);
     cmd_buffer.End();
 
@@ -1381,7 +1381,8 @@ BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device &device, vkt::Queue
 
 namespace rt {
 
-Pipeline::Pipeline(VkLayerTest &test, vkt::Device *device) : test_(test), device_(device) {}
+Pipeline::Pipeline(VkLayerTest &test, vkt::Device *device)
+    : test_(test), device_(device), pipeline_layout_ci_(vku::InitStructHelper()) {}
 
 Pipeline::~Pipeline() {
     if (deferred_op_ != VK_NULL_HANDLE) {
@@ -1411,6 +1412,11 @@ void Pipeline::AddBinding(VkDescriptorType descriptor_type, uint32_t binding, ui
 }
 
 void Pipeline::CreateDescriptorSet() { desc_set_ = std::make_unique<OneOffDescriptorSet>(device_, bindings_); }
+
+void Pipeline::SetPipelineSetLayouts(uint32_t set_layout_count, const VkDescriptorSetLayout *set_layouts) {
+    pipeline_layout_ci_.setLayoutCount = set_layout_count;
+    pipeline_layout_ci_.pSetLayouts = set_layouts;
+}
 
 void Pipeline::SetPushConstantRangeSize(uint32_t byte_size) { push_constant_range_size_ = byte_size; }
 
@@ -1466,16 +1472,15 @@ void Pipeline::BuildPipeline() {
 
     // Create pipeline layout
     if (!pipeline_layout_.initialized()) {
-        VkPipelineLayoutCreateInfo pipeline_layout_ci = vku::InitStructHelper();
         if (push_constant_range_size_ > 0) {
-            pipeline_layout_ci.pushConstantRangeCount = 1;
-            pipeline_layout_ci.pPushConstantRanges = &push_constant_range;
+            pipeline_layout_ci_.pushConstantRangeCount = 1;
+            pipeline_layout_ci_.pPushConstantRanges = &push_constant_range;
         }
         if (desc_set_) {
-            pipeline_layout_ci.setLayoutCount = 1;
-            pipeline_layout_ci.pSetLayouts = &desc_set_->layout_.handle();
+            pipeline_layout_ci_.setLayoutCount = 1;
+            pipeline_layout_ci_.pSetLayouts = &desc_set_->layout_.handle();
         }
-        pipeline_layout_.init(*device_, pipeline_layout_ci);
+        pipeline_layout_.init(*device_, pipeline_layout_ci_);
     }
 
     // Assemble shaders information (stages and groups)
@@ -1799,6 +1804,8 @@ void Pipeline::DeferBuild() {
         return;
     }
 }
+
+VkShaderObj &Pipeline::GetRayGenShader(uint32_t ray_gen_i) { return *ray_gen_shaders_[ray_gen_i]; }
 
 vkt::rt::TraceRaysSbt Pipeline::GetTraceRaysSbt(uint32_t ray_gen_shader_i /*= 0*/) {
     // As of now, no function support if not using any ray generation shader

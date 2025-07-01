@@ -47,7 +47,15 @@ class APISpecific:
                     'const VkExternalMemoryHandleTypeFlagsNV AllVkExternalMemoryHandleTypeFlagBitsNV = 0;\n',
                     'const VkVideoEncodeFeedbackFlagsKHR AllVkVideoEncodeFeedbackFlagBitsKHR = 0;\n',
                     'const VkIndirectCommandsInputModeFlagsEXT AllVkIndirectCommandsInputModeFlagBitsEXT = 0;\n',
-                    'const VkInstanceCreateFlags AllVkInstanceCreateFlagBits = 0;\n'
+                    'const VkInstanceCreateFlags AllVkInstanceCreateFlagBits = 0;\n',
+                    'const VkPipelineLayoutCreateFlags AllVkPipelineLayoutCreateFlagBits = 0;\n',
+                    'const VkMemoryMapFlags AllVkMemoryMapFlagBits = 0;\n',
+                    'const VkMemoryUnmapFlags AllVkMemoryUnmapFlagBits = 0;\n',
+                    'const VkQueryPoolCreateFlags AllVkQueryPoolCreateFlagBits = 0;\n',
+                    'const VkImageViewCreateFlags AllVkImageViewCreateFlagBits = 0;\n',
+                    'const VkSamplerCreateFlags AllVkSamplerCreateFlagBits = 0;\n',
+                    'const VkRenderPassCreateFlags AllVkRenderPassCreateFlagBits = 0;\n',
+                    'const VkSubpassDescriptionFlags AllVkSubpassDescriptionFlagBits = 0;\n',
                     # This one is special, because upstream code uses it to verify whether a GPL based pipeline
                     # has all subsections specified and zero has a special meaning indicating no use of GPL
                     'const VkGraphicsPipelineLibraryFlagsEXT AllVkGraphicsPipelineLibraryFlagBitsEXT = 0xF;\n',

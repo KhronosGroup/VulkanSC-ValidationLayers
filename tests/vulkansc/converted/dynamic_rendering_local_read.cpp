@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2021-2022 ARM, Inc. All rights reserved.
  *
@@ -91,7 +91,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdDrawColorLocation) {
     color_attachment[1].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -104,10 +104,10 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdDrawColorLocation) {
     VkRenderingAttachmentLocationInfo location_info = vku::InitStructHelper();
     location_info.colorAttachmentCount = 2;
     location_info.pColorAttachmentLocations = &locations[1];
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &location_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &location_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09548");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 }
 
@@ -146,7 +146,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdDrawColorIndex) {
     color_attachment[1].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -164,11 +164,11 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdDrawColorIndex) {
     input_info.colorAttachmentCount = 2;
     input_info.pColorAttachmentInputIndices = &inputs[1];
 
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &location_info);
-    vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer.handle(), &input_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &location_info);
+    vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer, &input_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09549");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 }
 
@@ -189,7 +189,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdClearAttachments) {
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {m_width, m_height}};
@@ -204,7 +204,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdClearAttachments) {
     location_info.colorAttachmentCount = 1;
     location_info.pColorAttachmentLocations = &location;
 
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &location_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &location_info);
 
     VkClearAttachment clear_attachment;
     clear_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -216,7 +216,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdClearAttachments) {
     VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdClearAttachments-colorAttachment-09503");
-    vk::CmdClearAttachments(m_command_buffer.handle(), 1, &clear_attachment, 1, &clear_rect);
+    vk::CmdClearAttachments(m_command_buffer, 1, &clear_attachment, 1, &clear_rect);
     m_errorMonitor->VerifyFound();
 }
 
@@ -232,14 +232,14 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrier) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
     m_command_buffer.Begin();
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT);
 
     VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     img_barrier.srcAccessMask = VK_ACCESS_NONE;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ;
     img_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    img_barrier.image = image.handle();
+    img_barrier.image = image;
     img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -253,19 +253,16 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrier) {
     auto img_barrier2 = ConvertVkImageMemoryBarrierToV2(img_barrier, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                                                         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    dependency_info.imageMemoryBarrierCount = 1;
-    dependency_info.pImageMemoryBarriers = img_barrier2.ptr();
-
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-dynamicRenderingLocalRead-09552");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier2-None-09554");
-    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier2-oldLayout-01181");
+    m_command_buffer.Barrier(*img_barrier2.ptr(), VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-dynamicRenderingLocalRead-09552");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-None-09554");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-oldLayout-01181");
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
                            &img_barrier);
     m_errorMonitor->VerifyFound();
@@ -277,7 +274,8 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrier) {
 
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-dynamicRenderingLocalRead-09551");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier2-None-09554");
-    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier2-oldLayout-01181");
+    m_command_buffer.Barrier(*img_barrier2.ptr(), VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -287,7 +285,8 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrier) {
 
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-dynamicRenderingLocalRead-09551");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-None-09554");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-oldLayout-01181");
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
                            &img_barrier);
     m_errorMonitor->VerifyFound();
@@ -311,14 +310,14 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierOwnership) {
 
     m_command_buffer.Begin();
 
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 
     VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     img_barrier.srcAccessMask = VK_ACCESS_NONE;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ;
     img_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    img_barrier.image = image.handle();
+    img_barrier.image = image;
     img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -332,21 +331,18 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierOwnership) {
     auto img_barrier2 = ConvertVkImageMemoryBarrierToV2(img_barrier, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                                                         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    dependency_info.imageMemoryBarrierCount = 1;
-    dependency_info.pImageMemoryBarriers = img_barrier2.ptr();
-
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-srcQueueFamilyIndex-09550");
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageMemoryBarrier2-dynamicRenderingLocalRead-09552");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier2-None-09554");
-    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier2-oldLayout-01181");
+    m_command_buffer.Barrier(*img_barrier2.ptr(), VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-srcQueueFamilyIndex-09550");
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageMemoryBarrier-dynamicRenderingLocalRead-09552");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-None-09554");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-oldLayout-01181");
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
                            &img_barrier);
     m_errorMonitor->VerifyFound();
@@ -368,14 +364,14 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierNoBufferOrImage) {
 
     m_command_buffer.Begin();
 
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT);
 
     VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     img_barrier.srcAccessMask = VK_ACCESS_NONE;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     img_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    img_barrier.image = image.handle();
+    img_barrier.image = image;
     img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -389,17 +385,14 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierNoBufferOrImage) {
     auto img_barrier2 = ConvertVkImageMemoryBarrierToV2(img_barrier, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                                                         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    dependency_info.imageMemoryBarrierCount = 1;
-    dependency_info.pImageMemoryBarriers = img_barrier2.ptr();
-
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-None-09554");
-    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier2-oldLayout-01181");
+    m_command_buffer.Barrier(*img_barrier2.ptr(), VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-09554");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-oldLayout-01181");
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
                            &img_barrier);
     m_errorMonitor->VerifyFound();
@@ -424,14 +417,9 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierFramebufferStagesOnly) {
     barrier2.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     barrier2.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    dependency_info.memoryBarrierCount = 1;
-    dependency_info.pMemoryBarriers = &barrier2;
-
     // testing vkCmdPipelineBarrier2 srcStageMask
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-09556");
-    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
+    m_command_buffer.Barrier(barrier2, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // testing vkCmdPipelineBarrier2 dstStageMask
@@ -439,7 +427,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierFramebufferStagesOnly) {
     std::swap(barrier2.srcAccessMask, barrier2.dstAccessMask);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-09556");
-    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
+    m_command_buffer.Barrier(barrier2, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // testing vkCmdPipelineBarrier srcStageMask
@@ -448,17 +436,16 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierFramebufferStagesOnly) {
     barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-09556");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, nullptr, 0,
-                           nullptr);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, nullptr, 0, nullptr);
     m_errorMonitor->VerifyFound();
 
     // testing vkCmdPipelineBarrier dstStageMask
     std::swap(barrier.srcAccessMask, barrier.dstAccessMask);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-09556");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, nullptr, 0, nullptr);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, nullptr, 0, nullptr);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRendering();
@@ -483,12 +470,8 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierRequireFeature) {
     barrier2.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     barrier2.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    dependency_info.memoryBarrierCount = 1;
-    dependency_info.pMemoryBarriers = &barrier2;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-None-09553");
-    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
+    m_command_buffer.Barrier(barrier2, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     VkMemoryBarrier barrier = vku::InitStructHelper();
@@ -496,7 +479,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierRequireFeature) {
     barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-09553");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, nullptr, 0,
                            nullptr);
     m_errorMonitor->VerifyFound();
@@ -505,65 +488,321 @@ TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierRequireFeature) {
     m_command_buffer.End();
 }
 
+TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierLayoutMismatch) {
+    TEST_DESCRIPTION("Image barrier's layout does not match expected attachment layout");
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {32, 32}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkImageMemoryBarrier local_read_barrier = vku::InitStructHelper();
+    local_read_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+    // Different layout then in VkRenderingAttachmentInfo (GENERAL)
+    local_read_barrier.oldLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ;
+    local_read_barrier.newLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ;
+    local_read_barrier.image = image;
+    local_read_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-oldLayout-10759");
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &local_read_barrier);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierInProperLayout) {
-    TEST_DESCRIPTION(
-        "Barrier within a render pass instance started with vkCmdBeginRendering, then the image must be in the "
-        "VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ or VK_IMAGE_LAYOUT_GENERAL layout");
+    TEST_DESCRIPTION("Barrier within a render pass instance started with vkCmdBeginRendering");
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    vkt::Image image(*m_device, 256, 256, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {256, 256}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkImageMemoryBarrier local_read_barrier = vku::InitStructHelper();
+    local_read_barrier.srcAccessMask = VK_ACCESS_NONE;
+    local_read_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    local_read_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    local_read_barrier.image = image;
+    local_read_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
+                           &local_read_barrier);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    image.SetLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-image-09555");
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierInProperLayout2) {
+    TEST_DESCRIPTION("Barrier within a render pass instance started with vkCmdBeginRendering");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredFeature(vkt::Feature::synchronization2);
     RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
-    InitRenderTarget();
+
+    vkt::Image image(*m_device, 256, 256, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {256, 256}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkImageMemoryBarrier2 local_read_barrier = vku::InitStructHelper();
+    local_read_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    local_read_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    local_read_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.image = image;
+    local_read_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    m_command_buffer.Barrier(local_read_barrier, VK_DEPENDENCY_BY_REGION_BIT);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    image.SetLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-image-09555");
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierInProperLayoutLateTransition) {
+    TEST_DESCRIPTION("Barrier within a render pass instance started with vkCmdBeginRendering");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    vkt::Image image(*m_device, 256, 256, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {256, 256}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkImageMemoryBarrier2 local_read_barrier = vku::InitStructHelper();
+    local_read_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    local_read_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    local_read_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.image = image;
+    local_read_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    layout_transition.image = image;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    m_command_buffer.Barrier(local_read_barrier, VK_DEPENDENCY_BY_REGION_BIT);
+    m_command_buffer.EndRendering();
+
+    // Transition to allowed layout (VK_IMAGE_LAYOUT_GENERAL) but do this too late.
+    // This checks that state tracking is not confused by the final image layout which
+    // was set after rendering ended and not before.
+    m_command_buffer.Barrier(layout_transition);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-image-09555");
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierInProperLayoutDepthImage) {
+    TEST_DESCRIPTION("Barrier within a render pass instance started with vkCmdBeginRendering");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
+
+    vkt::Image image(*m_device, 256, 256, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    VkRenderingAttachmentInfo depth_attachment = vku::InitStructHelper();
+    depth_attachment.imageView = image_view;
+    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {256, 256}};
+    rendering_info.layerCount = 1;
+    rendering_info.pDepthAttachment = &depth_attachment;
+
+    VkImageMemoryBarrier2 local_read_barrier = vku::InitStructHelper();
+    local_read_barrier.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT_KHR;
+    local_read_barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.dstStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT_KHR;
+    local_read_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.image = image;
+    local_read_barrier.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    m_command_buffer.Barrier(local_read_barrier, VK_DEPENDENCY_BY_REGION_BIT);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    image.SetLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-image-09555");
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRenderingLocalRead, ImageBarrierInProperLayoutMultipleSubresources) {
+    TEST_DESCRIPTION("Barrier within a render pass instance started with vkCmdBeginRendering");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    const auto image_ci =
+        vkt::Image::ImageCreateInfo2D(256, 256, 2, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, image_ci);
+    // Create view for mip 0
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1);
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {256, 256}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    layout_transition.image = image;
+    // Select mip 1 for layout transition
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 1, 1, 0, 1};
+
+    VkImageMemoryBarrier2 local_read_barrier = vku::InitStructHelper();
+    local_read_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    local_read_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    local_read_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.image = image;
+    local_read_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    // Set VK_IMAGE_LAYOUT_GENERAL for mip 1
+    m_command_buffer.Barrier(layout_transition);
+    m_command_buffer.BeginRendering(rendering_info);
+    // mip 0 still has undefined layout
+    m_command_buffer.Barrier(local_read_barrier, VK_DEPENDENCY_BY_REGION_BIT);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-image-09555");
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRenderingLocalRead, PipelineBarrierWrongAttachmentLayout) {
+    TEST_DESCRIPTION("Using image barrier inside dynamic render pass instance with invalid attachment layout");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    layout_transition.image = image;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {32, 32}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkImageMemoryBarrier2 local_read_barrier = vku::InitStructHelper();
+    local_read_barrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    local_read_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    local_read_barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    local_read_barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+    local_read_barrier.image = image;
+    local_read_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     m_command_buffer.Begin();
 
-    vkt::Image image(*m_device, m_width, m_height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    vkt::ImageView imageView = image.CreateView();
+    // Transition attachment to COLOR_ATTACHMENT_OPTIMAL layout
+    m_command_buffer.Barrier(layout_transition);
 
-    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
-    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment.imageView = imageView;
-
-    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
-    VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
-    begin_rendering_info.renderArea = clear_rect.rect;
-    begin_rendering_info.layerCount = 1;
-    begin_rendering_info.colorAttachmentCount = 1;
-    begin_rendering_info.pColorAttachments = &color_attachment;
-
-    VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
-    img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    img_barrier.srcAccessMask = VK_ACCESS_NONE;
-    img_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    img_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    img_barrier.image = image.handle();
-    img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    img_barrier.subresourceRange.baseArrayLayer = 0;
-    img_barrier.subresourceRange.baseMipLevel = 0;
-    img_barrier.subresourceRange.layerCount = 1;
-    img_barrier.subresourceRange.levelCount = 1;
-
-    m_command_buffer.BeginRendering(begin_rendering_info);
-
-    auto img_barrier2 = ConvertVkImageMemoryBarrierToV2(img_barrier, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                                        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
-
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    dependency_info.imageMemoryBarrierCount = 1;
-    dependency_info.pImageMemoryBarriers = img_barrier2.ptr();
-
+    m_command_buffer.BeginRendering(rendering_info);
+    // Wrong layout: should be GENERAL or LOCAL_READ
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-image-09555");
-    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
+    m_command_buffer.Barrier(local_read_barrier);
     m_errorMonitor->VerifyFound();
-
-    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-image-09555");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
-                           &img_barrier);
-    m_errorMonitor->VerifyFound();
-
     m_command_buffer.EndRendering();
     m_command_buffer.End();
 }
@@ -613,7 +852,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, BeginWithinRenderPass) {
 
         VkFormatProperties props;
 
-        vk::GetPhysicalDeviceFormatProperties(m_device->Physical().handle(), m_render_target_fmt, &props);
+        vk::GetPhysicalDeviceFormatProperties(m_device->Physical(), m_render_target_fmt, &props);
 
         if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) {
             img->Init(*m_device, m_width, m_height, 1, m_render_target_fmt,
@@ -646,7 +885,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, BeginWithinRenderPass) {
         vk::CreateRenderPass(device(), &rp_info, NULL, &m_renderPass);
 
         framebuffer = std::shared_ptr<vkt::Framebuffer>(new vkt::Framebuffer(
-            *DeviceObj(), m_renderPass, framebuffer_attachments.size(), framebuffer_attachments.data(), m_width, m_height));
+            *m_device, m_renderPass, framebuffer_attachments.size(), framebuffer_attachments.data(), m_width, m_height));
 
         m_renderPassBeginInfo.renderPass = m_renderPass;
         m_renderPassBeginInfo.framebuffer = framebuffer->handle();
@@ -658,14 +897,14 @@ TEST_F(NegativeDynamicRenderingLocalRead, BeginWithinRenderPass) {
         m_command_buffer.Begin();
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdBeginRenderPass-initialLayout-09537");
-        vk::CmdBeginRenderPass(m_command_buffer.handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vk::CmdBeginRenderPass(m_command_buffer, &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
         m_errorMonitor->VerifyFound();
 
         if (rp2Supported) {
             auto subpassBeginInfo = vku::InitStruct<VkSubpassBeginInfo>(nullptr, VK_SUBPASS_CONTENTS_INLINE);
 
             m_errorMonitor->SetDesiredError("VUID-vkCmdBeginRenderPass2-initialLayout-09538");
-            vk::CmdBeginRenderPass2KHR(m_command_buffer.handle(), &m_renderPassBeginInfo, &subpassBeginInfo);
+            vk::CmdBeginRenderPass2KHR(m_command_buffer, &m_renderPassBeginInfo, &subpassBeginInfo);
             m_errorMonitor->VerifyFound();
         }
         m_command_buffer.End();
@@ -764,7 +1003,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdSetAttachmentIndicesColorAttachment
     color_attachment[1].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -780,7 +1019,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdSetAttachmentIndicesColorAttachment
     input_info.pColorAttachmentInputIndices = locations;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetRenderingInputAttachmentIndices-pInputAttachmentIndexInfo-09517");
-    vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer.handle(), &input_info);
+    vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer, &input_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -793,7 +1032,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdSetAttachmentIndices) {
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     VkRenderingInputAttachmentIndexInfo input_info = vku::InitStructHelper();
@@ -801,7 +1040,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdSetAttachmentIndices) {
     input_info.pColorAttachmentInputIndices = nullptr;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetRenderingInputAttachmentIndices-commandBuffer-09518");
-    vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer.handle(), &input_info);
+    vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer, &input_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -826,7 +1065,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, InputAttachmentIndexSetToUnused) {
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -849,7 +1088,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, InputAttachmentIndexSetToUnused) {
     for (uint32_t i = 0; i < 3; i++) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdSetRenderingInputAttachmentIndices-dynamicRenderingLocalRead-09516");
         m_errorMonitor->SetDesiredError(vuids[i]);
-        vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer.handle(), &input_info[i]);
+        vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer, &input_info[i]);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -870,7 +1109,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, InputAttachmentIndexUnique) {
     VkRenderingAttachmentInfo color_attachments[2] = {vku::InitStructHelper(), vku::InitStructHelper()};
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -892,7 +1131,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, InputAttachmentIndexUnique) {
 
     for (uint32_t i = 0; i < 3; i++) {
         m_errorMonitor->SetDesiredError(vuids[i]);
-        vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer.handle(), &input_info[i]);
+        vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer, &input_info[i]);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -915,7 +1154,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdSetAttachmentLocationsColorAttachme
     color_attachment[1].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -931,7 +1170,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdSetAttachmentLocationsColorAttachme
     location_info.pColorAttachmentLocations = locations;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetRenderingAttachmentLocations-pLocationInfo-09510");
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &location_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &location_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -953,7 +1192,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, NewFunctionsReportErrorExtensionDisabl
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -966,7 +1205,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, NewFunctionsReportErrorExtensionDisabl
     location_info.pColorAttachmentLocations = nullptr;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetRenderingAttachmentLocations-dynamicRenderingLocalRead-09509");
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &location_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &location_info);
     m_errorMonitor->VerifyFound();
 
     VkRenderingInputAttachmentIndexInfo input_info = vku::InitStructHelper();
@@ -974,7 +1213,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, NewFunctionsReportErrorExtensionDisabl
     input_info.pColorAttachmentInputIndices = nullptr;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetRenderingInputAttachmentIndices-dynamicRenderingLocalRead-09516");
-    vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer.handle(), &input_info);
+    vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer, &input_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -987,7 +1226,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdSetRenderingAttachmentLocations) {
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     VkRenderingAttachmentLocationInfo location_info = vku::InitStructHelper();
@@ -995,7 +1234,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdSetRenderingAttachmentLocations) {
     location_info.pColorAttachmentLocations = nullptr;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetRenderingAttachmentLocations-commandBuffer-09511");
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &location_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &location_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1022,7 +1261,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, AttachmentLocationsValidity) {
     color_attachments[1].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -1040,7 +1279,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, AttachmentLocationsValidity) {
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdSetRenderingAttachmentLocations-dynamicRenderingLocalRead-09509");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentLocationInfo-pColorAttachmentLocations-09513");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentLocationInfo-dynamicRenderingLocalRead-09512");
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &location_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &location_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1059,7 +1298,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, AttachmentLocationsMax) {
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -1079,7 +1318,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, AttachmentLocationsMax) {
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentLocationInfo-colorAttachmentCount-09514");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentLocationInfo-pColorAttachmentLocations-09515");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdSetRenderingAttachmentLocations-pLocationInfo-09510");
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &location_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &location_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1098,15 +1337,8 @@ TEST_F(NegativeDynamicRenderingLocalRead, DependencyViewLocalInsideRendering) {
     memory_barrier_2.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     memory_barrier_2.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_VIEW_LOCAL_BIT;
-    dependency_info.memoryBarrierCount = 1;
-    dependency_info.pMemoryBarriers = &memory_barrier_2;
-    dependency_info.bufferMemoryBarrierCount = 0;
-    dependency_info.imageMemoryBarrierCount = 0;
-
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-dependencyFlags-07891");
-    vk::CmdPipelineBarrier2KHR(m_command_buffer.handle(), &dependency_info);
+    m_command_buffer.BarrierKHR(memory_barrier_2, VK_DEPENDENCY_VIEW_LOCAL_BIT);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1123,15 +1355,8 @@ TEST_F(NegativeDynamicRenderingLocalRead, DependencyViewLocalOutsideRendering) {
     memory_barrier_2.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     memory_barrier_2.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_VIEW_LOCAL_BIT;
-    dependency_info.memoryBarrierCount = 1;
-    dependency_info.pMemoryBarriers = &memory_barrier_2;
-    dependency_info.bufferMemoryBarrierCount = 0;
-    dependency_info.imageMemoryBarrierCount = 0;
-
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-dependencyFlags-01186");
-    vk::CmdPipelineBarrier2KHR(m_command_buffer.handle(), &dependency_info);
+    m_command_buffer.BarrierKHR(memory_barrier_2, VK_DEPENDENCY_VIEW_LOCAL_BIT);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1150,15 +1375,8 @@ TEST_F(NegativeDynamicRenderingLocalRead, FramebufferSpaceStagesDst) {
     memory_barrier_2.dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
     memory_barrier_2.dstAccessMask = VK_ACCESS_2_NONE;
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    dependency_info.memoryBarrierCount = 1;
-    dependency_info.pMemoryBarriers = &memory_barrier_2;
-    dependency_info.bufferMemoryBarrierCount = 0;
-    dependency_info.imageMemoryBarrierCount = 0;
-
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-09556");
-    vk::CmdPipelineBarrier2KHR(m_command_buffer.handle(), &dependency_info);
+    m_command_buffer.BarrierKHR(memory_barrier_2, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1174,7 +1392,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, RenderingAttachmentLocationInfoMismatc
     vkt::ImageView render_target_view = render_target.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1, 0, render_target_ci.arrayLayers);
 
     VkCommandBufferAllocateInfo secondary_cmd_buffer_alloc_info = vku::InitStructHelper();
-    secondary_cmd_buffer_alloc_info.commandPool = m_command_pool.handle();
+    secondary_cmd_buffer_alloc_info.commandPool = m_command_pool;
     secondary_cmd_buffer_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
     secondary_cmd_buffer_alloc_info.commandBufferCount = 1;
 
@@ -1210,7 +1428,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, RenderingAttachmentLocationInfoMismatc
 
     VkRenderingAttachmentInfo color_attachment_info = vku::InitStructHelper{};
     color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment_info.imageView = render_target_view.handle();
+    color_attachment_info.imageView = render_target_view;
 
     VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
 
@@ -1224,8 +1442,8 @@ TEST_F(NegativeDynamicRenderingLocalRead, RenderingAttachmentLocationInfoMismatc
     // Force invalid colorAttachmentCount
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-09504");
     m_command_buffer.BeginRendering(begin_rendering_info);
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &rendering_attachment_location_info);
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_cmd_buffer.handle());
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &rendering_attachment_location_info);
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_cmd_buffer.handle());
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRendering();
     m_command_buffer.End();
@@ -1243,8 +1461,8 @@ TEST_F(NegativeDynamicRenderingLocalRead, RenderingAttachmentLocationInfoMismatc
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-09504");
     m_command_buffer.BeginRendering(begin_rendering_info);
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &rendering_attachment_location_info);
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_cmd_buffer.handle());
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &rendering_attachment_location_info);
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_cmd_buffer.handle());
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRendering();
 
@@ -1263,7 +1481,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, RenderingInputAttachmentIndexInfoMisma
     vkt::ImageView render_target_view = render_target.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1, 0, render_target_ci.arrayLayers);
 
     VkCommandBufferAllocateInfo secondary_cmd_buffer_alloc_info = vku::InitStructHelper();
-    secondary_cmd_buffer_alloc_info.commandPool = m_command_pool.handle();
+    secondary_cmd_buffer_alloc_info.commandPool = m_command_pool;
     secondary_cmd_buffer_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
     secondary_cmd_buffer_alloc_info.commandBufferCount = 1;
 
@@ -1303,7 +1521,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, RenderingInputAttachmentIndexInfoMisma
 
     VkRenderingAttachmentInfo color_attachment_info = vku::InitStructHelper{};
     color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment_info.imageView = render_target_view.handle();
+    color_attachment_info.imageView = render_target_view;
 
     VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
 
@@ -1321,10 +1539,10 @@ TEST_F(NegativeDynamicRenderingLocalRead, RenderingInputAttachmentIndexInfoMisma
         m_command_buffer.Begin();
         m_command_buffer.BeginRendering(begin_rendering_info);
 
-        vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer.handle(), &rendering_input_attachment_index_info);
+        vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer, &rendering_input_attachment_index_info);
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-09505");
-        vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_cmd_buffer.handle());
+        vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_cmd_buffer.handle());
         m_errorMonitor->VerifyFound();
 
         m_command_buffer.EndRendering();

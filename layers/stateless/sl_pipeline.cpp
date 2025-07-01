@@ -16,11 +16,14 @@
  * limitations under the License.
  */
 
+#include <vulkan/utility/vk_format_utils.h>
 #include "error_message/error_location.h"
 #include "stateless/stateless_validation.h"
 #include "generated/enum_flag_bits.h"
 #include "generated/dispatch_functions.h"
 #include "stateless/sl_vuid_maps.h"
+#include "containers/container_utils.h"
+#include "utils/math_utils.h"
 
 namespace stateless {
 
@@ -92,8 +95,8 @@ bool Device::ValidatePushConstantRange(uint32_t push_constant_range_count, const
 
         // size needs to be non-zero and a multiple of 4.
         if (size == 0) {
-            skip |= LogError("VUID-VkPushConstantRange-size-00296", device, pc_loc.dot(Field::size),
-                             "(%" PRIu32 ") is not greater than zero.", size);
+            skip |=
+                LogError("VUID-VkPushConstantRange-size-00296", device, pc_loc.dot(Field::size), "(%" PRIu32 ") is zero.", size);
         }
         if (size & 0x3) {
             skip |= LogError("VUID-VkPushConstantRange-size-00297", device, pc_loc.dot(Field::size),
@@ -152,8 +155,7 @@ bool Device::ValidatePipelineBinaryInfo(const void *next, VkPipelineCreateFlags 
                                         const Location &loc) const {
     bool skip = false;
     const auto *temp_flags_2 = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfo>(next);
-    const VkPipelineCreateFlags2KHR create_flags_2 =
-        temp_flags_2 ? temp_flags_2->flags : static_cast<VkPipelineCreateFlags2KHR>(flags);
+    const VkPipelineCreateFlags2 create_flags_2 = temp_flags_2 ? temp_flags_2->flags : static_cast<VkPipelineCreateFlags2>(flags);
     const Location flag_loc =
         temp_flags_2 ? loc.pNext(Struct::VkPipelineCreateFlags2CreateInfo, Field::flags) : loc.dot(Field::flags);
 
@@ -264,7 +266,7 @@ bool Device::ValidatePipelineRenderingCreateInfo(const Context &context, const V
     return skip;
 }
 
-bool Device::ValidateCreateGraphicsPipelinesFlags(const VkPipelineCreateFlags2KHR flags, const Location &flags_loc) const {
+bool Device::ValidateCreateGraphicsPipelinesFlags(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const {
     bool skip = false;
     if ((flags & VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT) != 0 &&
         (flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) == 0) {
@@ -375,8 +377,8 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
         VkGraphicsPipelineCreateInfo create_info = pCreateInfos[i];
 
         const auto *create_flags_2 = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfo>(create_info.pNext);
-        const VkPipelineCreateFlags2KHR flags =
-            create_flags_2 ? create_flags_2->flags : static_cast<VkPipelineCreateFlags2KHR>(create_info.flags);
+        const VkPipelineCreateFlags2 flags =
+            create_flags_2 ? create_flags_2->flags : static_cast<VkPipelineCreateFlags2>(create_info.flags);
         const Location flags_loc = create_flags_2 ? create_info_loc.pNext(Struct::VkPipelineCreateFlags2CreateInfo, Field::flags)
                                                   : create_info_loc.dot(Field::flags);
         if (!create_flags_2) {
@@ -470,7 +472,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
         }
 
         // <VkDynamicState, index in pDynamicStates, hash for enum key>
-        vvl::unordered_map<VkDynamicState, uint32_t, std::hash<int>> dynamic_state_map;
+        vvl::unordered_map<VkDynamicState, uint32_t, vvl::hash<int>> dynamic_state_map;
         // TODO probably should check dynamic state from graphics libraries, at least when creating an "executable pipeline"
         if (create_info.pDynamicState != nullptr) {
             const auto &dynamic_state_info = *create_info.pDynamicState;
@@ -1245,7 +1247,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
     return skip;
 }
 
-bool Device::ValidateCreateComputePipelinesFlags(const VkPipelineCreateFlags2KHR flags, const Location &flags_loc) const {
+bool Device::ValidateCreateComputePipelinesFlags(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const {
     bool skip = false;
     if ((flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) != 0) {
         if (!enabled_features.shaderEnqueue) {
@@ -1338,8 +1340,8 @@ bool Device::manual_PreCallValidateCreateComputePipelines(VkDevice device, VkPip
         }
 
         const auto *create_flags_2 = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfo>(create_info.pNext);
-        const VkPipelineCreateFlags2KHR flags =
-            create_flags_2 ? create_flags_2->flags : static_cast<VkPipelineCreateFlags2KHR>(create_info.flags);
+        const VkPipelineCreateFlags2 flags =
+            create_flags_2 ? create_flags_2->flags : static_cast<VkPipelineCreateFlags2>(create_info.flags);
         const Location flags_loc = create_flags_2 ? create_info_loc.pNext(Struct::VkPipelineCreateFlags2CreateInfo, Field::flags)
                                                   : create_info_loc.dot(Field::flags);
         if (!create_flags_2) {
@@ -1467,7 +1469,8 @@ bool Device::manual_PreCallValidateGetPipelinePropertiesEXT(VkDevice device, con
         }
         if (pPipelineProperties->pNext != nullptr) {
             skip |= LogError("VUID-VkPipelinePropertiesIdentifierEXT-pNext-pNext", device,
-                             pipeline_properties_loc.dot(Field::pNext), "is not NULL.");
+                             pipeline_properties_loc.dot(Field::pNext), "is not NULL.\n%s",
+                             PrintPNextChain(Struct::VkPipelinePropertiesIdentifierEXT, pPipelineProperties->pNext).c_str());
         }
     } else {
         skip |= LogError("VUID-vkGetPipelinePropertiesEXT-pPipelineProperties-06739", device, pipeline_properties_loc, "is NULL.");

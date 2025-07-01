@@ -28,15 +28,13 @@ class PipelineCacheData;
 
 namespace core::sc {
 
-class Instance : public vvl::sc::Instance<core::Instance> {
+class Instance : public vvl::sc::InstanceProxy<core::Instance> {
   protected:
-    using BaseClass = vvl::sc::Instance<core::Instance>;
+    using BaseClass = vvl::sc::InstanceProxy<core::Instance>;
 
     void InitFilters();
 
   public:
-    using StateTracker = vvl::sc::Instance<core::Instance>;
-
     Instance(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch) {}
 
     template <typename VkHandleType>
@@ -80,17 +78,15 @@ class Instance : public vvl::sc::Instance<core::Instance> {
                                                                          const ErrorObject& error_obj) const override;
 };
 
-class Device : public vvl::sc::Device<CoreChecks> {
+class Device : public vvl::sc::DeviceProxy<CoreChecks> {
   protected:
-    using BaseClass = vvl::sc::Device<CoreChecks>;
+    using BaseClass = vvl::sc::DeviceProxy<CoreChecks>;
 
     void InitFilters();
 
     core::sc::Instance* instance_vo_;
 
   public:
-    using StateTracker = vvl::sc::Device<CoreChecks>;
-
     Device(vvl::dispatch::Device* dev, core::sc::Instance* instance_vo) : BaseClass(dev, instance_vo), instance_vo_(instance_vo) {}
 
     bool ValidateObjectRequestCount(VkDevice device, const Location& loc, const char* vuid, const char* object_name_plural,

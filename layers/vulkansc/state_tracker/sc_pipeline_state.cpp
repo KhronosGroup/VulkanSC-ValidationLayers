@@ -19,6 +19,7 @@
 #include "sc_pipeline_state.h"
 #include "state_tracker/shader_module.h"
 #include "state_tracker/state_tracker.h"
+#include "utils/shader_utils.h"
 #include "vulkansc/sc_vuid_enums.h"
 #include "vulkansc/base64.h"
 #include "spirv-tools/optimizer.hpp"
@@ -27,7 +28,8 @@
 
 namespace vvl::sc {
 
-PipelineCache::PipelineCache(const Device& state_data, VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo* pCreateInfo)
+PipelineCache::PipelineCache(const DeviceState& state_data, VkPipelineCache pipeline_cache,
+                             const VkPipelineCacheCreateInfo* pCreateInfo)
     : vvl::PipelineCache(pipeline_cache, pCreateInfo), pipelines_() {
     vvl::sc::PipelineCacheData pipeline_cache_data(*pCreateInfo);
 
@@ -39,7 +41,7 @@ PipelineCache::PipelineCache(const Device& state_data, VkPipelineCache pipeline_
     }
 }
 
-PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const Device& state_data,
+PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const DeviceState& state_data,
                                                                            const PipelineCacheData::Entry& cache_entry) {
     Entry::StageModules stage_modules;
     stage_modules.reserve(cache_entry.StageIndexCount());

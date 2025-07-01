@@ -22,11 +22,15 @@
 #include "error_message/error_strings.h"
 #include "generated/dispatch_functions.h"
 #include "state_tracker/device_generated_commands_state.h"
+#include "state_tracker/last_bound_state.h"
 #include "state_tracker/pipeline_layout_state.h"
 #include "state_tracker/descriptor_sets.h"
 #include "state_tracker/render_pass_state.h"
 #include "state_tracker/shader_object_state.h"
 #include "state_tracker/shader_module.h"
+#include "state_tracker/cmd_buffer_state.h"
+#include "state_tracker/pipeline_state.h"
+#include "containers/limits.h"
 #include "cc_buffer_address.h"
 
 static inline bool IsActionCommand(VkIndirectCommandsTokenTypeEXT type) {
@@ -168,8 +172,9 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
                 } else if (!dynamic_layout_create) {
                     skip |= LogError("VUID-VkIndirectCommandsLayoutCreateInfoEXT-pTokens-11102", device, token_loc.dot(Field::type),
                                      "is %s, pipelineLayout is VK_NULL_HANDLE, but no "
-                                     "there is no VkPipelineLayoutCreateInfo structure attached to the pNext chain.",
-                                     string_VkIndirectCommandsTokenTypeEXT(token.type));
+                                     "there is no VkPipelineLayoutCreateInfo structure attached to the pNext chain.\n%s",
+                                     string_VkIndirectCommandsTokenTypeEXT(token.type),
+                                     PrintPNextChain(Struct::VkIndirectCommandsLayoutCreateInfoEXT, pCreateInfo->pNext).c_str());
                 }
             }
 
@@ -377,7 +382,7 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
 
     if (indirect_commands_layout.has_vertex_buffer_token) {
         // If had vertex buffer token, it had to be graphic bind point (else would hit error earlier)
-        const auto pipeline = cb_state.GetCurrentPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS);
+        const auto pipeline = cb_state.GetLastBoundGraphics().pipeline_state;
         if (pipeline && !pipeline->IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE)) {
             const LogObjectList objlist(cb_state.Handle(), pipeline->Handle());
             skip |= LogError("VUID-VkGeneratedCommandsInfoEXT-indirectCommandsLayout-11079", objlist,
@@ -408,7 +413,8 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
                 "VUID-VkGeneratedCommandsInfoEXT-indirectExecutionSet-11080", cb_state.Handle(),
                 info_loc.dot(Field::indirectExecutionSet),
                 "is VK_NULL_HANDLE but the pNext chain does not contain an instance of VkGeneratedCommandsPipelineInfoEXT or "
-                "VkGeneratedCommandsShaderInfoEXT.");
+                "VkGeneratedCommandsShaderInfoEXT.\n%s",
+                PrintPNextChain(Struct::VkGeneratedCommandsInfoEXT, generated_commands_info.pNext).c_str());
             valid_dispatch = false;
         } else if (indirect_commands_layout.has_execution_set_token) {
             skip |= LogError("VUID-VkGeneratedCommandsInfoEXT-indirectCommandsLayout-11083", indirect_commands_layout.Handle(),
@@ -554,7 +560,7 @@ bool CoreChecks::PreCallValidateCmdExecuteGeneratedCommandsEXT(VkCommandBuffer c
         }
     }
 
-    if (cb_state.beginInfo.flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT) {
+    if (cb_state.begin_info_flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT) {
         LogError("VUID-vkCmdExecuteGeneratedCommandsEXT-commandBuffer-11143", commandBuffer,
                  error_obj.location.dot(Field::commandBuffer), "was created with VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT.");
     }
@@ -600,8 +606,7 @@ bool CoreChecks::PreCallValidateCmdExecuteGeneratedCommandsEXT(VkCommandBuffer c
                                                             error_obj.location.dot(Field::commandBuffer));
     }
 
-    const auto lv_bind_point = ConvertToLvlBindPoint(indirect_commands_layout->bind_point);
-    const auto& last_bound_state = cb_state.lastBound[lv_bind_point];
+    const auto& last_bound_state = cb_state.lastBound[ConvertToVvlBindPoint(indirect_commands_layout->bind_point)];
     VkShaderStageFlags bound_stages = last_bound_state.GetAllActiveBoundStages();
     if ((bound_stages | props.supportedIndirectCommandsShaderStages) != props.supportedIndirectCommandsShaderStages) {
         skip |= LogError("VUID-vkCmdExecuteGeneratedCommandsEXT-supportedIndirectCommandsShaderStages-11060",
@@ -609,6 +614,11 @@ bool CoreChecks::PreCallValidateCmdExecuteGeneratedCommandsEXT(VkCommandBuffer c
                          "is using stages (%s) but supportedIndirectCommandsShaderStages only supports %s.",
                          string_VkShaderStageFlags(bound_stages).c_str(),
                          string_VkShaderStageFlags(props.supportedIndirectCommandsShaderStages).c_str());
+    }
+
+    if (indirect_commands_layout->has_draw_token) {
+        skip |=
+            OutsideRenderPass(cb_state, error_obj.location, "VUID-vkCmdExecuteGeneratedCommandsEXT-indirectCommandsLayout-10769");
     }
 
     skip |= ValidateGeneratedCommandsInfo(cb_state, *indirect_commands_layout, *pGeneratedCommandsInfo, isPreprocessed, info_loc);
@@ -627,9 +637,8 @@ bool CoreChecks::ValidateGeneratedCommandsInitialShaderState(const vvl::CommandB
                            ? "VUID-vkCmdPreprocessGeneratedCommandsEXT-indirectCommandsLayout-11084"
                            : "VUID-vkCmdExecuteGeneratedCommandsEXT-indirectCommandsLayout-11053";
 
-    const VkPipelineBindPoint bind_point = ConvertToPipelineBindPoint(shader_stage_flags);
-    const auto lv_bind_point = ConvertToLvlBindPoint(bind_point);
-    const LastBound& last_bound = cb_state.lastBound[lv_bind_point];
+    const VkPipelineBindPoint bind_point = ConvertStageToBindPoint(shader_stage_flags);
+    const LastBound& last_bound = cb_state.lastBound[ConvertToVvlBindPoint(bind_point)];
 
     if (indirect_execution_set.is_pipeline) {
         const vvl::Pipeline* pipeline = last_bound.pipeline_state;

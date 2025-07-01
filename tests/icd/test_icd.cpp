@@ -1082,16 +1082,19 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetSwapchainImagesKHR(VkDevice device, VkS
                                                             uint32_t* pSwapchainImageCount, VkImage* pSwapchainImages) {
     if (!pSwapchainImages) {
         *pSwapchainImageCount = icd_swapchain_image_count;
+    } else if (swapchain_image_map.empty()) {
+        return VK_INCOMPLETE;
     } else {
         unique_lock_t lock(global_lock);
         for (uint32_t img_i = 0; img_i < (std::min)(*pSwapchainImageCount, icd_swapchain_image_count); ++img_i) {
             pSwapchainImages[img_i] = swapchain_image_map.at(swapchain)[img_i];
         }
 
-        if (*pSwapchainImageCount < icd_swapchain_image_count)
+        if (*pSwapchainImageCount < icd_swapchain_image_count) {
             return VK_INCOMPLETE;
-        else if (*pSwapchainImageCount > icd_swapchain_image_count)
+        } else if (*pSwapchainImageCount > icd_swapchain_image_count) {
             *pSwapchainImageCount = icd_swapchain_image_count;
+        }
     }
     return VK_SUCCESS;
 }
@@ -1364,6 +1367,12 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceProperties2(VkPhysicalDevice 
         device_generated_commands_props->deviceGeneratedCommandsMultiDrawIndirectCount = VK_TRUE;
     }
 
+    auto* coop_vec_nv_props = vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeVectorPropertiesNV>(pProperties->pNext);
+    if (coop_vec_nv_props) {
+        coop_vec_nv_props->cooperativeVectorTrainingFloat16Accumulation = VK_TRUE;
+        coop_vec_nv_props->cooperativeVectorTrainingFloat32Accumulation = VK_TRUE;
+    }
+
     const uint32_t num_copy_layouts = 5;
     const VkImageLayout HostCopyLayouts[]{
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,        VK_IMAGE_LAYOUT_GENERAL,
@@ -1484,9 +1493,9 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceQueueFamilyProperties2(VkPhys
             }
             auto video_props = vku::FindStructInPNextChain<VkQueueFamilyVideoPropertiesKHR>(pQueueFamilyProperties[1].pNext);
             if (video_props) {
-                video_props->videoCodecOperations = VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR |
-                                                    VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR |
-                                                    VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR;
+                video_props->videoCodecOperations =
+                    VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR | VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR |
+                    VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR | VK_VIDEO_CODEC_OPERATION_DECODE_VP9_BIT_KHR;
             }
         }
         if (*pQueueFamilyPropertyCount >= 3) {
@@ -1629,10 +1638,10 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilities2KHR(V
                                                                                const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
                                                                                VkSurfaceCapabilities2KHR* pSurfaceCapabilities) {
     GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, pSurfaceInfo->surface, &pSurfaceCapabilities->surfaceCapabilities);
+
 #ifndef VULKANSC
-    auto* present_mode_compatibility =
-        vku::FindStructInPNextChain<VkSurfacePresentModeCompatibilityEXT>(pSurfaceCapabilities->pNext);
-    if (present_mode_compatibility) {
+    if (auto* present_mode_compatibility =
+            vku::FindStructInPNextChain<VkSurfacePresentModeCompatibilityEXT>(pSurfaceCapabilities->pNext)) {
         if (!present_mode_compatibility->pPresentModes) {
             present_mode_compatibility->presentModeCount = 3;
         } else {
@@ -1643,6 +1652,18 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilities2KHR(V
         }
     }
 #endif  // VULKANSC
+    if (auto* shared_present_capabilities =
+            vku::FindStructInPNextChain<VkSharedPresentSurfaceCapabilitiesKHR>(pSurfaceCapabilities->pNext)) {
+        // "VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT must be included in the set but implementations may support additional usages."
+        shared_present_capabilities->sharedPresentSupportedUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    }
+    if (auto* wait2_capabilities = vku::FindStructInPNextChain<VkSurfaceCapabilitiesPresentWait2KHR>(pSurfaceCapabilities->pNext)) {
+        wait2_capabilities->presentWait2Supported = VK_TRUE;
+    }
+    if (auto* id2_capabilities = vku::FindStructInPNextChain<VkSurfaceCapabilitiesPresentId2KHR>(pSurfaceCapabilities->pNext)) {
+        id2_capabilities->presentId2Supported = VK_TRUE;
+    }
+
     return VK_SUCCESS;
 }
 
@@ -1732,6 +1753,51 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixProperti
     return VK_SUCCESS;
 }
 #endif  // VULKANSC
+
+static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeVectorPropertiesNV(VkPhysicalDevice physicalDevice,
+                                                                                     uint32_t* pPropertyCount,
+                                                                                     VkCooperativeVectorPropertiesNV* pProperties) {
+    if (!pProperties) {
+        *pPropertyCount = 5;
+    } else {
+        // arbitrary
+        pProperties[0].inputType = VK_COMPONENT_TYPE_UINT32_KHR;
+        pProperties[0].inputInterpretation = VK_COMPONENT_TYPE_UINT32_KHR;
+        pProperties[0].matrixInterpretation = VK_COMPONENT_TYPE_UINT32_KHR;
+        pProperties[0].biasInterpretation = VK_COMPONENT_TYPE_UINT32_KHR;
+        pProperties[0].resultType = VK_COMPONENT_TYPE_UINT32_KHR;
+        pProperties[0].transpose = VK_FALSE;
+
+        pProperties[1].inputType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[1].inputInterpretation = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[1].matrixInterpretation = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[1].biasInterpretation = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[1].resultType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[1].transpose = VK_FALSE;
+
+        pProperties[2].inputType = VK_COMPONENT_TYPE_FLOAT32_KHR;
+        pProperties[2].inputInterpretation = VK_COMPONENT_TYPE_FLOAT32_KHR;
+        pProperties[2].matrixInterpretation = VK_COMPONENT_TYPE_FLOAT32_KHR;
+        pProperties[2].biasInterpretation = VK_COMPONENT_TYPE_FLOAT32_KHR;
+        pProperties[2].resultType = VK_COMPONENT_TYPE_FLOAT32_KHR;
+        pProperties[2].transpose = VK_FALSE;
+
+        pProperties[3].inputType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[3].inputInterpretation = VK_COMPONENT_TYPE_FLOAT_E4M3_NV;
+        pProperties[3].matrixInterpretation = VK_COMPONENT_TYPE_FLOAT_E4M3_NV;
+        pProperties[3].biasInterpretation = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[3].resultType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[3].transpose = VK_FALSE;
+
+        pProperties[4].inputType = VK_COMPONENT_TYPE_SINT8_KHR;
+        pProperties[4].inputInterpretation = VK_COMPONENT_TYPE_SINT8_KHR;
+        pProperties[4].matrixInterpretation = VK_COMPONENT_TYPE_SINT8_KHR;
+        pProperties[4].biasInterpretation = VK_COMPONENT_TYPE_SINT32_KHR;
+        pProperties[4].resultType = VK_COMPONENT_TYPE_SINT32_KHR;
+        pProperties[4].transpose = VK_FALSE;
+    }
+    return VK_SUCCESS;
+}
 
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCalibrateableTimeDomainsKHR(VkPhysicalDevice physicalDevice,
                                                                                    uint32_t* pTimeDomainCount,

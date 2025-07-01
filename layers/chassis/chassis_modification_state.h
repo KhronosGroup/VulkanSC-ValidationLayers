@@ -21,6 +21,7 @@
 #pragma once
 #include <vector>
 #include "state_tracker/shader_module.h"
+#include "utils/vk_api_utils.h"
 
 namespace vvl {
 class Pipeline;
@@ -63,7 +64,9 @@ struct ShaderObject {
     std::vector<std::shared_ptr<spirv::Module>> module_states;  // contains SPIR-V to validate
     std::vector<spirv::StatelessData> stateless_data;
 
-    std::vector<VkShaderCreateInfoEXT> modified_create_infos;
+    // When using GPU-AV the pCreateInfo is modified on the user
+    bool is_modified = false;
+    std::vector<vku::safe_VkShaderCreateInfoEXT> modified_create_infos;
     const VkShaderCreateInfoEXT* pCreateInfos = nullptr;
 
     // Pass the instrumented SPIR-V info from PreCallRecord to Dispatch (so GPU-AV logic can run with it)
@@ -87,6 +90,8 @@ struct ShaderInstrumentationMetadata {
 };
 
 struct CreateGraphicsPipelines {
+    // When using GPU-AV the pCreateInfo is modified on the user
+    bool is_modified = false;
     std::vector<vku::safe_VkGraphicsPipelineCreateInfo> modified_create_infos;
     const VkGraphicsPipelineCreateInfo* pCreateInfos = nullptr;
     spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages];
@@ -97,6 +102,8 @@ struct CreateGraphicsPipelines {
 };
 
 struct CreateComputePipelines {
+    // When using GPU-AV the pCreateInfo is modified on the user
+    bool is_modified = false;
     std::vector<vku::safe_VkComputePipelineCreateInfo> modified_create_infos;
     const VkComputePipelineCreateInfo* pCreateInfos = nullptr;
     spirv::StatelessData stateless_data;
@@ -106,16 +113,9 @@ struct CreateComputePipelines {
     CreateComputePipelines(const VkComputePipelineCreateInfo* create_info) { pCreateInfos = create_info; }
 };
 
-struct CreateRayTracingPipelinesNV {
-    std::vector<vku::safe_VkRayTracingPipelineCreateInfoCommon> modified_create_infos;
-    const VkRayTracingPipelineCreateInfoNV* pCreateInfos = nullptr;
-    // 2D array for [pipelineCount][stageCount]
-    std::vector<std::vector<ShaderInstrumentationMetadata>> shader_instrumentations_metadata;
-
-    CreateRayTracingPipelinesNV(const VkRayTracingPipelineCreateInfoNV* create_info) { pCreateInfos = create_info; }
-};
-
 struct CreateRayTracingPipelinesKHR {
+    // When using GPU-AV the pCreateInfo is modified on the user
+    bool is_modified = false;
     std::vector<vku::safe_VkRayTracingPipelineCreateInfoKHR> modified_create_infos;
     const VkRayTracingPipelineCreateInfoKHR* pCreateInfos = nullptr;
     // 2D array for [pipelineCount][stageCount]
@@ -129,6 +129,10 @@ struct CreatePipelineLayout {
     // If a 2nd layer starts to use it, can have conflicting values
     std::vector<VkDescriptorSetLayout> new_layouts;
     VkPipelineLayoutCreateInfo modified_create_info;
+};
+
+struct ShaderBinaryData {
+    VkShaderEXT modified_shader_handle;
 };
 
 struct CreateBuffer {

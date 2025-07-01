@@ -15,6 +15,7 @@
 // limitations under the License.
 
 #extension GL_EXT_buffer_reference : require
+#extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_buffer_reference_uvec2 : require
 #if defined(GL_ARB_gpu_shader_int64)
 #extension GL_ARB_gpu_shader_int64 : require
@@ -44,3 +45,8 @@ layout(set = kInstDefaultDescriptorSet, binding = kBindingInstCmdErrorsCount, st
     uint errors_count[];
 }
 inst_cmd_errors_count_buffer;
+
+// Without a Spec Constant, GLSL (or any language) will be smart and constant fold for us
+// When linking we can apply the constant fold for it
+// (The constant_id doesn't matter, it easier to just hot swap the known default constant value)
+layout(constant_id = 0) const uint SpecConstantLinkShaderId = kLinkShaderId;

@@ -40,7 +40,9 @@ const char* unimplementable_validation[] = {
 
     // these are already taken care in spirv-val for 08737
     "VUID-VkShaderModuleCreateInfo-pCode-08736", "VUID-VkShaderCreateInfoEXT-pCode-08736",
-    "VUID-VkShaderModuleCreateInfo-pCode-08738", "VUID-VkShaderCreateInfoEXT-pCode-08738",
+
+    // is same as VUID-VkShaderModuleCreateInfo-pCode-08738
+    "VUID-VkShaderModuleCreateInfo-pCode-07912",
 
     // We can't detect what user does in their callback
     "VUID-PFN_vkDebugUtilsMessengerCallbackEXT-None-04769",
@@ -460,7 +462,6 @@ const char* unimplementable_validation[] = {
     "VUID-VkPhysicalDeviceExternalMemoryHostPropertiesEXT-sType-sType",
     "VUID-VkPhysicalDeviceFloatControlsProperties-sType-sType",
     "VUID-VkPhysicalDeviceFragmentDensityMap2PropertiesEXT-sType-sType",
-    "VUID-VkPhysicalDeviceFragmentDensityMapOffsetPropertiesQCOM-sType-sType",
     "VUID-VkPhysicalDeviceFragmentDensityMapPropertiesEXT-sType-sType",
     "VUID-VkPhysicalDeviceFragmentShaderBarycentricPropertiesKHR-sType-sType",
     "VUID-VkPhysicalDeviceFragmentShadingRateEnumsPropertiesNV-sType-sType",
@@ -507,7 +508,7 @@ const char* unimplementable_validation[] = {
     "VUID-VkPhysicalDeviceRayTracingPipelinePropertiesKHR-sType-sType",
     "VUID-VkPhysicalDeviceRayTracingPropertiesNV-sType-sType",
     "VUID-VkPhysicalDeviceRenderPassStripedPropertiesARM-sType-sType",
-    "VUID-VkPhysicalDeviceRobustness2PropertiesEXT-sType-sType",
+    "VUID-VkPhysicalDeviceRobustness2PropertiesKHR-sType-sType",
     "VUID-VkPhysicalDeviceSampleLocationsPropertiesEXT-sType-sType",
     "VUID-VkPhysicalDeviceSamplerFilterMinmaxProperties-sType-sType",
     "VUID-VkPhysicalDeviceSchedulingControlsPropertiesARM-sType-sType",

@@ -15,7 +15,8 @@
 #pragma once
 
 #include <stdint.h>
-#include "inject_conditional_function_pass.h"
+#include "containers/limits.h"
+#include "pass.h"
 
 namespace gpuav {
 namespace spirv {
@@ -23,22 +24,41 @@ namespace spirv {
 // Create a pass to instrument physical buffer address checking
 // This pass instruments all physical buffer address references to check that
 // all referenced bytes fall in a valid buffer.
-class BufferDeviceAddressPass : public InjectConditionalFunctionPass {
+class BufferDeviceAddressPass : public Pass {
   public:
-    BufferDeviceAddressPass(Module& module) : InjectConditionalFunctionPass(module) {}
+    BufferDeviceAddressPass(Module& module);
     const char* Name() const final { return "BufferDeviceAddressPass"; }
+    bool Instrument() final;
     void PrintDebugInfo() const final;
 
   private:
-    bool RequiresInstrumentation(const Function& function, const Instruction& inst) final;
-    uint32_t CreateFunctionCall(BasicBlock& block, InstructionIt* inst_it, const InjectionData& injection_data) final;
-    void Reset() final;
+    // This is metadata tied to a single instruction gathered during RequiresInstrumentation() to be used later
+    struct InstructionMeta {
+        const Instruction* target_instruction = nullptr;
+        const Instruction* pointer_inst = nullptr;
+        uint32_t alignment_literal = 0;
+        uint32_t access_size = 0;
+        bool type_is_struct = false;
+    };
 
-    uint32_t link_function_id = 0;
-    uint32_t GetLinkFunctionId();
+    bool RequiresInstrumentation(const Function& function, const Instruction& inst, InstructionMeta& meta);
+    uint32_t CreateFunctionCall(BasicBlock& block, InstructionIt* inst_it, const InstructionMeta& meta);
 
-    uint32_t alignment_literal_ = 0;
-    uint32_t type_length_ = 0;
+    // Function IDs to link in
+    uint32_t function_range_id_ = 0;
+    uint32_t function_align_id_ = 0;
+
+    // This is find the range of the statically accessed members in a BDA struct
+    // We track for each struct, the offsets into it that are statically accessed.
+    // From here, we can do the BDA range check just once.
+    // (example https://godbolt.org/z/v6boos6Yr)
+    struct Range {
+        uint32_t min_instruction = 0;  // used to only instrument at the lowest offset
+        uint32_t min_struct_offsets = vvl::kU32Max;
+        uint32_t max_struct_offsets = 0;
+    };
+    vvl::unordered_map<uint32_t, Range> block_struct_range_map_;
+    vvl::unordered_set<uint32_t> block_skip_list_;
 };
 
 }  // namespace spirv

@@ -20,8 +20,10 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "containers/custom_containers.h"
 #include <spirv/unified1/spirv.hpp>
+#include "containers/custom_containers.h"
+#include "containers/small_vector.h"
+#include "containers/span.h"
 
 struct OperandInfo;
 
@@ -73,6 +75,7 @@ class Instruction {
     spv::BuiltIn GetBuiltIn() const;
     uint32_t GetPositionIndex() const { return position_index_; }
     bool IsArray() const;
+    bool IsNonPtrAccessChain() const;
     bool IsAccessChain() const;
     // Helpers for OpTypeImage
     spv::Dim FindImageDim() const;

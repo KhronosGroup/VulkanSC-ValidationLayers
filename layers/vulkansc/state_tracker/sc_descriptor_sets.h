@@ -26,7 +26,7 @@ class DescriptorPool : public vvl::DescriptorPool {
   public:
     std::atomic_uint32_t allocated_descriptor_sets{0};
 
-    DescriptorPool(Device &dev, const VkDescriptorPool handle, const VkDescriptorPoolCreateInfo *pCreateInfo)
+    DescriptorPool(DeviceState &dev, const VkDescriptorPool handle, const VkDescriptorPoolCreateInfo *pCreateInfo)
         : vvl::DescriptorPool(dev, handle, pCreateInfo) {}
 };
 

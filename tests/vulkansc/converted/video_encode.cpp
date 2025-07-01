@@ -15,6 +15,7 @@
 
 #include "../framework/video_objects.h"
 #include "generated/enum_flag_bits.h"
+#include <algorithm>
 
 class NegativeVideoEncode : public VkVideoLayerTest {};
 
@@ -254,8 +255,8 @@ TEST_F(NegativeVideoEncode, BeginCodingSlotInactive) {
     cb.Begin();
     cb.BeginVideoCoding(context.Begin().AddResource(-1, 0));
     cb.ControlVideoCoding(context.Control().Reset());
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR, 0, 1));
+    vk::CmdPipelineBarrier2KHR(cb, context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
+    vk::CmdPipelineBarrier2KHR(cb, context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR, 0, 1));
     cb.EncodeVideo(context.EncodeReferenceFrame(0));
     cb.EndVideoCoding(context.End());
     cb.End();
@@ -302,8 +303,8 @@ TEST_F(NegativeVideoEncode, BeginCodingInvalidSlotResourceAssociation) {
     cb.Begin();
     cb.BeginVideoCoding(context.Begin().AddResource(-1, 0));
     cb.ControlVideoCoding(context.Control().Reset());
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR, 0, 1));
+    vk::CmdPipelineBarrier2KHR(cb, context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
+    vk::CmdPipelineBarrier2KHR(cb, context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR, 0, 1));
     cb.EncodeVideo(context.EncodeReferenceFrame(0));
     cb.EndVideoCoding(context.End());
 
@@ -354,7 +355,7 @@ TEST_F(NegativeVideoEncode, BeginCodingMissingEncodeDpbUsage) {
 
     vkt::ImageView image_view(*m_device, image_view_ci);
 
-    res.imageViewBinding = image_view.handle();
+    res.imageViewBinding = image_view;
 
     cb.Begin();
 
@@ -1086,6 +1087,41 @@ TEST_F(NegativeVideoEncode, RateControlStateMismatchNotDefault) {
     m_device->Wait();
 }
 
+TEST_F(NegativeVideoEncode, RateControlDisabledStateMismatch) {
+    TEST_DESCRIPTION("vkCmdBeginVideoCodingKHR - A case where rate control state specified as disabled");
+    RETURN_IF_SKIP(Init());
+
+    VideoConfig config =
+        GetConfig(GetConfigsWithRateControl(GetConfigsEncode(), VK_VIDEO_ENCODE_RATE_CONTROL_MODE_DISABLED_BIT_KHR));
+
+    if (!config) {
+        GTEST_SKIP() << "Test requires video encode support with rate control disabled";
+    }
+
+    VideoContext context(m_device, config);
+    context.CreateAndBindSessionMemory();
+    context.CreateResources();
+
+    vkt::CommandBuffer& cb = context.CmdBuffer();
+
+    auto rc_info = VideoEncodeRateControlInfo(config);
+    rc_info->rateControlMode = VK_VIDEO_ENCODE_RATE_CONTROL_MODE_DISABLED_BIT_KHR;
+
+    cb.Begin();
+    cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
+    cb.ControlVideoCoding(context.Control().Reset().RateControl(rc_info));
+    cb.EndVideoCoding(context.End());
+    cb.End();
+
+    /* Should be VK_VIDEO_ENCODE_RATE_CONTROL_MODE_DEFAULT_KHR at first,
+     * and then be set through ControlVideoCoding for the disabled bit.
+     */
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08254");
+    context.Queue().Submit(cb);
+    m_errorMonitor->VerifyFound();
+    m_device->Wait();
+}
+
 TEST_F(NegativeVideoEncode, RateControlStateMismatch) {
     TEST_DESCRIPTION("vkCmdBeginVideoCodingKHR - rate control state specified does not match current configuration");
 
@@ -1359,29 +1395,29 @@ TEST_F(NegativeVideoEncode, EncodeImageLayouts) {
     cb.Begin();
     cb.BeginVideoCoding(context.Begin().AddResource(-1, 0).AddResource(-1, 1));
 
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR));
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
+    vk::CmdPipelineBarrier2KHR(cb, context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR));
+    vk::CmdPipelineBarrier2KHR(cb, context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
 
     cb.EncodeVideo(context.EncodeFrame(0));
 
     // Encode input must be in ENCODE_SRC layout
-    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08222");
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL));
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-10811");
+    vk::CmdPipelineBarrier2KHR(cb, context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL));
     cb.EncodeVideo(context.EncodeFrame(0));
     m_errorMonitor->VerifyFound();
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
+    vk::CmdPipelineBarrier2KHR(cb, context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
 
     // Reconstructed must be in ENCODE_DPB layout
-    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08223");
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL, 0, 1));
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-10812");
+    vk::CmdPipelineBarrier2KHR(cb, context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL, 0, 1));
     cb.EncodeVideo(context.EncodeFrame(0));
     m_errorMonitor->VerifyFound();
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR, 0, 1));
+    vk::CmdPipelineBarrier2KHR(cb, context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR, 0, 1));
 
     // Reference must be in ENCODE_DPB layout
     cb.EncodeVideo(context.EncodeReferenceFrame(0));
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL, 0, 1));
-    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pPictureResource-08224");
+    vk::CmdPipelineBarrier2KHR(cb, context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL, 0, 1));
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pPictureResource-10813");
     cb.EncodeVideo(context.EncodeFrame(1).AddReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -1463,27 +1499,27 @@ TEST_F(NegativeVideoEncode, EncodeQueryTooManyOperations) {
 
     cb.Begin();
     cb.BeginVideoCoding(context.Begin());
-    vk::CmdBeginQuery(cb.handle(), context.StatusQueryPool(), 0, 0);
+    vk::CmdBeginQuery(cb, context.StatusQueryPool(), 0, 0);
     cb.EncodeVideo(context.EncodeFrame());
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-opCount-07174");
     cb.EncodeVideo(context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
-    vk::CmdEndQuery(cb.handle(), context.StatusQueryPool(), 0);
+    vk::CmdEndQuery(cb, context.StatusQueryPool(), 0);
     cb.EndVideoCoding(context.End());
     cb.End();
 
     cb.Begin();
     cb.BeginVideoCoding(context.Begin());
-    vk::CmdBeginQuery(cb.handle(), context.EncodeFeedbackQueryPool(), 0, 0);
+    vk::CmdBeginQuery(cb, context.EncodeFeedbackQueryPool(), 0, 0);
     cb.EncodeVideo(context.EncodeFrame());
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-opCount-07174");
     cb.EncodeVideo(context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
-    vk::CmdEndQuery(cb.handle(), context.EncodeFeedbackQueryPool(), 0);
+    vk::CmdEndQuery(cb, context.EncodeFeedbackQueryPool(), 0);
     cb.EndVideoCoding(context.End());
     cb.End();
 }
@@ -1980,7 +2016,7 @@ TEST_F(NegativeVideoEncode, EncodeInputMissingEncodeSrcUsage) {
     vkt::ImageView image_view(*m_device, image_view_ci);
 
     VkVideoPictureResourceInfoKHR src_res = context.EncodeInput()->Picture();
-    src_res.imageViewBinding = image_view.handle();
+    src_res.imageViewBinding = image_view;
 
     cb.Begin();
     cb.BeginVideoCoding(context.Begin());
@@ -2162,8 +2198,8 @@ TEST_F(NegativeVideoEncode, EncodeRefResourceNotBoundToDpbSlot) {
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(1, 0));
     m_errorMonitor->VerifyFound();
 
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
-    vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR, 0, 1));
+    vk::CmdPipelineBarrier2KHR(cb, context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
+    vk::CmdPipelineBarrier2KHR(cb, context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR, 0, 1));
     cb.EncodeVideo(context.EncodeReferenceFrame(1, 0));
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(1, 0));
 
@@ -2425,7 +2461,7 @@ TEST_F(NegativeVideoEncode, EncodeInlineQueryUnavailable) {
     cb.End();
 
     m_command_buffer.Begin(&begin_info);
-    vk::CmdResetQueryPool(m_command_buffer.handle(), context.EncodeFeedbackQueryPool(), 0, 1);
+    vk::CmdResetQueryPool(m_command_buffer, context.EncodeFeedbackQueryPool(), 0, 1);
     m_command_buffer.End();
 
     // Will fail as query pool has never been reset before
@@ -2447,8 +2483,7 @@ TEST_F(NegativeVideoEncode, EncodeInlineQueryUnavailable) {
     m_errorMonitor->VerifyFound();
     m_device->Wait();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Will succeed again after reset
     context.Queue().Submit(cb);
@@ -2666,7 +2701,7 @@ TEST_F(NegativeVideoEncode, BeginQueryEncodeFeedbackProfileMismatch) {
     cb.BeginVideoCoding(context1.Begin());
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-queryType-07130");
-    vk::CmdBeginQuery(cb.handle(), context2.EncodeFeedbackQueryPool(), 0, 0);
+    vk::CmdBeginQuery(cb, context2.EncodeFeedbackQueryPool(), 0, 0);
     m_errorMonitor->VerifyFound();
 
     cb.EndVideoCoding(context1.End());
@@ -2692,7 +2727,7 @@ TEST_F(NegativeVideoEncode, BeginQueryEncodeFeedbackNoBoundVideoSession) {
     cb.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-queryType-07129");
-    vk::CmdBeginQuery(cb.handle(), context.EncodeFeedbackQueryPool(), 0, 0);
+    vk::CmdBeginQuery(cb, context.EncodeFeedbackQueryPool(), 0, 0);
     m_errorMonitor->VerifyFound();
 
     cb.End();

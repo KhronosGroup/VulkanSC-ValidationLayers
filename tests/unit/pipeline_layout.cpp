@@ -16,6 +16,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
+#include <algorithm>
 
 class NegativePipelineLayout : public VkLayerTest {};
 
@@ -38,7 +39,7 @@ TEST_F(NegativePipelineLayout, ExceedsSetLimit) {
 
     // Create an array of DSLs, one larger than the physical limit
     const auto excess_layouts = 1 + m_device->Physical().limits_.maxBoundDescriptorSets;
-    std::vector<VkDescriptorSetLayout> dsl_array(excess_layouts, ds_layout.handle());
+    std::vector<VkDescriptorSetLayout> dsl_array(excess_layouts, ds_layout);
 
     VkPipelineLayoutCreateInfo pipeline_layout_ci = vku::InitStructHelper();
     pipeline_layout_ci.setLayoutCount = excess_layouts;
@@ -87,7 +88,7 @@ TEST_F(NegativePipelineLayout, ExcessSubsampledPerStageDescriptors) {
     std::vector<VkSampler> immutableSamplers;
     immutableSamplers.resize(max_subsampled_samplers);
     for (uint32_t sampler_idx = 0; sampler_idx < max_subsampled_samplers; sampler_idx++) {
-        immutableSamplers[sampler_idx] = sampler.handle();
+        immutableSamplers[sampler_idx] = sampler;
     }
 
     // VU 03566 - too many subsampled sampler type descriptors across stages
@@ -810,7 +811,7 @@ TEST_F(NegativePipelineLayout, DescriptorTypeMismatchCompute) {
     )glsl";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        helper.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkComputePipelineCreateInfo-layout-07990");
@@ -922,7 +923,7 @@ TEST_F(NegativePipelineLayout, UniformBlockNotProvided) {
     OneOffDescriptorSet descriptor_set(m_device, {});  // no descriptor in layout
     vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.gp_ci_.layout = pipeline_layout;
     pipe.CreateGraphicsPipeline();
 
     m_errorMonitor->VerifyFound();
@@ -945,7 +946,7 @@ TEST_F(NegativePipelineLayout, MissingDescriptor) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {});
     m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-layout-07988");
     pipe.CreateComputePipeline();
@@ -971,7 +972,10 @@ TEST_F(NegativePipelineLayout, MultiplePushDescriptorSets) {
         ds_layouts.emplace_back(*m_device, std::vector<VkDescriptorSetLayoutBinding>(1, dsl_binding),
                                 VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
     }
-    const auto &ds_vk_layouts = MakeVkHandles<VkDescriptorSetLayout>(ds_layouts);
+    std::vector<VkDescriptorSetLayout> ds_vk_layouts;
+    for (const auto &ds_layout : ds_layouts) {
+        ds_vk_layouts.push_back(ds_layout.handle());
+    }
 
     VkPipelineLayout pipeline_layout;
     VkPipelineLayoutCreateInfo pipeline_layout_ci = vku::InitStructHelper();
@@ -1005,7 +1009,7 @@ TEST_F(NegativePipelineLayout, SetLayoutFlags) {
     ds_layout_ci.pBindings = &layout_binding;
 
     vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
-    VkDescriptorSetLayout ds_layout_handle = ds_layout.handle();
+    VkDescriptorSetLayout ds_layout_handle = ds_layout;
 
     VkPipelineLayoutCreateInfo pipeline_layout_ci = vku::InitStructHelper();
     pipeline_layout_ci.setLayoutCount = 1;
@@ -1045,8 +1049,8 @@ TEST_F(NegativePipelineLayout, InlineUniformBlockArray) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout.handle();
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
 
     m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-None-10391");
     pipe.CreateComputePipeline();
@@ -1082,8 +1086,8 @@ TEST_F(NegativePipelineLayout, InlineUniformBlockArrayOf1) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout.handle();
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
 
     m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-None-10391");
     pipe.CreateComputePipeline();

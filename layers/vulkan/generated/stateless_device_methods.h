@@ -750,6 +750,8 @@ bool PreCallValidateGetDeviceImageSubresourceLayoutKHR(VkDevice device, const Vk
                                                        VkSubresourceLayout2* pLayout, const ErrorObject& error_obj) const override;
 bool PreCallValidateGetImageSubresourceLayout2KHR(VkDevice device, VkImage image, const VkImageSubresource2* pSubresource,
                                                   VkSubresourceLayout2* pLayout, const ErrorObject& error_obj) const override;
+bool PreCallValidateWaitForPresent2KHR(VkDevice device, VkSwapchainKHR swapchain, const VkPresentWait2InfoKHR* pPresentWait2Info,
+                                       const ErrorObject& error_obj) const override;
 bool PreCallValidateCreatePipelineBinariesKHR(VkDevice device, const VkPipelineBinaryCreateInfoKHR* pCreateInfo,
                                               const VkAllocationCallbacks* pAllocator, VkPipelineBinaryHandlesInfoKHR* pBinaries,
                                               const ErrorObject& error_obj) const override;
@@ -1143,6 +1145,12 @@ bool PreCallValidateDestroyCudaFunctionNV(VkDevice device, VkCudaFunctionNV func
 bool PreCallValidateCmdCudaLaunchKernelNV(VkCommandBuffer commandBuffer, const VkCudaLaunchInfoNV* pLaunchInfo,
                                           const ErrorObject& error_obj) const override;
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+bool PreCallValidateCmdDispatchTileQCOM(VkCommandBuffer commandBuffer, const VkDispatchTileInfoQCOM* pDispatchTileInfo,
+                                        const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdBeginPerTileExecutionQCOM(VkCommandBuffer commandBuffer, const VkPerTileBeginInfoQCOM* pPerTileBeginInfo,
+                                                 const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdEndPerTileExecutionQCOM(VkCommandBuffer commandBuffer, const VkPerTileEndInfoQCOM* pPerTileEndInfo,
+                                               const ErrorObject& error_obj) const override;
 #ifdef VK_USE_PLATFORM_METAL_EXT
 bool PreCallValidateExportMetalObjectsEXT(VkDevice device, VkExportMetalObjectsInfoEXT* pMetalObjectsInfo,
                                           const ErrorObject& error_obj) const override;
@@ -1377,6 +1385,31 @@ bool PreCallValidateCmdSetRepresentativeFragmentTestEnableNV(VkCommandBuffer com
                                                              const ErrorObject& error_obj) const override;
 bool PreCallValidateCmdSetCoverageReductionModeNV(VkCommandBuffer commandBuffer, VkCoverageReductionModeNV coverageReductionMode,
                                                   const ErrorObject& error_obj) const override;
+bool PreCallValidateCreateTensorARM(VkDevice device, const VkTensorCreateInfoARM* pCreateInfo,
+                                    const VkAllocationCallbacks* pAllocator, VkTensorARM* pTensor,
+                                    const ErrorObject& error_obj) const override;
+bool PreCallValidateDestroyTensorARM(VkDevice device, VkTensorARM tensor, const VkAllocationCallbacks* pAllocator,
+                                     const ErrorObject& error_obj) const override;
+bool PreCallValidateCreateTensorViewARM(VkDevice device, const VkTensorViewCreateInfoARM* pCreateInfo,
+                                        const VkAllocationCallbacks* pAllocator, VkTensorViewARM* pView,
+                                        const ErrorObject& error_obj) const override;
+bool PreCallValidateDestroyTensorViewARM(VkDevice device, VkTensorViewARM tensorView, const VkAllocationCallbacks* pAllocator,
+                                         const ErrorObject& error_obj) const override;
+bool PreCallValidateGetTensorMemoryRequirementsARM(VkDevice device, const VkTensorMemoryRequirementsInfoARM* pInfo,
+                                                   VkMemoryRequirements2* pMemoryRequirements,
+                                                   const ErrorObject& error_obj) const override;
+bool PreCallValidateBindTensorMemoryARM(VkDevice device, uint32_t bindInfoCount, const VkBindTensorMemoryInfoARM* pBindInfos,
+                                        const ErrorObject& error_obj) const override;
+bool PreCallValidateGetDeviceTensorMemoryRequirementsARM(VkDevice device, const VkDeviceTensorMemoryRequirementsARM* pInfo,
+                                                         VkMemoryRequirements2* pMemoryRequirements,
+                                                         const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdCopyTensorARM(VkCommandBuffer commandBuffer, const VkCopyTensorInfoARM* pCopyTensorInfo,
+                                     const ErrorObject& error_obj) const override;
+bool PreCallValidateGetTensorOpaqueCaptureDescriptorDataARM(VkDevice device, const VkTensorCaptureDescriptorDataInfoARM* pInfo,
+                                                            void* pData, const ErrorObject& error_obj) const override;
+bool PreCallValidateGetTensorViewOpaqueCaptureDescriptorDataARM(VkDevice device,
+                                                                const VkTensorViewCaptureDescriptorDataInfoARM* pInfo, void* pData,
+                                                                const ErrorObject& error_obj) const override;
 bool PreCallValidateGetShaderModuleIdentifierEXT(VkDevice device, VkShaderModule shaderModule,
                                                  VkShaderModuleIdentifierEXT* pIdentifier,
                                                  const ErrorObject& error_obj) const override;
@@ -1430,6 +1463,38 @@ bool PreCallValidateGetLatencyTimingsNV(VkDevice device, VkSwapchainKHR swapchai
                                         const ErrorObject& error_obj) const override;
 bool PreCallValidateQueueNotifyOutOfBandNV(VkQueue queue, const VkOutOfBandQueueTypeInfoNV* pQueueTypeInfo,
                                            const ErrorObject& error_obj) const override;
+bool PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                                const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                const ErrorObject& error_obj) const override;
+bool PreCallValidateCreateDataGraphPipelineSessionARM(VkDevice device, const VkDataGraphPipelineSessionCreateInfoARM* pCreateInfo,
+                                                      const VkAllocationCallbacks* pAllocator,
+                                                      VkDataGraphPipelineSessionARM* pSession,
+                                                      const ErrorObject& error_obj) const override;
+bool PreCallValidateGetDataGraphPipelineSessionBindPointRequirementsARM(
+    VkDevice device, const VkDataGraphPipelineSessionBindPointRequirementsInfoARM* pInfo, uint32_t* pBindPointRequirementCount,
+    VkDataGraphPipelineSessionBindPointRequirementARM* pBindPointRequirements, const ErrorObject& error_obj) const override;
+bool PreCallValidateGetDataGraphPipelineSessionMemoryRequirementsARM(
+    VkDevice device, const VkDataGraphPipelineSessionMemoryRequirementsInfoARM* pInfo, VkMemoryRequirements2* pMemoryRequirements,
+    const ErrorObject& error_obj) const override;
+bool PreCallValidateBindDataGraphPipelineSessionMemoryARM(VkDevice device, uint32_t bindInfoCount,
+                                                          const VkBindDataGraphPipelineSessionMemoryInfoARM* pBindInfos,
+                                                          const ErrorObject& error_obj) const override;
+bool PreCallValidateDestroyDataGraphPipelineSessionARM(VkDevice device, VkDataGraphPipelineSessionARM session,
+                                                       const VkAllocationCallbacks* pAllocator,
+                                                       const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdDispatchDataGraphARM(VkCommandBuffer commandBuffer, VkDataGraphPipelineSessionARM session,
+                                            const VkDataGraphPipelineDispatchInfoARM* pInfo,
+                                            const ErrorObject& error_obj) const override;
+bool PreCallValidateGetDataGraphPipelineAvailablePropertiesARM(VkDevice device, const VkDataGraphPipelineInfoARM* pPipelineInfo,
+                                                               uint32_t* pPropertiesCount,
+                                                               VkDataGraphPipelinePropertyARM* pProperties,
+                                                               const ErrorObject& error_obj) const override;
+bool PreCallValidateGetDataGraphPipelinePropertiesARM(VkDevice device, const VkDataGraphPipelineInfoARM* pPipelineInfo,
+                                                      uint32_t propertiesCount,
+                                                      VkDataGraphPipelinePropertyQueryResultARM* pProperties,
+                                                      const ErrorObject& error_obj) const override;
 bool PreCallValidateCmdSetAttachmentFeedbackLoopEnableEXT(VkCommandBuffer commandBuffer, VkImageAspectFlags aspectMask,
                                                           const ErrorObject& error_obj) const override;
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
@@ -1437,6 +1502,17 @@ bool PreCallValidateGetScreenBufferPropertiesQNX(VkDevice device, const struct _
                                                  VkScreenBufferPropertiesQNX* pProperties,
                                                  const ErrorObject& error_obj) const override;
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+bool PreCallValidateCmdBindTileMemoryQCOM(VkCommandBuffer commandBuffer, const VkTileMemoryBindInfoQCOM* pTileMemoryBindInfo,
+                                          const ErrorObject& error_obj) const override;
+bool PreCallValidateCreateExternalComputeQueueNV(VkDevice device, const VkExternalComputeQueueCreateInfoNV* pCreateInfo,
+                                                 const VkAllocationCallbacks* pAllocator, VkExternalComputeQueueNV* pExternalQueue,
+                                                 const ErrorObject& error_obj) const override;
+bool PreCallValidateDestroyExternalComputeQueueNV(VkDevice device, VkExternalComputeQueueNV externalQueue,
+                                                  const VkAllocationCallbacks* pAllocator,
+                                                  const ErrorObject& error_obj) const override;
+bool PreCallValidateGetExternalComputeQueueDataNV(VkExternalComputeQueueNV externalQueue,
+                                                  VkExternalComputeQueueDataParamsNV* params, void* pData,
+                                                  const ErrorObject& error_obj) const override;
 bool PreCallValidateGetClusterAccelerationStructureBuildSizesNV(VkDevice device,
                                                                 const VkClusterAccelerationStructureInputInfoNV* pInfo,
                                                                 VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo,
@@ -1491,6 +1567,8 @@ bool PreCallValidateGetMemoryMetalHandlePropertiesEXT(VkDevice device, VkExterna
                                                       VkMemoryMetalHandlePropertiesEXT* pMemoryMetalHandleProperties,
                                                       const ErrorObject& error_obj) const override;
 #endif  // VK_USE_PLATFORM_METAL_EXT
+bool PreCallValidateCmdEndRendering2EXT(VkCommandBuffer commandBuffer, const VkRenderingEndInfoEXT* pRenderingEndInfo,
+                                        const ErrorObject& error_obj) const override;
 bool PreCallValidateCreateAccelerationStructureKHR(VkDevice device, const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
                                                    const VkAllocationCallbacks* pAllocator,
                                                    VkAccelerationStructureKHR* pAccelerationStructure,

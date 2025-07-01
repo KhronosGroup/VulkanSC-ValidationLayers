@@ -34,53 +34,30 @@ VALSTATETRACK_DERIVED_STATE_OBJECT(VkDescriptorPool, vvl::sc::DescriptorPool, vv
 
 namespace vvl::sc {
 
-template <typename BASE>
-class Instance : public BASE {
-    using BaseClass = BASE;
+class InstanceState : public vvl::InstanceState {
+    using BaseClass = vvl::InstanceState;
 
   public:
-    Instance(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch) {}
+    InstanceState(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch) {}
 };
 
 template <typename BASE>
-class Device : public BASE {
+class InstanceProxy : public BASE {
     using BaseClass = BASE;
 
   public:
-    template <typename INSTANCE_BASE>
-    Device(vvl::dispatch::Device* dev, INSTANCE_BASE* instance) : BaseClass(dev, instance) {}
+    vvl::sc::InstanceState* sc_instance_state;
 
-    template <typename State, typename HandleType = typename state_object::Traits<State>::HandleType>
-    void Add(std::shared_ptr<State>&& state_object) {
-        BaseClass::template Add<State, HandleType>(std::move(state_object));
-    }
+    InstanceProxy(vvl::dispatch::Instance* dispatch)
+        : BaseClass(dispatch),
+          sc_instance_state(dynamic_cast<vvl::sc::InstanceState*>(dispatch->GetValidationObject(LayerObjectTypeStateTracker))) {}
+};
 
-    template <typename State, typename Traits = typename state_object::Traits<State>>
-    void Destroy(typename Traits::HandleType handle) {
-        BaseClass::template Destroy<State, Traits>(handle);
-    }
+class DeviceState : public vvl::DeviceState {
+    using BaseClass = vvl::DeviceState;
 
-    template <typename State, typename Traits = typename state_object::Traits<State>>
-    typename Traits::SharedType Get(typename Traits::HandleType handle) {
-        return BaseClass::template Get<State, Traits>(handle);
-    }
-
-    template <typename State, typename Traits = typename state_object::Traits<State>>
-    typename Traits::ConstSharedType Get(typename Traits::HandleType handle) const {
-        return BaseClass::template Get<State, Traits>(handle);
-    }
-
-    template <typename State, typename Traits = typename state_object::Traits<State>,
-              typename ReadLockedType = typename Traits::ReadLockedType>
-    ReadLockedType GetRead(typename Traits::HandleType handle) const {
-        return BaseClass::template GetRead<State, Traits, ReadLockedType>(handle);
-    }
-
-    template <typename State, typename Traits = state_object::Traits<State>,
-              typename WriteLockedType = typename Traits::WriteLockedType>
-    WriteLockedType GetWrite(typename Traits::HandleType handle) {
-        return BaseClass::template GetWrite<State, Traits, WriteLockedType>(handle);
-    }
+  public:
+    DeviceState(vvl::dispatch::Device* dev, vvl::InstanceState* instance) : BaseClass(dev, instance) {}
 
     template <typename CreateInfo>
     void ReservePipelinePoolEntries(uint32_t create_info_count, const CreateInfo* create_info);
@@ -150,9 +127,9 @@ class Device : public BASE {
                                                     const VkAllocationCallbacks* pAllocator,
                                                     VkSamplerYcbcrConversion* pYcbcrConversion,
                                                     const RecordObject& record_obj) override;
-    void PostCallRecordDestroySamplerYcbcrConversion(VkDevice device, VkSamplerYcbcrConversion ycbcrConversion,
-                                                     const VkAllocationCallbacks* pAllocator,
-                                                     const RecordObject& record_obj) override;
+    void PreCallRecordDestroySamplerYcbcrConversion(VkDevice device, VkSamplerYcbcrConversion ycbcrConversion,
+                                                    const VkAllocationCallbacks* pAllocator,
+                                                    const RecordObject& record_obj) override;
     void PostCallRecordCreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo,
                                             const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout,
                                             const RecordObject& record_obj) override;
@@ -220,7 +197,6 @@ class Device : public BASE {
                                           const RecordObject& record_obj) override;
     void PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer, const RecordObject& record_obj) override;
 
-  protected:
     // SC-specific features and properties
     SCDeviceFeatures enabled_sc_features_ = {};
     VkPhysicalDeviceVulkanSC10Properties phys_dev_props_sc_10_ = {};
@@ -267,6 +243,21 @@ class Device : public BASE {
         std::atomic_uint32_t descriptor_set_layout_bindings{0};
         std::atomic_uint32_t private_data_slots{0};
     } sc_reserved_objects_{};
+};
+
+template <typename BASE>
+class DeviceProxy : public BASE {
+    using BaseClass = BASE;
+
+  public:
+    vvl::sc::DeviceState* sc_device_state{};
+    vvl::sc::InstanceState* sc_instance_state{};
+
+    template <typename INSTANCE_TYPE>
+    DeviceProxy(vvl::dispatch::Device* dev, INSTANCE_TYPE* instance)
+        : BaseClass(dev, instance),
+          sc_device_state(dynamic_cast<vvl::sc::DeviceState*>(dev->GetValidationObject(LayerObjectTypeStateTracker))),
+          sc_instance_state(dynamic_cast<vvl::sc::InstanceState*>(instance->instance_state)) {}
 };
 
 }  // namespace vvl::sc

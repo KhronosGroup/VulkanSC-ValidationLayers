@@ -17,10 +17,7 @@
 #include <vulkan/vulkan_core.h>
 #include <cstdint>
 #include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/shader_object_helper.h"
 #include "../framework/descriptor_helper.h"
-#include "../framework/buffer_helper.h"
 #include "../framework/gpu_av_helper.h"
 #include "../framework/ray_tracing_objects.h"
 
@@ -73,7 +70,7 @@ class NegativeDebugPrintfRayTracing : public DebugPrintfTests {
 
         // Build Bottom Level Acceleration Structure
         m_command_buffer.Begin();
-        out_cube_blas->BuildCmdBuffer(m_command_buffer.handle());
+        out_cube_blas->BuildCmdBuffer(m_command_buffer);
         m_command_buffer.End();
 
         m_default_queue->Submit(m_command_buffer);
@@ -130,7 +127,7 @@ class NegativeDebugPrintfRayTracing : public DebugPrintfTests {
         tlas.SetNullBuildRangeInfos(false);
 
         m_command_buffer.Begin();
-        tlas.BuildCmdBuffer(m_command_buffer.handle());
+        tlas.BuildCmdBuffer(m_command_buffer);
         m_command_buffer.End();
 
         m_default_queue->Submit(m_command_buffer);
@@ -910,14 +907,13 @@ TEST_F(NegativeDebugPrintfRayTracing, Raygen) {
     m_command_buffer.Begin();
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
     vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);
     m_command_buffer.End();
     m_errorMonitor->SetDesiredInfo("In Raygen");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -933,21 +929,20 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShader) {
 
     // #ARNO_TODO: For clarity, here geometry should be set explicitly, as of now the ray hitting or not
     // implicitly depends on the default triangle position.
-    auto blas = std::make_shared<vkt::as::BuildGeometryInfoKHR>(
-        vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::Triangle));
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
 
     // Build Bottom Level Acceleration Structure
     m_command_buffer.Begin();
-    blas->BuildCmdBuffer(m_command_buffer.handle());
+    blas.BuildCmdBuffer(m_command_buffer);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 
     // Build Top Level Acceleration Structure
-    vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, blas);
+    vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, *blas.GetDstAS());
     m_command_buffer.Begin();
-    tlas.BuildCmdBuffer(m_command_buffer.handle());
+    tlas.BuildCmdBuffer(m_command_buffer);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
@@ -957,10 +952,9 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShader) {
     vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              kHostVisibleMemProps);
     m_command_buffer.Begin();
-    vk::CmdFillBuffer(m_command_buffer.handle(), debug_buffer.handle(), 0, debug_buffer.CreateInfo().size, 0);
+    vk::CmdFillBuffer(m_command_buffer, debug_buffer, 0, debug_buffer.CreateInfo().size, 0);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
@@ -1053,8 +1047,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShader) {
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     pipeline.CreateDescriptorSet();
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
-    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer.handle(), 0, VK_WHOLE_SIZE,
-                                                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
     pipeline.Build();
@@ -1066,13 +1059,13 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShader) {
     const uint32_t ray_gen_rays_count = ray_gen_width * ray_gen_height * ray_gen_depth;
     for (uint32_t frame = 0; frame < frames_count; ++frame) {
         m_command_buffer.Begin();
-        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(),
-                                  0, 1, &pipeline.GetDescriptorSet().set_, 0, nullptr);
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                                  &pipeline.GetDescriptorSet().set_, 0, nullptr);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
         vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
 
-        vk::CmdTraceRaysKHR(m_command_buffer.handle(), &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt,
-                            &trace_rays_sbt.hit_sbt, &trace_rays_sbt.callable_sbt, ray_gen_width, ray_gen_height, ray_gen_depth);
+        vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                            &trace_rays_sbt.callable_sbt, ray_gen_width, ray_gen_height, ray_gen_depth);
 
         m_command_buffer.End();
         for (uint32_t i = 0; i < ray_gen_rays_count; ++i) {
@@ -1088,8 +1081,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShader) {
             m_errorMonitor->SetDesiredInfo(msg.c_str());
         }
 
-        m_default_queue->Submit(m_command_buffer);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(m_command_buffer);
 
         m_errorMonitor->VerifyFound();
     }
@@ -1098,7 +1090,6 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShader) {
     ASSERT_EQ(debug_buffer_ptr[0], ray_gen_rays_count * frames_count);
     ASSERT_EQ(debug_buffer_ptr[1], 3 * ray_gen_rays_count * frames_count);
     ASSERT_EQ(debug_buffer_ptr[2], 2 * ray_gen_rays_count * frames_count);
-    debug_buffer.Memory().Unmap();
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9559
@@ -1118,21 +1109,20 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader) {
 
     // #ARNO_TODO: For clarity, here geometry should be set explicitly, as of now the ray hitting or not
     // implicitly depends on the default triangle position.
-    auto blas = std::make_shared<vkt::as::BuildGeometryInfoKHR>(
-        vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::Triangle));
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
 
     // Build Bottom Level Acceleration Structure
     m_command_buffer.Begin();
-    blas->BuildCmdBuffer(m_command_buffer.handle());
+    blas.BuildCmdBuffer(m_command_buffer);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 
     // Build Top Level Acceleration Structure
-    vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, blas);
+    vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, *blas.GetDstAS());
     m_command_buffer.Begin();
-    tlas.BuildCmdBuffer(m_command_buffer.handle());
+    tlas.BuildCmdBuffer(m_command_buffer);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
@@ -1142,10 +1132,9 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader) {
     vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              kHostVisibleMemProps);
     m_command_buffer.Begin();
-    vk::CmdFillBuffer(m_command_buffer.handle(), debug_buffer.handle(), 0, debug_buffer.CreateInfo().size, 0);
+    vk::CmdFillBuffer(m_command_buffer, debug_buffer, 0, debug_buffer.CreateInfo().size, 0);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
@@ -1157,8 +1146,7 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader) {
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     pipeline.CreateDescriptorSet();
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
-    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer.handle(), 0, VK_WHOLE_SIZE,
-                                                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
     pipeline.Build();
@@ -1166,20 +1154,19 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader) {
     uint32_t frames_count = 42;
     for (uint32_t frame = 0; frame < frames_count; ++frame) {
         m_command_buffer.Begin();
-        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(),
-                                  0, 1, &pipeline.GetDescriptorSet().set_, 0, nullptr);
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                                  &pipeline.GetDescriptorSet().set_, 0, nullptr);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
         vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
 
-        vk::CmdTraceRaysKHR(m_command_buffer.handle(), &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt,
-                            &trace_rays_sbt.hit_sbt, &trace_rays_sbt.callable_sbt, 1, 1, 1);
+        vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                            &trace_rays_sbt.callable_sbt, 1, 1, 1);
 
         m_command_buffer.End();
         m_errorMonitor->SetDesiredInfo("In Raygen");
         m_errorMonitor->SetDesiredInfo("In Miss", 3);
         m_errorMonitor->SetDesiredInfo("In Closest Hit", 2);
-        m_default_queue->Submit(m_command_buffer);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(m_command_buffer);
     }
     m_errorMonitor->VerifyFound();
 
@@ -1187,7 +1174,6 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader) {
     ASSERT_EQ(debug_buffer_ptr[0], frames_count);
     ASSERT_EQ(debug_buffer_ptr[1], 3 * frames_count);
     ASSERT_EQ(debug_buffer_ptr[2], 2 * frames_count);
-    debug_buffer.Memory().Unmap();
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9559
@@ -1210,10 +1196,9 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     vkt::Buffer debug_buffer(*m_device, 2 * 3 * sizeof(uint32_t),
                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, kHostVisibleMemProps);
     m_command_buffer.Begin();
-    vk::CmdFillBuffer(m_command_buffer.handle(), debug_buffer.handle(), 0, debug_buffer.CreateInfo().size, 0);
+    vk::CmdFillBuffer(m_command_buffer, debug_buffer, 0, debug_buffer.CreateInfo().size, 0);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
@@ -1228,8 +1213,7 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     pipeline.CreateDescriptorSet();
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
-    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer.handle(), 0, VK_WHOLE_SIZE,
-                                                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
     pipeline.Build();
@@ -1237,18 +1221,18 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     uint32_t frames_count = 42;
     for (uint32_t frame = 0; frame < frames_count; ++frame) {
         m_command_buffer.Begin();
-        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(),
-                                  0, 1, &pipeline.GetDescriptorSet().set_, 0, nullptr);
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                                  &pipeline.GetDescriptorSet().set_, 0, nullptr);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
 
         // Invoke ray gen shader 1
         vkt::rt::TraceRaysSbt sbt_ray_gen_1 = pipeline.GetTraceRaysSbt(0);
-        vk::CmdTraceRaysKHR(m_command_buffer.handle(), &sbt_ray_gen_1.ray_gen_sbt, &sbt_ray_gen_1.miss_sbt, &sbt_ray_gen_1.hit_sbt,
+        vk::CmdTraceRaysKHR(m_command_buffer, &sbt_ray_gen_1.ray_gen_sbt, &sbt_ray_gen_1.miss_sbt, &sbt_ray_gen_1.hit_sbt,
                             &sbt_ray_gen_1.callable_sbt, 1, 1, 1);
 
         // Invoke ray gen shader 2
         vkt::rt::TraceRaysSbt sbt_ray_gen_2 = pipeline.GetTraceRaysSbt(1);
-        vk::CmdTraceRaysKHR(m_command_buffer.handle(), &sbt_ray_gen_2.ray_gen_sbt, &sbt_ray_gen_2.miss_sbt, &sbt_ray_gen_2.hit_sbt,
+        vk::CmdTraceRaysKHR(m_command_buffer, &sbt_ray_gen_2.ray_gen_sbt, &sbt_ray_gen_2.miss_sbt, &sbt_ray_gen_2.hit_sbt,
                             &sbt_ray_gen_2.callable_sbt, 1, 1, 1);
 
         m_command_buffer.End();
@@ -1258,8 +1242,7 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
         m_errorMonitor->SetDesiredInfo("In Miss 2", 2);
         m_errorMonitor->SetDesiredInfo("In Closest Hit 1", 2);
         m_errorMonitor->SetDesiredInfo("In Closest Hit 2", 3);
-        m_default_queue->Submit(m_command_buffer);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(m_command_buffer);
     }
     m_errorMonitor->VerifyFound();
 
@@ -1271,7 +1254,6 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     ASSERT_EQ(debug_buffer_ptr[3], (1 + 1) * frames_count);
     ASSERT_EQ(debug_buffer_ptr[4], (1 + 1) * frames_count);
     ASSERT_EQ(debug_buffer_ptr[5], (1 + 2) * frames_count);
-    debug_buffer.Memory().Unmap();
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9559
@@ -1296,10 +1278,9 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     vkt::Buffer debug_buffer(*m_device, 2 * 3 * sizeof(uint32_t),
                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, kHostVisibleMemProps);
     m_command_buffer.Begin();
-    vk::CmdFillBuffer(m_command_buffer.handle(), debug_buffer.handle(), 0, debug_buffer.CreateInfo().size, 0);
+    vk::CmdFillBuffer(m_command_buffer, debug_buffer, 0, debug_buffer.CreateInfo().size, 0);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
@@ -1314,8 +1295,7 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     pipeline.CreateDescriptorSet();
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
-    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer.handle(), 0, VK_WHOLE_SIZE,
-                                                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
     pipeline.Build();
@@ -1326,15 +1306,15 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     uint32_t frames_count = 42;
     for (uint32_t frame = 0; frame < frames_count; ++frame) {
         m_command_buffer.Begin();
-        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(),
-                                  0, 1, &pipeline.GetDescriptorSet().set_, 0, nullptr);
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                                  &pipeline.GetDescriptorSet().set_, 0, nullptr);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
 
         // Invoke ray gen shader 1
-        vk::CmdTraceRaysIndirect2KHR(m_command_buffer.handle(), sbt_ray_gen_1.Address());
+        vk::CmdTraceRaysIndirect2KHR(m_command_buffer, sbt_ray_gen_1.Address());
 
         // Invoke ray gen shader 2
-        vk::CmdTraceRaysIndirect2KHR(m_command_buffer.handle(), sbt_ray_gen_2.Address());
+        vk::CmdTraceRaysIndirect2KHR(m_command_buffer, sbt_ray_gen_2.Address());
 
         m_command_buffer.End();
         m_errorMonitor->SetDesiredInfo("In Raygen 1");
@@ -1343,8 +1323,7 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
         m_errorMonitor->SetDesiredInfo("In Miss 2", 2);
         m_errorMonitor->SetDesiredInfo("In Closest Hit 1", 2);
         m_errorMonitor->SetDesiredInfo("In Closest Hit 2", 3);
-        m_default_queue->Submit(m_command_buffer);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(m_command_buffer);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1356,7 +1335,6 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     ASSERT_EQ(debug_buffer_ptr[3], (1 + 1) * frames_count);
     ASSERT_EQ(debug_buffer_ptr[4], (1 + 1) * frames_count);
     ASSERT_EQ(debug_buffer_ptr[5], (1 + 2) * frames_count);
-    debug_buffer.Memory().Unmap();
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9559
@@ -1381,10 +1359,9 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     vkt::Buffer debug_buffer(*m_device, 2 * 3 * sizeof(uint32_t),
                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, kHostVisibleMemProps);
     m_command_buffer.Begin();
-    vk::CmdFillBuffer(m_command_buffer.handle(), debug_buffer.handle(), 0, debug_buffer.CreateInfo().size, 0);
+    vk::CmdFillBuffer(m_command_buffer, debug_buffer, 0, debug_buffer.CreateInfo().size, 0);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
@@ -1399,8 +1376,7 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     pipeline.CreateDescriptorSet();
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
-    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer.handle(), 0, VK_WHOLE_SIZE,
-                                                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
     pipeline.DeferBuild();
@@ -1416,15 +1392,15 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     uint32_t frames_count = 1;
     for (uint32_t frame = 0; frame < frames_count; ++frame) {
         m_command_buffer.Begin();
-        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(),
-                                  0, 1, &pipeline.GetDescriptorSet().set_, 0, nullptr);
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                                  &pipeline.GetDescriptorSet().set_, 0, nullptr);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
 
         // Invoke ray gen shader 1
-        vk::CmdTraceRaysIndirect2KHR(m_command_buffer.handle(), sbt_ray_gen_1.Address());
+        vk::CmdTraceRaysIndirect2KHR(m_command_buffer, sbt_ray_gen_1.Address());
 
         // Invoke ray gen shader 2
-        vk::CmdTraceRaysIndirect2KHR(m_command_buffer.handle(), sbt_ray_gen_2.Address());
+        vk::CmdTraceRaysIndirect2KHR(m_command_buffer, sbt_ray_gen_2.Address());
 
         m_command_buffer.End();
         m_errorMonitor->SetDesiredInfo("In Raygen 1", ray_gen_1_rays_count);
@@ -1433,8 +1409,7 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
         m_errorMonitor->SetDesiredInfo("In Miss 2", 1 * ray_gen_1_rays_count + 1);
         m_errorMonitor->SetDesiredInfo("In Closest Hit 1", 1 * ray_gen_1_rays_count + 1);
         m_errorMonitor->SetDesiredInfo("In Closest Hit 2", 1 * ray_gen_1_rays_count + 2);
-        m_default_queue->Submit(m_command_buffer);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(m_command_buffer);
     }
     m_errorMonitor->VerifyFound();
 
@@ -1446,5 +1421,4 @@ TEST_F(NegativeDebugPrintfRayTracing, DISABLED_OneMultiEntryPointsShader2CmdTrac
     ASSERT_EQ(debug_buffer_ptr[3], (1 * ray_gen_1_rays_count + 1) * frames_count);
     ASSERT_EQ(debug_buffer_ptr[4], (1 * ray_gen_1_rays_count + 1) * frames_count);
     ASSERT_EQ(debug_buffer_ptr[5], (1 * ray_gen_1_rays_count + 2) * frames_count);
-    debug_buffer.Memory().Unmap();
 }

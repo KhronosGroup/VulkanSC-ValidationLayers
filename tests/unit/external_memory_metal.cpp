@@ -12,9 +12,10 @@
  */
 
 #ifdef VK_USE_PLATFORM_METAL_EXT
-#include "utils/vk_layer_utils.h"
+#include "utils/math_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/external_memory_sync.h"
+#include "containers/container_utils.h"
 
 // We need these instead of using FindSupportedExternalMemoryHandleTypes because otherwise we'll get
 // VUID-VkPhysicalDeviceExternalImageFormatInfo-handleType-parameter due to sending flags that are not supported due to extensions
@@ -141,7 +142,7 @@ TEST_F(NegativeExternalMemoryMetal, AllocateImportableImageWithoutDedicatedAlloc
     vkt::Image image(*m_device, image_info, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
-    dedicated_info.image = image.handle();
+    dedicated_info.image = image;
     VkExportMemoryAllocateInfo export_memory_info = vku::InitStructHelper(&dedicated_info);
     export_memory_info.handleTypes = metal_texture_type;
     image.AllocateAndBindMemory(*m_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &export_memory_info);
@@ -193,7 +194,7 @@ TEST_F(NegativeExternalMemoryMetal, AllocateImportableImageWithoutDedicatedImage
     vkt::Image image(*m_device, image_info, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
-    dedicated_info.image = image.handle();
+    dedicated_info.image = image;
     VkExportMemoryAllocateInfo export_memory_info = vku::InitStructHelper(&dedicated_info);
     export_memory_info.handleTypes = metal_texture_type;
     image.AllocateAndBindMemory(*m_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &export_memory_info);
@@ -246,7 +247,7 @@ TEST_F(NegativeExternalMemoryMetal, AllocateImportableImageWithAllocationSizeNot
     vkt::Image image(*m_device, image_info, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
-    dedicated_info.image = image.handle();
+    dedicated_info.image = image;
     VkExportMemoryAllocateInfo export_memory_info = vku::InitStructHelper(&dedicated_info);
     export_memory_info.handleTypes = metal_texture_type;
     image.AllocateAndBindMemory(*m_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &export_memory_info);

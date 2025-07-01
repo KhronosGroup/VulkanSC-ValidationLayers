@@ -18,56 +18,31 @@
  */
 
 #include "best_practices/best_practices_validation.h"
-#include "sync/sync_utils.h"
 #include "best_practices/bp_state.h"
 #include "state_tracker/queue_state.h"
-
-bool BestPractices::CheckPipelineStageFlags(const LogObjectList& objlist, const Location& loc, VkPipelineStageFlags flags) const {
-    bool skip = false;
-
-    if (flags & VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT) {
-        skip |= LogWarning("BestPractices-pipeline-stage-flags-graphics", objlist, loc, "using VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT");
-    } else if (flags & VK_PIPELINE_STAGE_ALL_COMMANDS_BIT) {
-        skip |= LogWarning("BestPractices-pipeline-stage-flags-compute", objlist, loc, "using VK_PIPELINE_STAGE_ALL_COMMANDS_BIT");
-    }
-
-    return skip;
-}
-
-bool BestPractices::CheckPipelineStageFlags(const LogObjectList& objlist, const Location& loc,
-                                            VkPipelineStageFlags2KHR flags) const {
-    bool skip = false;
-
-    if (flags & VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT) {
-        skip |=
-            LogWarning("BestPractices-pipeline-stage-flags2-graphics", objlist, loc, "using VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT");
-    } else if (flags & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT) {
-        skip |=
-            LogWarning("BestPractices-pipeline-stage-flags2-compute", objlist, loc, "using VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT");
-    }
-
-    return skip;
-}
+#include "generated/dispatch_functions.h"
 
 bool BestPractices::CheckDependencyInfo(const LogObjectList& objlist, const Location& dep_loc,
-                                        const VkDependencyInfo& dep_info) const {
+                                        const VkDependencyInfo& dep_info, VkCommandBuffer commandBuffer) const {
     bool skip = false;
-    auto stage_masks = sync_utils::GetGlobalStageMasks(dep_info);
-
-    skip |= CheckPipelineStageFlags(objlist, dep_loc, stage_masks.src);
-    skip |= CheckPipelineStageFlags(objlist, dep_loc, stage_masks.dst);
     for (uint32_t i = 0; i < dep_info.imageMemoryBarrierCount; ++i) {
-        skip |= ValidateImageMemoryBarrier(dep_loc.dot(Field::pImageMemoryBarriers, i), dep_info.pImageMemoryBarriers[i].image,
-                                           dep_info.pImageMemoryBarriers[i].oldLayout, dep_info.pImageMemoryBarriers[i].newLayout,
-                                           dep_info.pImageMemoryBarriers[i].srcAccessMask,
-                                           dep_info.pImageMemoryBarriers[i].dstAccessMask,
-                                           dep_info.pImageMemoryBarriers[i].subresourceRange.aspectMask);
+        skip |= ValidateImageMemoryBarrier(
+            dep_loc.dot(Field::pImageMemoryBarriers, i), commandBuffer, dep_info.pImageMemoryBarriers[i].image,
+            dep_info.pImageMemoryBarriers[i].oldLayout, dep_info.pImageMemoryBarriers[i].newLayout,
+            dep_info.pImageMemoryBarriers[i].srcAccessMask, dep_info.pImageMemoryBarriers[i].dstAccessMask,
+            dep_info.pImageMemoryBarriers[i].subresourceRange.aspectMask, dep_info.pImageMemoryBarriers[i].srcQueueFamilyIndex,
+            dep_info.pImageMemoryBarriers[i].dstQueueFamilyIndex);
+    }
+    for (uint32_t i = 0; i < dep_info.bufferMemoryBarrierCount; ++i) {
+        skip |= ValidateBufferMemoryBarrier(
+            dep_loc.dot(Field::pBufferMemoryBarriers, i), commandBuffer, dep_info.pBufferMemoryBarriers[i].buffer,
+            dep_info.pBufferMemoryBarriers[i].srcQueueFamilyIndex, dep_info.pBufferMemoryBarriers[i].dstQueueFamilyIndex);
     }
 
     return skip;
 }
 
-bool BestPractices::CheckEventSignalingState(const bp_state::CommandBuffer& command_buffer, VkEvent event,
+bool BestPractices::CheckEventSignalingState(const bp_state::CommandBufferSubState& command_buffer, VkEvent event,
                                              const Location& cb_loc) const {
     bool skip = false;
     if (auto* signaling_info = vvl::Find(command_buffer.event_signaling_state, event); signaling_info && signaling_info->signaled) {
@@ -80,37 +55,36 @@ bool BestPractices::CheckEventSignalingState(const bp_state::CommandBuffer& comm
     return skip;
 }
 
-void BestPractices::RecordCmdSetEvent(bp_state::CommandBuffer& command_buffer, VkEvent event) {
+void BestPractices::RecordCmdSetEvent(bp_state::CommandBufferSubState& command_buffer, VkEvent event) {
     if (auto* signaling_info = vvl::Find(command_buffer.event_signaling_state, event)) {
         signaling_info->signaled = true;
     } else {
-        command_buffer.event_signaling_state.emplace(event, bp_state::CommandBuffer::SignalingInfo(true));
+        command_buffer.event_signaling_state.emplace(event, bp_state::CommandBufferSubState::SignalingInfo(true));
     }
 }
 
-void BestPractices::RecordCmdResetEvent(bp_state::CommandBuffer& command_buffer, VkEvent event) {
+void BestPractices::RecordCmdResetEvent(bp_state::CommandBufferSubState& command_buffer, VkEvent event) {
     if (auto* signaling_info = vvl::Find(command_buffer.event_signaling_state, event)) {
         signaling_info->signaled = false;
     } else {
-        command_buffer.event_signaling_state.emplace(event, bp_state::CommandBuffer::SignalingInfo(false));
+        command_buffer.event_signaling_state.emplace(event, bp_state::CommandBufferSubState::SignalingInfo(false));
     }
 }
 
 bool BestPractices::PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                                const ErrorObject& error_obj) const {
     bool skip = false;
-
-    skip |= CheckPipelineStageFlags(commandBuffer, error_obj.location.dot(Field::stageMask), stageMask);
-    auto cb_state = Get<bp_state::CommandBuffer>(commandBuffer);
-    skip |= CheckEventSignalingState(*cb_state, event, error_obj.location.dot(Field::commandBuffer));
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    auto& sub_state = bp_state::SubState(*cb_state);
+    skip |= CheckEventSignalingState(sub_state, event, error_obj.location.dot(Field::commandBuffer));
     return skip;
 }
 
-void BestPractices::PreCallRecordCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
-                                             const RecordObject& record_obj) {
-    BaseClass::PreCallRecordCmdSetEvent(commandBuffer, event, stageMask, record_obj);
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    RecordCmdSetEvent(*cb_state, event);
+void BestPractices::PostCallRecordCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
+                                              const RecordObject& record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+    auto& sub_state = bp_state::SubState(*cb_state);
+    RecordCmdSetEvent(sub_state, event);
 }
 
 bool BestPractices::PreCallValidateCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
@@ -121,36 +95,30 @@ bool BestPractices::PreCallValidateCmdSetEvent2KHR(VkCommandBuffer commandBuffer
 bool BestPractices::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event,
                                                 const VkDependencyInfo* pDependencyInfo, const ErrorObject& error_obj) const {
     bool skip = false;
-    skip |= CheckDependencyInfo(commandBuffer, error_obj.location.dot(Field::pDependencyInfo), *pDependencyInfo);
-    auto cb_state = Get<bp_state::CommandBuffer>(commandBuffer);
-    skip |= CheckEventSignalingState(*cb_state, event, error_obj.location.dot(Field::commandBuffer));
+    skip |= CheckDependencyInfo(commandBuffer, error_obj.location.dot(Field::pDependencyInfo), *pDependencyInfo, commandBuffer);
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    auto& sub_state = bp_state::SubState(*cb_state);
+    skip |= CheckEventSignalingState(sub_state, event, error_obj.location.dot(Field::commandBuffer));
     return skip;
 }
 
-void BestPractices::PreCallRecordCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
-                                                 const VkDependencyInfoKHR* pDependencyInfo, const RecordObject& record_obj) {
-    PreCallRecordCmdSetEvent2(commandBuffer, event, pDependencyInfo, record_obj);
+void BestPractices::PostCallRecordCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
+                                                  const VkDependencyInfoKHR* pDependencyInfo, const RecordObject& record_obj) {
+    PostCallRecordCmdSetEvent2(commandBuffer, event, pDependencyInfo, record_obj);
 }
 
-void BestPractices::PreCallRecordCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfo* pDependencyInfo,
-                                              const RecordObject& record_obj) {
-    BaseClass::PreCallRecordCmdSetEvent2(commandBuffer, event, pDependencyInfo, record_obj);
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    RecordCmdSetEvent(*cb_state, event);
+void BestPractices::PostCallRecordCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event,
+                                               const VkDependencyInfo* pDependencyInfo, const RecordObject& record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+    auto& sub_state = bp_state::SubState(*cb_state);
+    RecordCmdSetEvent(sub_state, event);
 }
 
-bool BestPractices::PreCallValidateCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
-                                                 const ErrorObject& error_obj) const {
-    bool skip = false;
-    skip |= CheckPipelineStageFlags(commandBuffer, error_obj.location.dot(Field::stageMask), stageMask);
-    return skip;
-}
-
-void BestPractices::PreCallRecordCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
-                                               const RecordObject& record_obj) {
-    BaseClass::PreCallRecordCmdResetEvent(commandBuffer, event, stageMask, record_obj);
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    RecordCmdResetEvent(*cb_state, event);
+void BestPractices::PostCallRecordCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
+                                                const RecordObject& record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+    auto& sub_state = bp_state::SubState(*cb_state);
+    RecordCmdResetEvent(sub_state, event);
 }
 
 bool BestPractices::PreCallValidateCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
@@ -158,38 +126,16 @@ bool BestPractices::PreCallValidateCmdResetEvent2KHR(VkCommandBuffer commandBuff
     return PreCallValidateCmdResetEvent2(commandBuffer, event, stageMask, error_obj);
 }
 
-bool BestPractices::PreCallValidateCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
-                                                  const ErrorObject& error_obj) const {
-    bool skip = false;
-    skip |= CheckPipelineStageFlags(commandBuffer, error_obj.location.dot(Field::stageMask), stageMask);
-    return skip;
+void BestPractices::PostCallRecordCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
+                                                    VkPipelineStageFlags2KHR stageMask, const RecordObject& record_obj) {
+    PostCallRecordCmdResetEvent2(commandBuffer, event, stageMask, record_obj);
 }
 
-void BestPractices::PreCallRecordCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2KHR stageMask,
-                                                   const RecordObject& record_obj) {
-    PreCallRecordCmdResetEvent2(commandBuffer, event, stageMask, record_obj);
-}
-
-void BestPractices::PreCallRecordCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
-                                                const RecordObject& record_obj) {
-    BaseClass::PreCallRecordCmdResetEvent2(commandBuffer, event, stageMask, record_obj);
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    RecordCmdResetEvent(*cb_state, event);
-}
-
-bool BestPractices::PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
-                                                 VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
-                                                 uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
-                                                 uint32_t bufferMemoryBarrierCount,
-                                                 const VkBufferMemoryBarrier* pBufferMemoryBarriers,
-                                                 uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers,
-                                                 const ErrorObject& error_obj) const {
-    bool skip = false;
-
-    skip |= CheckPipelineStageFlags(commandBuffer, error_obj.location.dot(Field::srcStageMask), srcStageMask);
-    skip |= CheckPipelineStageFlags(commandBuffer, error_obj.location.dot(Field::dstStageMask), dstStageMask);
-
-    return skip;
+void BestPractices::PostCallRecordCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
+                                                 const RecordObject& record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+    auto& sub_state = bp_state::SubState(*cb_state);
+    RecordCmdResetEvent(sub_state, event);
 }
 
 bool BestPractices::PreCallValidateCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
@@ -202,7 +148,8 @@ bool BestPractices::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer,
                                                   const VkDependencyInfo* pDependencyInfos, const ErrorObject& error_obj) const {
     bool skip = false;
     for (uint32_t i = 0; i < eventCount; i++) {
-        skip |= CheckDependencyInfo(commandBuffer, error_obj.location.dot(Field::pDependencyInfos, i), pDependencyInfos[i]);
+        skip |= CheckDependencyInfo(commandBuffer, error_obj.location.dot(Field::pDependencyInfos, i), pDependencyInfos[i],
+                                    commandBuffer);
     }
 
     return skip;
@@ -314,9 +261,10 @@ bool BestPractices::ValidateAccessLayoutCombination(const Location& loc, VkImage
     return skip;
 }
 
-bool BestPractices::ValidateImageMemoryBarrier(const Location& loc, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
-                                               VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask,
-                                               VkImageAspectFlags aspectMask) const {
+bool BestPractices::ValidateImageMemoryBarrier(const Location& loc, VkCommandBuffer commandBuffer, VkImage image,
+                                               VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags2 srcAccessMask,
+                                               VkAccessFlags2 dstAccessMask, VkImageAspectFlags aspectMask,
+                                               uint32_t srcQueueFamilyIndex, uint32_t dstQueueFamilyIndex) const {
     bool skip = false;
 
     if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && IsImageLayoutReadOnly(newLayout)) {
@@ -326,8 +274,66 @@ bool BestPractices::ValidateImageMemoryBarrier(const Location& loc, VkImage imag
                            string_VkImageLayout(newLayout));
     }
 
+    if (device_state->special_supported.has_maintenance9 && srcQueueFamilyIndex != dstQueueFamilyIndex &&
+        srcQueueFamilyIndex != VK_QUEUE_FAMILY_FOREIGN_EXT && srcQueueFamilyIndex != VK_QUEUE_FAMILY_EXTERNAL &&
+        dstQueueFamilyIndex != VK_QUEUE_FAMILY_FOREIGN_EXT && dstQueueFamilyIndex != VK_QUEUE_FAMILY_EXTERNAL) {
+        auto image_state = Get<vvl::Image>(image);
+        const char* warning = enabled_features.maintenance9
+                                  ? "is not required, because maintenance9 is enabled"
+                                  : "could be omitted, if maintenance9 (which is supported by the physical device) were enabled";
+        if (image_state->create_info.tiling == VK_IMAGE_TILING_LINEAR) {
+            skip |= LogPerformanceWarning("BestPractices-PipelineBarrier-unneeded-QFOT", image, loc,
+                                          "A queue family ownership transfer is being performed on %s, but this %s. Image was "
+                                          "created with VK_IMAGE_TILING_LINEAR.",
+                                          FormatHandle(image).c_str(), warning);
+        } else if ((image_state->create_info.usage &
+                    (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                     VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+                     VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT | VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) ==
+                   0) {
+            auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+            VkQueueFamilyOwnershipTransferPropertiesKHR qfot_props = vku::InitStructHelper();
+            uint32_t qf_count = dstQueueFamilyIndex + 1;
+            std::vector<VkQueueFamilyProperties2> qf_props(qf_count);
+            qf_props.back().pNext = &qfot_props;
+            DispatchGetPhysicalDeviceQueueFamilyProperties2(cb_state->dev_data.physical_device, &qf_count, qf_props.data());
+            // The list of image usages not allowed comes from
+            // https://registry.khronos.org/vulkan/specs/latest/man/html/VkSharingMode.html
+            if (qfot_props.optimalImageTransferToQueueFamilies) {
+                skip |= LogPerformanceWarning(
+                    "BestPractices-PipelineBarrier-unneeded-QFOT", image, loc,
+                    "A queue family ownership transfer is being performed on %s, but this %s. Image was created with "
+                    "VK_IMAGE_TILING_OPTIMAL, image usage does not contain any of VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | "
+                    "VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | "
+                    "VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT | "
+                    "VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR and "
+                    "VkQueueFamilyOwnershipTransferPropertiesKHR::optimalImageTransferToQueueFamilies (%" PRIu32
+                    ") has bit set for destination queue family index %" PRIu32 ".",
+                    FormatHandle(image).c_str(), warning, qfot_props.optimalImageTransferToQueueFamilies, dstQueueFamilyIndex);
+            }
+        }
+    }
+
     skip |= ValidateAccessLayoutCombination(loc, image, srcAccessMask, oldLayout, aspectMask);
     skip |= ValidateAccessLayoutCombination(loc, image, dstAccessMask, newLayout, aspectMask);
+
+    return skip;
+}
+
+bool BestPractices::ValidateBufferMemoryBarrier(const Location& loc, VkCommandBuffer commandBuffer, VkBuffer buffer,
+                                                uint32_t srcQueueFamilyIndex, uint32_t dstQueueFamilyIndex) const {
+    bool skip = false;
+
+    if (device_state->special_supported.has_maintenance9 && srcQueueFamilyIndex != dstQueueFamilyIndex &&
+        srcQueueFamilyIndex != VK_QUEUE_FAMILY_FOREIGN_EXT && srcQueueFamilyIndex != VK_QUEUE_FAMILY_EXTERNAL &&
+        dstQueueFamilyIndex != VK_QUEUE_FAMILY_FOREIGN_EXT && dstQueueFamilyIndex != VK_QUEUE_FAMILY_EXTERNAL) {
+        const char* warning = enabled_features.maintenance9
+                                  ? "is not required, because maintenance9 is enabled"
+                                  : "could be omitted, if maintenance9 (which is supported by the physical device) were enabled";
+        skip |= LogPerformanceWarning("BestPractices-PipelineBarrier-unneeded-QFOT", buffer, loc,
+                                      "A queue family ownership transfer is being performed on %s, but this %s.",
+                                      FormatHandle(buffer).c_str(), warning);
+    }
 
     return skip;
 }
@@ -339,14 +345,17 @@ bool BestPractices::PreCallValidateCmdPipelineBarrier(
     const VkImageMemoryBarrier* pImageMemoryBarriers, const ErrorObject& error_obj) const {
     bool skip = false;
 
-    skip |= CheckPipelineStageFlags(commandBuffer, error_obj.location.dot(Field::srcStageMask), srcStageMask);
-    skip |= CheckPipelineStageFlags(commandBuffer, error_obj.location.dot(Field::dstStageMask), dstStageMask);
-
     for (uint32_t i = 0; i < imageMemoryBarrierCount; ++i) {
-        skip |= ValidateImageMemoryBarrier(error_obj.location.dot(Field::pImageMemoryBarriers, i), pImageMemoryBarriers[i].image,
-                                           pImageMemoryBarriers[i].oldLayout, pImageMemoryBarriers[i].newLayout,
-                                           pImageMemoryBarriers[i].srcAccessMask, pImageMemoryBarriers[i].dstAccessMask,
-                                           pImageMemoryBarriers[i].subresourceRange.aspectMask);
+        skip |= ValidateImageMemoryBarrier(
+            error_obj.location.dot(Field::pImageMemoryBarriers, i), commandBuffer, pImageMemoryBarriers[i].image,
+            pImageMemoryBarriers[i].oldLayout, pImageMemoryBarriers[i].newLayout, pImageMemoryBarriers[i].srcAccessMask,
+            pImageMemoryBarriers[i].dstAccessMask, pImageMemoryBarriers[i].subresourceRange.aspectMask,
+            pImageMemoryBarriers[i].srcQueueFamilyIndex, pImageMemoryBarriers[i].dstQueueFamilyIndex);
+    }
+    for (uint32_t i = 0; i < bufferMemoryBarrierCount; ++i) {
+        skip |= ValidateBufferMemoryBarrier(error_obj.location.dot(Field::pBufferMemoryBarriers, i), commandBuffer,
+                                            pBufferMemoryBarriers[i].buffer, pBufferMemoryBarriers[i].srcQueueFamilyIndex,
+                                            pBufferMemoryBarriers[i].dstQueueFamilyIndex);
     }
 
     if (VendorCheckEnabled(kBPVendorAMD)) {
@@ -356,10 +365,8 @@ bool BestPractices::PreCallValidateCmdPipelineBarrier(
             skip |= LogPerformanceWarning("BestPractices-AMD-CmdBuffer-highBarrierCount", commandBuffer, error_obj.location,
                                           "%s In this frame, %" PRIu32 " barriers were already submitted (%" PRIu32
                                           " if you include image and buffer barriers too). Barriers have a high cost and can "
-                                          "stall the GPU. "
-                                          "Total recommended max is %" PRIu32
-                                          ". "
-                                          "Consider consolidating and re-organizing the frame to use fewer barriers.",
+                                          "stall the GPU.\nTotal recommended max is %" PRIu32
+                                          ". Consider consolidating and re-organizing the frame to use fewer barriers.",
                                           VendorSpecificTag(kBPVendorAMD), num, total_barriers, kMaxRecommendedBarriersSizeAMD);
         }
     }
@@ -418,7 +425,7 @@ bool BestPractices::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer commandBu
     bool skip = false;
 
     const Location dep_info_loc = error_obj.location.dot(Field::pDependencyInfo);
-    skip |= CheckDependencyInfo(commandBuffer, dep_info_loc, *pDependencyInfo);
+    skip |= CheckDependencyInfo(commandBuffer, dep_info_loc, *pDependencyInfo, commandBuffer);
 
     for (uint32_t i = 0; i < pDependencyInfo->imageMemoryBarrierCount; ++i) {
         skip |= ValidateCmdPipelineBarrierImageBarrier(commandBuffer, pDependencyInfo->pImageMemoryBarriers[i],
@@ -433,11 +440,12 @@ bool BestPractices::ValidateCmdPipelineBarrierImageBarrier(VkCommandBuffer comma
                                                            const Location& loc) const {
     bool skip = false;
 
-    const auto cb_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
+    const auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
         if (barrier.oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && barrier.newLayout != VK_IMAGE_LAYOUT_UNDEFINED) {
-            skip |= ValidateZcull(*cb_state, barrier.image, barrier.subresourceRange, loc);
+            const auto& sub_state = bp_state::SubState(*cb_state);
+            skip |= ValidateZcull(sub_state, barrier.image, barrier.subresourceRange, loc);
         }
     }
 
@@ -462,26 +470,28 @@ static void ForEachSubresource(const vvl::Image& image, const VkImageSubresource
 
 template <typename ImageMemoryBarrier>
 void BestPractices::RecordCmdPipelineBarrierImageBarrier(VkCommandBuffer commandBuffer, const ImageMemoryBarrier& barrier) {
-    auto cb_state = Get<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
 
     // Is a queue ownership acquisition barrier
     if (barrier.srcQueueFamilyIndex != barrier.dstQueueFamilyIndex &&
         barrier.dstQueueFamilyIndex == cb_state->command_pool->queueFamilyIndex) {
-        auto image = Get<bp_state::Image>(barrier.image);
+        auto image = Get<vvl::Image>(barrier.image);
         ASSERT_AND_RETURN(image);
         auto subresource_range = barrier.subresourceRange;
-        cb_state->queue_submit_functions.emplace_back([image, subresource_range](const vvl::Queue& qs,
-                                                                                 const vvl::CommandBuffer& cbs) -> bool {
-            ForEachSubresource(*image, subresource_range, [&](uint32_t layer, uint32_t level) {
-                // Update queue family index without changing usage, signifying a correct queue family transfer
-                image->UpdateUsage(layer, level, image->GetUsageType(layer, level), qs.queue_family_index);
+        cb_state->queue_submit_functions.emplace_back(
+            [image, subresource_range](const vvl::Queue& qs, const vvl::CommandBuffer& cbs) -> bool {
+                ForEachSubresource(*image, subresource_range, [&](uint32_t layer, uint32_t level) {
+                    // Update queue family index without changing usage, signifying a correct queue family transfer
+                    auto& sub_state = bp_state::SubState(*image);
+                    sub_state.UpdateUsage(layer, level, sub_state.GetUsageType(layer, level), qs.queue_family_index);
+                });
+                return false;
             });
-            return false;
-        });
     }
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        RecordResetZcullDirection(*cb_state, barrier.image, barrier.subresourceRange);
+        auto& sub_state = bp_state::SubState(*cb_state);
+        RecordResetZcullDirection(sub_state, barrier.image, barrier.subresourceRange);
     }
 }
 
@@ -490,10 +500,6 @@ void BestPractices::PostCallRecordCmdPipelineBarrier(
     VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
     uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
     const VkImageMemoryBarrier* pImageMemoryBarriers, const RecordObject& record_obj) {
-    BaseClass::PostCallRecordCmdPipelineBarrier(
-        commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount,
-        pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers, record_obj);
-
     num_barriers_objects_ += (memoryBarrierCount + imageMemoryBarrierCount + bufferMemoryBarrierCount);
 
     for (uint32_t i = 0; i < imageMemoryBarrierCount; ++i) {
@@ -503,8 +509,6 @@ void BestPractices::PostCallRecordCmdPipelineBarrier(
 
 void BestPractices::PostCallRecordCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
                                                       const RecordObject& record_obj) {
-    BaseClass::PostCallRecordCmdPipelineBarrier2(commandBuffer, pDependencyInfo, record_obj);
-
     for (uint32_t i = 0; i < pDependencyInfo->imageMemoryBarrierCount; ++i) {
         RecordCmdPipelineBarrierImageBarrier(commandBuffer, pDependencyInfo->pImageMemoryBarriers[i]);
     }
@@ -525,8 +529,7 @@ bool BestPractices::PreCallValidateCreateSemaphore(VkDevice device, const VkSema
             skip |= LogPerformanceWarning("BestPractices-SyncObjects-HighNumberOfSemaphores", device, error_obj.location,
                                           "%s %s High number of vkSemaphore objects created. "
                                           "%zu created, but recommended max is %" PRIu32
-                                          ". "
-                                          "Minimize the amount of queue synchronization that is used. "
+                                          ".\nMinimize the amount of queue synchronization that is used. "
                                           "Each semaphore has a CPU and GPU overhead cost with it.",
                                           VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorNVIDIA), count,
                                           kMaxRecommendedSemaphoreObjectsSizeAMD);
@@ -546,8 +549,7 @@ bool BestPractices::PreCallValidateCreateFence(VkDevice device, const VkFenceCre
             skip |= LogPerformanceWarning("BestPractices-SyncObjects-HighNumberOfFences", device, error_obj.location,
                                           "%s %s High number of VkFence objects created. "
                                           "%zu created, but recommended max is %" PRIu32
-                                          ". "
-                                          "Minimize the amount of CPU-GPU synchronization that is used. "
+                                          ".\nMinimize the amount of CPU-GPU synchronization that is used. "
                                           "Each fence has a CPU and GPU overhead cost with it.",
                                           VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorNVIDIA), count,
                                           kMaxRecommendedFenceObjectsSizeAMD);

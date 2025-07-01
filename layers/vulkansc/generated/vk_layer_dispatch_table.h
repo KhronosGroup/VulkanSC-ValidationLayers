@@ -177,8 +177,15 @@ typedef struct VkLayerInstanceDispatchTable_ {
     PFN_vkCreateScreenSurfaceQNX CreateScreenSurfaceQNX;
     PFN_vkGetPhysicalDeviceScreenPresentationSupportQNX GetPhysicalDeviceScreenPresentationSupportQNX;
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+    PFN_vkGetPhysicalDeviceExternalTensorPropertiesARM GetPhysicalDeviceExternalTensorPropertiesARM;
     PFN_vkGetPhysicalDeviceOpticalFlowImageFormatsNV GetPhysicalDeviceOpticalFlowImageFormatsNV;
     PFN_vkGetPhysicalDeviceCooperativeVectorPropertiesNV GetPhysicalDeviceCooperativeVectorPropertiesNV;
+    PFN_vkGetPhysicalDeviceQueueFamilyDataGraphPropertiesARM GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM;
+    PFN_vkGetPhysicalDeviceQueueFamilyDataGraphProcessingEnginePropertiesARM
+        GetPhysicalDeviceQueueFamilyDataGraphProcessingEnginePropertiesARM;
+#ifdef VK_USE_PLATFORM_OHOS
+    PFN_vkCreateSurfaceOHOS CreateSurfaceOHOS;
+#endif  // VK_USE_PLATFORM_OHOS
     PFN_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV
         GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV;
 } VkLayerInstanceDispatchTable;
@@ -501,6 +508,7 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkGetRenderingAreaGranularityKHR GetRenderingAreaGranularityKHR;
     PFN_vkGetDeviceImageSubresourceLayoutKHR GetDeviceImageSubresourceLayoutKHR;
     PFN_vkGetImageSubresourceLayout2KHR GetImageSubresourceLayout2KHR;
+    PFN_vkWaitForPresent2KHR WaitForPresent2KHR;
     PFN_vkCreatePipelineBinariesKHR CreatePipelineBinariesKHR;
     PFN_vkDestroyPipelineBinaryKHR DestroyPipelineBinaryKHR;
     PFN_vkGetPipelineKeyKHR GetPipelineKeyKHR;
@@ -662,6 +670,9 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkDestroyCudaFunctionNV DestroyCudaFunctionNV;
     PFN_vkCmdCudaLaunchKernelNV CmdCudaLaunchKernelNV;
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+    PFN_vkCmdDispatchTileQCOM CmdDispatchTileQCOM;
+    PFN_vkCmdBeginPerTileExecutionQCOM CmdBeginPerTileExecutionQCOM;
+    PFN_vkCmdEndPerTileExecutionQCOM CmdEndPerTileExecutionQCOM;
 #ifdef VK_USE_PLATFORM_METAL_EXT
     PFN_vkExportMetalObjectsEXT ExportMetalObjectsEXT;
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -769,6 +780,16 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkCmdSetShadingRateImageEnableNV CmdSetShadingRateImageEnableNV;
     PFN_vkCmdSetRepresentativeFragmentTestEnableNV CmdSetRepresentativeFragmentTestEnableNV;
     PFN_vkCmdSetCoverageReductionModeNV CmdSetCoverageReductionModeNV;
+    PFN_vkCreateTensorARM CreateTensorARM;
+    PFN_vkDestroyTensorARM DestroyTensorARM;
+    PFN_vkCreateTensorViewARM CreateTensorViewARM;
+    PFN_vkDestroyTensorViewARM DestroyTensorViewARM;
+    PFN_vkGetTensorMemoryRequirementsARM GetTensorMemoryRequirementsARM;
+    PFN_vkBindTensorMemoryARM BindTensorMemoryARM;
+    PFN_vkGetDeviceTensorMemoryRequirementsARM GetDeviceTensorMemoryRequirementsARM;
+    PFN_vkCmdCopyTensorARM CmdCopyTensorARM;
+    PFN_vkGetTensorOpaqueCaptureDescriptorDataARM GetTensorOpaqueCaptureDescriptorDataARM;
+    PFN_vkGetTensorViewOpaqueCaptureDescriptorDataARM GetTensorViewOpaqueCaptureDescriptorDataARM;
     PFN_vkGetShaderModuleIdentifierEXT GetShaderModuleIdentifierEXT;
     PFN_vkGetShaderModuleCreateInfoIdentifierEXT GetShaderModuleCreateInfoIdentifierEXT;
     PFN_vkCreateOpticalFlowSessionNV CreateOpticalFlowSessionNV;
@@ -794,10 +815,23 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkSetLatencyMarkerNV SetLatencyMarkerNV;
     PFN_vkGetLatencyTimingsNV GetLatencyTimingsNV;
     PFN_vkQueueNotifyOutOfBandNV QueueNotifyOutOfBandNV;
+    PFN_vkCreateDataGraphPipelinesARM CreateDataGraphPipelinesARM;
+    PFN_vkCreateDataGraphPipelineSessionARM CreateDataGraphPipelineSessionARM;
+    PFN_vkGetDataGraphPipelineSessionBindPointRequirementsARM GetDataGraphPipelineSessionBindPointRequirementsARM;
+    PFN_vkGetDataGraphPipelineSessionMemoryRequirementsARM GetDataGraphPipelineSessionMemoryRequirementsARM;
+    PFN_vkBindDataGraphPipelineSessionMemoryARM BindDataGraphPipelineSessionMemoryARM;
+    PFN_vkDestroyDataGraphPipelineSessionARM DestroyDataGraphPipelineSessionARM;
+    PFN_vkCmdDispatchDataGraphARM CmdDispatchDataGraphARM;
+    PFN_vkGetDataGraphPipelineAvailablePropertiesARM GetDataGraphPipelineAvailablePropertiesARM;
+    PFN_vkGetDataGraphPipelinePropertiesARM GetDataGraphPipelinePropertiesARM;
     PFN_vkCmdSetAttachmentFeedbackLoopEnableEXT CmdSetAttachmentFeedbackLoopEnableEXT;
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
     PFN_vkGetScreenBufferPropertiesQNX GetScreenBufferPropertiesQNX;
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+    PFN_vkCmdBindTileMemoryQCOM CmdBindTileMemoryQCOM;
+    PFN_vkCreateExternalComputeQueueNV CreateExternalComputeQueueNV;
+    PFN_vkDestroyExternalComputeQueueNV DestroyExternalComputeQueueNV;
+    PFN_vkGetExternalComputeQueueDataNV GetExternalComputeQueueDataNV;
     PFN_vkGetClusterAccelerationStructureBuildSizesNV GetClusterAccelerationStructureBuildSizesNV;
     PFN_vkCmdBuildClusterAccelerationStructureIndirectNV CmdBuildClusterAccelerationStructureIndirectNV;
     PFN_vkGetPartitionedAccelerationStructuresBuildSizesNV GetPartitionedAccelerationStructuresBuildSizesNV;
@@ -815,6 +849,7 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkGetMemoryMetalHandleEXT GetMemoryMetalHandleEXT;
     PFN_vkGetMemoryMetalHandlePropertiesEXT GetMemoryMetalHandlePropertiesEXT;
 #endif  // VK_USE_PLATFORM_METAL_EXT
+    PFN_vkCmdEndRendering2EXT CmdEndRendering2EXT;
     PFN_vkCreateAccelerationStructureKHR CreateAccelerationStructureKHR;
     PFN_vkDestroyAccelerationStructureKHR DestroyAccelerationStructureKHR;
     PFN_vkCmdBuildAccelerationStructuresKHR CmdBuildAccelerationStructuresKHR;

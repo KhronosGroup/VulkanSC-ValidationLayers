@@ -92,10 +92,13 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
     skip |= ReportLeakedObjects(kVulkanObjectTypeAccelerationStructureKHR, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeBufferCollectionFUCHSIA, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeMicromapEXT, error_code, loc);
+    skip |= ReportLeakedObjects(kVulkanObjectTypeTensorARM, error_code, loc);
+    skip |= ReportLeakedObjects(kVulkanObjectTypeTensorViewARM, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeOpticalFlowSessionNV, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeShaderEXT, error_code, loc);
     // No destroy API or implicitly freed/destroyed -- do not report: skip |=
     // ReportLeakedObjects(kVulkanObjectTypeSemaphoreSciSyncPoolNV, error_code, loc);
+    skip |= ReportLeakedObjects(kVulkanObjectTypeDataGraphPipelineSessionARM, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeIndirectExecutionSetEXT, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeIndirectCommandsLayoutEXT, error_code, loc);
     return skip;
@@ -152,9 +155,12 @@ void Device::DestroyLeakedObjects() {
     DestroyUndestroyedObjects(kVulkanObjectTypeAccelerationStructureKHR, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeBufferCollectionFUCHSIA, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeMicromapEXT, loc);
+    DestroyUndestroyedObjects(kVulkanObjectTypeTensorARM, loc);
+    DestroyUndestroyedObjects(kVulkanObjectTypeTensorViewARM, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeOpticalFlowSessionNV, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeShaderEXT, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeSemaphoreSciSyncPoolNV, loc);
+    DestroyUndestroyedObjects(kVulkanObjectTypeDataGraphPipelineSessionARM, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeIndirectExecutionSetEXT, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeIndirectCommandsLayoutEXT, loc);
 }
@@ -253,6 +259,17 @@ bool Device::PreCallValidateQueueSubmit(VkQueue queue, uint32_t submitCount, con
                     }
                 }
             }
+            if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkFrameBoundaryTensorsARM>(pSubmits[index0].pNext)) {
+                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkFrameBoundaryTensorsARM);
+
+                if ((pNext->tensorCount > 0) && (pNext->pTensors)) {
+                    for (uint32_t index2 = 0; index2 < pNext->tensorCount; ++index2) {
+                        skip |= ValidateObject(pNext->pTensors[index2], kVulkanObjectTypeTensorARM, false, kVUIDUndefined,
+                                               "UNASSIGNED-VkFrameBoundaryTensorsARM-pTensors-parent",
+                                               pNext_loc.dot(Field::pTensors, index2));
+                    }
+                }
+            }
 #ifdef VK_USE_PLATFORM_WIN32_KHR
             if ([[maybe_unused]] auto pNext =
                     vku::FindStructInPNextChain<VkWin32KeyedMutexAcquireReleaseInfoKHR>(pSubmits[index0].pNext)) {
@@ -333,6 +350,10 @@ bool Device::PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAlloca
             skip |=
                 ValidateObject(pNext->buffer, kVulkanObjectTypeBuffer, true, "VUID-VkMemoryDedicatedAllocateInfo-buffer-parameter",
                                "VUID-VkMemoryDedicatedAllocateInfo-commonparent", pNext_loc.dot(Field::buffer));
+        }
+        if ([[maybe_unused]] auto pNext =
+                vku::FindStructInPNextChain<VkMemoryDedicatedAllocateInfoTensorARM>(pAllocateInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pAllocateInfo_loc.pNext(Struct::VkMemoryDedicatedAllocateInfoTensorARM);
         }
     }
 
@@ -542,6 +563,17 @@ bool Device::PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindInfoCoun
                         skip |=
                             ValidateObject(pNext->pBuffers[index2], kVulkanObjectTypeBuffer, false, kVUIDUndefined,
                                            "UNASSIGNED-VkFrameBoundaryEXT-commonparent", pNext_loc.dot(Field::pBuffers, index2));
+                    }
+                }
+            }
+            if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkFrameBoundaryTensorsARM>(pBindInfo[index0].pNext)) {
+                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkFrameBoundaryTensorsARM);
+
+                if ((pNext->tensorCount > 0) && (pNext->pTensors)) {
+                    for (uint32_t index2 = 0; index2 < pNext->tensorCount; ++index2) {
+                        skip |= ValidateObject(pNext->pTensors[index2], kVulkanObjectTypeTensorARM, false, kVUIDUndefined,
+                                               "UNASSIGNED-VkFrameBoundaryTensorsARM-pTensors-parent",
+                                               pNext_loc.dot(Field::pTensors, index2));
                     }
                 }
             }
@@ -2258,6 +2290,9 @@ bool Device::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent 
                                        "UNASSIGNED-vkCmdSetEvent2-commandBuffer-commonparent", index1_loc.dot(Field::image));
             }
         }
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkTensorMemoryBarrierARM>(pDependencyInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pDependencyInfo_loc.pNext(Struct::VkTensorMemoryBarrierARM);
+        }
     }
 
     return skip;
@@ -2305,6 +2340,10 @@ bool Device::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32
                                            "UNASSIGNED-vkCmdWaitEvents2-commandBuffer-commonparent", index1_loc.dot(Field::image));
                 }
             }
+            if ([[maybe_unused]] auto pNext =
+                    vku::FindStructInPNextChain<VkTensorMemoryBarrierARM>(pDependencyInfos[index0].pNext)) {
+                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkTensorMemoryBarrierARM);
+            }
         }
     }
 
@@ -2333,6 +2372,9 @@ bool Device::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer commandBuffer, c
                                        "VUID-VkImageMemoryBarrier2-image-parameter",
                                        "UNASSIGNED-vkCmdPipelineBarrier2-commandBuffer-commonparent", index1_loc.dot(Field::image));
             }
+        }
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkTensorMemoryBarrierARM>(pDependencyInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pDependencyInfo_loc.pNext(Struct::VkTensorMemoryBarrierARM);
         }
     }
 
@@ -2398,6 +2440,17 @@ bool Device::PreCallValidateQueueSubmit2(VkQueue queue, uint32_t submitCount, co
                         skip |=
                             ValidateObject(pNext->pBuffers[index2], kVulkanObjectTypeBuffer, false, kVUIDUndefined,
                                            "UNASSIGNED-VkFrameBoundaryEXT-commonparent", pNext_loc.dot(Field::pBuffers, index2));
+                    }
+                }
+            }
+            if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkFrameBoundaryTensorsARM>(pSubmits[index0].pNext)) {
+                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkFrameBoundaryTensorsARM);
+
+                if ((pNext->tensorCount > 0) && (pNext->pTensors)) {
+                    for (uint32_t index2 = 0; index2 < pNext->tensorCount; ++index2) {
+                        skip |= ValidateObject(pNext->pTensors[index2], kVulkanObjectTypeTensorARM, false, kVUIDUndefined,
+                                               "UNASSIGNED-VkFrameBoundaryTensorsARM-pTensors-parent",
+                                               pNext_loc.dot(Field::pTensors, index2));
                     }
                 }
             }
@@ -3019,6 +3072,17 @@ bool Device::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentInfoKH
                 for (uint32_t index2 = 0; index2 < pNext->bufferCount; ++index2) {
                     skip |= ValidateObject(pNext->pBuffers[index2], kVulkanObjectTypeBuffer, false, kVUIDUndefined,
                                            "UNASSIGNED-VkFrameBoundaryEXT-commonparent", pNext_loc.dot(Field::pBuffers, index2));
+                }
+            }
+        }
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkFrameBoundaryTensorsARM>(pPresentInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pPresentInfo_loc.pNext(Struct::VkFrameBoundaryTensorsARM);
+
+            if ((pNext->tensorCount > 0) && (pNext->pTensors)) {
+                for (uint32_t index2 = 0; index2 < pNext->tensorCount; ++index2) {
+                    skip |= ValidateObject(pNext->pTensors[index2], kVulkanObjectTypeTensorARM, false, kVUIDUndefined,
+                                           "UNASSIGNED-VkFrameBoundaryTensorsARM-pTensors-parent",
+                                           pNext_loc.dot(Field::pTensors, index2));
                 }
             }
         }
@@ -4119,6 +4183,9 @@ bool Device::PreCallValidateCmdResolveImage2KHR(VkCommandBuffer commandBuffer, c
 // Checked by chassis: device: kVUIDUndefined
 
 // vkGetImageSubresourceLayout2KHR:
+// Checked by chassis: device: kVUIDUndefined
+
+// vkWaitForPresent2KHR:
 // Checked by chassis: device: kVUIDUndefined
 
 bool Device::PreCallValidateCreatePipelineBinariesKHR(VkDevice device, const VkPipelineBinaryCreateInfoKHR* pCreateInfo,
@@ -5574,6 +5641,16 @@ bool Device::PreCallValidateCmdCudaLaunchKernelNV(VkCommandBuffer commandBuffer,
     return skip;
 }
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+
+// vkCmdDispatchTileQCOM:
+// Checked by chassis: commandBuffer: kVUIDUndefined
+
+// vkCmdBeginPerTileExecutionQCOM:
+// Checked by chassis: commandBuffer: kVUIDUndefined
+
+// vkCmdEndPerTileExecutionQCOM:
+// Checked by chassis: commandBuffer: kVUIDUndefined
+
 #ifdef VK_USE_PLATFORM_METAL_EXT
 #endif  // VK_USE_PLATFORM_METAL_EXT
 
@@ -6367,6 +6444,131 @@ bool Device::PreCallValidateGetPipelineIndirectDeviceAddressNV(VkDevice device, 
 // vkCmdSetCoverageReductionModeNV:
 // Checked by chassis: commandBuffer: kVUIDUndefined
 
+// vkCreateTensorARM:
+// Checked by chassis: device: kVUIDUndefined
+
+void Device::PostCallRecordCreateTensorARM(VkDevice device, const VkTensorCreateInfoARM* pCreateInfo,
+                                           const VkAllocationCallbacks* pAllocator, VkTensorARM* pTensor,
+                                           const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pTensor, kVulkanObjectTypeTensorARM, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateDestroyTensorARM(VkDevice device, VkTensorARM tensor, const VkAllocationCallbacks* pAllocator,
+                                             const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    skip |=
+        ValidateDestroyObject(tensor, kVulkanObjectTypeTensorARM, pAllocator, kVUIDUndefined, kVUIDUndefined, error_obj.location);
+
+    return skip;
+}
+
+void Device::PreCallRecordDestroyTensorARM(VkDevice device, VkTensorARM tensor, const VkAllocationCallbacks* pAllocator,
+                                           const RecordObject& record_obj) {
+    RecordDestroyObject(tensor, kVulkanObjectTypeTensorARM, record_obj.location);
+}
+
+bool Device::PreCallValidateCreateTensorViewARM(VkDevice device, const VkTensorViewCreateInfoARM* pCreateInfo,
+                                                const VkAllocationCallbacks* pAllocator, VkTensorViewARM* pView,
+                                                const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pCreateInfo) {
+        [[maybe_unused]] const Location pCreateInfo_loc = error_obj.location.dot(Field::pCreateInfo);
+    }
+
+    return skip;
+}
+
+void Device::PostCallRecordCreateTensorViewARM(VkDevice device, const VkTensorViewCreateInfoARM* pCreateInfo,
+                                               const VkAllocationCallbacks* pAllocator, VkTensorViewARM* pView,
+                                               const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pView, kVulkanObjectTypeTensorViewARM, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateDestroyTensorViewARM(VkDevice device, VkTensorViewARM tensorView,
+                                                 const VkAllocationCallbacks* pAllocator, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    skip |= ValidateDestroyObject(tensorView, kVulkanObjectTypeTensorViewARM, pAllocator, kVUIDUndefined, kVUIDUndefined,
+                                  error_obj.location);
+
+    return skip;
+}
+
+void Device::PreCallRecordDestroyTensorViewARM(VkDevice device, VkTensorViewARM tensorView, const VkAllocationCallbacks* pAllocator,
+                                               const RecordObject& record_obj) {
+    RecordDestroyObject(tensorView, kVulkanObjectTypeTensorViewARM, record_obj.location);
+}
+
+bool Device::PreCallValidateGetTensorMemoryRequirementsARM(VkDevice device, const VkTensorMemoryRequirementsInfoARM* pInfo,
+                                                           VkMemoryRequirements2* pMemoryRequirements,
+                                                           const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pInfo) {
+        [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateBindTensorMemoryARM(VkDevice device, uint32_t bindInfoCount,
+                                                const VkBindTensorMemoryInfoARM* pBindInfos, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pBindInfos) {
+        for (uint32_t index0 = 0; index0 < bindInfoCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pBindInfos, index0);
+        }
+    }
+
+    return skip;
+}
+
+// vkGetDeviceTensorMemoryRequirementsARM:
+// Checked by chassis: device: kVUIDUndefined
+
+bool Device::PreCallValidateCmdCopyTensorARM(VkCommandBuffer commandBuffer, const VkCopyTensorInfoARM* pCopyTensorInfo,
+                                             const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: kVUIDUndefined
+    if (pCopyTensorInfo) {
+        [[maybe_unused]] const Location pCopyTensorInfo_loc = error_obj.location.dot(Field::pCopyTensorInfo);
+    }
+
+    return skip;
+}
+
+// vkGetPhysicalDeviceExternalTensorPropertiesARM:
+// Checked by chassis: physicalDevice: kVUIDUndefined
+
+bool Device::PreCallValidateGetTensorOpaqueCaptureDescriptorDataARM(VkDevice device,
+                                                                    const VkTensorCaptureDescriptorDataInfoARM* pInfo, void* pData,
+                                                                    const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pInfo) {
+        [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateGetTensorViewOpaqueCaptureDescriptorDataARM(VkDevice device,
+                                                                        const VkTensorViewCaptureDescriptorDataInfoARM* pInfo,
+                                                                        void* pData, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pInfo) {
+        [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
+    }
+
+    return skip;
+}
+
 // vkGetShaderModuleIdentifierEXT:
 // Checked by chassis: device: kVUIDUndefined
 
@@ -6450,10 +6652,10 @@ bool Device::PreCallValidateCreateShadersEXT(VkDevice device, uint32_t createInf
 void Device::PostCallRecordCreateShadersEXT(VkDevice device, uint32_t createInfoCount, const VkShaderCreateInfoEXT* pCreateInfos,
                                             const VkAllocationCallbacks* pAllocator, VkShaderEXT* pShaders,
                                             const RecordObject& record_obj) {
-    if (record_obj.result < VK_SUCCESS) return;
+    if (VK_ERROR_VALIDATION_FAILED_EXT == record_obj.result) return;
     if (pShaders) {
         for (uint32_t index = 0; index < createInfoCount; index++) {
-            if (!pShaders[index]) break;
+            if (!pShaders[index]) continue;
             tracker.CreateObject(pShaders[index], kVulkanObjectTypeShaderEXT, pAllocator,
                                  record_obj.location.dot(Field::pShaders, index), device);
         }
@@ -6594,6 +6796,155 @@ bool Device::PreCallValidateLatencySleepNV(VkDevice device, VkSwapchainKHR swapc
 // vkQueueNotifyOutOfBandNV:
 // Checked by chassis: queue: kVUIDUndefined
 
+bool Device::PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                        VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                        const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                                        const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                        const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pCreateInfos) {
+        for (uint32_t index0 = 0; index0 < createInfoCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pCreateInfos, index0);
+            if ([[maybe_unused]] auto pNext =
+                    vku::FindStructInPNextChain<VkDataGraphPipelineShaderModuleCreateInfoARM>(pCreateInfos[index0].pNext)) {
+                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkDataGraphPipelineShaderModuleCreateInfoARM);
+            }
+        }
+    }
+
+    return skip;
+}
+
+void Device::PostCallRecordCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                       VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                       const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                                       const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                       const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    if (pPipelines) {
+        for (uint32_t index = 0; index < createInfoCount; index++) {
+            tracker.CreateObject(pPipelines[index], kVulkanObjectTypePipeline, pAllocator,
+                                 record_obj.location.dot(Field::pPipelines, index), device);
+        }
+    }
+}
+
+bool Device::PreCallValidateCreateDataGraphPipelineSessionARM(VkDevice device,
+                                                              const VkDataGraphPipelineSessionCreateInfoARM* pCreateInfo,
+                                                              const VkAllocationCallbacks* pAllocator,
+                                                              VkDataGraphPipelineSessionARM* pSession,
+                                                              const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pCreateInfo) {
+        [[maybe_unused]] const Location pCreateInfo_loc = error_obj.location.dot(Field::pCreateInfo);
+    }
+
+    return skip;
+}
+
+void Device::PostCallRecordCreateDataGraphPipelineSessionARM(VkDevice device,
+                                                             const VkDataGraphPipelineSessionCreateInfoARM* pCreateInfo,
+                                                             const VkAllocationCallbacks* pAllocator,
+                                                             VkDataGraphPipelineSessionARM* pSession,
+                                                             const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pSession, kVulkanObjectTypeDataGraphPipelineSessionARM, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateGetDataGraphPipelineSessionBindPointRequirementsARM(
+    VkDevice device, const VkDataGraphPipelineSessionBindPointRequirementsInfoARM* pInfo, uint32_t* pBindPointRequirementCount,
+    VkDataGraphPipelineSessionBindPointRequirementARM* pBindPointRequirements, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pInfo) {
+        [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateGetDataGraphPipelineSessionMemoryRequirementsARM(
+    VkDevice device, const VkDataGraphPipelineSessionMemoryRequirementsInfoARM* pInfo, VkMemoryRequirements2* pMemoryRequirements,
+    const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pInfo) {
+        [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateBindDataGraphPipelineSessionMemoryARM(VkDevice device, uint32_t bindInfoCount,
+                                                                  const VkBindDataGraphPipelineSessionMemoryInfoARM* pBindInfos,
+                                                                  const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pBindInfos) {
+        for (uint32_t index0 = 0; index0 < bindInfoCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pBindInfos, index0);
+        }
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateDestroyDataGraphPipelineSessionARM(VkDevice device, VkDataGraphPipelineSessionARM session,
+                                                               const VkAllocationCallbacks* pAllocator,
+                                                               const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    skip |= ValidateDestroyObject(session, kVulkanObjectTypeDataGraphPipelineSessionARM, pAllocator, kVUIDUndefined, kVUIDUndefined,
+                                  error_obj.location);
+
+    return skip;
+}
+
+void Device::PreCallRecordDestroyDataGraphPipelineSessionARM(VkDevice device, VkDataGraphPipelineSessionARM session,
+                                                             const VkAllocationCallbacks* pAllocator,
+                                                             const RecordObject& record_obj) {
+    RecordDestroyObject(session, kVulkanObjectTypeDataGraphPipelineSessionARM, record_obj.location);
+}
+
+// vkCmdDispatchDataGraphARM:
+// Checked by chassis: commandBuffer: kVUIDUndefined
+// Checked by chassis: commandBuffer: "UNASSIGNED-vkCmdDispatchDataGraphARM-commonparent"
+
+bool Device::PreCallValidateGetDataGraphPipelineAvailablePropertiesARM(VkDevice device,
+                                                                       const VkDataGraphPipelineInfoARM* pPipelineInfo,
+                                                                       uint32_t* pPropertiesCount,
+                                                                       VkDataGraphPipelinePropertyARM* pProperties,
+                                                                       const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pPipelineInfo) {
+        [[maybe_unused]] const Location pPipelineInfo_loc = error_obj.location.dot(Field::pPipelineInfo);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateGetDataGraphPipelinePropertiesARM(VkDevice device, const VkDataGraphPipelineInfoARM* pPipelineInfo,
+                                                              uint32_t propertiesCount,
+                                                              VkDataGraphPipelinePropertyQueryResultARM* pProperties,
+                                                              const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pPipelineInfo) {
+        [[maybe_unused]] const Location pPipelineInfo_loc = error_obj.location.dot(Field::pPipelineInfo);
+    }
+
+    return skip;
+}
+
+// vkGetPhysicalDeviceQueueFamilyDataGraphPropertiesARM:
+// Checked by chassis: physicalDevice: kVUIDUndefined
+
+// vkGetPhysicalDeviceQueueFamilyDataGraphProcessingEnginePropertiesARM:
+// Checked by chassis: physicalDevice: kVUIDUndefined
+
 // vkCmdSetAttachmentFeedbackLoopEnableEXT:
 // Checked by chassis: commandBuffer: kVUIDUndefined
 
@@ -6603,6 +6954,62 @@ bool Device::PreCallValidateLatencySleepNV(VkDevice device, VkSwapchainKHR swapc
 // Checked by chassis: device: "VUID-vkGetScreenBufferPropertiesQNX-device-parameter"
 
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+
+bool Device::PreCallValidateCmdBindTileMemoryQCOM(VkCommandBuffer commandBuffer,
+                                                  const VkTileMemoryBindInfoQCOM* pTileMemoryBindInfo,
+                                                  const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: kVUIDUndefined
+    if (pTileMemoryBindInfo) {
+        [[maybe_unused]] const Location pTileMemoryBindInfo_loc = error_obj.location.dot(Field::pTileMemoryBindInfo);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateCreateExternalComputeQueueNV(VkDevice device, const VkExternalComputeQueueCreateInfoNV* pCreateInfo,
+                                                         const VkAllocationCallbacks* pAllocator,
+                                                         VkExternalComputeQueueNV* pExternalQueue,
+                                                         const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pCreateInfo) {
+        [[maybe_unused]] const Location pCreateInfo_loc = error_obj.location.dot(Field::pCreateInfo);
+    }
+
+    return skip;
+}
+
+void Device::PostCallRecordCreateExternalComputeQueueNV(VkDevice device, const VkExternalComputeQueueCreateInfoNV* pCreateInfo,
+                                                        const VkAllocationCallbacks* pAllocator,
+                                                        VkExternalComputeQueueNV* pExternalQueue, const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pExternalQueue, kVulkanObjectTypeExternalComputeQueueNV, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateDestroyExternalComputeQueueNV(VkDevice device, VkExternalComputeQueueNV externalQueue,
+                                                          const VkAllocationCallbacks* pAllocator,
+                                                          const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    // There should be an explicit VU (if not that is a spec bug)
+    {
+        skip |= ValidateObject(externalQueue, kVulkanObjectTypeExternalComputeQueueNV, false, kVUIDUndefined, kVUIDUndefined,
+                               error_obj.location.dot(Field::externalQueue));
+    }
+    skip |= ValidateDestroyObject(externalQueue, kVulkanObjectTypeExternalComputeQueueNV, pAllocator, kVUIDUndefined,
+                                  kVUIDUndefined, error_obj.location);
+
+    return skip;
+}
+
+void Device::PreCallRecordDestroyExternalComputeQueueNV(VkDevice device, VkExternalComputeQueueNV externalQueue,
+                                                        const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
+    RecordDestroyObject(externalQueue, kVulkanObjectTypeExternalComputeQueueNV, record_obj.location);
+}
+
+// vkGetExternalComputeQueueDataNV:
+// Checked by chassis: externalQueue: kVUIDUndefined
 
 // vkGetClusterAccelerationStructureBuildSizesNV:
 // Checked by chassis: device: kVUIDUndefined
@@ -6809,6 +7216,18 @@ bool Device::PreCallValidateUpdateIndirectExecutionSetShaderEXT(VkDevice device,
 
     return skip;
 }
+#ifdef VK_USE_PLATFORM_OHOS
+
+// vkCreateSurfaceOHOS:
+// Checked by chassis: instance: kVUIDUndefined
+
+void Instance::PostCallRecordCreateSurfaceOHOS(VkInstance instance, const VkSurfaceCreateInfoOHOS* pCreateInfo,
+                                               const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface,
+                                               const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pSurface, kVulkanObjectTypeSurfaceKHR, pAllocator, record_obj.location, instance);
+}
+#endif  // VK_USE_PLATFORM_OHOS
 
 // vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV:
 // Checked by chassis: physicalDevice: kVUIDUndefined
@@ -6830,6 +7249,9 @@ bool Device::PreCallValidateGetMemoryMetalHandleEXT(VkDevice device, const VkMem
 // Checked by chassis: device: kVUIDUndefined
 
 #endif  // VK_USE_PLATFORM_METAL_EXT
+
+// vkCmdEndRendering2EXT:
+// Checked by chassis: commandBuffer: kVUIDUndefined
 
 bool Device::PreCallValidateCreateAccelerationStructureKHR(VkDevice device, const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
                                                            const VkAllocationCallbacks* pAllocator,

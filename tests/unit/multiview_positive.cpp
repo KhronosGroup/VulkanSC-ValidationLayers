@@ -15,7 +15,6 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/render_pass_helper.h"
-#include "error_message/log_message_type.h"
 
 class PositiveMultiview : public VkLayerTest {};
 
@@ -44,25 +43,24 @@ TEST_F(PositiveMultiview, RenderPassQueries) {
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 3);
 
-    vkt::Framebuffer fb(*m_device, rp.Handle(), 1, &view.handle());
+    vkt::Framebuffer fb(*m_device, rp, 1, &view.handle());
 
     vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2);
 
     m_command_buffer.Begin();
-    vk::CmdResetQueryPool(m_command_buffer.handle(), query_pool, 0, 2);
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0, 2);
 
-    m_command_buffer.BeginRenderPass(rp.Handle(), fb, 32, 32);
-    vk::CmdBeginQuery(m_command_buffer.handle(), query_pool, 0, 0);
-    vk::CmdEndQuery(m_command_buffer.handle(), query_pool, 0);
+    m_command_buffer.BeginRenderPass(rp, fb, 32, 32);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0, 0);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0);
     m_command_buffer.EndRenderPass();
 
-    vk::CmdCopyQueryPoolResults(m_command_buffer.handle(), query_pool, 0, 2, buffer, 0, 4, 0);
+    vk::CmdCopyQueryPoolResults(m_command_buffer, query_pool, 0, 2, buffer, 0, 4, 0);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 TEST_F(PositiveMultiview, BasicRenderPass) {
@@ -114,8 +112,7 @@ TEST_F(PositiveMultiview, PushDescriptor) {
     vkt::RenderPass render_pass(*m_device, render_pass_ci);
 
     // A compatible framebuffer.
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView view = image.CreateView();
     vkt::Framebuffer fb(*m_device, render_pass, 1, &view.handle());
 
@@ -150,9 +147,8 @@ TEST_F(PositiveMultiview, PushDescriptor) {
     descriptor_write.dstSet = 0;  // Should not cause a validation error
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdPushDescriptorSetKHR(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
-                                &descriptor_write);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdPushDescriptorSetKHR(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_, 0, 1, &descriptor_write);
     m_command_buffer.BeginRenderPass(render_pass, fb, 32, 32);
     m_command_buffer.NextSubpass();
     m_command_buffer.EndRenderPass();
@@ -175,6 +171,15 @@ TEST_F(PositiveMultiview, MeshShader) {
         layout(max_vertices=81) out;
         layout(max_primitives=32) out;
         layout(triangles) out;
+
+        // Leave out the Layer builtin
+        perprimitiveEXT out gl_MeshPerPrimitiveEXT {
+            int  gl_PrimitiveID;
+            int  gl_ViewportIndex;
+            bool gl_CullPrimitiveEXT;
+            int  gl_PrimitiveShadingRateEXT;
+        } gl_MeshPrimitivesEXT[];
+
         void main() {
             SetMeshOutputsEXT(81, 32);
             gl_MeshPrimitivesEXT[0].gl_CullPrimitiveEXT = true;

@@ -19,7 +19,6 @@
 #include "vksc_test_environment.h"
 #include "vksc_test_dispatch_helper.h"
 
-#include "utils/vk_layer_utils.h"
 #include "utils/text_utils.h"
 #include "vk_layer_config.h"
 

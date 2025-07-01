@@ -170,6 +170,7 @@
             "reason": "Not supported in Vulkan SC: VK_EXT_debug_marker",
             "cases": [
                 "NegativeDebugExtensions.DebugMarkerName",
+                "NegativeDebugExtensions.DebugMarkerRecording",
                 "NegativeDebugExtensions.DebugMarkerSetObject",
                 "NegativeDebugExtensions.DebugMarkerSetUtils",
                 "NegativeDebugExtensions.SwapchainImagesDebugMarker",
@@ -232,7 +233,26 @@
             "reason": "Not supported in Vulkan SC: VK_KHR_descriptor_update_template",
             "cases": [
                 "NegativeDescriptors.DSBufferInfoTemplate",
-                "NegativeDescriptors.DSBufferLimitWithTemplateUpdate"
+                "NegativeDescriptors.DSBufferLimitWithTemplateUpdate",
+                "NegativeDescriptors.TemplatesInvalidBuffer",
+                "NegativeDescriptors.TemplatesInvalidBufferView",
+                "NegativeDescriptors.TemplatesInvalidCombinedImageSampler",
+                "NegativeDescriptors.TemplatesInvalidSampler",
+                "NegativeDescriptors.TemplatesInvalidStorageImage"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_QCOM_render_pass_transform",
+            "cases": [
+                "NegativeFragmentShadingRate.Attachments"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_EXT_extended_dynamic_state3",
+            "cases": [
+                "NegativePipelineTopology.PatchListTopology",
+                "NegativePipelineTopology.PatchListTopologyNoShader",
+                "PositivePipelineTopology.PatchListTopology"
             ]
         },
         {
@@ -319,6 +339,7 @@
                 "NegativeObjectLifetime.ImageViewInUseDestroyedSignaled",
                 "NegativeObjectLifetime.SamplerInUseDestroyedSignaled",
                 "NegativeObjectLifetime.DescriptorSetStorageBufferDestroyed",
+                "NegativePipeline.DescriptorSetNotBound",
                 "NegativePipeline.NotCompatibleForSet",
                 "NegativePipeline.ShaderDrawParametersNotEnabled11",
                 "NegativePipelineLayout.DescriptorNotAccessible",
@@ -328,6 +349,7 @@
                 "NegativePipelineLayout.MissingDescriptor",
                 "NegativePipelineLayout.UniformBlockNotProvided",
                 "NegativePipelineTopology.PointSize",
+                "NegativePipelineTopology.DynamicPrimitiveRestartEnable",
                 "NegativeProtectedMemory.MixingProtectedResources",
                 "NegativeSampler.CustomBorderColorFormatUndefined",
                 "NegativeSampler.CustomBorderColorFormatUndefinedNonCombined",
@@ -360,6 +382,7 @@
                 "NegativeShaderImageAccess.SampledImageShareBindingArray",
                 "NegativeShaderImageAccess.SampledImageShareBindingArrayFunction",
                 "NegativeShaderImageAccess.AliasImageBinding",
+                "NegativeShaderImageAccess.AliasImageBindingArrayType",
                 "NegativeShaderImageAccess.AliasImageMultisample",
                 "NegativeShaderInterface.*",
                 "NegativeShaderLimits.MinAndMaxTexelGatherOffset",
@@ -372,11 +395,13 @@
                 "NegativeShaderLimits.MaxFragmentOutputAttachmentsArrayAtEnd",
                 "NegativeShaderPushConstants.ArrayOf8Bit",
                 "NegativeShaderPushConstants.ArrayOfStructOf8Bit",
+                "NegativeShaderPushConstants.BufferDeviceAddress",
                 "NegativeShaderPushConstants.DrawWithoutUpdate",
                 "NegativeShaderPushConstants.MultipleEntryPoint",
                 "NegativeShaderPushConstants.NotDeclared",
                 "NegativeShaderPushConstants.NotInLayout",
                 "NegativeShaderPushConstants.StructOf8Bit",
+                "NegativeShaderSpirv.Bitwise32bitMaintenance9",
                 "NegativeShaderSpirv.ConservativeRasterizationPostDepthCoverage",
                 "NegativeShaderSpirv.DemoteToHelperInvocation",
                 "NegativeShaderSpirv.DescriptorCountConstant",
@@ -412,7 +437,11 @@
                 "NegativeSubpass.InputAttachmentSharingVariable",
                 "NegativeSubpass.SubpassInputNotBoundDescriptorSet",
                 "NegativeSubpass.SubpassInputWithoutFormat",
+                "NegativeSyncVal.CmdDispatchBase",
                 "NegativeSyncVal.CopyVsShaderDescriptorAccess",
+                "NegativeSyncVal.ExternalDependencyDoesNotSyncLayoutTransition",
+                "NegativeSyncVal.InputAttachmentReadHazard",
+                "NegativeSyncVal.InputAttachmentReadHazard2",
                 "NegativeSyncVal.RenderPassAsyncHazard",
                 "NegativeSyncVal.SampledImageDescriptorHazard",
                 "NegativeSyncVal.StageAccessExpansion",
@@ -441,10 +470,12 @@
                 "NegativeVertexInput.AttributeTypeMismatchDynamic",
                 "NegativeVertexInput.ResetCmdSetVertexInput",
                 "NegativeVertexInput.VertexInputRebinding",
-                "NegativeYcbcr.DrawConstOffset",
-                "NegativeYcbcr.DrawFetch",
-                "NegativeYcbcr.DrawFetchArray",
-                "NegativeYcbcr.DrawFetchIndexed"
+                "NegativeYcbcr.ConstOffset",
+                "NegativeYcbcr.TexelFetch",
+                "NegativeYcbcr.TexelFetchArray",
+                "NegativeYcbcr.TexelFetchIndexed",
+                "NegativeYcbcr.TexelFetchNonArrayPartiallyBound",
+                "NegativeYcbcr.TextureGather"
             ],
             "patch": [
                 "RequiresSpvDebugInfo()"
@@ -457,16 +488,6 @@
             ],
             "patch": [
                 "SkipOnQNX()"
-            ]
-        },
-        {
-            "reason":
-                "This test case triggers an unexpected VUID due to reliance on the VK_QCOM_render_pass_transform extension that is not available in Vulkan SC",
-            "cases": [
-                "NegativeFragmentShadingRate.Attachments"
-            ],
-            "patch": [
-                "m_errorMonitor->SetAllowedFailureMsg(\"VUID-VkRenderPassCreateInfo2-flags-zerobitmask\")"
             ]
         },
         {

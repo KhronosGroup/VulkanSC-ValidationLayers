@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2024 The Khronos Group Inc.
- * Copyright (c) 2018-2024 Valve Corporation
- * Copyright (c) 2018-2024 LunarG, Inc.
+/* Copyright (c) 2018-2025 The Khronos Group Inc.
+ * Copyright (c) 2018-2025 Valve Corporation
+ * Copyright (c) 2018-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,39 +17,49 @@
 
 #pragma once
 
-#include <utility>
 #include <vector>
-#include "state_tracker/cmd_buffer_state.h"
+#include "gpuav/core/gpuav_validation_pipeline.h"
+#include "gpuav/resources/gpuav_state_trackers.h"
 
+struct Location;
 namespace gpuav {
-class Validator;
-class CommandBuffer;
+namespace valcmd {
 
-class RestorablePipelineState {
-  public:
-    RestorablePipelineState(CommandBuffer& cb_state, VkPipelineBindPoint bind_point) : cb_state_(cb_state) {
-        Create(cb_state, bind_point);
+namespace internal {
+void BindShaderResourcesHelper(Validator& gpuav, CommandBufferSubState& cb_state, uint32_t cmd_index, uint32_t error_logger_index,
+                               VkPipelineLayout pipeline_layout, VkDescriptorSet desc_set,
+                               const std::vector<VkWriteDescriptorSet>& descriptor_writes, const uint32_t push_constants_byte_size,
+                               const void* push_constants);
+}
+
+template <typename ShaderResources>
+bool BindShaderResources(gpuav::valpipe::ComputePipeline<ShaderResources>& validation_pipeline, Validator& gpuav,
+                         CommandBufferSubState& cb_state, uint32_t cmd_index, uint32_t error_logger_index,
+                         const ShaderResources& shader_resources) {
+    const VkDescriptorSet desc_set =
+        cb_state.gpu_resources_manager.GetManagedDescriptorSet(validation_pipeline.specific_desc_set_layout);
+    if (!desc_set) {
+        return false;
     }
-    ~RestorablePipelineState() { Restore(); }
+    const std::vector<VkWriteDescriptorSet> desc_writes = shader_resources.GetDescriptorWrites(desc_set);
+    internal::BindShaderResourcesHelper(gpuav, cb_state, cmd_index, error_logger_index, validation_pipeline.pipeline_layout,
+                                        desc_set, desc_writes, sizeof(shader_resources.push_constants),
+                                        &shader_resources.push_constants);
+    return true;
+}
+
+class ValidationCommandsCommon {
+  public:
+    ValidationCommandsCommon(Validator& gpuav, CommandBufferSubState& cb, const Location& loc);
+    ~ValidationCommandsCommon();
+
+    VkDescriptorSetLayout error_logging_desc_set_layout_ = VK_NULL_HANDLE;
+    VkDescriptorSet error_logging_desc_set_ = VK_NULL_HANDLE;
+    VkDescriptorPool validation_cmd_desc_pool_ = VK_NULL_HANDLE;
 
   private:
-    void Create(CommandBuffer& cb_state, VkPipelineBindPoint bind_point);
-    void Restore() const;
-
-    CommandBuffer& cb_state_;
-    const vku::safe_VkRenderingInfo* rendering_info_ = nullptr;
-    VkPipelineBindPoint pipeline_bind_point_ = VK_PIPELINE_BIND_POINT_MAX_ENUM;
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
-    VkPipelineLayout desc_set_pipeline_layout_ = VK_NULL_HANDLE;
-    std::vector<std::pair<VkDescriptorSet, uint32_t>> descriptor_sets_;
-    std::vector<std::vector<uint32_t>> dynamic_offsets_;
-    uint32_t push_descriptor_set_index_ = 0;
-    std::vector<vku::safe_VkWriteDescriptorSet> push_descriptor_set_writes_;
-    std::vector<vvl::CommandBuffer::PushConstantData> push_constants_data_;
-    std::vector<vvl::ShaderObject*> shader_objects_;
+    Validator& gpuav_;
 };
-
-void BindErrorLoggingDescSet(Validator& gpuav, CommandBuffer& cb_state, VkPipelineBindPoint bind_point,
-                             VkPipelineLayout pipeline_layout, uint32_t cmd_index, uint32_t error_logger_index);
+}  // namespace valcmd
 
 }  // namespace gpuav

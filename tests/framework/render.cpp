@@ -28,6 +28,7 @@
 #include "layer_validation_tests.h"
 #include "vk_layer_config.h"
 #include "shader_helper.h"
+#include "containers/container_utils.h"
 
 #if defined(VK_USE_PLATFORM_METAL_EXT)
 #include "apple_wsi.h"
@@ -56,11 +57,26 @@ VkRenderFramework::VkRenderFramework()
     m_clear_color.float32[1] = 0.25f;
     m_clear_color.float32[2] = 0.25f;
     m_clear_color.float32[3] = 0.0f;
+
+    // While it seems very undeal to have to allocate these on the heap, the alternative is to include vk_extension_helper.h (which
+    // contains custom_container.h) in the header which will add a measured 150ms second per test file to compile. This is the only
+    // code that requires custom hash maps
+    m_instance_extensions = new InstanceExtensions();
+    m_device_extensions = new DeviceExtensions();
 }
 
 VkRenderFramework::~VkRenderFramework() {
     ShutdownFramework();
     m_errorMonitor->Finish();
+
+    if (m_device_extensions) {
+        delete m_device_extensions;
+        m_device_extensions = nullptr;
+    }
+    if (m_instance_extensions) {
+        delete m_instance_extensions;
+        m_instance_extensions = nullptr;
+    }
 }
 
 VkPhysicalDevice VkRenderFramework::Gpu() const {
@@ -357,12 +373,11 @@ std::string VkRenderFramework::RequiredExtensionsNotSupported() const {
 }
 
 void VkRenderFramework::AddRequiredFeature(vkt::Feature feature) {
-    required_features_.AddRequiredFeature(m_target_api_version, feature);
-    features_to_enable_.AddRequiredFeature(m_target_api_version, feature);
+    requested_features_.AddRequiredFeature(m_target_api_version, feature);
 }
 
 void VkRenderFramework::AddOptionalFeature(vkt::Feature feature) {
-    features_to_enable_.AddOptionalFeature(m_target_api_version, feature);
+    requested_features_.AddOptionalFeature(m_target_api_version, feature);
 }
 
 bool VkRenderFramework::AddRequestedInstanceExtensions(const char *ext_name) {
@@ -370,10 +385,10 @@ bool VkRenderFramework::AddRequestedInstanceExtensions(const char *ext_name) {
         return true;
     }
 
-    const auto &instance_exts_map = InstanceExtensions::GetInfoMap();
     bool is_instance_ext = false;
     vvl::Extension extension = GetExtension(ext_name);
-    if (instance_exts_map.find(extension) != instance_exts_map.cend()) {
+    const auto &instance_info = m_instance_extensions->GetInfo(extension);
+    if (instance_info.state) {
         if (!InstanceExtensionSupported(ext_name)) {
             return false;
         } else {
@@ -384,8 +399,7 @@ bool VkRenderFramework::AddRequestedInstanceExtensions(const char *ext_name) {
     // Different tables need to be used for extension dependency lookup depending on whether `ext_name` refers to a device or
     // instance extension
     if (is_instance_ext) {
-        const auto &info = InstanceExtensions::GetInfo(extension);
-        for (const auto &req : info.requirements) {
+        for (const auto &req : instance_info.requirements) {
             if (0 == strncmp(req.name, "VK_VERSION", 10)) {
                 continue;
             }
@@ -395,7 +409,7 @@ bool VkRenderFramework::AddRequestedInstanceExtensions(const char *ext_name) {
         }
         m_instance_extension_names.push_back(ext_name);
     } else {
-        const auto &info = DeviceExtensions::GetInfo(extension);
+        const auto &info = m_device_extensions->GetInfo(extension);
         for (const auto &req : info.requirements) {
             if (!AddRequestedInstanceExtensions(req.name)) {
                 return false;
@@ -441,9 +455,9 @@ bool VkRenderFramework::AddRequestedDeviceExtensions(const char *dev_ext_name) {
 
     // If this is an instance extension, just return true under the assumption instance extensions do not depend on any device
     // extensions.
-    const auto &instance_exts_map = InstanceExtensions::GetInfoMap();
     vvl::Extension extension = GetExtension(dev_ext_name);
-    if (instance_exts_map.find(extension) != instance_exts_map.cend()) {
+    const auto &instance_info = m_instance_extensions->GetInfo(extension);
+    if (instance_info.state) {
         return true;
     }
 
@@ -452,7 +466,7 @@ bool VkRenderFramework::AddRequestedDeviceExtensions(const char *dev_ext_name) {
     }
     m_device_extension_names.push_back(dev_ext_name);
 
-    const auto &info = DeviceExtensions::GetInfo(extension);
+    const auto &info = m_device_extensions->GetInfo(extension);
     for (const auto &req : info.requirements) {
         if (!AddRequestedDeviceExtensions(req.name)) {
             return false;
@@ -625,35 +639,33 @@ void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *crea
 
     // Apply required features after we are done with handling promoted extensions
     if (!features) {
-        if (required_features_.HasFeatures2()) {
+        if (requested_features_.HasFeatures2()) {
             if (vk::GetPhysicalDeviceFeatures2KHR) {
-                vk::GetPhysicalDeviceFeatures2KHR(Gpu(), required_features_.GetFeatures2());
+                vk::GetPhysicalDeviceFeatures2KHR(Gpu(), requested_features_.GetQueriedFeatures2());
             } else {
-                vk::GetPhysicalDeviceFeatures2(Gpu(), required_features_.GetFeatures2());
+                vk::GetPhysicalDeviceFeatures2(Gpu(), requested_features_.GetQueriedFeatures2());
             }
         } else {
-            GetPhysicalDeviceFeatures(required_features_.GetFeatures());
+            GetPhysicalDeviceFeatures(requested_features_.GetQueriedFeatures());
         }
 
-        if (const char *f = required_features_.AnyRequiredFeatureDisabled()) {
+        if (const char *f = requested_features_.AnyRequiredFeatureDisabled()) {
             GTEST_SKIP() << "Required feature " << f << " is not available on device, skipping test";
         }
 
-        features_to_enable_.EnforceRequiredFeatures();
-
-        if (features_to_enable_.HasFeatures2()) {
+        if (requested_features_.HasFeatures2()) {
             if (create_device_pnext) {
                 // Chain to the end of the list
                 VkBaseOutStructure *p = reinterpret_cast<VkBaseOutStructure *>(create_device_pnext);
                 while (p->pNext != nullptr) {
                     p = p->pNext;
                 }
-                p->pNext = reinterpret_cast<VkBaseOutStructure *>(features_to_enable_.GetFeatures2());
+                p->pNext = reinterpret_cast<VkBaseOutStructure *>(requested_features_.GetEnabledFeatures2());
             } else {
-                create_device_pnext = features_to_enable_.GetFeatures2();
+                create_device_pnext = requested_features_.GetEnabledFeatures2();
             }
         } else {
-            features = features_to_enable_.GetFeatures();
+            features = requested_features_.GetEnabledFeatures();
         }
     }
 
@@ -789,6 +801,18 @@ VkResult VkRenderFramework::CreateSurface(SurfaceContext &surface_context, vkt::
     }
 #endif
 
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+    if (IsExtensionsEnabled(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME)) {
+        if (surface_context.m_wayland_context.Init()) {
+            VkWaylandSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
+            surface_create_info.flags = 0;
+            surface_create_info.display = surface_context.m_wayland_context.display;
+            surface_create_info.surface = surface_context.m_wayland_context.surface;
+            return surface.Init(surface_instance, surface_create_info);
+        }
+    }
+#endif
+
     return VK_ERROR_UNKNOWN;
 }
 
@@ -820,6 +844,11 @@ void SurfaceContext::Destroy() {
     if (m_surface_xcb_conn != nullptr) {
         xcb_disconnect(m_surface_xcb_conn);
         m_surface_xcb_conn = nullptr;
+    }
+#endif
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+    if (m_wayland_context.display) {
+        m_wayland_context.Release();
     }
 #endif
 }
@@ -985,7 +1014,7 @@ void VkRenderFramework::InitRenderTarget(uint32_t targets, const VkImageView *ds
         m_renderPassClearValues.push_back(clear);
 
         VkFormatProperties props;
-        vk::GetPhysicalDeviceFormatProperties(m_device->Physical().handle(), m_render_target_fmt, &props);
+        vk::GetPhysicalDeviceFormatProperties(m_device->Physical(), m_render_target_fmt, &props);
 
         VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
         if (props.linearTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) {
@@ -1103,13 +1132,18 @@ void VkRenderFramework::DestroyRenderTarget() {
 void VkRenderFramework::SetDefaultDynamicStatesExclude(const std::vector<VkDynamicState> &exclude, bool tessellation,
                                                        VkCommandBuffer commandBuffer) {
     const auto excluded = [&exclude](VkDynamicState state) {
-        return std::find(exclude.begin(), exclude.end(), state) != exclude.end();
+        for (const auto &check_state : exclude) {
+            if (check_state == state) {
+                return true;
+            }
+        }
+        return false;
     };
     if (!m_vertex_buffer) {
         m_vertex_buffer = new vkt::Buffer(*m_device, 32u, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     }
 
-    VkCommandBuffer cmdBuffer = commandBuffer ? commandBuffer : m_command_buffer.handle();
+    VkCommandBuffer cmdBuffer = commandBuffer ? commandBuffer : m_command_buffer;
     VkViewport viewport = {0, 0, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
     VkRect2D scissor = {{0, 0}, {m_width, m_height}};
     if (!excluded(VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT)) vk::CmdSetViewportWithCountEXT(cmdBuffer, 1u, &viewport);

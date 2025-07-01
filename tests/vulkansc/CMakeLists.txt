@@ -63,8 +63,6 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/ray_tracing_objects.cpp
     ../framework/external_memory_sync.h
     ../framework/external_memory_sync.cpp
-    ../framework/barrier_queue_family.h
-    ../framework/barrier_queue_family.cpp
     ../framework/descriptor_helper.h
     ../framework/descriptor_helper.cpp
     ../framework/thread_helper.h
@@ -75,6 +73,8 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/feature_requirements.cpp
     ../framework/queue_submit_context.h
     ../framework/queue_submit_context.cpp
+    ../framework/sync_helper.h
+    ../framework/sync_helper.cpp
     negative/command.cpp
     negative/device_create.cpp
     negative/implicit.cpp
@@ -147,7 +147,9 @@ file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h" INPUT "${C
 target_compile_definitions(vksc_layer_validation_tests PRIVATE CONFIG_HEADER_FILE="config_$<CONFIG>.h")
 
 target_sources(vksc_layer_validation_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h)
-target_include_directories(vksc_layer_validation_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(vksc_layer_validation_tests PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${VVL_SOURCE_DIR}/layers/external)
 
 find_package(SPIRV-Tools CONFIG QUIET)
 

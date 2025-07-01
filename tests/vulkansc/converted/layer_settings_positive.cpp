@@ -14,7 +14,6 @@
  */
 // stype-check off
 
-#include <array>
 #include "../framework/layer_validation_tests.h"
 
 class PositiveLayerSettings : public VkLayerTest {};
@@ -60,9 +59,8 @@ TEST_F(PositiveLayerSettings, AllSettings) {
         {OBJECT_LAYER_NAME, "gpuav_enable", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "gpuav_shader_instrumentation", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "gpuav_descriptor_checks", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
-        {OBJECT_LAYER_NAME, "gpuav_warn_on_robust_oob", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
+        {OBJECT_LAYER_NAME, "gpuav_force_on_robustness", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "gpuav_buffer_address_oob", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
-        {OBJECT_LAYER_NAME, "gpuav_max_buffer_device_addresses", VK_LAYER_SETTING_TYPE_UINT32_EXT, 1, &one_k},
         {OBJECT_LAYER_NAME, "gpuav_validate_ray_query", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "gpuav_post_process_descriptor_indexing", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
@@ -72,13 +70,9 @@ TEST_F(PositiveLayerSettings, AllSettings) {
         {OBJECT_LAYER_NAME, "gpuav_indirect_trace_rays_buffers", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "gpuav_buffer_copies", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "gpuav_index_buffers", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
-        {OBJECT_LAYER_NAME, "gpuav_image_layout", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
-        {OBJECT_LAYER_NAME, "gpuav_reserve_binding_slot", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
-        {OBJECT_LAYER_NAME, "gpuav_vma_linear_output", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "syncval_submit_time_validation", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "syncval_shader_accesses_heuristic", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "syncval_message_extra_properties", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
-        {OBJECT_LAYER_NAME, "syncval_message_extra_properties_pretty_print", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "message_format_display_application_name", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "message_format_json", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &disable},
         {OBJECT_LAYER_NAME, "debug_action", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &action_ignore},

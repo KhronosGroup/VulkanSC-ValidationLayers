@@ -22,9 +22,10 @@
 
 #include "generated/error_location_helper.h"
 #include "logging.h"
-#include "containers/custom_containers.h"
 #include "chassis/chassis_handle_data.h"
 #include "utils/hash_util.h"
+#include "containers/small_vector.h"
+#include "containers/limits.h"
 
 // Holds the 'Location' of where the code is inside a function/struct/etc
 // see docs/error_object.md for more details
@@ -90,6 +91,8 @@ struct Location {
     const char* StringField() const { return vvl::String(field); }
 };
 
+std::string PrintPNextChain(vvl::Struct in_struct, const void* in_pNext);
+
 // Contains the base information needed for errors to be logged out
 // Created for each function as a starting point to build off of
 struct ErrorObject {
@@ -125,8 +128,12 @@ struct LocationVuidAdapter {
 
 struct LocationCapture {
     LocationCapture(const Location& loc);
-    LocationCapture(const LocationCapture &other);
-    LocationCapture(LocationCapture &&other);
+    LocationCapture(const LocationCapture& other);
+    LocationCapture(LocationCapture&& other);
+    LocationCapture& operator=(LocationCapture&& other);
+
+    // Currently not needed, implement if required (compiler generated default is not valid)
+    LocationCapture& operator=(const LocationCapture& other) = delete;
 
     const Location& Get() const { return capture.back(); }
 

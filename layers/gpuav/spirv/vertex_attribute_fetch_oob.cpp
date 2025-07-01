@@ -17,7 +17,7 @@
 
 #include "vertex_attribute_fetch_oob.h"
 #include "module.h"
-#include "generated/instrumentation_vertex_attribute_fetch_oob_vert.h"
+#include "generated/gpuav_offline_spirv.h"
 
 #include <iostream>
 
@@ -26,19 +26,15 @@
 namespace gpuav {
 namespace spirv {
 
-uint32_t VertexAttributeFetchOob::GetLinkFunctionId() {
-    static LinkInfo link_info = {instrumentation_vertex_attribute_fetch_oob_vert,
-                                 instrumentation_vertex_attribute_fetch_oob_vert_size, 0, "inst_vertex_attribute_fetch_oob"};
+const static OfflineModule kOfflineModule = {instrumentation_vertex_attribute_fetch_oob_vert,
+                                             instrumentation_vertex_attribute_fetch_oob_vert_size};
 
-    if (link_function_id == 0) {
-        link_function_id = module_.TakeNextId();
-        link_info.function_id = link_function_id;
-        module_.link_info_.push_back(link_info);
-    }
-    return link_function_id;
-}
+const static OfflineFunction kOfflineFunction = {"inst_vertex_attribute_fetch_oob",
+                                                 instrumentation_vertex_attribute_fetch_oob_vert_function_0_offset};
 
-VertexAttributeFetchOob::VertexAttributeFetchOob(Module& module) : Pass(module) {}
+VertexAttributeFetchOob::VertexAttributeFetchOob(Module& module) : Pass(module, kOfflineModule) {}
+
+uint32_t VertexAttributeFetchOob::GetLinkFunctionId() { return GetLinkFunction(link_function_id_, kOfflineFunction); }
 
 bool VertexAttributeFetchOob::Instrument() {
     for (const auto& entry_point_inst : module_.entry_points_) {
@@ -48,14 +44,13 @@ bool VertexAttributeFetchOob::Instrument() {
         const uint32_t vertex_shader_entry_point_id = entry_point_inst->Word(2);
         for (const auto& function : module_.functions_) {
             if (function->instrumentation_added_) continue;
-            const uint32_t function_id = function->GetDef().Word(2);
+            const uint32_t function_id = function->GetDef().ResultId();
             if (vertex_shader_entry_point_id != function_id) continue;
 
-            BasicBlock& first_block = *function->blocks_[0];
+            BasicBlock& first_block = function->GetFirstBlock();
             InstructionIt first_injectable_instruction = first_block.GetFirstInjectableInstrution();
-            target_instruction_ = first_injectable_instruction->get();
 
-            const uint32_t stage_info_id = GetStageInfo(*function, function->blocks_.begin(), first_injectable_instruction);
+            const uint32_t stage_info_id = GetStageInfo(*function, first_block, first_injectable_instruction);
 
             InstructionIt stage_info_inst_it;
             for (auto inst_it = first_block.instructions_.begin(); inst_it != first_block.instructions_.end(); ++inst_it) {

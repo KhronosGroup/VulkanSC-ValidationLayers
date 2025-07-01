@@ -19,6 +19,7 @@
 #include "stateless/stateless_validation.h"
 #include "generated/enum_flag_bits.h"
 #include "containers/range.h"
+#include "utils/math_utils.h"
 
 namespace stateless {
 ReadLockGuard Device::ReadLock() const { return ReadLockGuard(validation_object_mutex, std::defer_lock); }
@@ -456,17 +457,17 @@ bool Device::manual_PreCallValidateCmdUpdateBuffer(VkCommandBuffer commandBuffer
     if (dstOffset & 3) {
         const LogObjectList objlist(commandBuffer, dstBuffer);
         skip |= LogError("VUID-vkCmdUpdateBuffer-dstOffset-00036", objlist, error_obj.location.dot(Field::dstOffset),
-                         "(%" PRIu64 "), is not a multiple of 4.", dstOffset);
+                         "(%" PRIu64 ") is not a multiple of 4.", dstOffset);
     }
 
     if ((dataSize <= 0) || (dataSize > 65536)) {
         const LogObjectList objlist(commandBuffer, dstBuffer);
         skip |= LogError("VUID-vkCmdUpdateBuffer-dataSize-00037", objlist, error_obj.location.dot(Field::dataSize),
-                         "(%" PRIu64 "), must be greater than zero and less than or equal to 65536.", dataSize);
+                         "(%" PRIu64 ") must be greater than zero and less than or equal to 65536.", dataSize);
     } else if (dataSize & 3) {
         const LogObjectList objlist(commandBuffer, dstBuffer);
         skip |= LogError("VUID-vkCmdUpdateBuffer-dataSize-00038", objlist, error_obj.location.dot(Field::dataSize),
-                         "(%" PRIu64 "), is not a multiple of 4.", dataSize);
+                         "(%" PRIu64 ") is not a multiple of 4.", dataSize);
     }
     return skip;
 }

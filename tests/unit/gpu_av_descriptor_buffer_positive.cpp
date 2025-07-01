@@ -32,7 +32,6 @@ TEST_F(PositiveGpuAVDescriptorBuffer, Basic) {
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
-    buffer_data.Memory().Unmap();
 
     VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     vkt::DescriptorSetLayout ds_layout(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
@@ -43,7 +42,7 @@ TEST_F(PositiveGpuAVDescriptorBuffer, Basic) {
     vkt::PipelineLayout pipeline_layout(*m_device, pipe_layout_ci);
 
     VkDeviceSize ds_layout_size = 0;
-    vk::GetDescriptorSetLayoutSizeEXT(device(), ds_layout.handle(), &ds_layout_size);
+    vk::GetDescriptorSetLayoutSizeEXT(device(), ds_layout, &ds_layout_size);
 
     ds_layout_size = Align(ds_layout_size, descriptor_buffer_properties.descriptorBufferOffsetAlignment);
 
@@ -62,7 +61,6 @@ TEST_F(PositiveGpuAVDescriptorBuffer, Basic) {
     void *mapped_descriptor_data = descriptor_buffer.Memory().Map();
     vk::GetDescriptorEXT(device(), &buffer_descriptor_info, descriptor_buffer_properties.storageBufferDescriptorSize,
                          mapped_descriptor_data);
-    descriptor_buffer.Memory().Unmap();
 
     char const *cs_source = R"glsl(
         #version 450
@@ -78,34 +76,29 @@ TEST_F(PositiveGpuAVDescriptorBuffer, Basic) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     pipe.cp_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
-    pipe.cp_ci_.layout = pipeline_layout.handle();
+    pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
 
     VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
     descriptor_buffer_binding_info.address = descriptor_buffer.Address();
     descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
-    vk::CmdBindDescriptorBuffersEXT(m_command_buffer.handle(), 1, &descriptor_buffer_binding_info);
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &descriptor_buffer_binding_info);
 
     uint32_t buffer_index = 0;
     VkDeviceSize buffer_offset = 0;
-    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1,
-                                         &buffer_index, &buffer_offset);
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &buffer_index,
+                                         &buffer_offset);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
-    if (!IsPlatformMockICD()) {
-        data = (uint32_t *)buffer_data.Memory().Map();
-        ASSERT_TRUE(data[0] == 8);
-        ASSERT_TRUE(data[1] == 12);
-        ASSERT_TRUE(data[2] == 20);
-        buffer_data.Memory().Unmap();
-    }
+    ASSERT_TRUE(data[0] == 8);
+    ASSERT_TRUE(data[1] == 12);
+    ASSERT_TRUE(data[2] == 20);
 }

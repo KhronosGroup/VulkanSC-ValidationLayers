@@ -85,10 +85,9 @@ TEST_F(NegativeDeviceQueue, FamilyIndexUsage) {
         ib.init(*m_device, buffer_ci);
 
         m_command_buffer.Begin();
-        vk::CmdFillBuffer(m_command_buffer.handle(), ib.handle(), 0, 16, 5);
+        vk::CmdFillBuffer(m_command_buffer, ib.handle(), 0, 16, 5);
         m_command_buffer.End();
-        m_default_queue->Submit(m_command_buffer);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(m_command_buffer);
         m_errorMonitor->VerifyFound();
     }
 
@@ -334,12 +333,12 @@ TEST_F(NegativeDeviceQueue, BindPipeline) {
     commandBuffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-commandBuffer-cmdpool");
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipelineBindPoint-00777");
-    vk::CmdBindPipeline(commandBuffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, c_pipe.Handle());
+    vk::CmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, c_pipe);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-commandBuffer-cmdpool");
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipelineBindPoint-00778");
-    vk::CmdBindPipeline(commandBuffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
+    vk::CmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe);
     m_errorMonitor->VerifyFound();
     commandBuffer.End();
 }
@@ -475,11 +474,13 @@ TEST_F(NegativeDeviceQueue, DeviceCreateInvalidParameters) {
     vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 
-    device_ci.pQueueCreateInfos = &device_queue_ci;
-    device_ci.queueCreateInfoCount = 0u;
-    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-queueCreateInfoCount-arraylength");
-    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
-    m_errorMonitor->VerifyFound();
+    if (!DeviceExtensionSupported(VK_KHR_MAINTENANCE_9_EXTENSION_NAME)) {
+        device_ci.pQueueCreateInfos = &device_queue_ci;
+        device_ci.queueCreateInfoCount = 0u;
+        m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-None-10778");
+        vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
+        m_errorMonitor->VerifyFound();
+    }
 }
 
 TEST_F(NegativeDeviceQueue, DeviceCreateEnabledLayerNamesPointer) {

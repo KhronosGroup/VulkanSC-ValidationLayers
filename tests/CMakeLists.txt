@@ -52,8 +52,9 @@ target_sources(vk_layer_validation_tests PRIVATE
     framework/ray_tracing_helper_nv.cpp
     framework/external_memory_sync.h
     framework/external_memory_sync.cpp
-    framework/barrier_queue_family.h
-    framework/barrier_queue_family.cpp
+    framework/sync_helper.h
+    framework/sync_helper.cpp
+    framework/sync_val_tests.h
     framework/descriptor_helper.h
     framework/descriptor_helper.cpp
     framework/thread_helper.h
@@ -79,8 +80,6 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/buffer_positive.cpp
     unit/command.cpp
     unit/command_positive.cpp
-    unit/cooperative_vector.cpp
-    unit/cooperative_vector_positive.cpp
     unit/copy_buffer_image.cpp
     unit/copy_buffer_image_positive.cpp
     unit/debug_extensions.cpp
@@ -99,6 +98,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/device_generated_commands.cpp
     unit/device_generated_commands_positive.cpp
     unit/device_queue.cpp
+    unit/device_queue_positive.cpp
     unit/dynamic_rendering.cpp
     unit/dynamic_rendering_positive.cpp
     unit/dynamic_rendering_local_read.cpp
@@ -117,6 +117,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_buffer_device_address_positive.cpp
     unit/gpu_av_cooperative_vector.cpp
     unit/gpu_av_cooperative_vector_positive.cpp
+    unit/gpu_av_copies.cpp
+    unit/gpu_av_copies_positive.cpp
     unit/gpu_av_debug_printf.cpp
     unit/gpu_av_descriptor_buffer_positive.cpp
     unit/gpu_av_descriptor_class_general_buffer.cpp
@@ -127,8 +129,6 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_descriptor_indexing_positive.cpp
     unit/gpu_av_descriptor_post_process.cpp
     unit/gpu_av_descriptor_post_process_positive.cpp
-    unit/gpu_av_image_layout.cpp
-    unit/gpu_av_image_layout_positive.cpp
     unit/gpu_av_indirect_buffer.cpp
     unit/gpu_av_indirect_buffer_positive.cpp
     unit/gpu_av_index_buffer.cpp
@@ -142,6 +142,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_ray_query_positive.cpp
     unit/gpu_av_ray_tracing.cpp
     unit/gpu_av_ray_tracing_positive.cpp
+    unit/gpu_av_vertex_attribute_fetch.cpp
     unit/graphics_library.cpp
     unit/graphics_library_positive.cpp
     unit/host_image_copy.cpp
@@ -207,6 +208,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/shader_compute_positive.cpp
     unit/shader_cooperative_matrix.cpp
     unit/shader_cooperative_matrix_positive.cpp
+    unit/shader_cooperative_vector.cpp
+    unit/shader_cooperative_vector_positive.cpp
     unit/shader_debug_info.cpp
     unit/shader_image_access.cpp
     unit/shader_image_access_positive.cpp
@@ -215,6 +218,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/shader_limits.cpp
     unit/shader_limits_positive.cpp
     unit/shader_mesh.cpp
+    unit/shader_mesh_positive.cpp
     unit/shader_object.cpp
     unit/shader_object_positive.cpp
     unit/shader_push_constants.cpp
@@ -262,6 +266,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/video_decode_h264_positive.cpp
     unit/video_decode_h265.cpp
     unit/video_decode_h265_positive.cpp
+    unit/video_decode_vp9.cpp
+    unit/video_decode_vp9_positive.cpp
     unit/video_encode.cpp
     unit/video_encode_positive.cpp
     unit/video_encode_av1.cpp
@@ -344,7 +350,10 @@ file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h" INPUT "${C
 target_compile_definitions(vk_layer_validation_tests PRIVATE CONFIG_HEADER_FILE="config_$<CONFIG>.h")
 
 target_sources(vk_layer_validation_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h)
-target_include_directories(vk_layer_validation_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(vk_layer_validation_tests PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${VVL_SOURCE_DIR}/layers/external
+)
 
 # More details in tests/android/mock/README.md
 option(VVL_MOCK_ANDROID "Enable building for Android on desktop for testing with MockICD setup")

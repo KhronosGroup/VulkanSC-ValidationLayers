@@ -22,6 +22,9 @@
 #include <vulkan/utility/vk_safe_struct.hpp>
 
 namespace vvl {
+
+std::optional<VkExternalMemoryHandleTypeFlagBits> GetImportHandleType(const VkMemoryAllocateInfo &alloc_info);
+
 struct MemRange {
     VkDeviceSize offset = 0;
     VkDeviceSize size = 0;
@@ -305,11 +308,6 @@ class Bindable : public StateObject {
     std::pair<VkDeviceMemory, BindableMemoryTracker::MemoryRange> GetResourceMemoryOverlap(
         const BindableMemoryTracker::MemoryRange &memory_region, const Bindable *other_resource,
         const BindableMemoryTracker::MemoryRange &other_memory_region) const;
-
-    bool DoesResourceMemoryOverlap(const BindableMemoryTracker::MemoryRange &memory_region, const Bindable *other_resource,
-                                   const BindableMemoryTracker::MemoryRange &other_memory_region) const {
-        return GetResourceMemoryOverlap(memory_region, other_resource, other_memory_region).first != VK_NULL_HANDLE;
-    }
 
     BindableMemoryTracker::BoundMemoryRange GetBoundMemoryRange(const BindableMemoryTracker::MemoryRange &range) const {
         return memory_tracker_->GetBoundMemoryRange(range);

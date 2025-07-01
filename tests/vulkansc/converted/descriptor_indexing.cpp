@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2021 ARM, Inc. All rights reserved.
  *
@@ -62,18 +62,18 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
     vkt::DescriptorPool pool(*m_device, dspci);
 
     VkDescriptorSetAllocateInfo ds_alloc_info = vku::InitStructHelper();
-    ds_alloc_info.descriptorPool = pool.handle();
+    ds_alloc_info.descriptorPool = pool;
     ds_alloc_info.descriptorSetCount = 1;
     ds_alloc_info.pSetLayouts = &ds_layout.handle();
 
     VkDescriptorSet ds = VK_NULL_HANDLE;
-    VkResult err = vk::AllocateDescriptorSets(m_device->handle(), &ds_alloc_info, &ds);
+    VkResult err = vk::AllocateDescriptorSets(*m_device, &ds_alloc_info, &ds);
     ASSERT_EQ(VK_SUCCESS, err);
 
     vkt::Buffer dynamic_uniform_buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
     VkDescriptorBufferInfo buffInfo[2] = {};
-    buffInfo[0].buffer = dynamic_uniform_buffer.handle();
+    buffInfo[0].buffer = dynamic_uniform_buffer;
     buffInfo[0].offset = 0;
     buffInfo[0].range = 1024;
 
@@ -109,7 +109,7 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_[1] = fs.GetStageCreateInfo();
-    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.gp_ci_.layout = pipeline_layout;
     pipe.CreateGraphicsPipeline();
 
     // Make both bindings valid before binding to the command buffer
@@ -121,7 +121,7 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
 
     m_errorMonitor->SetDesiredError("VUID-vkEndCommandBuffer-commandBuffer-00059");
 
-    vk::EndCommandBuffer(m_command_buffer.handle());
+    vk::EndCommandBuffer(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -159,16 +159,16 @@ TEST_F(NegativeDescriptorIndexing, SetNonIdenticalWrite) {
     vkt::DescriptorPool pool(*m_device, dspci);
 
     VkDescriptorSetAllocateInfo ds_alloc_info = vku::InitStructHelper();
-    ds_alloc_info.descriptorPool = pool.handle();
+    ds_alloc_info.descriptorPool = pool;
     ds_alloc_info.descriptorSetCount = 1;
     ds_alloc_info.pSetLayouts = &ds_layout.handle();
     VkDescriptorSet ds = VK_NULL_HANDLE;
-    ASSERT_EQ(VK_SUCCESS, vk::AllocateDescriptorSets(m_device->handle(), &ds_alloc_info, &ds));
+    ASSERT_EQ(VK_SUCCESS, vk::AllocateDescriptorSets(*m_device, &ds_alloc_info, &ds));
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
     VkDescriptorBufferInfo bufferInfo[3] = {};
-    bufferInfo[0].buffer = buffer.handle();
+    bufferInfo[0].buffer = buffer;
     bufferInfo[0].offset = 0;
     bufferInfo[0].range = 1024;
     bufferInfo[1] = bufferInfo[0];
@@ -183,7 +183,7 @@ TEST_F(NegativeDescriptorIndexing, SetNonIdenticalWrite) {
     descriptor_write.descriptorCount = 3;
 
     // binding 1 has a different VkDescriptorBindingFlags
-    m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-dstArrayElement-00321");
+    m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-descriptorCount-10777");
     vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
     m_errorMonitor->VerifyFound();
 }
@@ -199,7 +199,7 @@ TEST_F(NegativeDescriptorIndexing, DISABLED_SetLayoutWithoutExtension) {
     VkDescriptorSetLayout ds_layout = VK_NULL_HANDLE;
 
     m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutCreateInfo-flags-parameter");
-    vk::CreateDescriptorSetLayout(m_device->handle(), &ds_layout_ci, nullptr, &ds_layout);
+    vk::CreateDescriptorSetLayout(*m_device, &ds_layout_ci, nullptr, &ds_layout);
     m_errorMonitor->VerifyFound();
 }
 
@@ -225,7 +225,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
     VkDescriptorSetLayout dsl = VK_NULL_HANDLE;
     {
         m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutBindingFlagsCreateInfo-pBindingFlags-parameter");
-        vk::CreateDescriptorSetLayout(m_device->handle(), &ds_layout_ci, nullptr, &dsl);
+        vk::CreateDescriptorSetLayout(*m_device, &ds_layout_ci, nullptr, &dsl);
         m_errorMonitor->VerifyFound();
     }
 
@@ -235,7 +235,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
         flags_create_info.bindingCount = 2;
 
         m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutBindingFlagsCreateInfo-bindingCount-03002");
-        vk::CreateDescriptorSetLayout(m_device->handle(), &ds_layout_ci, nullptr, &dsl);
+        vk::CreateDescriptorSetLayout(*m_device, &ds_layout_ci, nullptr, &dsl);
         m_errorMonitor->VerifyFound();
     }
 
@@ -247,7 +247,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
         // binding uses a feature we disabled
         m_errorMonitor->SetDesiredError(
             "VUID-VkDescriptorSetLayoutBindingFlagsCreateInfo-descriptorBindingUniformBufferUpdateAfterBind-03005");
-        vk::CreateDescriptorSetLayout(m_device->handle(), &ds_layout_ci, nullptr, &dsl);
+        vk::CreateDescriptorSetLayout(*m_device, &ds_layout_ci, nullptr, &dsl);
         m_errorMonitor->VerifyFound();
     }
     {
@@ -264,14 +264,14 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
         vkt::DescriptorPool pool(*m_device, dspci);
 
         VkDescriptorSetAllocateInfo ds_alloc_info = vku::InitStructHelper();
-        ds_alloc_info.descriptorPool = pool.handle();
+        ds_alloc_info.descriptorPool = pool;
         ds_alloc_info.descriptorSetCount = 1;
         ds_alloc_info.pSetLayouts = &ds_layout.handle();
 
         VkDescriptorSet ds = VK_NULL_HANDLE;
         // mismatch between descriptor set and pool
         m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetAllocateInfo-pSetLayouts-03044");
-        vk::AllocateDescriptorSets(m_device->handle(), &ds_alloc_info, &ds);
+        vk::AllocateDescriptorSets(*m_device, &ds_alloc_info, &ds);
         m_errorMonitor->VerifyFound();
     }
 
@@ -297,13 +297,13 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
             count_alloc_info.pDescriptorCounts = &variable_count;
 
             VkDescriptorSetAllocateInfo ds_alloc_info = vku::InitStructHelper(&count_alloc_info);
-            ds_alloc_info.descriptorPool = pool.handle();
+            ds_alloc_info.descriptorPool = pool;
             ds_alloc_info.descriptorSetCount = 1;
             ds_alloc_info.pSetLayouts = &ds_layout.handle();
 
             VkDescriptorSet ds = VK_NULL_HANDLE;
             m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetAllocateInfo-pSetLayouts-09380");
-            vk::AllocateDescriptorSets(m_device->handle(), &ds_alloc_info, &ds);
+            vk::AllocateDescriptorSets(*m_device, &ds_alloc_info, &ds);
             m_errorMonitor->VerifyFound();
         }
         {
@@ -318,17 +318,17 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
             count_alloc_info.pDescriptorCounts = &variable_count;
 
             VkDescriptorSetAllocateInfo ds_alloc_info = vku::InitStructHelper(&count_alloc_info);
-            ds_alloc_info.descriptorPool = pool.handle();
+            ds_alloc_info.descriptorPool = pool;
             ds_alloc_info.descriptorSetCount = 1;
             ds_alloc_info.pSetLayouts = &ds_layout.handle();
 
             VkDescriptorSet ds;
-            VkResult err = vk::AllocateDescriptorSets(m_device->handle(), &ds_alloc_info, &ds);
+            VkResult err = vk::AllocateDescriptorSets(*m_device, &ds_alloc_info, &ds);
             ASSERT_EQ(VK_SUCCESS, err);
             vkt::Buffer buffer(*m_device, 128 * 128, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
             VkDescriptorBufferInfo buffer_info[3] = {};
             for (int i = 0; i < 3; i++) {
-                buffer_info[i].buffer = buffer.handle();
+                buffer_info[i].buffer = buffer;
                 buffer_info[i].offset = 0;
                 buffer_info[i].range = 128 * 128;
             }
@@ -381,6 +381,6 @@ TEST_F(NegativeDescriptorIndexing, SetLayoutBindings) {
 
     m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutCreateInfo-descriptorType-03001");
     VkDescriptorSetLayout setLayout;
-    vk::CreateDescriptorSetLayout(m_device->handle(), &create_info, nullptr, &setLayout);
+    vk::CreateDescriptorSetLayout(*m_device, &create_info, nullptr, &setLayout);
     m_errorMonitor->VerifyFound();
 }

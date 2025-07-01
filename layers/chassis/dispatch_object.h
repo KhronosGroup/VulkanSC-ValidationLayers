@@ -26,29 +26,17 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/utility/vk_safe_struct.hpp>
 
-#include "containers/custom_containers.h"
 #include "error_message/logging.h"
-#include "utils/vk_layer_utils.h"
+#include "containers/custom_containers.h"
 #include "layer_options.h"
 #include "gpuav/core/gpuav_settings.h"
 #include "sync/sync_settings.h"
 #include "generated/device_features.h"
-#include "generated/dispatch_vector.h"
 #include "generated/vk_api_version.h"
 #include "generated/vk_extension_helper.h"
 #include "generated/vk_layer_dispatch_table.h"
-
-// Layer object type identifiers
-enum LayerObjectTypeId {
-    LayerObjectTypeThreading,            // Instance or device threading layer object
-    LayerObjectTypeParameterValidation,  // Instance or device parameter validation layer object
-    LayerObjectTypeObjectTracker,        // Instance or device object tracker layer object
-    LayerObjectTypeCoreValidation,       // Instance or device core validation layer object
-    LayerObjectTypeBestPractices,        // Instance or device best practices layer object
-    LayerObjectTypeGpuAssisted,          // Instance or device gpu assisted validation layer object
-    LayerObjectTypeSyncValidation,       // Instance or device synchronization validation layer object
-    LayerObjectTypeMaxEnum,              // Max enum count
-};
+#include "layer_object_id.h"
+#include "state_tracker/special_supported.h"
 
 // To avoid re-hashing unique ids on each use, we precompute the hash and store the
 // hash's LSBs in the high 24 bits.
@@ -88,7 +76,8 @@ struct DeviceExtensionProperties {
     VkPhysicalDeviceAccelerationStructurePropertiesKHR acc_structure_props;
     VkPhysicalDeviceFragmentDensityMapPropertiesEXT fragment_density_map_props;
     VkPhysicalDeviceFragmentDensityMap2PropertiesEXT fragment_density_map2_props;
-    VkPhysicalDeviceFragmentDensityMapOffsetPropertiesQCOM fragment_density_map_offset_props;
+    VkPhysicalDeviceFragmentDensityMapOffsetPropertiesEXT fragment_density_map_offset_props;
+    VkPhysicalDeviceFragmentDensityMapLayeredPropertiesVALVE fragment_density_map_layered_props;
     VkPhysicalDevicePerformanceQueryPropertiesKHR performance_query_props;
     VkPhysicalDeviceSampleLocationsPropertiesEXT sample_locations_props;
     VkPhysicalDeviceCustomBorderColorPropertiesEXT custom_border_color_props;
@@ -115,6 +104,7 @@ struct DeviceExtensionProperties {
     VkPhysicalDeviceCooperativeVectorPropertiesNV cooperative_vector_props_nv;
     VkPhysicalDeviceRenderPassStripedPropertiesARM renderpass_striped_props;
     VkPhysicalDeviceExternalMemoryHostPropertiesEXT external_memory_host_props;
+    VkPhysicalDeviceMaintenance9PropertiesKHR maintenance9_props;
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
     VkPhysicalDeviceExternalFormatResolvePropertiesANDROID android_format_resolve_props;
 #endif
@@ -129,9 +119,8 @@ class StatelessDeviceData {
 
     APIVersion api_version;
 
-    // Mutable, because the chassis will patch these after PreCallRecordCreateDevice
-    mutable DeviceExtensions extensions{};
-    mutable DeviceFeatures enabled_features{};
+    DeviceExtensions extensions{};
+    DeviceFeatures enabled_features{};
 
     VkPhysicalDeviceMemoryProperties phys_dev_mem_props{};
     VkPhysicalDeviceProperties phys_dev_props{};
@@ -144,17 +133,7 @@ class StatelessDeviceData {
     std::vector<VkImageLayout> host_imape_copy_props_copy_dst_layouts{};
     DeviceExtensionProperties phys_dev_ext_props = {};
 
-    // Some extensions/features changes the behavior of the app/layers/spec if present.
-    // So it needs its own special boolean unlike the enabled_fatures.
-    bool has_format_feature2;  // VK_KHR_format_feature_flags2
-    // VK_EXT_pipeline_robustness was designed to be a subset of robustness extensions
-    // Enabling the other robustness features can reduce performance on GPU, so just the
-    // support is needed to check
-    bool has_robust_image_access;  // VK_EXT_image_robustness
-    // Validation requires special handling for VkPhysicalDeviceRobustness2FeaturesEXT, because for some cases robustness features
-    // // need to only be supported, not enabled
-    bool has_robust_image_access2;   // VK_EXT_robustness2
-    bool has_robust_buffer_access2;  // VK_EXT_robustness2
+    SpecialSupported special_supported;
 };
 
 namespace dispatch {
@@ -170,6 +149,7 @@ void SetData(VkDevice dev, std::unique_ptr<Device>&&);
 Device* GetData(VkDevice);
 Device* GetData(VkQueue);
 Device* GetData(VkCommandBuffer);
+Device* GetData(VkExternalComputeQueueNV);
 void FreeData(void* key, VkDevice device);
 
 void FreeAllData();
@@ -188,8 +168,8 @@ struct Settings {
     GpuAVSettings gpuav_settings = {};
     SyncValSettings syncval_settings = {};
 
-    CHECK_DISABLED disabled = {};
-    CHECK_ENABLED enabled = {};
+    ValidationDisabled disabled = {};
+    ValidationEnabled enabled = {};
 };
 
 class HandleWrapper : public Logger {
@@ -319,9 +299,8 @@ class Device : public HandleWrapper {
 
     const APIVersion api_version;
 
-    // Non-const, because the chassis will patch these after PreCallRecordCreateDevice
-    DeviceExtensions& extensions;
-    DeviceFeatures& enabled_features;
+    const DeviceExtensions& extensions;
+    const DeviceFeatures& enabled_features;
 
     const VkPhysicalDeviceMemoryProperties& phys_dev_mem_props;
     const VkPhysicalDeviceProperties& phys_dev_props;

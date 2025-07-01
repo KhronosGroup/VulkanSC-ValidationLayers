@@ -21,8 +21,8 @@
 #pragma once
 
 #include <vulkan/vulkan_core.h>
-#include "utils/vk_layer_utils.h"
 #include "containers/custom_containers.h"
+#include "utils/lock_utils.h"
 
 #include <spirv-tools/libspirv.hpp>
 
@@ -115,4 +115,4 @@ spv_target_env PickSpirvEnv(const APIVersion &api_version, bool spirv_1_4);
 void AdjustValidatorOptions(const DeviceExtensions &device_extensions, const DeviceFeatures &enabled_features,
                             spvtools::ValidatorOptions &out_options, uint32_t *out_hash);
 
-void DumpSpirvToFile(std::string file_name, const char *spirv_data, size_t spirv_size);
+void DumpSpirvToFile(const std::string &file_name, const uint32_t *spirv, size_t spirv_dwords_count);

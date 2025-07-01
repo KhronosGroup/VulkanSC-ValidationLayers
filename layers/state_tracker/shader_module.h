@@ -21,12 +21,16 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <vector>
+#include <optional>
 
+#include "containers/custom_containers.h"
 #include "state_tracker/shader_instruction.h"
 #include "state_tracker/state_object.h"
 #include "state_tracker/sampler_state.h"
 #include <spirv/unified1/spirv.hpp>
+#include "containers/limits.h"
 
 namespace vvl {
 class Pipeline;
@@ -40,6 +44,16 @@ static constexpr uint32_t kInvalidValue = std::numeric_limits<uint32_t>::max();
 
 // Need to find a way to know if actually array length of zero, or a runtime array.
 static constexpr uint32_t kRuntimeArray = std::numeric_limits<uint32_t>::max();
+
+struct LocalSize {
+    uint32_t x = 0;
+    uint32_t y = 0;
+    uint32_t z = 0;
+
+    std::string ToString() const {
+        return "x = " + std::to_string(x) + ", y = " + std::to_string(y) + ", z = " + std::to_string(z);
+    }
+};
 
 // This is the common info for both OpDecorate and OpMemberDecorate
 // Used to keep track of all decorations applied to any instruction
@@ -140,9 +154,7 @@ struct ExecutionModeSet {
     VkPrimitiveTopology primitive_topology = VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
 
     // SPIR-V spec says only LocalSize or LocalSizeId can be used, so can share
-    uint32_t local_size_x = kInvalidValue;
-    uint32_t local_size_y = kInvalidValue;
-    uint32_t local_size_z = kInvalidValue;
+    LocalSize local_size = {kInvalidValue, kInvalidValue, kInvalidValue};
 
     uint32_t output_vertices = vvl::kU32Max;
     uint32_t output_primitives = 0;
@@ -233,7 +245,6 @@ struct ImageAccess {
     bool is_dref = false;
     bool is_sampler_implicitLod_dref_proj = false;
     bool is_sampler_sampled = false;  // OpImageSample* or OpImageSparseSample*
-    bool is_not_sampler_sampled = false;
     bool is_sampler_bias_offset = false;
     bool is_sampler_offset = false;  // ConstOffset or Offset (not ConstOffsets)
     bool is_sign_extended = false;
@@ -337,6 +348,8 @@ struct VariableBase {
     // memory was read
     bool IsImageReadFrom() const { return access_mask & AccessBit::image_read; }
     bool IsImageWrittenTo() const { return access_mask & AccessBit::image_write; }
+    // Something like textureSize() will access the OpVariable, but not the image itself
+    bool IsImageAccessed() const { return access_mask & AccessBit::image_mask; }
 
   private:
     static const char *FindDebugName(const VariableBase &variable, const DebugNameMap &debug_name_map);
@@ -389,10 +402,13 @@ struct ResourceInterfaceVariable : public VariableBase {
     // Will be kRuntimeArray (non-zero) for runtime arrays
     uint32_t array_length;
 
-    bool is_sampled_image;  // OpTypeSampledImage
+    // OpTypeSampledImage (used for combined image samplers)
+    bool is_type_sampled_image;
 
-    // List of samplers that sample a given image. The index of array is index of image.
+    // The index of vector is index of image. (TODO - this doesn't work for GPU-AV)
     std::vector<vvl::unordered_set<SamplerUsedByImage>> samplers_used_by_image;
+    // workaround for YCbCr to track sampler variables until |samplers_used_by_image| is fixed
+    vvl::unordered_set<uint32_t> sampled_image_sampler_variable_ids;
 
     // For storage images - list of Texel component length the OpImageWrite
     std::vector<uint32_t> write_without_formats_component_count_list;
@@ -426,7 +442,6 @@ struct ResourceInterfaceVariable : public VariableBase {
         bool is_multisampled;
 
         bool is_sampler_sampled{false};  // OpImageSample* or OpImageSparseSample*
-        bool is_not_sampler_sampled{false};
         bool is_sampler_implicitLod_dref_proj{false};
         bool is_sampler_bias_offset{false};
         bool is_sampler_offset{false};        // ConstOffset or Offset (not ConstOffsets)
@@ -508,6 +523,8 @@ struct EntryPoint {
     // "User-defined Variable Interface" - vkspec.html#interfaces-iointerfaces-user
     std::vector<const StageInterfaceVariable *> user_defined_interface_variables;
 
+    // Map for quick reserve lookup of variables from the OpVariable Result ID
+    vvl::unordered_map<uint32_t, const ResourceInterfaceVariable *> resource_interface_variable_map;
     // Lookup map from Interface slot to the variable in that spot
     // spirv-val guarantees no overlap so 2 variables won't have same slot
     vvl::unordered_map<InterfaceSlot, const StageInterfaceVariable *, InterfaceSlot::Hash> input_interface_slots;
@@ -572,6 +589,7 @@ struct StatelessData {
     bool has_builtin_fully_covered{false};
     bool has_invocation_repack_instruction{false};
     bool has_group_decoration{false};
+    bool has_ext_inst_with_forward_refs{false};  // OpExtInstWithForwardRefsKHR
 };
 
 // Represents a SPIR-V Module
@@ -689,27 +707,7 @@ struct Module {
         return (it != static_data_.execution_modes.end()) ? it->second : static_data_.empty_execution_mode;
     }
 
-    std::shared_ptr<const TypeStructInfo> GetTypeStructInfo(uint32_t struct_id) const {
-        // return the actual execution modes for this id, or a default empty set.
-        const auto it = static_data_.type_struct_map.find(struct_id);
-        return (it != static_data_.type_struct_map.end()) ? it->second : nullptr;
-    }
-    // Overload to walk down and find the OpTypeStruct
-    std::shared_ptr<const TypeStructInfo> GetTypeStructInfo(const Instruction *insn) const {
-        while (true) {
-            if (insn->Opcode() == spv::OpVariable) {
-                insn = FindDef(insn->Word(1));
-            } else if (insn->Opcode() == spv::OpTypePointer) {
-                insn = FindDef(insn->Word(3));
-            } else if (insn->IsArray()) {
-                insn = FindDef(insn->Word(2));
-            } else if (insn->Opcode() == spv::OpTypeStruct) {
-                return GetTypeStructInfo(insn->Word(1));
-            } else {
-                return nullptr;
-            }
-        }
-    }
+    std::shared_ptr<const TypeStructInfo> GetTypeStructInfo(const Instruction *insn) const;
 
     // Used to get human readable strings for error messages
     std::string GetDecorations(uint32_t id) const;
@@ -724,9 +722,10 @@ struct Module {
     std::optional<VkPrimitiveTopology> GetTopology(const EntryPoint &entrypoint) const;
 
     std::shared_ptr<const EntryPoint> FindEntrypoint(char const *name, VkShaderStageFlagBits stageBits) const;
-    bool FindLocalSize(const EntryPoint &entrypoint, uint32_t &local_size_x, uint32_t &local_size_y, uint32_t &local_size_z) const;
+    LocalSize FindLocalSize(const EntryPoint &entrypoint) const;
 
     uint32_t CalculateWorkgroupSharedMemory() const;
+    uint32_t CalculateTaskPayloadMemory() const;
 
     const Instruction *GetConstantDef(uint32_t id) const;
     uint32_t GetConstantValueById(uint32_t id) const;
@@ -742,6 +741,7 @@ struct Module {
     uint32_t GetTypeBytesSize(const Instruction *insn) const;
     uint32_t GetBaseType(const Instruction *insn) const;
     const Instruction *GetBaseTypeInstruction(uint32_t type) const;
+    const Instruction *GetVariablePointerType(const spirv::Instruction &var_insn) const;
     uint32_t GetTypeId(uint32_t id) const;
     uint32_t GetTexelComponentCount(const Instruction &insn) const;
     uint32_t GetFlattenArraySize(const Instruction &insn) const;

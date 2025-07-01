@@ -16,6 +16,8 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/descriptor_helper.h"
+#include "../framework/pipeline_helper.h"
 #include "../framework/render_pass_helper.h"
 
 class NegativeSecondaryCommandBuffer : public VkLayerTest {};
@@ -47,27 +49,25 @@ TEST_F(NegativeSecondaryCommandBuffer, Barrier) {
                             VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
     rp.CreateRenderPass();
 
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView imageView = image.CreateView();
     // Second image that img_barrier will incorrectly use
-    vkt::Image image2(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image2.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image2(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 
-    vkt::Framebuffer fb(*m_device, rp.Handle(), 1, &imageView.handle());
+    vkt::Framebuffer fb(*m_device, rp, 1, &imageView.handle());
 
     m_command_buffer.Begin();
 
     VkRenderPassBeginInfo rpbi =
         vku::InitStruct<VkRenderPassBeginInfo>(nullptr, rp.Handle(), fb.handle(), VkRect2D{{0, 0}, {32u, 32u}}, 0u, nullptr);
-    vk::CmdBeginRenderPass(m_command_buffer.handle(), &rpbi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    vk::CmdBeginRenderPass(m_command_buffer, &rpbi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
     vkt::CommandPool pool(*m_device, m_device->graphics_queue_node_index_, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     vkt::CommandBuffer secondary(*m_device, pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
     VkCommandBufferInheritanceInfo cbii = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
                                            nullptr,
-                                           rp.Handle(),
+                                           rp,
                                            0,
                                            VK_NULL_HANDLE,  // Set to NULL FB handle intentionally to flesh out any errors
                                            VK_FALSE,
@@ -76,13 +76,13 @@ TEST_F(NegativeSecondaryCommandBuffer, Barrier) {
     VkCommandBufferBeginInfo cbbi = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr,
                                      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
                                      &cbii};
-    vk::BeginCommandBuffer(secondary.handle(), &cbbi);
+    vk::BeginCommandBuffer(secondary, &cbbi);
     VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
     img_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     img_barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    img_barrier.image = image2.handle();  // Image mis-matches with FB image
+    img_barrier.image = image2;  // Image mis-matches with FB image
     img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -90,12 +90,12 @@ TEST_F(NegativeSecondaryCommandBuffer, Barrier) {
     img_barrier.subresourceRange.baseMipLevel = 0;
     img_barrier.subresourceRange.layerCount = 1;
     img_barrier.subresourceRange.levelCount = 1;
-    vk::CmdPipelineBarrier(secondary.handle(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+    vk::CmdPipelineBarrier(secondary, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &img_barrier);
     secondary.End();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-image-04073");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 }
 
@@ -113,7 +113,7 @@ TEST_F(NegativeSecondaryCommandBuffer, Sync2AsPrimary) {
     secondary.End();
 
     VkCommandBufferSubmitInfo cb_info = vku::InitStructHelper();
-    cb_info.commandBuffer = secondary.handle();
+    cb_info.commandBuffer = secondary;
 
     VkSubmitInfo2 submit_info = vku::InitStructHelper();
     submit_info.commandBufferInfoCount = 1;
@@ -140,14 +140,14 @@ TEST_F(NegativeSecondaryCommandBuffer, RerecordedExplicitReset) {
     secondary.End();
 
     m_command_buffer.Begin();
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
 
     // rerecording of secondary
     secondary.Reset();  // explicit reset here.
     secondary.Begin();
     secondary.End();
 
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 }
 
@@ -168,13 +168,13 @@ TEST_F(NegativeSecondaryCommandBuffer, RerecordedNoReset) {
     secondary.End();
 
     m_command_buffer.Begin();
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
 
     // rerecording of secondary
     secondary.Begin();  // implicit reset in begin
     secondary.End();
 
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 }
 
@@ -188,19 +188,18 @@ TEST_F(NegativeSecondaryCommandBuffer, CascadedInvalidation) {
 
     vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     secondary.Begin();
-    vk::CmdSetEvent(secondary.handle(), event, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+    vk::CmdSetEvent(secondary, event, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     secondary.End();
 
     m_command_buffer.Begin();
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_command_buffer.End();
 
     // destroying the event should invalidate both primary and secondary CB
     vk::DestroyEvent(device(), event, nullptr);
 
     m_errorMonitor->SetDesiredError("VUID-vkQueueSubmit-pCommandBuffers-00070");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -234,9 +233,9 @@ TEST_F(NegativeSecondaryCommandBuffer, SimultaneousUseTwoExecutes) {
     secondary.End();
 
     m_command_buffer.Begin();
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->SetDesiredError(simultaneous_use_message);
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -258,9 +257,9 @@ TEST_F(NegativeSecondaryCommandBuffer, SimultaneousUseSingleExecute) {
     secondary.End();
 
     m_command_buffer.Begin();
-    VkCommandBuffer cbs[] = {secondary.handle(), secondary.handle()};
+    VkCommandBuffer cbs[] = {secondary, secondary};
     m_errorMonitor->SetDesiredError(simultaneous_use_message);
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 2, cbs);
+    vk::CmdExecuteCommands(m_command_buffer, 2, cbs);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -291,12 +290,12 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteDiffertQueueFlags) {
 
     VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
     command_buffer_allocate_info.commandBufferCount = 1;
-    command_buffer_allocate_info.commandPool = command_pool_a.handle();
+    command_buffer_allocate_info.commandPool = command_pool_a;
     command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     vkt::CommandBuffer command_buffer_primary(*m_device, command_buffer_allocate_info);
     ASSERT_TRUE(command_buffer_primary.initialized());
 
-    command_buffer_allocate_info.commandPool = command_pool_b.handle();
+    command_buffer_allocate_info.commandPool = command_pool_b;
     command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
     vkt::CommandBuffer command_buffer_secondary(*m_device, command_buffer_allocate_info);
 
@@ -314,7 +313,7 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteDiffertQueueFlags) {
     // Try using different pool's command buffer as secondary
     command_buffer_primary.Begin(&begin_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-00094");
-    vk::CmdExecuteCommands(command_buffer_primary.handle(), 1, &command_buffer_secondary.handle());
+    vk::CmdExecuteCommands(command_buffer_primary, 1, &command_buffer_secondary.handle());
     m_errorMonitor->VerifyFound();
     command_buffer_primary.End();
 }
@@ -327,7 +326,7 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteUnrecorded) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-00089");
     m_command_buffer.Begin();
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -341,8 +340,7 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteWithLayoutMismatch) {
         32, 1, 1, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     vkt::Image image(*m_device, image_create_info, vkt::set_layout);
 
-    VkImageSubresource image_sub = vkt::Image::Subresource(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0);
-    VkImageSubresourceRange image_sub_range = vkt::Image::SubresourceRange(image_sub);
+    VkImageSubresourceRange image_sub_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     VkImageMemoryBarrier image_barrier =
         image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
@@ -350,8 +348,8 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteWithLayoutMismatch) {
     auto pipeline = [&image_barrier](const vkt::CommandBuffer &cb, VkImageLayout old_layout, VkImageLayout new_layout) {
         image_barrier.oldLayout = old_layout;
         image_barrier.newLayout = new_layout;
-        vk::CmdPipelineBarrier(cb.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
-                               0, nullptr, 1, &image_barrier);
+        vk::CmdPipelineBarrier(cb, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
+                               nullptr, 1, &image_barrier);
     };
 
     // Validate that mismatched use of image layout in secondary command buffer is caught at record time
@@ -360,10 +358,10 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteWithLayoutMismatch) {
     pipeline(secondary, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     secondary.End();
 
-    m_errorMonitor->SetDesiredError("UNASSIGNED-vkCmdExecuteCommands-commandBuffer-00001");
     m_command_buffer.Begin();
     pipeline(m_command_buffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    m_errorMonitor->SetDesiredError("UNASSIGNED-vkCmdExecuteCommands-commandBuffer-00001");
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.Reset();
@@ -375,7 +373,63 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteWithLayoutMismatch) {
     secondary.End();
     m_command_buffer.Begin();
     pipeline(m_command_buffer, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeSecondaryCommandBuffer, ExecuteWithLayoutMismatchUseGenericLayout) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7896
+    TEST_DESCRIPTION("Check that generic layouts like VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL are reported correctly");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::ImageView image_view = image.CreateView();
+
+    // Main command buffer transitions to READ_ONLY_OPTIMAL
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    layout_transition.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+    layout_transition.image = image;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    // Secondary command buffer expects sampled image to be in READ_ONLY_OPTIMAL
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT}});
+    descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                            VK_IMAGE_LAYOUT_GENERAL);
+    descriptor_set.UpdateDescriptorSets();
+    char const *cs_source = R"glsl(
+        #version 450
+        layout(set=0, binding=0) uniform sampler2D color_image;
+        void main() {
+            vec4 data = texture(color_image, vec2(0));
+        }
+    )glsl";
+    CreateComputePipelineHelper cs_pipe(*this);
+    cs_pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    cs_pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
+    cs_pipe.CreateComputePipeline();
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary.Begin();
+    vk::CmdBindPipeline(secondary, VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipe);
+    vk::CmdBindDescriptorSets(secondary, VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipe.pipeline_layout_, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(secondary, 1, 1, 1);
+    secondary.End();
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(layout_transition);
+    // Check that the error message reports image layout exactly as specified by the test (VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL)
+    // and not in the normalized form that is used by the implementation (VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    m_errorMonitor->SetDesiredErrorRegex("UNASSIGNED-vkCmdExecuteCommands-commandBuffer-00001",
+                                         "VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL");
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
+    m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
 
@@ -413,16 +467,16 @@ TEST_F(NegativeSecondaryCommandBuffer, RenderPassScope) {
     m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-00100");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &sec_cmdbuff_inside_rp.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &sec_cmdbuff_inside_rp.handle());
     m_errorMonitor->VerifyFound();
 
     VkRenderPassBeginInfo rp_bi = vku::InitStruct<VkRenderPassBeginInfo>(
         nullptr, m_renderPass, Framebuffer(), VkRect2D{{0, 0}, {32u, 32u}}, static_cast<uint32_t>(m_renderPassClearValues.size()),
         m_renderPassClearValues.data());
-    vk::CmdBeginRenderPass(m_command_buffer.handle(), &rp_bi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    vk::CmdBeginRenderPass(m_command_buffer, &rp_bi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-00096");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &sec_cmdbuff_outside_rp.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &sec_cmdbuff_outside_rp.handle());
     m_errorMonitor->VerifyFound();
 }
 
@@ -433,7 +487,7 @@ TEST_F(NegativeSecondaryCommandBuffer, ClearColorAttachmentsRenderArea) {
     InitRenderTarget();
 
     VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
-    command_buffer_allocate_info.commandPool = m_command_pool.handle();
+    command_buffer_allocate_info.commandPool = m_command_pool;
     command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
     command_buffer_allocate_info.commandBufferCount = 1;
 
@@ -458,13 +512,13 @@ TEST_F(NegativeSecondaryCommandBuffer, ClearColorAttachmentsRenderArea) {
     color_attachment.colorAttachment = 0;
     // x extent of 257 exceeds render area of 256
     VkClearRect clear_rect = {{{0, 0}, {257, 32}}, 0, 1};
-    vk::CmdClearAttachments(secondary_command_buffer.handle(), 1, &color_attachment, 1, &clear_rect);
+    vk::CmdClearAttachments(secondary_command_buffer, 1, &color_attachment, 1, &clear_rect);
     secondary_command_buffer.End();
     m_command_buffer.Begin();
-    vk::CmdBeginRenderPass(m_command_buffer.handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    vk::CmdBeginRenderPass(m_command_buffer, &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdClearAttachments-pRects-00016");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_command_buffer.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_command_buffer.handle());
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -500,7 +554,7 @@ TEST_F(NegativeSecondaryCommandBuffer, RenderPassContentsFirstSubpass) {
                                      m_renderPassClearValues.data());
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-contents-09680");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -531,19 +585,18 @@ TEST_F(NegativeSecondaryCommandBuffer, RenderPassContentsNotFirstSubpass) {
     vkt::RenderPass rp(*m_device, render_pass_ci);
 
     // A compatible framebuffer.
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView view = image.CreateView();
-    vkt::Framebuffer fb(*m_device, rp.handle(), 1, &view.handle());
+    vkt::Framebuffer fb(*m_device, rp, 1, &view.handle());
 
     vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
     const VkCommandBufferInheritanceInfo cmdbuff_ii = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         nullptr,  // pNext
-        rp.handle(),
+        rp,
         1,  // subpass
-        fb.handle(),
+        fb,
     };
 
     VkCommandBufferBeginInfo cmdbuff__bi = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -554,11 +607,10 @@ TEST_F(NegativeSecondaryCommandBuffer, RenderPassContentsNotFirstSubpass) {
     secondary.End();
 
     m_command_buffer.Begin();
-    m_command_buffer.BeginRenderPass(rp.handle(), fb.handle(), 32, 32, m_renderPassClearValues.size(),
-                                     m_renderPassClearValues.data());
+    m_command_buffer.BeginRenderPass(rp, fb, 32, 32, m_renderPassClearValues.size(), m_renderPassClearValues.data());
     m_command_buffer.NextSubpass();
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-None-09681");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -600,18 +652,18 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteCommandsSubpassIndices) {
     rpci.pDependencies = &dependencies;
     vkt::RenderPass render_pass(*m_device, rpci);
 
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView imageView = image.CreateView();
-    vkt::Framebuffer framebuffer(*m_device, render_pass.handle(), 1, &imageView.handle());
+    vkt::Framebuffer framebuffer(*m_device, render_pass, 1, &imageView.handle());
 
     vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
     const VkCommandBufferInheritanceInfo cmdbuff_ii = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         nullptr,  // pNext
-        render_pass.handle(),
+        render_pass,
         1,  // subpass
-        framebuffer.handle(),
+        framebuffer,
     };
 
     VkCommandBufferBeginInfo cmdbuff__bi = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -627,7 +679,7 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteCommandsSubpassIndices) {
     m_command_buffer.BeginRenderPass(rp_bi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-06019");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 }
 
@@ -652,16 +704,16 @@ TEST_F(NegativeSecondaryCommandBuffer, IncompatibleRenderPassesInExecuteCommands
     rpci.subpassCount = 2;
     vkt::RenderPass render_pass_2(*m_device, rpci);
 
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView imageView = image.CreateView();
-    vkt::Framebuffer framebuffer(*m_device, render_pass_1.handle(), 1, &imageView.handle());
+    vkt::Framebuffer framebuffer(*m_device, render_pass_1, 1, &imageView.handle());
 
     vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
     const VkCommandBufferInheritanceInfo cmdbuff_ii = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
         nullptr,  // pNext
-        render_pass_2.handle(),
+        render_pass_2,
         0,  // subpass
         VK_NULL_HANDLE,
     };
@@ -679,7 +731,7 @@ TEST_F(NegativeSecondaryCommandBuffer, IncompatibleRenderPassesInExecuteCommands
     m_command_buffer.BeginRenderPass(rp_bi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pBeginInfo-06020");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -696,7 +748,7 @@ TEST_F(NegativeSecondaryCommandBuffer, CommandBufferInheritanceInfo) {
     VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
 
     m_errorMonitor->SetDesiredError("VUID-vkBeginCommandBuffer-commandBuffer-00051");
-    vk::BeginCommandBuffer(secondary.handle(), &begin_info);
+    vk::BeginCommandBuffer(secondary, &begin_info);
     m_errorMonitor->VerifyFound();
 
     VkCommandBufferInheritanceInfo inheritance_info = vku::InitStructHelper();
@@ -704,7 +756,7 @@ TEST_F(NegativeSecondaryCommandBuffer, CommandBufferInheritanceInfo) {
     begin_info.pInheritanceInfo = &inheritance_info;
 
     m_errorMonitor->SetDesiredError("VUID-vkBeginCommandBuffer-commandBuffer-00052");
-    vk::BeginCommandBuffer(secondary.handle(), &begin_info);
+    vk::BeginCommandBuffer(secondary, &begin_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -738,7 +790,7 @@ TEST_F(NegativeSecondaryCommandBuffer, NestedCommandBufferRendering) {
 
     secondary2.Begin(&cbbi);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-nestedCommandBufferRendering-09377");
-    vk::CmdExecuteCommands(secondary2.handle(), 1u, &secondary1.handle());
+    vk::CmdExecuteCommands(secondary2, 1u, &secondary1.handle());
     m_errorMonitor->VerifyFound();
     secondary2.End();
 }
@@ -774,7 +826,7 @@ TEST_F(NegativeSecondaryCommandBuffer, NestedCommandBufferSimultaneousUse) {
 
     secondary2.Begin(&cbbi);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-nestedCommandBufferSimultaneousUse-09378");
-    vk::CmdExecuteCommands(secondary2.handle(), 1u, &secondary1.handle());
+    vk::CmdExecuteCommands(secondary2, 1u, &secondary1.handle());
     m_errorMonitor->VerifyFound();
     secondary2.End();
 }
@@ -816,17 +868,17 @@ TEST_F(NegativeSecondaryCommandBuffer, MaxCommandBufferNestingLevel) {
     secondary1.End();
 
     secondary2.Begin(&cbbi);
-    vk::CmdExecuteCommands(secondary2.handle(), 1u, &secondary1.handle());
+    vk::CmdExecuteCommands(secondary2, 1u, &secondary1.handle());
     secondary2.End();
 
     secondary3.Begin(&cbbi);
-    vk::CmdExecuteCommands(secondary3.handle(), 1u, &secondary2.handle());
-    vk::CmdExecuteCommands(secondary3.handle(), 1u, &secondary1.handle());
+    vk::CmdExecuteCommands(secondary3, 1u, &secondary2.handle());
+    vk::CmdExecuteCommands(secondary3, 1u, &secondary1.handle());
     secondary3.End();
 
     secondary4.Begin(&cbbi);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-nestedCommandBuffer-09376");
-    vk::CmdExecuteCommands(secondary4.handle(), 1u, &secondary3.handle());
+    vk::CmdExecuteCommands(secondary4, 1u, &secondary3.handle());
     m_errorMonitor->VerifyFound();
     secondary4.End();
 }
@@ -850,12 +902,12 @@ TEST_F(NegativeSecondaryCommandBuffer, MissingInheritedQueriesFeature) {
     secondary.End();
 
     m_command_buffer.Begin();
-    vk::CmdResetQueryPool(m_command_buffer.handle(), query_pool.handle(), 0u, 1u);
-    vk::CmdBeginQuery(m_command_buffer.handle(), query_pool.handle(), 0u, 0u);
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 1u);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-commandBuffer-00101");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1u, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1u, &secondary.handle());
     m_errorMonitor->VerifyFound();
-    vk::CmdEndQuery(m_command_buffer.handle(), query_pool.handle(), 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
     m_command_buffer.End();
 }
 
@@ -868,11 +920,11 @@ TEST_F(NegativeSecondaryCommandBuffer, MissingSimultaniousUseBit) {
 
     vkt::CommandBuffer primary(*m_device, m_command_pool);
     primary.Begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
-    vk::CmdExecuteCommands(primary.handle(), 1u, &secondary.handle());
+    vk::CmdExecuteCommands(primary, 1u, &secondary.handle());
     primary.End();
 
     m_command_buffer.Begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1u, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1u, &secondary.handle());
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredError("VUID-vkQueueSubmit-pCommandBuffers-00073");

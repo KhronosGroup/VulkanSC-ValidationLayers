@@ -38,7 +38,7 @@ TEST_F(NegativeDebugExtensions, DISABLED_DebugMarkerName) {
     vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
 
     VkMemoryRequirements memRequirements;
-    vk::GetBufferMemoryRequirements(device(), buffer.handle(), &memRequirements);
+    vk::GetBufferMemoryRequirements(device(), buffer, &memRequirements);
 
     VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper();
     memory_allocate_info.allocationSize = memRequirements.size;
@@ -52,11 +52,11 @@ TEST_F(NegativeDebugExtensions, DISABLED_DebugMarkerName) {
     name_info.pObjectName = memory_name.c_str();
     vk::DebugMarkerSetObjectNameEXT(device(), &name_info);
 
-    vk::BindBufferMemory(device(), buffer.handle(), memory_1.handle(), 0);
+    vk::BindBufferMemory(device(), buffer, memory_1.handle(), 0);
 
     // Test core_validation layer
     m_errorMonitor->SetDesiredError(memory_name.c_str());
-    vk::BindBufferMemory(device(), buffer.handle(), memory_2.handle(), 0);
+    vk::BindBufferMemory(device(), buffer, memory_2.handle(), 0);
     m_errorMonitor->VerifyFound();
 
     VkCommandBuffer commandBuffer;
@@ -167,7 +167,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
     vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
 
     VkMemoryRequirements memRequirements;
-    vk::GetBufferMemoryRequirements(device(), buffer.handle(), &memRequirements);
+    vk::GetBufferMemoryRequirements(device(), buffer, &memRequirements);
 
     VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper();
     memory_allocate_info.allocationSize = memRequirements.size;
@@ -202,11 +202,11 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
     name_info.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
 
-    vk::BindBufferMemory(device(), buffer.handle(), memory_1.handle(), 0);
+    vk::BindBufferMemory(device(), buffer, memory_1.handle(), 0);
 
     // Test core_validation layer
     m_errorMonitor->SetDesiredError(memory_name.c_str());
-    vk::BindBufferMemory(device(), buffer.handle(), memory_2.handle(), 0);
+    vk::BindBufferMemory(device(), buffer, memory_2.handle(), 0);
     m_errorMonitor->VerifyFound();
 
     VkCommandBuffer commandBuffer;
@@ -386,7 +386,7 @@ TEST_F(NegativeDebugExtensions, SetDebugUtilsObjectSecondDevice) {
     }
 
     auto features = m_device->Physical().Features();
-    vkt::Device second_device(gpu_, m_device_extension_names, &features, nullptr);
+    vkt::Device second_device(gpu_, m_device_extension_names, &features);
 
     DebugUtilsLabelCheckData callback_data;
     auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, DebugUtilsLabelCheckData *data) {
@@ -518,8 +518,7 @@ TEST_F(NegativeDebugExtensions, DebugLabelPrimaryCommandBuffer3) {
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     cb1.End();
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
-    std::array cbs = {&cb0, &cb1};
-    m_default_queue->Submit(cbs);
+    m_default_queue->Submit({cb0, cb1});
     m_errorMonitor->VerifyFound();
     m_default_queue->Wait();
 }
@@ -619,5 +618,95 @@ TEST_F(NegativeDebugExtensions, MultiObjectBindImage) {
     // the same image object
     m_errorMonitor->SetDesiredErrorRegex("VUID-vkBindImageMemory-image-07460", "Objects: 3");
     vk::BindImageMemory(device(), image, mem2, 0);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugExtensions, SetDeviceHandle) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9780");
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    // Create second device
+    float priorities[] = {1.0f};
+    VkDeviceQueueCreateInfo queue_info = vku::InitStructHelper();
+    queue_info.flags = 0;
+    queue_info.queueFamilyIndex = 0;
+    queue_info.queueCount = 1;
+    queue_info.pQueuePriorities = &priorities[0];
+
+    VkDeviceCreateInfo device_create_info = vku::InitStructHelper();
+    auto features = m_device->Physical().Features();
+    device_create_info.queueCreateInfoCount = 1;
+    device_create_info.pQueueCreateInfos = &queue_info;
+    device_create_info.enabledLayerCount = 0;
+    device_create_info.ppEnabledLayerNames = nullptr;
+    device_create_info.pEnabledFeatures = &features;
+
+    VkDevice second_device;
+    ASSERT_EQ(VK_SUCCESS, vk::CreateDevice(Gpu(), &device_create_info, nullptr, &second_device));
+
+    const char *device_1_name = "device_1";
+    const char *device_2_name = "device_2";
+    VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
+    name_info.objectType = VK_OBJECT_TYPE_DEVICE;
+    name_info.pObjectName = device_1_name;
+    name_info.objectHandle = (uint64_t)device();
+    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
+
+    name_info.pObjectName = device_2_name;
+    name_info.objectHandle = (uint64_t)second_device;
+    vk::SetDebugUtilsObjectNameEXT(second_device, &name_info);
+
+    VkBufferCreateInfo create_info = vkt::Buffer::CreateInfo(32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    VkBuffer buffer = VK_NULL_HANDLE;
+    vk::CreateBuffer(device(), &create_info, nullptr, &buffer);
+
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkDestroyBuffer-buffer-parent",
+                                         "was created, allocated or retrieved from VkDevice .*\\[device_1\\], but command is using "
+                                         "\\(or its dispatchable parameter is associated with\\) VkDevice .*\\[device_2\\]");
+    vk::DestroyBuffer(second_device, buffer, nullptr);
+    m_errorMonitor->VerifyFound();
+
+    vk::DestroyBuffer(device(), buffer, nullptr);
+    vk::DestroyDevice(second_device, nullptr);
+}
+
+// Not supported in Vulkan SC: VK_EXT_debug_marker
+TEST_F(NegativeDebugExtensions, DISABLED_DebugMarkerRecording) {
+    AddRequiredExtensions(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkDebugMarkerMarkerInfoEXT marker_info = vku::InitStructHelper();
+    marker_info.pMarkerName = "test";
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDebugMarkerBeginEXT-commandBuffer-recording");
+    vk::CmdDebugMarkerBeginEXT(m_command_buffer, &marker_info);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDebugMarkerEndEXT-commandBuffer-recording");
+    vk::CmdDebugMarkerEndEXT(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDebugMarkerInsertEXT-commandBuffer-recording");
+    vk::CmdDebugMarkerInsertEXT(m_command_buffer, &marker_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugExtensions, DebugUtilsRecording) {
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkDebugUtilsLabelEXT label = vku::InitStructHelper();
+    label.pLabelName = "test";
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginDebugUtilsLabelEXT-commandBuffer-recording");
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &label);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-recording");
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdInsertDebugUtilsLabelEXT-commandBuffer-recording");
+    vk::CmdInsertDebugUtilsLabelEXT(m_command_buffer, &label);
     m_errorMonitor->VerifyFound();
 }

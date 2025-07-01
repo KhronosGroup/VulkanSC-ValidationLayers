@@ -19,57 +19,41 @@
 
 #pragma once
 
+#include "best_practices/bp_constants.h"
+// We pull in most the core state tracking files
+// bp_state.h should NOT be included by any other header file
 #include "state_tracker/state_tracker.h"
 #include "state_tracker/cmd_buffer_state.h"
 #include "state_tracker/image_state.h"
-#include "state_tracker/device_state.h"
 #include "state_tracker/descriptor_sets.h"
+#include "state_tracker/push_constant_data.h"
 
 class BestPractices;
 
 namespace bp_state {
-class Image : public vvl::Image {
-  public:
-    Image(const vvl::Device& dev_data, VkImage handle, const VkImageCreateInfo* create_info, VkFormatFeatureFlags2 features)
-        : vvl::Image(dev_data, handle, create_info, features) {
-        SetupUsages();
-    }
 
-    Image(const vvl::Device& dev_data, VkImage handle, const VkImageCreateInfo* create_info, VkSwapchainKHR swapchain,
-          uint32_t swapchain_index, VkFormatFeatureFlags2 features)
-        : vvl::Image(dev_data, handle, create_info, swapchain, swapchain_index, features) {
-        SetupUsages();
-    }
+class ImageSubState : public vvl::ImageSubState {
+  public:
+    explicit ImageSubState(vvl::Image& img);
 
     struct Usage {
         IMAGE_SUBRESOURCE_USAGE_BP type;
         uint32_t queue_family_index;
     };
 
-    Usage UpdateUsage(uint32_t array_layer, uint32_t mip_level, IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t queue_family) {
-        auto last_usage = usages_[array_layer][mip_level];
-        usages_[array_layer][mip_level].type = usage;
-        usages_[array_layer][mip_level].queue_family_index = queue_family;
-        return last_usage;
-    }
+    Usage UpdateUsage(uint32_t array_layer, uint32_t mip_level, IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t queue_family);
+    Usage GetUsage(uint32_t array_layer, uint32_t mip_level) const;
+    IMAGE_SUBRESOURCE_USAGE_BP GetUsageType(uint32_t array_layer, uint32_t mip_level) const;
+    uint32_t GetLastQueueFamily(uint32_t array_layer, uint32_t mip_level) const;
 
-    Usage GetUsage(uint32_t array_layer, uint32_t mip_level) const { return usages_[array_layer][mip_level]; }
+    std::array<bool, vvl::Image::kMaxPlanes> memory_requirements_checked = {};
 
-    IMAGE_SUBRESOURCE_USAGE_BP GetUsageType(uint32_t array_layer, uint32_t mip_level) const {
-        return GetUsage(array_layer, mip_level).type;
-    }
-
-    uint32_t GetLastQueueFamily(uint32_t array_layer, uint32_t mip_level) const {
-        return GetUsage(array_layer, mip_level).queue_family_index;
-    }
+    const bool sparse_metadata_required;  // Track if sparse metadata aspect is required for this image
+    bool get_sparse_reqs_called{false};   // Track if GetImageSparseMemoryRequirements() has been called for this image
+    bool sparse_metadata_bound{false};    // Track if sparse metadata aspect is bound to this image
 
   private:
-    void SetupUsages() {
-        usages_.resize(create_info.arrayLayers);
-        for (auto& mip_vec : usages_) {
-            mip_vec.resize(create_info.mipLevels, {IMAGE_SUBRESOURCE_USAGE_BP::UNDEFINED, VK_QUEUE_FAMILY_IGNORED});
-        }
-    }
+    void SetupUsages();
     // A 2d vector for all the array layers and mip levels.
     // This does not split usages per aspect.
     // Aspects are generally read and written together,
@@ -77,6 +61,14 @@ class Image : public vvl::Image {
     // second/uint32_t is last queue family usage
     std::vector<std::vector<Usage>> usages_;
 };
+
+static inline ImageSubState& SubState(vvl::Image& img) {
+    return *static_cast<ImageSubState*>(img.SubState(LayerObjectTypeBestPractices));
+}
+
+static inline const ImageSubState& SubState(const vvl::Image& img) {
+    return *static_cast<const ImageSubState*>(img.SubState(LayerObjectTypeBestPractices));
+}
 
 struct AttachmentInfo {
     uint32_t framebufferAttachment;
@@ -87,6 +79,7 @@ struct AttachmentInfo {
 };
 
 // used to track state regarding render pass heuristic checks
+// TODO - make vvl::RenderPassSubState instead
 struct RenderPassState {
     bool depthAttachment = false;
     bool colorAttachment = false;
@@ -107,6 +100,8 @@ struct RenderPassState {
     std::vector<AttachmentInfo> touchesAttachments;
     std::vector<AttachmentInfo> nextDrawTouchesAttachments;
     bool drawTouchAttachments = false;
+
+    bool has_draw_cmd = false;
 };
 
 struct CommandBufferStateNV {
@@ -151,21 +146,31 @@ struct CommandBufferStateNV {
     bool depth_test_enable = false;
 };
 
-class CommandBuffer : public vvl::CommandBuffer {
+class CommandBufferSubState : public vvl::CommandBufferSubState {
   public:
-    CommandBuffer(BestPractices& bp, VkCommandBuffer handle, const VkCommandBufferAllocateInfo* allocate_info,
-                  const vvl::CommandPool* pool);
+    explicit CommandBufferSubState(vvl::CommandBuffer& cb) : vvl::CommandBufferSubState(cb) {}
 
     RenderPassState render_pass_state;
     CommandBufferStateNV nv;
     uint64_t num_submits = 0;
-    bool uses_vertex_buffer = false;
     uint32_t small_indexed_draw_call_count = 0;
+
+    std::vector<PushConstantData> push_constant_data_chunks;
 
     // This function used to not be empty. It has been left empty because
     // the logic to decide to call this function is not simple, so adding this
     // function back could tedious.
     void UnbindResources() {}
+
+    void Destroy() final;
+    void Reset(const Location& loc) final;
+
+    void ExecuteCommands(vvl::CommandBuffer& secondary_command_buffer) final;
+    void RecordCmd(vvl::Func command) final;
+
+    void RecordPushConstants(VkPipelineLayout layout, VkShaderStageFlags stage_flags, uint32_t offset, uint32_t size,
+                             const void* values) final;
+    void ClearPushConstants() final;
 
     struct SignalingInfo {
         // True, if the event's first state change within a command buffer is a signal (SetEvent)
@@ -177,9 +182,20 @@ class CommandBuffer : public vvl::CommandBuffer {
         // When recording is finished, this is the event state "at the end of the command buffer".
         bool signaled = false;
 
-        SignalingInfo(bool signal) : first_state_change_is_signal(signal), signaled(signal) {}
+        explicit SignalingInfo(bool signal) : first_state_change_is_signal(signal), signaled(signal) {}
     };
     vvl::unordered_map<VkEvent, SignalingInfo> event_signaling_state;
+
+  private:
+    void ResetCBState();
 };
+
+static inline CommandBufferSubState& SubState(vvl::CommandBuffer& cb) {
+    return *static_cast<CommandBufferSubState*>(cb.SubState(LayerObjectTypeBestPractices));
+}
+
+static inline const CommandBufferSubState& SubState(const vvl::CommandBuffer& cb) {
+    return *static_cast<const CommandBufferSubState*>(cb.SubState(LayerObjectTypeBestPractices));
+}
 
 }  // namespace bp_state

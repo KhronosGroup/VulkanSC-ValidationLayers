@@ -70,7 +70,8 @@ class DispatchTableHelperOutputGenerator(BaseGenerator):
             #include <cstring>
             #include <string>
             #include "vk_layer_dispatch_table.h"
-            #include "vk_extension_helper.h"
+
+            struct DeviceExtensions;
             \n''')
 
         out.append('''
@@ -87,7 +88,8 @@ class DispatchTableHelperOutputGenerator(BaseGenerator):
 
     def generateSource(self):
         out = []
-        out.append('#include "vk_dispatch_table_helper.h"\n')
+        out.append('#include "vk_dispatch_table_helper.h"\n\n')
+        out.append('#include "vk_extension_helper.h"\n\n')
 
         guard_helper = PlatformGuardHelper()
 
@@ -121,7 +123,7 @@ class DispatchTableHelperOutputGenerator(BaseGenerator):
         out.append('const auto &GetApiExtensionMap() {\n')
         out.append('    static const vvl::unordered_map<std::string, small_vector<vvl::Extension, 2, size_t>> api_extension_map {\n')
         for command in [x for x in self.vk.commands.values() if x.extensions and x.device]:
-            extensions = ', '.join(f'vvl::Extension::_{x.name}' for x in command.extensions)
+            extensions = ', '.join(f'vvl::Extension::_{x}' for x in command.extensions)
             out.append(f'    {{ "{command.name}", {{ {extensions} }} }},\n')
         out.append('    };\n')
         out.append('    return api_extension_map;\n')

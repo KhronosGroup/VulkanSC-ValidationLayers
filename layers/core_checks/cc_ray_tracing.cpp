@@ -22,10 +22,14 @@
 #include <string>
 
 #include <vulkan/vk_enum_string_helper.h>
+#include <vulkan/utility/vk_format_utils.h>
 #include "core_validation.h"
 #include "cc_buffer_address.h"
 #include "utils/ray_tracing_utils.h"
+#include "utils/math_utils.h"
 #include "state_tracker/ray_tracing_state.h"
+#include "state_tracker/cmd_buffer_state.h"
+#include "state_tracker/pipeline_state.h"
 #include "error_message/error_strings.h"
 
 #include <algorithm>
@@ -59,7 +63,7 @@ bool CoreChecks::PreCallValidateCreateAccelerationStructureKHR(VkDevice device,
     auto buffer_state = Get<vvl::Buffer>(pCreateInfo->buffer);
     ASSERT_AND_RETURN_SKIP(buffer_state);
 
-    if (!(buffer_state->usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR)) {
+    if (!(buffer_state->usage & VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR)) {
         skip |= LogError("VUID-VkAccelerationStructureCreateInfoKHR-buffer-03614", buffer_state->Handle(),
                          error_obj.location.dot(Field::pCreateInfo).dot(Field::buffer), "was created with %s.",
                          string_VkBufferUsageFlags2(buffer_state->usage).c_str());
@@ -459,7 +463,7 @@ bool CoreChecks::PreCallValidateGetAccelerationStructureDeviceAddressKHR(VkDevic
         skip |= LogError("VUID-vkGetAccelerationStructureDeviceAddressKHR-accelerationStructure-08935", device, error_obj.location,
                          "accelerationStructure feature was not enabled.");
     }
-    if (physical_device_count > 1 && !enabled_features.bufferDeviceAddressMultiDevice &&
+    if (device_state->physical_device_count > 1 && !enabled_features.bufferDeviceAddressMultiDevice &&
         !enabled_features.bufferDeviceAddressMultiDeviceEXT) {
         skip |= LogError("VUID-vkGetAccelerationStructureDeviceAddressKHR-device-03504", device, error_obj.location,
                          "bufferDeviceAddressMultiDevice feature was not enabled.");
@@ -471,7 +475,7 @@ bool CoreChecks::PreCallValidateGetAccelerationStructureDeviceAddressKHR(VkDevic
                                               info_loc.dot(Field::accelerationStructure).dot(Field::buffer),
                                               "VUID-vkGetAccelerationStructureDeviceAddressKHR-pInfo-09541");
 
-        if (!(accel_struct->buffer_state->usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)) {
+        if (!(accel_struct->buffer_state->usage & VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT)) {
             skip |= LogError("VUID-vkGetAccelerationStructureDeviceAddressKHR-pInfo-09542", LogObjectList(device),
                              info_loc.dot(Field::accelerationStructure).dot(Field::buffer), "was created with usage flag(s) %s.",
                              string_VkBufferUsageFlags2(accel_struct->buffer_state->usage).c_str());
@@ -496,7 +500,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
         const auto buffer_states = GetBuffersByAddress(address.deviceAddress);
         const bool no_valid_buffer_found =
             !buffer_states.empty() && std::none_of(buffer_states.begin(), buffer_states.end(), [](const vvl::Buffer *buffer_state) {
-                return buffer_state->usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+                return buffer_state->usage & VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
             });
         if (no_valid_buffer_found) {
             LogObjectList objlist(device);
@@ -507,7 +511,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
                 pick_vuid("VUID-vkCmdBuildAccelerationStructuresKHR-geometry-03673",
                           "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-geometry-03673"),
                 objlist, geom_loc,
-                "has no buffer which created with VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR.");
+                "has no buffer which created with VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR.");
         }
 
         return false;
@@ -519,6 +523,8 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
         const Location p_geom_geom_loc = p_geom_loc.dot(Field::geometry);
         const Location p_geom_geom_triangles_loc = p_geom_geom_loc.dot(Field::triangles);
         const VkAccelerationStructureGeometryKHR &geom_data = rt::GetGeometry(info, geom_i);
+        const uint32_t geometry_build_range_primitive_count =
+            geometry_build_ranges ? geometry_build_ranges[geom_i].primitiveCount : 0;
 
         switch (geom_data.geometryType) {
             case VK_GEOMETRY_TYPE_TRIANGLES_KHR:  // == VK_GEOMETRY_TYPE_TRIANGLES_NV
@@ -531,7 +537,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
                                      p_geom_geom_triangles_loc.dot(Field::transformData));
 
                 auto vertex_buffer_states = GetBuffersByAddress(geom_data.geometry.triangles.vertexData.deviceAddress);
-                if (vertex_buffer_states.empty() && geometry_build_ranges[geom_i].primitiveCount > 0) {
+                if (vertex_buffer_states.empty() && geometry_build_range_primitive_count > 0) {
                     skip |= LogError(pick_vuid("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03804",
                                                "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03804"),
                                      cmd_buffer, p_geom_geom_triangles_loc.dot(Field::vertexData).dot(Field::deviceAddress),
@@ -553,7 +559,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
 
                 if (geom_data.geometry.triangles.indexType != VK_INDEX_TYPE_NONE_KHR) {
                     auto index_buffer_states = GetBuffersByAddress(geom_data.geometry.triangles.indexData.deviceAddress);
-                    if (index_buffer_states.empty() && geometry_build_ranges[geom_i].primitiveCount > 0) {
+                    if (index_buffer_states.empty() && geometry_build_range_primitive_count > 0) {
                         skip |= LogError(pick_vuid("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03806",
                                                    "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03806"),
                                          cmd_buffer, p_geom_geom_triangles_loc.dot(Field::indexData).dot(Field::deviceAddress),
@@ -582,7 +588,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
                             if (geom_i < src_as_state->build_range_infos.size()) {
                                 if (const uint32_t recorded_primitive_count =
                                         src_as_state->build_range_infos[geom_i].primitiveCount;
-                                    recorded_primitive_count != geometry_build_ranges[geom_i].primitiveCount) {
+                                    recorded_primitive_count != geometry_build_range_primitive_count) {
                                     const LogObjectList objlist(cmd_buffer, info.srcAccelerationStructure);
                                     skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-primitiveCount-03769", objlist,
                                                      p_geom_loc,
@@ -590,7 +596,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
                                                      "], but this build range has its primitiveCount member set to (%" PRIu32
                                                      ") when it was last specified as (%" PRIu32 ").",
                                                      pp_build_range_info_loc.Fields().c_str(), geom_i,
-                                                     geometry_build_ranges[geom_i].primitiveCount, recorded_primitive_count);
+                                                     geometry_build_range_primitive_count, recorded_primitive_count);
                                 }
                             }
                         }
@@ -636,7 +642,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
                 }
                 if (geom_data.geometry.triangles.transformData.deviceAddress != 0) {
                     auto tranform_buffer_states = GetBuffersByAddress(geom_data.geometry.triangles.transformData.deviceAddress);
-                    if (tranform_buffer_states.empty() && geometry_build_ranges[geom_i].primitiveCount > 0) {
+                    if (tranform_buffer_states.empty() && geometry_build_range_primitive_count > 0) {
                         skip |= LogError(pick_vuid("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03808",
                                                    "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03808"),
                                          cmd_buffer, p_geom_geom_triangles_loc.dot(Field::transformData).dot(Field::deviceAddress),
@@ -667,7 +673,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
                 skip |= buffer_check(geom_i, geom_data.geometry.instances.data, instances_data_loc);
 
                 auto buffer_states = GetBuffersByAddress(geom_data.geometry.instances.data.deviceAddress);
-                if (buffer_states.empty() && geometry_build_ranges[geom_i].primitiveCount > 0) {
+                if (buffer_states.empty() && geometry_build_range_primitive_count > 0) {
                     skip |= LogError(pick_vuid("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03813",
                                                "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03813"),
                                      cmd_buffer, instances_data_loc.dot(Field::deviceAddress),
@@ -694,7 +700,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
                 skip |= buffer_check(geom_i, geom_data.geometry.aabbs.data, p_geom_geom_loc.dot(Field::aabbs).dot(Field::data));
 
                 auto aabb_buffer_states = GetBuffersByAddress(geom_data.geometry.aabbs.data.deviceAddress);
-                if (aabb_buffer_states.empty() && geometry_build_ranges[geom_i].primitiveCount > 0) {
+                if (aabb_buffer_states.empty() && geometry_build_range_primitive_count > 0) {
                     skip |= LogError(pick_vuid("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03811",
                                                "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03811"),
                                      cmd_buffer, p_geom_geom_loc.dot(Field::aabbs).dot(Field::data).dot(Field::deviceAddress),
@@ -771,7 +777,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
             {pick_vuid("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03674",
                        "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03674"),
              [](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
-                 if (!(buffer_state->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)) {
+                 if (!(buffer_state->usage & VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT)) {
                      if (out_error_msg) {
                          *out_error_msg += "buffer usage is " + string_VkBufferUsageFlags2(buffer_state->usage) + '\n';
                      }
@@ -779,7 +785,7 @@ bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_
                  }
                  return true;
              },
-             []() { return "The following buffers are missing VK_BUFFER_USAGE_STORAGE_BUFFER_BIT usage flag:"; }},
+             []() { return "The following buffers are missing VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT usage flag:"; }},
 
             {scratch_address_range_vuid,
              [scratch_address_range](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
@@ -1460,13 +1466,13 @@ bool CoreChecks::PreCallValidateCmdBuildAccelerationStructureNV(VkCommandBuffer 
     if (instanceData != VK_NULL_HANDLE) {
         if (auto buffer_state = Get<vvl::Buffer>(instanceData)) {
             skip |= ValidateBufferUsageFlags(
-                LogObjectList(commandBuffer, instanceData), *buffer_state, VK_BUFFER_USAGE_RAY_TRACING_BIT_NV, true,
+                LogObjectList(commandBuffer, instanceData), *buffer_state, VK_BUFFER_USAGE_2_RAY_TRACING_BIT_NV, true,
                 "VUID-VkAccelerationStructureInfoNV-instanceData-02782", error_obj.location.dot(Field::instanceData));
         }
     }
     if (scratch_buffer_state) {
         skip |= ValidateBufferUsageFlags(
-            LogObjectList(commandBuffer, scratch), *scratch_buffer_state, VK_BUFFER_USAGE_RAY_TRACING_BIT_NV, true,
+            LogObjectList(commandBuffer, scratch), *scratch_buffer_state, VK_BUFFER_USAGE_2_RAY_TRACING_BIT_NV, true,
             "VUID-VkAccelerationStructureInfoNV-scratch-02781", error_obj.location.dot(Field::scratch));
     }
     return skip;
@@ -1541,11 +1547,13 @@ bool CoreChecks::PreCallValidateDestroyAccelerationStructureKHR(VkDevice device,
     return skip;
 }
 
-void CoreChecks::PostCallRecordCmdWriteAccelerationStructuresPropertiesKHR(
-    VkCommandBuffer commandBuffer, uint32_t accelerationStructureCount, const VkAccelerationStructureKHR *pAccelerationStructures,
-    VkQueryType queryType, VkQueryPool queryPool, uint32_t firstQuery, const RecordObject &record_obj) {
+void CoreChecks::PreCallRecordCmdWriteAccelerationStructuresPropertiesKHR(VkCommandBuffer commandBuffer,
+                                                                          uint32_t accelerationStructureCount,
+                                                                          const VkAccelerationStructureKHR *pAccelerationStructures,
+                                                                          VkQueryType queryType, VkQueryPool queryPool,
+                                                                          uint32_t firstQuery, const RecordObject &record_obj) {
     if (disabled[query_validation]) return;
-    // Enqueue the submit time validation check here, before the submit time state update in BaseClass::PostCall...
+    // Enqueue the submit time validation check here, before the submit time state update in StateTracker::PostCall
     auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     cb_state->query_updates.emplace_back([accelerationStructureCount, firstQuery, queryPool](
                                              vvl::CommandBuffer &cb_state_arg, bool do_validate, VkQueryPool &firstPerfQueryPool,
@@ -1896,31 +1904,19 @@ bool CoreChecks::PreCallValidateCmdCopyMemoryToAccelerationStructureKHR(VkComman
     return skip;
 }
 
-uint32_t CoreChecks::CalcTotalShaderGroupCount(const vvl::Pipeline &pipeline) const {
+// Calculates the total number of shader groups taking libraries into account.
+static uint32_t CalcTotalShaderGroupCount(const CoreChecks &validator, const vvl::Pipeline &pipeline) {
     uint32_t total = 0;
-    const auto &create_info = pipeline.RayTracingCreateInfo();
-    if (create_info.sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR) {
-        total = create_info.groupCount;
+    const vku::safe_VkRayTracingPipelineCreateInfoCommon &create_info = pipeline.RayTracingCreateInfo();
+    total = create_info.groupCount;
 
-        if (create_info.pLibraryInfo) {
-            for (uint32_t i = 0; i < create_info.pLibraryInfo->libraryCount; ++i) {
-                auto library_pipeline_state = Get<vvl::Pipeline>(create_info.pLibraryInfo->pLibraries[i]);
-                if (!library_pipeline_state) continue;
-                total += CalcTotalShaderGroupCount(*library_pipeline_state.get());
-            }
-        }
-    } else if (create_info.sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV) {
-        total = create_info.groupCount;
-
-        if (create_info.pLibraryInfo) {
-            for (uint32_t i = 0; i < create_info.pLibraryInfo->libraryCount; ++i) {
-                auto library_pipeline_state = Get<vvl::Pipeline>(create_info.pLibraryInfo->pLibraries[i]);
-                if (!library_pipeline_state) continue;
-                total += CalcTotalShaderGroupCount(*library_pipeline_state.get());
-            }
+    if (create_info.pLibraryInfo) {
+        for (uint32_t i = 0; i < create_info.pLibraryInfo->libraryCount; ++i) {
+            auto library_pipeline_state = validator.Get<vvl::Pipeline>(create_info.pLibraryInfo->pLibraries[i]);
+            if (!library_pipeline_state) continue;
+            total += CalcTotalShaderGroupCount(validator, *library_pipeline_state.get());
         }
     }
-
     return total;
 }
 
@@ -1954,7 +1950,7 @@ bool CoreChecks::PreCallValidateGetRayTracingShaderGroupHandlesKHR(VkDevice devi
                      dataSize, phys_dev_ext_props.ray_tracing_props_khr.shaderGroupHandleSize, groupCount);
     }
 
-    const uint32_t total_group_count = CalcTotalShaderGroupCount(pipeline_state);
+    const uint32_t total_group_count = CalcTotalShaderGroupCount(*this, pipeline_state);
 
     if (firstGroup >= total_group_count) {
         skip |= LogError("VUID-vkGetRayTracingShaderGroupHandlesKHR-firstGroup-04050", device,
@@ -2004,7 +2000,7 @@ bool CoreChecks::PreCallValidateGetRayTracingCaptureReplayShaderGroupHandlesKHR(
         }
     }
 
-    const uint32_t total_group_count = CalcTotalShaderGroupCount(*pipeline_state);
+    const uint32_t total_group_count = CalcTotalShaderGroupCount(*this, *pipeline_state);
 
     if (firstGroup >= total_group_count) {
         skip |= LogError("VUID-vkGetRayTracingCaptureReplayShaderGroupHandlesKHR-firstGroup-04051", device,
@@ -2035,6 +2031,26 @@ bool CoreChecks::PreCallValidateCmdSetRayTracingPipelineStackSizeKHR(VkCommandBu
     return ValidateCmd(*cb_state, error_obj.location);
 }
 
+static vku::safe_VkRayTracingShaderGroupCreateInfoKHR *GetRayTracingShaderGroup(const CoreChecks &validator,
+                                                                                const vvl::Pipeline &pipeline, uint32_t group_i) {
+    const vku::safe_VkRayTracingPipelineCreateInfoCommon &create_info = pipeline.RayTracingCreateInfo();
+    // Target group is in currently explored pipeline
+    if (group_i < create_info.groupCount) {
+        return &create_info.pGroups[group_i];
+    }
+
+    // Target group is in a linked pipeline library, recursively explore them
+    if (create_info.pLibraryInfo) {
+        for (uint32_t i = 0; i < create_info.pLibraryInfo->libraryCount; ++i) {
+            auto library_pipeline_state = validator.Get<vvl::Pipeline>(create_info.pLibraryInfo->pLibraries[i]);
+            if (!library_pipeline_state) continue;
+            return GetRayTracingShaderGroup(validator, *library_pipeline_state.get(), group_i - create_info.groupCount);
+        }
+    }
+
+    return nullptr;
+}
+
 bool CoreChecks::PreCallValidateGetRayTracingShaderGroupStackSizeKHR(VkDevice device, VkPipeline pipeline, uint32_t group,
                                                                      VkShaderGroupShaderKHR groupShader,
                                                                      const ErrorObject &error_obj) const {
@@ -2048,32 +2064,35 @@ bool CoreChecks::PreCallValidateGetRayTracingShaderGroupStackSizeKHR(VkDevice de
                          string_VkPipelineBindPoint(pipeline_state->pipeline_type));
     } else {
         const auto &create_info = pipeline_state->RayTracingCreateInfo();
-        if (group >= create_info.groupCount) {
-            skip |=
-                LogError("VUID-vkGetRayTracingShaderGroupStackSizeKHR-group-03608", pipeline, error_obj.location.dot(Field::group),
-                         "(%" PRIu32 ") must be less than the number of shader groups in pipeline (%" PRIu32 ").", group,
-                         create_info.groupCount);
+        const uint32_t total_group_count = CalcTotalShaderGroupCount(*this, *pipeline_state);
+        if (group >= total_group_count) {
+            skip |= LogError(
+                "VUID-vkGetRayTracingShaderGroupStackSizeKHR-group-03608", pipeline, error_obj.location.dot(Field::group),
+                "(%" PRIu32 ") must be less than the number of shader groups in pipeline (create info had a groupCount of %" PRIu32
+                " and %" PRIu32 " got added from pLibraryInfo).",
+                group, create_info.groupCount, total_group_count - create_info.groupCount);
         } else {
-            const auto &group_info = create_info.pGroups[group];
+            const auto *group_info = GetRayTracingShaderGroup(*this, *pipeline_state, group);
+            ASSERT_AND_RETURN_SKIP(group_info);
             bool unused_group = false;
             switch (groupShader) {
                 case VK_SHADER_GROUP_SHADER_GENERAL_KHR:
-                    if (group_info.generalShader == VK_SHADER_UNUSED_KHR) {
+                    if (group_info->generalShader == VK_SHADER_UNUSED_KHR) {
                         unused_group = true;
                     }
                     break;
                 case VK_SHADER_GROUP_SHADER_CLOSEST_HIT_KHR:
-                    if (group_info.closestHitShader == VK_SHADER_UNUSED_KHR) {
+                    if (group_info->closestHitShader == VK_SHADER_UNUSED_KHR) {
                         unused_group = true;
                     }
                     break;
                 case VK_SHADER_GROUP_SHADER_ANY_HIT_KHR:
-                    if (group_info.anyHitShader == VK_SHADER_UNUSED_KHR) {
+                    if (group_info->anyHitShader == VK_SHADER_UNUSED_KHR) {
                         unused_group = true;
                     }
                     break;
                 case VK_SHADER_GROUP_SHADER_INTERSECTION_KHR:
-                    if (group_info.intersectionShader == VK_SHADER_UNUSED_KHR) {
+                    if (group_info->intersectionShader == VK_SHADER_UNUSED_KHR) {
                         unused_group = true;
                     }
                     break;
@@ -2085,7 +2104,7 @@ bool CoreChecks::PreCallValidateGetRayTracingShaderGroupStackSizeKHR(VkDevice de
                 const LogObjectList objlist(device, pipeline);
                 skip |= LogError("VUID-vkGetRayTracingShaderGroupStackSizeKHR-groupShader-03609", objlist,
                                  error_obj.location.dot(Field::groupShader),
-                                 "is %s but the corresponding shader in shader group (%" PRIu32 ") is VK_SHADER_UNUSED_KHR.",
+                                 "is %s but the corresponding shader in shader group %" PRIu32 " is VK_SHADER_UNUSED_KHR.",
                                  string_VkShaderGroupShaderKHR(groupShader), group);
             }
         }
@@ -2135,7 +2154,7 @@ bool CoreChecks::ValidateGeometryNV(const VkGeometryNV &geometry, const Location
     return skip;
 }
 
-bool CoreChecks::ValidateRaytracingShaderBindingTable(VkCommandBuffer commandBuffer, const Location &table_loc,
+bool CoreChecks::ValidateRaytracingShaderBindingTable(const vvl::CommandBuffer &cb_state, const Location &table_loc,
                                                       const char *vuid_single_device_memory, const char *vuid_binding_table_flag,
                                                       const VkStridedDeviceAddressRegionKHR &binding_table) const {
     bool skip = false;
@@ -2146,7 +2165,8 @@ bool CoreChecks::ValidateRaytracingShaderBindingTable(VkCommandBuffer commandBuf
 
     const auto buffer_states = GetBuffersByAddress(binding_table.deviceAddress);
     if (buffer_states.empty()) {
-        skip |= LogError("VUID-VkStridedDeviceAddressRegionKHR-size-04631", commandBuffer, table_loc.dot(Field::deviceAddress),
+        skip |= LogError("VUID-VkStridedDeviceAddressRegionKHR-size-04631",
+                         cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR), table_loc.dot(Field::deviceAddress),
                          "(0x%" PRIx64 ") has no buffer associated with it.", binding_table.deviceAddress);
     } else {
         const vvl::range<VkDeviceSize> requested_range(binding_table.deviceAddress,
@@ -2161,7 +2181,7 @@ bool CoreChecks::ValidateRaytracingShaderBindingTable(VkCommandBuffer commandBuf
 
             {vuid_binding_table_flag,
              [](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
-                 if (!(static_cast<uint32_t>(buffer_state->usage) & VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR)) {
+                 if (!(static_cast<uint32_t>(buffer_state->usage) & VK_BUFFER_USAGE_2_SHADER_BINDING_TABLE_BIT_KHR)) {
                      if (out_error_msg) {
                          *out_error_msg += "buffer has usage " + string_VkBufferUsageFlags2(buffer_state->usage);
                      }
@@ -2170,7 +2190,7 @@ bool CoreChecks::ValidateRaytracingShaderBindingTable(VkCommandBuffer commandBuf
                  return true;
              },
              []() {
-                 return "The following buffers have not been created with the VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR "
+                 return "The following buffers have not been created with the VK_BUFFER_USAGE_2_SHADER_BINDING_TABLE_BIT_KHR "
                         "usage flag:";
              }},
 
@@ -2209,7 +2229,8 @@ bool CoreChecks::ValidateRaytracingShaderBindingTable(VkCommandBuffer commandBuf
         }}};
 
         skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(*this, buffer_states, table_loc.dot(Field::deviceAddress),
-                                                                  LogObjectList(commandBuffer), binding_table.deviceAddress);
+                                                                  cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR),
+                                                                  binding_table.deviceAddress);
     }
 
     return skip;

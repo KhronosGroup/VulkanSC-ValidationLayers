@@ -23,27 +23,66 @@
 #include "state_tracker/cmd_buffer_state.h"
 #include "state_tracker/queue_state.h"
 
+class CoreChecks;
+
 namespace core {
 
 // CommandBuffer is over 3 times larger than the next largest state object struct, but the majority of the state is only used in
 // CoreChecks. This state object is used by everyone else (best practice, sync val, GPU-AV, etc). For this reason, we have
 // CommandBuffer object only for core and keep only the most basic items in the parent class
-class CommandBuffer : public vvl::CommandBuffer {
+class CommandBufferSubState : public vvl::CommandBufferSubState {
   public:
-    CommandBuffer(CoreChecks& core, VkCommandBuffer handle, const VkCommandBufferAllocateInfo* pCreateInfo,
-                  const vvl::CommandPool* cmd_pool);
+    CommandBufferSubState(vvl::CommandBuffer &cb, CoreChecks &validator);
 
-    void RecordWaitEvents(vvl::Func command, uint32_t eventCount, const VkEvent* pEvents,
-                          VkPipelineStageFlags2KHR src_stage_mask) override;
-};
+    void RecordWaitEvents(vvl::Func command, uint32_t eventCount, const VkEvent *pEvents, VkPipelineStageFlags2KHR src_stage_mask,
+                          const VkDependencyInfo *dependency_info) override;
 
-// Override Retire to validate submissions in the order defined by synchronization
-class Queue : public vvl::Queue {
-  public:
-    Queue(vvl::Device& dev_data, VkQueue handle, uint32_t family_index, uint32_t queue_index, VkDeviceQueueCreateFlags flags,
-          const VkQueueFamilyProperties& queue_family_properties, const vvl::Device& error_logger);
+    void Reset(const Location &loc) final;
+    void Destroy() final;
+
+    void ExecuteCommands(vvl::CommandBuffer &secondary_command_buffer) final;
+
+    void SubmitTimeValidate();
+
+    CoreChecks &validator;
+
+    uint32_t nesting_level;  // VK_EXT_nested_command_buffer
+
+    QFOTransferBarrierSets<QFOBufferTransferBarrier> qfo_transfer_buffer_barriers;
+    QFOTransferBarrierSets<QFOImageTransferBarrier> qfo_transfer_image_barriers;
+    const QFOTransferBarrierSets<QFOImageTransferBarrier> &GetQFOBarrierSets(const QFOImageTransferBarrier &type_tag) const {
+        return qfo_transfer_image_barriers;
+    }
+    const QFOTransferBarrierSets<QFOBufferTransferBarrier> &GetQFOBarrierSets(const QFOBufferTransferBarrier &type_tag) const {
+        return qfo_transfer_buffer_barriers;
+    }
+
+    // used for VK_EXT_fragment_density_map_offset
+    // currently need to hold in Command buffer because it can be a suspended renderpassss
+    std::vector<VkOffset2D> fragment_density_offsets;
+
+    // The subresources from dynamic rendering barriers that can't be validated during record time.
+    vvl::unordered_map<VkImage, std::vector<std::pair<VkImageSubresourceRange, vvl::LocationCapture>>>
+        submit_validate_dynamic_rendering_barrier_subresources;
 
   private:
+    void ResetCBState();
+};
+
+static inline CommandBufferSubState &SubState(vvl::CommandBuffer &cb) {
+    return *static_cast<CommandBufferSubState *>(cb.SubState(LayerObjectTypeCoreValidation));
+}
+static inline const CommandBufferSubState &SubState(const vvl::CommandBuffer &cb) {
+    return *static_cast<const CommandBufferSubState *>(cb.SubState(LayerObjectTypeCoreValidation));
+}
+
+class QueueSubState : public vvl::QueueSubState {
+  public:
+    QueueSubState(Logger& logger, vvl::Queue& q);
+
+    void PreSubmit(std::vector<vvl::QueueSubmission> &submissions) override;
+
+    // Override Retire to validate submissions in the order defined by synchronization
     void Retire(vvl::QueueSubmission&) override;
 
   private:

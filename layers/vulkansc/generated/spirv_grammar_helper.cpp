@@ -593,6 +593,14 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpDepthAttachmentReadEXT";
         case spv::OpStencilAttachmentReadEXT:
             return "OpStencilAttachmentReadEXT";
+        case spv::OpTypeTensorARM:
+            return "OpTypeTensorARM";
+        case spv::OpTensorReadARM:
+            return "OpTensorReadARM";
+        case spv::OpTensorWriteARM:
+            return "OpTensorWriteARM";
+        case spv::OpTensorQuerySizeARM:
+            return "OpTensorQuerySizeARM";
         case spv::OpTerminateInvocation:
             return "OpTerminateInvocation";
         case spv::OpSubgroupBallotKHR:
@@ -999,6 +1007,16 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpAtomicFAddEXT";
         case spv::OpArithmeticFenceEXT:
             return "OpArithmeticFenceEXT";
+        case spv::OpTaskSequenceCreateINTEL:
+            return "OpTaskSequenceCreateINTEL";
+        case spv::OpTaskSequenceAsyncINTEL:
+            return "OpTaskSequenceAsyncINTEL";
+        case spv::OpTaskSequenceGetINTEL:
+            return "OpTaskSequenceGetINTEL";
+        case spv::OpTaskSequenceReleaseINTEL:
+            return "OpTaskSequenceReleaseINTEL";
+        case spv::OpTypeTaskSequenceINTEL:
+            return "OpTypeTaskSequenceINTEL";
         case spv::OpSubgroupBlockPrefetchINTEL:
             return "OpSubgroupBlockPrefetchINTEL";
         case spv::OpSubgroup2DBlockLoadINTEL:
@@ -1013,6 +1031,8 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpSubgroup2DBlockStoreINTEL";
         case spv::OpSubgroupMatrixMultiplyAccumulateINTEL:
             return "OpSubgroupMatrixMultiplyAccumulateINTEL";
+        case spv::OpBitwiseFunctionINTEL:
+            return "OpBitwiseFunctionINTEL";
         case spv::OpGroupIMulKHR:
             return "OpGroupIMulKHR";
         case spv::OpGroupFMulKHR:
@@ -1029,6 +1049,8 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpGroupLogicalOrKHR";
         case spv::OpGroupLogicalXorKHR:
             return "OpGroupLogicalXorKHR";
+        case spv::OpRoundFToTF32INTEL:
+            return "OpRoundFToTF32INTEL";
 
 #ifdef VK_ENABLE_BETA_EXTENSIONS
         case spv::OpTypeUntypedPointerKHR:
@@ -1063,6 +1085,12 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpConstantStringAMDX";
         case spv::OpSpecConstantStringAMDX:
             return "OpSpecConstantStringAMDX";
+        case spv::OpConvertHandleToImageINTEL:
+            return "OpConvertHandleToImageINTEL";
+        case spv::OpConvertHandleToSamplerINTEL:
+            return "OpConvertHandleToSamplerINTEL";
+        case spv::OpConvertHandleToSampledImageINTEL:
+            return "OpConvertHandleToSampledImageINTEL";
 #endif
         default:
             return "Unknown Opcode";
@@ -1099,6 +1127,8 @@ const char* string_SpvStorageClass(uint32_t storage_class) {
             return "StorageBuffer";
         case spv::StorageClassTileImageEXT:
             return "TileImageEXT";
+        case spv::StorageClassTileAttachmentQCOM:
+            return "TileAttachmentQCOM";
         case spv::StorageClassCallableDataKHR:
             return "CallableDataKHR";
         case spv::StorageClassIncomingCallableDataKHR:
@@ -1275,6 +1305,10 @@ const char* string_SpvExecutionMode(uint32_t execution_mode) {
             return "RoundingModeRTE";
         case spv::ExecutionModeRoundingModeRTZ:
             return "RoundingModeRTZ";
+        case spv::ExecutionModeNonCoherentTileAttachmentReadQCOM:
+            return "NonCoherentTileAttachmentReadQCOM";
+        case spv::ExecutionModeTileShadingRateQCOM:
+            return "TileShadingRateQCOM";
         case spv::ExecutionModeEarlyAndLateFragmentTestsAMD:
             return "EarlyAndLateFragmentTestsAMD";
         case spv::ExecutionModeStencilRefReplacingEXT:
@@ -1471,6 +1505,8 @@ const char* string_SpvDecoration(uint32_t decoration) {
             return "AlignmentId";
         case spv::DecorationMaxByteOffsetId:
             return "MaxByteOffsetId";
+        case spv::DecorationSaturatedToLargestFloat8NormalConversionEXT:
+            return "SaturatedToLargestFloat8NormalConversionEXT";
         case spv::DecorationNoSignedWrap:
             return "NoSignedWrap";
         case spv::DecorationNoUnsignedWrap:
@@ -1787,6 +1823,12 @@ const char* string_SpvBuiltIn(uint32_t built_in) {
             return "ViewIndex";
         case spv::BuiltInShadingRateKHR:
             return "ShadingRateKHR";
+        case spv::BuiltInTileOffsetQCOM:
+            return "TileOffsetQCOM";
+        case spv::BuiltInTileDimensionQCOM:
+            return "TileDimensionQCOM";
+        case spv::BuiltInTileApronSizeQCOM:
+            return "TileApronSizeQCOM";
         case spv::BuiltInBaryCoordNoPerspAMD:
             return "BaryCoordNoPerspAMD";
         case spv::BuiltInBaryCoordNoPerspCentroidAMD:
@@ -2267,6 +2309,10 @@ const OperandInfo& GetOperandInfo(uint32_t opcode) {
         {spv::OpColorAttachmentReadEXT, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpDepthAttachmentReadEXT, {{OperandKind::Id}}},
         {spv::OpStencilAttachmentReadEXT, {{OperandKind::Id}}},
+        {spv::OpTypeTensorARM, {{OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpTensorReadARM, {{OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
+        {spv::OpTensorWriteARM, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
+        {spv::OpTensorQuerySizeARM, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpTerminateInvocation, {{}}},
         {spv::OpSubgroupBallotKHR, {{OperandKind::Id}}},
         {spv::OpSubgroupFirstInvocationKHR, {{OperandKind::Id}}},
@@ -2470,6 +2516,11 @@ const OperandInfo& GetOperandInfo(uint32_t opcode) {
         {spv::OpRayQueryGetIntersectionWorldToObjectKHR, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpAtomicFAddEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpArithmeticFenceEXT, {{OperandKind::Id}}},
+        {spv::OpTaskSequenceCreateINTEL, {{OperandKind::Id, OperandKind::Literal, OperandKind::Literal, OperandKind::Literal, OperandKind::Literal}}},
+        {spv::OpTaskSequenceAsyncINTEL, {{OperandKind::Id, OperandKind::Id}}},
+        {spv::OpTaskSequenceGetINTEL, {{OperandKind::Id}}},
+        {spv::OpTaskSequenceReleaseINTEL, {{OperandKind::Id}}},
+        {spv::OpTypeTaskSequenceINTEL, {{}}},
         {spv::OpSubgroupBlockPrefetchINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
         {spv::OpSubgroup2DBlockLoadINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpSubgroup2DBlockLoadTransformINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
@@ -2477,6 +2528,7 @@ const OperandInfo& GetOperandInfo(uint32_t opcode) {
         {spv::OpSubgroup2DBlockPrefetchINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpSubgroup2DBlockStoreINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpSubgroupMatrixMultiplyAccumulateINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
+        {spv::OpBitwiseFunctionINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpGroupIMulKHR, {{OperandKind::Id, OperandKind::ValueEnum, OperandKind::Id}}},
         {spv::OpGroupFMulKHR, {{OperandKind::Id, OperandKind::ValueEnum, OperandKind::Id}}},
         {spv::OpGroupBitwiseAndKHR, {{OperandKind::Id, OperandKind::ValueEnum, OperandKind::Id}}},
@@ -2485,6 +2537,7 @@ const OperandInfo& GetOperandInfo(uint32_t opcode) {
         {spv::OpGroupLogicalAndKHR, {{OperandKind::Id, OperandKind::ValueEnum, OperandKind::Id}}},
         {spv::OpGroupLogicalOrKHR, {{OperandKind::Id, OperandKind::ValueEnum, OperandKind::Id}}},
         {spv::OpGroupLogicalXorKHR, {{OperandKind::Id, OperandKind::ValueEnum, OperandKind::Id}}},
+        {spv::OpRoundFToTF32INTEL, {{OperandKind::Id}}},
     };  // clang-format on
 
     auto info = kOperandTable.find(opcode);

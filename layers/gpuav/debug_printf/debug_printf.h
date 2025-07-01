@@ -1,6 +1,6 @@
-/* Copyright (c) 2020-2024 The Khronos Group Inc.
- * Copyright (c) 2020-2024 Valve Corporation
- * Copyright (c) 2020-2024 LunarG, Inc.
+/* Copyright (c) 2020-2025 The Khronos Group Inc.
+ * Copyright (c) 2020-2025 Valve Corporation
+ * Copyright (c) 2020-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,19 +17,12 @@
 
 #pragma once
 
-#include <vulkan/vulkan_core.h>
-
-struct Location;
 namespace gpuav {
-struct DebugPrintfBufferInfo;
-class CommandBuffer;
+class CommandBufferSubState;
 class Validator;
 
 namespace debug_printf {
-bool UpdateInstrumentationDescSet(Validator& gpuav, CommandBuffer& cb_state, VkDescriptorSet instrumentation_desc_set,
-                                  VkPipelineBindPoint bind_point, const Location& loc);
-void AnalyzeAndGenerateMessage(Validator& gpuav, VkCommandBuffer command_buffer, VkQueue queue, DebugPrintfBufferInfo& buffer_info,
-                               uint32_t* const debug_output_buffer, const Location& loc);
+void RegisterDebugPrintf(Validator& gpuav, CommandBufferSubState& cb_state);
 }  // namespace debug_printf
 
 }  // namespace gpuav

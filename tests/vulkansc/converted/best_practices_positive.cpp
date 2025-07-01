@@ -95,11 +95,11 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
     VkDescriptorSetAllocateInfo alloc_info = {};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.descriptorSetCount = 1;
-    alloc_info.descriptorPool = ds_pool.handle();
+    alloc_info.descriptorPool = ds_pool;
     alloc_info.pSetLayouts = &ds_layout.handle();
     err = vk::AllocateDescriptorSets(device(), &alloc_info, &descriptor_sets[1]);
     ASSERT_EQ(VK_SUCCESS, err);
-    vk::FreeDescriptorSets(device(), ds_pool.handle(), 3, descriptor_sets);
+    vk::FreeDescriptorSets(device(), ds_pool, 3, descriptor_sets);
 
     vk::FreeMemory(device(), VK_NULL_HANDLE, NULL);
 }
@@ -125,16 +125,15 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
 
     m_command_buffer.Begin();
 
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 1, 1,
-                              &empty_ds.set_, 0, nullptr);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &empty_ds.set_, 0, nullptr);
 
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 1, 1, &vbo.handle(), &kZeroDeviceSize);
+    vk::CmdBindVertexBuffers(m_command_buffer, 1, 1, &vbo.handle(), &kZeroDeviceSize);
 
     // The draw command will most likely produce a crash in case of a regression.
-    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 1, 0, 0);
 
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -171,7 +170,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DynStateIgnoreAttachments) {
     pipe.gp_ci_.pDynamicState = &dynamic_create_info;
     pipe.CreateGraphicsPipeline();
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_command_buffer.End();
 }
 
@@ -238,10 +237,10 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PushConstantSet) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, 16, data);
-    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_FRAGMENT_BIT, 16, 4, data);
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, 16, data);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 16, 4, data);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
@@ -277,13 +276,13 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_VertexBufferNotForAllDraws) {
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kPerformanceWarningBit);
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &vbo.handle(), &kZeroDeviceSize);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vbo.handle(), &kZeroDeviceSize);
 
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe0.Handle());
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe0.Handle());
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
 
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
@@ -460,16 +459,14 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetCommandPool) {
         m_command_buffer.Begin();
         event1.CmdSet(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
         m_command_buffer.End();
-        m_default_queue->Submit(m_command_buffer);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(m_command_buffer);
     }
 
     vkt::Event event2(*m_device);
     m_command_buffer.Begin();
     event2.CmdSet(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -491,19 +488,10 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ShaderObjectDraw) {
     )glsl";
 
     std::vector<uint32_t> vert_spirv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexGlsl);
-    VkShaderCreateInfoEXT create_info = vku::InitStructHelper();
-    create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
-    create_info.codeSize = vert_spirv.size() * sizeof(uint32_t);
-    create_info.pCode = vert_spirv.data();
-    create_info.pName = "main";
-    vkt::Shader vert_shader(*m_device, create_info);
+    vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vert_spirv);
 
     std::vector<uint32_t> frag_spirv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
-    create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    create_info.codeSize = frag_spirv.size() * sizeof(uint32_t);
-    create_info.pCode = frag_spirv.data();
-    vkt::Shader frag_shader(*m_device, create_info);
+    vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, frag_spirv);
 
     m_vertex_buffer = new vkt::Buffer(*m_device, sizeof(float) * 12u, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -525,9 +513,56 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ShaderObjectDraw) {
     VkDeviceSize offset = 0u;
     m_command_buffer.BindShaders(vert_shader, frag_shader);
     SetDefaultDynamicStatesExclude();
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0u, 1u, &m_vertex_buffer->handle(), &offset);
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1u, &binding_desc, 1u, &attr_desc);
-    vk::CmdDraw(m_command_buffer.handle(), 3u, 1u, 0u, 0u);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0u, 1u, &m_vertex_buffer->handle(), &offset);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1u, &binding_desc, 1u, &attr_desc);
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
+}
+
+// Not supported in Vulkan SC: best practices layers
+TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateDeviceWithFeatures) {
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    const vkt::PhysicalDevice phys_device_obj(gpu_);
+
+    // Now get information correctly
+    vkt::QueueCreateInfoArray queue_info(phys_device_obj.queue_properties_, true);
+    // Only request creation with queuefamilies that have at least one queue
+    std::vector<VkDeviceQueueCreateInfo> create_queue_infos;
+    auto qci = queue_info.Data();
+    for (uint32_t j = 0; j < queue_info.Size(); ++j) {
+        if (qci[j].queueCount) {
+            create_queue_infos.push_back(qci[j]);
+        }
+    }
+
+    VkPhysicalDeviceFeatures features;
+    vk::GetPhysicalDeviceFeatures(gpu_, &features);
+
+    const char *portability_extension = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
+
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
+    device_ci.queueCreateInfoCount = create_queue_infos.size();
+    device_ci.pQueueCreateInfos = create_queue_infos.data();
+    device_ci.enabledLayerCount = 0;
+    device_ci.ppEnabledLayerNames = nullptr;
+    device_ci.enabledExtensionCount = 0u;
+    device_ci.ppEnabledExtensionNames = nullptr;
+    device_ci.pEnabledFeatures = &features;
+
+    uint32_t extension_count;
+    vk::EnumerateDeviceExtensionProperties(gpu_, nullptr, &extension_count, nullptr);
+    std::vector<VkExtensionProperties> extensions(extension_count);
+    vk::EnumerateDeviceExtensionProperties(gpu_, nullptr, &extension_count, extensions.data());
+
+    for (uint32_t i = 0; i < extension_count; ++i) {
+        if (strcmp(extensions[i].extensionName, portability_extension) == 0) {
+            device_ci.enabledExtensionCount = 1u;
+            device_ci.ppEnabledExtensionNames = &portability_extension;
+            break;
+        }
+    }
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kPerformanceWarningBit);
+    vkt::Device device(phys_device_obj.handle(), device_ci);
 }

@@ -593,18 +593,18 @@ TEST_F(NegativeVertexInput, ProvokingVertexModePerPipeline) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipelineBindPoint-04881");
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipelineBindPoint-04881");
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe3.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe3);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -633,14 +633,14 @@ TEST_F(NegativeVertexInput, VertextBinding) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     VkDeviceSize offset = 0;
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 1, 1, &vtx_buf.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 1, 1, &vtx_buf.handle(), &offset);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04007");  // index 0
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");  // index 1 is OOB
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04007");  // index 2
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -669,14 +669,14 @@ TEST_F(NegativeVertexInput, VertextBindingNonLinear) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     VkDeviceSize offset = 0;
     // Forget to update binding 2
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 5, 1, &vtx_buf.handle(), &offset);
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 3, 1, &vtx_buf.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 5, 1, &vtx_buf.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 3, 1, &vtx_buf.handle(), &offset);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04007");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -723,13 +723,13 @@ TEST_F(NegativeVertexInput, VertextBindingDynamicState) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 5, 1, &buffer.handle(), &offset);
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 3, 1, &buffer.handle(), &offset);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 3, bindings, 3, attributes);
+    vk::CmdBindVertexBuffers(m_command_buffer, 5, 1, &buffer.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 3, 1, &buffer.handle(), &offset);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 3, bindings, 3, attributes);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04007");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 1);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 1);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -812,22 +812,22 @@ TEST_F(NegativeVertexInput, AttributeAlignment) {
 
     // Test with invalid buffer offset
     VkDeviceSize offset = 1;
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &vbo.handle(), &offset);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vbo.handle(), &offset);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");  // attribute 0
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");  // attribute 1
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");  // attribute 2
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     // Test with invalid buffer stride
     offset = 0;
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &vbo.handle(), &offset);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vbo.handle(), &offset);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");  // attribute 0
     // Attribute[1] is aligned properly even with a wrong stride
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");  // attribute 2
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -854,12 +854,12 @@ TEST_F(NegativeVertexInput, BindVertexOffset) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkDeviceSize offset = 3;
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &vtx_buf.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vtx_buf.handle(), &offset);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -886,12 +886,12 @@ TEST_F(NegativeVertexInput, VertexStride) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkDeviceSize offset = 0;
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &vtx_buf.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vtx_buf.handle(), &offset);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -925,13 +925,13 @@ TEST_F(NegativeVertexInput, VertexStrideDynamicInput) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkDeviceSize offset = 0;
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &buffer.handle(), &offset);
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1, &binding, 1, &attribute);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &buffer.handle(), &offset);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, 1, &attribute);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -962,13 +962,13 @@ TEST_F(NegativeVertexInput, VertexStrideDynamicStride) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     const VkDeviceSize offset = 0;
     const VkDeviceSize bad_stride = 3;
-    vk::CmdBindVertexBuffers2EXT(m_command_buffer.handle(), 0, 1, &buffer.handle(), &offset, nullptr, &bad_stride);
+    vk::CmdBindVertexBuffers2EXT(m_command_buffer, 0, 1, &buffer.handle(), &offset, nullptr, &bad_stride);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -999,14 +999,14 @@ TEST_F(NegativeVertexInput, VertexStrideDynamicStrideArray) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkDeviceSize offsets[2] = {0, 0};
     VkDeviceSize strides[2] = {4, 3};
-    VkBuffer buffers[2] = {buffer.handle(), buffer.handle()};
-    vk::CmdBindVertexBuffers2EXT(m_command_buffer.handle(), 0, 2, buffers, offsets, nullptr, strides);
+    VkBuffer buffers[2] = {buffer, buffer};
+    vk::CmdBindVertexBuffers2EXT(m_command_buffer, 0, 2, buffers, offsets, nullptr, strides);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -1043,23 +1043,23 @@ TEST_F(NegativeVertexInput, VertexStrideDoubleDynamicStride) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     VkDeviceSize offset = 0;
 
     const VkDeviceSize bad_stride = 3;
     const VkDeviceSize good_stride = 4;
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1, &binding, 1, &attribute);
-    vk::CmdBindVertexBuffers2EXT(m_command_buffer.handle(), 0, 1, &buffer.handle(), &offset, nullptr, &bad_stride);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, 1, &attribute);
+    vk::CmdBindVertexBuffers2EXT(m_command_buffer, 0, 1, &buffer.handle(), &offset, nullptr, &bad_stride);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     // flip order around
     binding.stride = static_cast<uint32_t>(bad_stride);
-    vk::CmdBindVertexBuffers2EXT(m_command_buffer.handle(), 0, 1, &buffer.handle(), &offset, nullptr, &good_stride);
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1, &binding, 1, &attribute);
+    vk::CmdBindVertexBuffers2EXT(m_command_buffer, 0, 1, &buffer.handle(), &offset, nullptr, &good_stride);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, 1, &attribute);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -1379,12 +1379,12 @@ TEST_F(NegativeVertexInput, AttributeTypeMismatchDynamic) {
     VkDeviceSize offset = 0;
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &buffer.handle(), &offset);
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1, &binding, 1, &attribute);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &buffer.handle(), &offset);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, 1, &attribute);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-Input-08734");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -1544,9 +1544,7 @@ TEST_F(NegativeVertexInput, AttributeStructTypeBlockLocation64bit) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    VkFormatProperties format_props;
-    vk::GetPhysicalDeviceFormatProperties(Gpu(), VK_FORMAT_R64G64B64A64_SFLOAT, &format_props);
-    if (!(format_props.bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)) {
+    if (!BufferFormatAndFeaturesSupported(Gpu(), VK_FORMAT_R64G64B64A64_SFLOAT, VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)) {
         GTEST_SKIP() << "Device does not support VK_FORMAT_R64G64B64A64_SFLOAT vertex buffers";
     }
 
@@ -1645,10 +1643,10 @@ TEST_F(NegativeVertexInput, UnsupportedDivisor) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0u, 1u, &buffer.handle(), &offset);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindVertexBuffers(m_command_buffer, 0u, 1u, &buffer.handle(), &offset);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pNext-09461");
-    vk::CmdDraw(m_command_buffer.handle(), 3u, 1u, 0u, 1u);
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 1u);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -1691,13 +1689,13 @@ TEST_F(NegativeVertexInput, UnsupportedDynamicStateDivisor) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0u, 1u, &buffer.handle(), &offset);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindVertexBuffers(m_command_buffer, 0u, 1u, &buffer.handle(), &offset);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1u, &vertex_input_binding_description, 0u, nullptr);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1u, &vertex_input_binding_description, 0u, nullptr);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09462");
-    vk::CmdDraw(m_command_buffer.handle(), 3u, 1u, 0u, 1u);
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 1u);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -1712,13 +1710,13 @@ TEST_F(NegativeVertexInput, BindVertexBufferNull) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     VkDeviceSize offsets[2] = {0, 0};
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers-pBuffers-parameter");
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, VK_NULL_HANDLE, offsets);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, VK_NULL_HANDLE, offsets);
     m_errorMonitor->VerifyFound();
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    VkBuffer buffers[2] = {buffer.handle(), VK_NULL_HANDLE};
+    VkBuffer buffers[2] = {buffer, VK_NULL_HANDLE};
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers-pBuffers-04001");
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 2, buffers, offsets);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 2, buffers, offsets);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -1744,15 +1742,15 @@ TEST_F(NegativeVertexInput, NoBoundVertexBuffer) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     VkDeviceSize offset = 0;
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     // only bind at index 0
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &buffer.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &buffer.handle(), &offset);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04007");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 1);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 1);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -1770,13 +1768,13 @@ TEST_F(NegativeVertexInput, VertexBufferDestroyed) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     VkDeviceSize offset = 0;
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 1, 1, &buffer.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 1, 1, &buffer.handle(), &offset);
     buffer.destroy();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-commandBuffer-recording");
-    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1816,15 +1814,15 @@ TEST_F(NegativeVertexInput, ResetCmdSetVertexInput) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0u, 1u, &vertex_buffer.handle(), &offset);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1, &bindings, 1, &attributes);
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 1);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0u, 1u, &vertex_buffer.handle(), &offset);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1, &bindings, 1, &attributes);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 1);
 
     attributes.format = VK_FORMAT_R8G8B8A8_UNORM;
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1, &bindings, 1, &attributes);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1, &bindings, 1, &attributes);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-Input-08734");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 1);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 1);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -1883,16 +1881,16 @@ TEST_F(NegativeVertexInput, VertexInputRebinding) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 2, buffers, offsets);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 2, buffers, offsets);
 
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 2, bindings, 2, attributes);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 2, bindings, 2, attributes);
 
     // Invalidate the binding not used
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 2, bindings, 1, attributes);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 2, bindings, 1, attributes);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-Input-07939");
-    vk::CmdDraw(m_command_buffer.handle(), 3u, 3u, 0u, 0u);
+    vk::CmdDraw(m_command_buffer, 3u, 3u, 0u, 0u);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();

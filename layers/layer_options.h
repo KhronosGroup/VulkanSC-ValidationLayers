@@ -1,6 +1,6 @@
-/* Copyright (c) 2022-2024 The Khronos Group Inc.
- * Copyright (c) 2022-2024 Valve Corporation
- * Copyright (c) 2022-2024 LunarG, Inc.
+/* Copyright (c) 2022-2025 The Khronos Group Inc.
+ * Copyright (c) 2022-2025 Valve Corporation
+ * Copyright (c) 2022-2025 LunarG, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,10 +20,10 @@
 #include <array>
 #include <vector>
 #include <string>
+#include <utility>
 #include <cstdint>
 #include <vulkan/vulkan.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
-#include "containers/custom_containers.h"
 
 #define OBJECT_LAYER_NAME "VK_LAYER_KHRONOS_validation"
 
@@ -42,8 +42,8 @@ enum ValidationCheckEnables {
     VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_ALL,
 };
 
-// CHECK_DISABLED and CHECK_ENABLED vectors are containers for bools that can opt in or out of specific classes of validation
-// checks. Enum values can be specified via the vk_layer_settings.txt config file or at CreateInstance time via the
+// ValidationDisabled and ValidationEnabled vectors are containers for bools that can opt in or out of specific classes of
+// validation checks. Enum values can be specified via the vk_layer_settings.txt config file or at CreateInstance time via the
 // VK_EXT_validation_features extension that can selectively disable or enable checks.
 enum DisableFlags {
     command_buffer_state,
@@ -75,8 +75,8 @@ enum EnableFlags {
     kMaxEnableFlags,
 };
 
-using CHECK_DISABLED = std::array<bool, kMaxDisableFlags>;
-using CHECK_ENABLED = std::array<bool, kMaxEnableFlags>;
+using ValidationDisabled = std::array<bool, kMaxDisableFlags>;
+using ValidationEnabled = std::array<bool, kMaxEnableFlags>;
 
 // General settings to be used by all parts of the Validation Layers
 struct GlobalSettings {
@@ -97,8 +97,8 @@ struct ConfigAndEnvSettings {
     const VkInstanceCreateInfo *create_info;
 
     // Find grain way to turn off/on parts of validation
-    CHECK_ENABLED &enables;
-    CHECK_DISABLED &disables;
+    ValidationEnabled &enables;
+    ValidationDisabled &disables;
 
     // Settings for DebugReport
     DebugReport *debug_report;

@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +17,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include <algorithm>
 
 class NegativeShaderCompute : public VkLayerTest {};
 
@@ -42,7 +43,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryOverLimit) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
@@ -71,7 +72,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryBooleanOverLimit) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
@@ -113,7 +114,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryOverLimitWorkgroupMemoryExplicitLayout
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cs_ = VkShaderObj(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
@@ -143,7 +144,7 @@ TEST_F(NegativeShaderCompute, SharedMemorySpecConstantDefault) {
     )glsl";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, cs_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+        helper.cs_ = VkShaderObj(this, cs_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-Workgroup-06530");
 }
@@ -185,8 +186,8 @@ TEST_F(NegativeShaderCompute, SharedMemorySpecConstantSet) {
     specialization_info.pData = &data;
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, cs_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_GLSL, &specialization_info);
+        helper.cs_ = VkShaderObj(this, cs_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
+                                 &specialization_info);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-Workgroup-06530");
 }
@@ -226,8 +227,8 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstant) {
     specialization_info.pData = data;
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_GLSL, &specialization_info);
+        helper.cs_ =
+            VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-y-06430");
@@ -278,8 +279,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeConstantDefault) {
         )";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_ASM);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -320,8 +320,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstantDefault) {
         )";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_ASM);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -357,8 +356,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeId) {
         )";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
-                                                   SPV_SOURCE_ASM);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -399,8 +397,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeIdSpecConstantDefault) {
         )";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
-                                                   SPV_SOURCE_ASM);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -452,8 +449,8 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeIdSpecConstantSet) {
     specialization_info.pData = &data;
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = std::make_unique<VkShaderObj>(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
-                                                   SPV_SOURCE_ASM, &specialization_info);
+        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM,
+                                 &specialization_info);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -467,6 +464,8 @@ TEST_F(NegativeShaderCompute, WorkgroupMemoryExplicitLayout) {
     AddRequiredFeature(vkt::Feature::shaderInt8);
     AddRequiredFeature(vkt::Feature::shaderInt16);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
+    AddRequiredFeature(vkt::Feature::workgroupMemoryExplicitLayout8BitAccess);
+    AddRequiredFeature(vkt::Feature::workgroupMemoryExplicitLayout16BitAccess);
     RETURN_IF_SKIP(Init());
 
     // WorkgroupMemoryExplicitLayoutKHR
@@ -533,7 +532,6 @@ TEST_F(NegativeShaderCompute, WorkgroupMemoryExplicitLayout) {
                OpFunctionEnd
         )";
 
-        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
         VkShaderObj::CreateFromASM(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
         m_errorMonitor->VerifyFound();
@@ -577,7 +575,6 @@ TEST_F(NegativeShaderCompute, WorkgroupMemoryExplicitLayout) {
                OpFunctionEnd
         )";
 
-        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
         VkShaderObj::CreateFromASM(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
         m_errorMonitor->VerifyFound();
@@ -716,7 +713,7 @@ TEST_F(NegativeShaderCompute, LocalSizeIdExecutionModeMaintenance5) {
     vkt::PipelineLayout layout(*m_device, {});
     CreateComputePipelineHelper pipe(*this);
     pipe.cp_ci_.stage = stage_ci;
-    pipe.cp_ci_.layout = layout.handle();
+    pipe.cp_ci_.layout = layout;
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-LocalSizeId-06434");
     pipe.CreateComputePipeline(false);
@@ -729,9 +726,8 @@ TEST_F(NegativeShaderCompute, CmdDispatchExceedLimits) {
     TEST_DESCRIPTION("Compute dispatch with dimensions that exceed device limits");
 
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);
-    AddOptionalExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
-    const bool device_group_creation = IsExtensionsEnabled(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
 
     uint32_t x_count_limit = m_device->Physical().limits_.maxComputeWorkGroupCount[0];
     uint32_t y_count_limit = m_device->Physical().limits_.maxComputeWorkGroupCount[1];
@@ -760,8 +756,7 @@ TEST_F(NegativeShaderCompute, CmdDispatchExceedLimits) {
                 OpFunctionEnd)");
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ =
-        std::make_unique<VkShaderObj>(this, spv_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, spv_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-x-06429");
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-y-06430");
@@ -789,39 +784,39 @@ TEST_F(NegativeShaderCompute, CmdDispatchExceedLimits) {
     cs_text << "local_size_z = " << z_size_limit << ") in;\n";
     cs_text << "void main() {}\n";
 
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_text.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, cs_text.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.flags = VK_PIPELINE_CREATE_DISPATCH_BASE;
     pipe.CreateComputePipeline();
 
     // Bind pipeline to command buffer
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
 
     // Dispatch counts that exceed device limits
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-groupCountX-00386");
-    vk::CmdDispatch(m_command_buffer.handle(), x_count_limit + 1, y_count_limit, z_count_limit);
+    vk::CmdDispatch(m_command_buffer, x_count_limit + 1, y_count_limit, z_count_limit);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-groupCountY-00387");
-    vk::CmdDispatch(m_command_buffer.handle(), x_count_limit, y_count_limit + 1, z_count_limit);
+    vk::CmdDispatch(m_command_buffer, x_count_limit, y_count_limit + 1, z_count_limit);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-groupCountZ-00388");
-    vk::CmdDispatch(m_command_buffer.handle(), x_count_limit, y_count_limit, z_count_limit + 1);
+    vk::CmdDispatch(m_command_buffer, x_count_limit, y_count_limit, z_count_limit + 1);
     m_errorMonitor->VerifyFound();
 
-    if (device_group_creation) {
+    {
         // Base equals or exceeds limit
         m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchBase-baseGroupX-00421");
-        vk::CmdDispatchBaseKHR(m_command_buffer.handle(), x_count_limit, y_count_limit - 1, z_count_limit - 1, 0, 0, 0);
+        vk::CmdDispatchBaseKHR(m_command_buffer, x_count_limit, y_count_limit - 1, z_count_limit - 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchBase-baseGroupX-00422");
-        vk::CmdDispatchBaseKHR(m_command_buffer.handle(), x_count_limit - 1, y_count_limit, z_count_limit - 1, 0, 0, 0);
+        vk::CmdDispatchBaseKHR(m_command_buffer, x_count_limit - 1, y_count_limit, z_count_limit - 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchBase-baseGroupZ-00423");
-        vk::CmdDispatchBaseKHR(m_command_buffer.handle(), x_count_limit - 1, y_count_limit - 1, z_count_limit, 0, 0, 0);
+        vk::CmdDispatchBaseKHR(m_command_buffer, x_count_limit - 1, y_count_limit - 1, z_count_limit, 0, 0, 0);
         m_errorMonitor->VerifyFound();
 
         // (Base + count) exceeds limit
@@ -833,18 +828,16 @@ TEST_F(NegativeShaderCompute, CmdDispatchExceedLimits) {
         z_count_limit -= z_base;
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchBase-groupCountX-00424");
-        vk::CmdDispatchBaseKHR(m_command_buffer.handle(), x_base, y_base, z_base, x_count_limit + 1, y_count_limit, z_count_limit);
+        vk::CmdDispatchBaseKHR(m_command_buffer, x_base, y_base, z_base, x_count_limit + 1, y_count_limit, z_count_limit);
         m_errorMonitor->VerifyFound();
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchBase-groupCountY-00425");
-        vk::CmdDispatchBaseKHR(m_command_buffer.handle(), x_base, y_base, z_base, x_count_limit, y_count_limit + 1, z_count_limit);
+        vk::CmdDispatchBaseKHR(m_command_buffer, x_base, y_base, z_base, x_count_limit, y_count_limit + 1, z_count_limit);
         m_errorMonitor->VerifyFound();
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchBase-groupCountZ-00426");
-        vk::CmdDispatchBaseKHR(m_command_buffer.handle(), x_base, y_base, z_base, x_count_limit, y_count_limit, z_count_limit + 1);
+        vk::CmdDispatchBaseKHR(m_command_buffer, x_base, y_base, z_base, x_count_limit, y_count_limit, z_count_limit + 1);
         m_errorMonitor->VerifyFound();
-    } else {
-        printf("KHR_DEVICE_GROUP_* extensions not supported, skipping CmdDispatchBaseKHR() tests.\n");
     }
 }
 
@@ -860,9 +853,9 @@ TEST_F(NegativeShaderCompute, DispatchBaseFlag) {
 
     // Bind pipeline to command buffer
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchBase-baseGroupX-00427");
-    vk::CmdDispatchBaseKHR(m_command_buffer.handle(), 1, 1, 1, 0, 0, 0);
+    vk::CmdDispatchBaseKHR(m_command_buffer, 1, 1, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }

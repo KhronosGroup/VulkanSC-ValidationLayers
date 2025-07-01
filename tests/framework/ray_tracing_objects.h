@@ -15,7 +15,6 @@
 #include "descriptor_helper.h"
 #include "shader_helper.h"
 
-#include <memory>
 #include <optional>
 
 namespace vkt {
@@ -252,7 +251,7 @@ void BuildHostAccelerationStructuresKHR(VkDevice device, std::vector<BuildGeomet
 //    as_build_info.SetFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 //
 //    m_command_buffer.Begin();
-//    as_build_info.BuildCmdBuffer(*m_device, m_command_buffer.handle());
+//    as_build_info.BuildCmdBuffer(*m_device, m_command_buffer);
 //    m_command_buffer.End();
 // }
 namespace blueprint {
@@ -286,7 +285,7 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostBottomLevel(const vkt::Device&
 // Create an on device TLAS pointing to one BLAS
 // on_device_bottom_level_geometry must have been built previously, and on the device
 BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceTopLevel(const vkt::Device& device,
-                                                             std::shared_ptr<BuildGeometryInfoKHR> on_device_blas);
+                                                             const vkt::as::AccelerationStructureKHR& on_device_blas);
 // Create an on host TLAS pointing to one BLAS
 // on_host_bottom_level_geometry must have been built previously, and on the host
 BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostTopLevel(const vkt::Device& device,
@@ -318,6 +317,8 @@ class Pipeline {
 
     void AddBinding(VkDescriptorType descriptor_type, uint32_t binding, uint32_t descriptor_count = 1);
     void CreateDescriptorSet();
+    // *If CreateDescriptorSet() is never called*, this method will hook supplied descriptor set layouts
+    void SetPipelineSetLayouts(uint32_t set_layout_count, const VkDescriptorSetLayout* set_layouts);
 
     void SetPushConstantRangeSize(uint32_t byte_size);
     void SetGlslRayGenShader(const char* glsl);
@@ -338,7 +339,9 @@ class Pipeline {
 
     // Get
     // ---
+    VkShaderObj& GetRayGenShader(uint32_t ray_gen_i);
     const auto& Handle() { return rt_pipeline_; }
+    operator VkPipeline() const { return rt_pipeline_; }
     vkt::PipelineLayout& GetPipelineLayout() { return pipeline_layout_; }
     OneOffDescriptorSet& GetDescriptorSet() {
         assert(desc_set_);
@@ -359,6 +362,7 @@ class Pipeline {
     uint32_t push_constant_range_size_ = 0;
     std::vector<VkDescriptorSetLayoutBinding> bindings_{};
     std::unique_ptr<OneOffDescriptorSet> desc_set_{};
+    VkPipelineLayoutCreateInfo pipeline_layout_ci_;
     vkt::PipelineLayout pipeline_layout_{};
     std::vector<VkDynamicState> dynamic_states{};
     std::vector<std::unique_ptr<VkShaderObj>> ray_gen_shaders_{};

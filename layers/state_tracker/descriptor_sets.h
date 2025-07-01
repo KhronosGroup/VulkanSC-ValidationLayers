@@ -21,8 +21,8 @@
 #include "state_tracker/state_object.h"
 #include "utils/hash_util.h"
 #include "state_tracker/shader_stage_state.h"
+#include "containers/small_vector.h"
 #include "generated/vk_object_types.h"
-#include "generated/error_location_helper.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
 #include <map>
 #include <set>
@@ -34,7 +34,7 @@ struct DeviceExtensions;
 namespace vvl {
 class Sampler;
 class DescriptorSet;
-class Device;
+class DeviceState;
 class CommandBuffer;
 class ImageView;
 class Buffer;
@@ -53,7 +53,7 @@ static inline bool IsBindless(VkDescriptorBindingFlags flags) {
 
 class DescriptorPool : public StateObject {
   public:
-    DescriptorPool(Device &dev, const VkDescriptorPool handle, const VkDescriptorPoolCreateInfo *pCreateInfo);
+    DescriptorPool(DeviceState &dev, const VkDescriptorPool handle, const VkDescriptorPoolCreateInfo *pCreateInfo);
     ~DescriptorPool() { Destroy(); }
 
     VkDescriptorPool VkHandle() const { return handle_.Cast<VkDescriptorPool>(); };
@@ -100,7 +100,7 @@ class DescriptorPool : public StateObject {
     uint32_t available_sets_;        // Available descriptor sets in this pool
     TypeCountMap available_counts_;  // Available # of descriptors of each type in this pool
     vvl::unordered_map<VkDescriptorSet, vvl::DescriptorSet *> sets_;  // Collection of all sets in this pool
-    Device &dev_data_;
+    DeviceState &dev_data_;
     mutable std::shared_mutex lock_;
     uint32_t freed_count{0};
 };
@@ -172,6 +172,7 @@ class DescriptorSetLayoutDef {
     uint32_t GetTotalDescriptorCount() const { return descriptor_count_; };
     uint32_t GetNonInlineDescriptorCount() const { return non_inline_descriptor_count_; };
     uint32_t GetDynamicDescriptorCount() const { return dynamic_descriptor_count_; };
+    bool HasImmutableSamplers() const { return has_immutable_samplers_; };
     VkDescriptorSetLayoutCreateFlags GetCreateFlags() const { return flags_; }
     // For a given binding, return the number of descriptors in that binding and all successive bindings
     uint32_t GetBindingCount() const { return binding_count_; };
@@ -250,6 +251,8 @@ class DescriptorSetLayoutDef {
     uint32_t non_inline_descriptor_count_;
     uint32_t dynamic_descriptor_count_;
     BindingTypeStats binding_type_stats_;
+
+    bool has_immutable_samplers_;
 };
 
 // Canonical dictionary of DSL definitions -- independent of device or handle
@@ -272,7 +275,7 @@ static inline bool operator==(const DescriptorSetLayoutDef &lhs, const Descripto
         const auto &l = lhs_bindings[i];
         const auto &r = rhs_bindings[i];
         // For things where we are comparing with the bound pipeline, the binding will always be right, but when comparing two
-        // arbitrary layouts (ex. templates, Device Generated Commands, etc) the bindings might be different
+        // arbitrary layouts (ex. templates, DeviceState Generated Commands, etc) the bindings might be different
         if (l.binding != r.binding) {
             return false;
         }
@@ -319,6 +322,7 @@ class DescriptorSetLayout : public StateObject {
     uint32_t GetNonInlineDescriptorCount() const { return layout_id_->GetNonInlineDescriptorCount(); };
     uint32_t GetDynamicDescriptorCount() const { return layout_id_->GetDynamicDescriptorCount(); };
     uint32_t GetBindingCount() const { return layout_id_->GetBindingCount(); };
+    bool HasImmutableSamplers() const { return layout_id_->HasImmutableSamplers(); };
     VkDescriptorSetLayoutCreateFlags GetCreateFlags() const { return layout_id_->GetCreateFlags(); }
     uint32_t GetIndexFromBinding(uint32_t binding) const { return layout_id_->GetIndexFromBinding(binding); }
     // Various Get functions that can either be passed a binding#, which will
@@ -367,14 +371,14 @@ class DescriptorSetLayout : public StateObject {
         return IsVariableDescriptorCountFromIndex(GetIndexFromBinding(binding));
     }
     void SetLayoutSizeInBytes(const VkDeviceSize *layout_size_in_bytes_);
-    const VkDeviceSize *GetLayoutSizeInBytes() const;
+    VkDeviceSize GetLayoutSizeInBytes() const;
 
     using BindingTypeStats = DescriptorSetLayoutDef::BindingTypeStats;
     const BindingTypeStats &GetBindingTypeStats() const { return layout_id_->GetBindingTypeStats(); }
 
   private:
-    DescriptorSetLayoutId layout_id_;
-    std::unique_ptr<VkDeviceSize> layout_size_in_bytes;
+    DescriptorSetLayoutId layout_id_{};
+    VkDeviceSize layout_size_in_bytes_{};
 };
 
 // Slightly broader than type, each c++ "class" will has a corresponding "DescriptorClass"
@@ -405,9 +409,9 @@ class Descriptor {
 
     Descriptor() {}
     virtual ~Descriptor() {}
-    virtual void WriteUpdate(DescriptorSet &set_state, const Device &dev_data, const VkWriteDescriptorSet &, const uint32_t,
+    virtual void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &, const uint32_t,
                              bool is_bindless) = 0;
-    virtual void CopyUpdate(DescriptorSet &set_state, const Device &dev_data, const Descriptor &, bool is_bindless,
+    virtual void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                             VkDescriptorType type) = 0;
     virtual DescriptorClass GetClass() const = 0;
     // Special fast-path check for SamplerDescriptors that are immutable
@@ -435,9 +439,9 @@ class SamplerDescriptor : public Descriptor {
   public:
     SamplerDescriptor() = default;
     DescriptorClass GetClass() const override { return DescriptorClass::PlainSampler; }
-    void WriteUpdate(DescriptorSet &set_state, const Device &dev_data, const VkWriteDescriptorSet &, const uint32_t,
+    void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &, const uint32_t,
                      bool is_bindless) override;
-    void CopyUpdate(DescriptorSet &set_state, const Device &dev_data, const Descriptor &, bool is_bindless,
+    void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override;
     virtual bool IsImmutableSampler() const override { return immutable_; };
     VkSampler GetSampler() const;
@@ -464,9 +468,9 @@ class ImageDescriptor : public Descriptor {
     }
     ImageDescriptor() = default;
     DescriptorClass GetClass() const override { return DescriptorClass::Image; }
-    void WriteUpdate(DescriptorSet &set_state, const Device &dev_data, const VkWriteDescriptorSet &, const uint32_t,
+    void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &, const uint32_t,
                      bool is_bindless) override;
-    void CopyUpdate(DescriptorSet &set_state, const Device &dev_data, const Descriptor &, bool is_bindless,
+    void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override;
     void UpdateImageLayoutDrawState(vvl::CommandBuffer &cb_state) override;
     VkImageView GetImageView() const;
@@ -493,9 +497,9 @@ class ImageSamplerDescriptor : public ImageDescriptor {
   public:
     ImageSamplerDescriptor() = default;
     DescriptorClass GetClass() const override { return DescriptorClass::ImageSampler; }
-    void WriteUpdate(DescriptorSet &set_state, const Device &dev_data, const VkWriteDescriptorSet &, const uint32_t,
+    void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &, const uint32_t,
                      bool is_bindless) override;
-    void CopyUpdate(DescriptorSet &set_state, const Device &dev_data, const Descriptor &, bool is_bindless,
+    void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override;
     virtual bool IsImmutableSampler() const override { return immutable_; };
     VkSampler GetSampler() const;
@@ -517,9 +521,9 @@ class TexelDescriptor : public Descriptor {
   public:
     TexelDescriptor() = default;
     DescriptorClass GetClass() const override { return DescriptorClass::TexelBuffer; }
-    void WriteUpdate(DescriptorSet &set_state, const Device &dev_data, const VkWriteDescriptorSet &, const uint32_t,
+    void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &, const uint32_t,
                      bool is_bindless) override;
-    void CopyUpdate(DescriptorSet &set_state, const Device &dev_data, const Descriptor &, bool is_bindless,
+    void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override;
     VkBufferView GetBufferView() const;
     const vvl::BufferView *GetBufferViewState() const { return buffer_view_state_.get(); }
@@ -538,9 +542,9 @@ class BufferDescriptor : public Descriptor {
   public:
     BufferDescriptor() = default;
     DescriptorClass GetClass() const override { return DescriptorClass::GeneralBuffer; }
-    void WriteUpdate(DescriptorSet &set_state, const Device &dev_data, const VkWriteDescriptorSet &, const uint32_t,
+    void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &, const uint32_t,
                      bool is_bindless) override;
-    void CopyUpdate(DescriptorSet &set_state, const Device &dev_data, const Descriptor &, bool is_bindless,
+    void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override;
     VkBuffer GetBuffer() const;
     const vvl::Buffer *GetBufferState() const { return buffer_state_.get(); }
@@ -564,9 +568,9 @@ class InlineUniformDescriptor : public Descriptor {
   public:
     InlineUniformDescriptor() = default;
     DescriptorClass GetClass() const override { return DescriptorClass::InlineUniform; }
-    void WriteUpdate(DescriptorSet &set_state, const Device &dev_data, const VkWriteDescriptorSet &, const uint32_t,
+    void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &, const uint32_t,
                      bool is_bindless) override {}
-    void CopyUpdate(DescriptorSet &set_state, const Device &dev_data, const Descriptor &, bool is_bindless,
+    void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override {}
 };
 
@@ -574,7 +578,7 @@ class AccelerationStructureDescriptor : public Descriptor {
   public:
     AccelerationStructureDescriptor() = default;
     DescriptorClass GetClass() const override { return DescriptorClass::AccelerationStructure; }
-    void WriteUpdate(DescriptorSet &set_state, const Device &dev_data, const VkWriteDescriptorSet &, const uint32_t,
+    void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &, const uint32_t,
                      bool is_bindless) override;
     VkAccelerationStructureKHR GetAccelerationStructure() const { return acc_; }
     const vvl::AccelerationStructureKHR *GetAccelerationStructureStateKHR() const { return acc_state_.get(); }
@@ -582,7 +586,7 @@ class AccelerationStructureDescriptor : public Descriptor {
     VkAccelerationStructureNV GetAccelerationStructureNV() const { return acc_nv_; }
     const vvl::AccelerationStructureNV *GetAccelerationStructureStateNV() const { return acc_state_nv_.get(); }
     vvl::AccelerationStructureNV *GetAccelerationStructureStateNV() { return acc_state_nv_.get(); }
-    void CopyUpdate(DescriptorSet &set_state, const Device &dev_data, const Descriptor &, bool is_bindless,
+    void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override;
     bool IsKHR() const { return is_khr_; }
 
@@ -602,9 +606,9 @@ class MutableDescriptor : public Descriptor {
   public:
     MutableDescriptor();
     DescriptorClass GetClass() const override { return DescriptorClass::Mutable; }
-    void WriteUpdate(DescriptorSet &set_state, const Device &dev_data, const VkWriteDescriptorSet &, const uint32_t,
+    void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &, const uint32_t,
                      bool is_bindless) override;
-    void CopyUpdate(DescriptorSet &set_state, const Device &dev_data, const Descriptor &, bool is_bindless,
+    void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override;
 
     void SetDescriptorType(VkDescriptorType type, VkDeviceSize buffer_size);
@@ -667,15 +671,14 @@ class MutableDescriptor : public Descriptor {
     std::shared_ptr<vvl::AccelerationStructureNV> acc_state_nv_;
 };
 
-// Structs to contain common elements that need to be shared between Validate* and Perform* calls below
+// We will want to build this map and list of layouts once in order to record in the state tracker at PostCallRecord time.
 struct AllocateDescriptorSetsData {
     std::map<uint32_t, uint32_t> required_descriptors_by_type;
     std::vector<std::shared_ptr<DescriptorSetLayout const>> layout_nodes;
-    void Init(uint32_t);
-    AllocateDescriptorSetsData(){};
 };
+
 // "Perform" does the update with the assumption that ValidateUpdateDescriptorSets() has passed for the given update
-void PerformUpdateDescriptorSets(Device &, uint32_t, const VkWriteDescriptorSet *, uint32_t, const VkCopyDescriptorSet *);
+void PerformUpdateDescriptorSets(DeviceState &, uint32_t, const VkWriteDescriptorSet *, uint32_t, const VkCopyDescriptorSet *);
 
 class DescriptorBinding {
   public:
@@ -761,6 +764,8 @@ class DescriptorBindingImpl : public DescriptorBinding {
         }
     }
 
+    // Most descriptor bindings will only have a single descriptor, so want to assume that
+    // If they don't have 1, we will resize on construction (and never resize again) to the exact size with small_vector
     small_vector<T, 1, uint32_t> descriptors;
 };
 
@@ -779,8 +784,9 @@ struct DecodedTemplateUpdate {
     std::vector<VkWriteDescriptorSetInlineUniformBlock> inline_infos;
     std::vector<VkWriteDescriptorSetAccelerationStructureKHR> inline_infos_khr;
     std::vector<VkWriteDescriptorSetAccelerationStructureNV> inline_infos_nv;
-    DecodedTemplateUpdate(const Device &device_data, VkDescriptorSet descriptorSet, const DescriptorUpdateTemplate *template_state,
-                          const void *pData, VkDescriptorSetLayout push_layout = VK_NULL_HANDLE);
+    DecodedTemplateUpdate(const DeviceState &device_data, VkDescriptorSet descriptorSet,
+                          const DescriptorUpdateTemplate &template_state, const void *pData,
+                          VkDescriptorSetLayout push_layout = VK_NULL_HANDLE);
 };
 
 /*
@@ -801,7 +807,21 @@ struct DecodedTemplateUpdate {
  *   those maps is performed externally. The set class relies on their contents to
  *   be correct at the time of update.
  */
-class DescriptorSet : public StateObject {
+class DescriptorSetSubState {
+  public:
+    DescriptorSetSubState(const DescriptorSet &set_) : base(set_) {}
+    DescriptorSetSubState(const DescriptorSetSubState &) = delete;
+    DescriptorSetSubState &operator=(const DescriptorSetSubState &) = delete;
+
+    virtual ~DescriptorSetSubState() {}
+
+    virtual void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) {}
+    virtual void NotifyUpdate() {}
+
+    const DescriptorSet &base;
+};
+
+class DescriptorSet : public StateObject, public SubStateManager<DescriptorSetSubState> {
   public:
     using BaseClass = StateObject;
     // Given that we are providing placement new allocation for bindings, the deleter needs to *only* call the destructor
@@ -814,9 +834,9 @@ class DescriptorSet : public StateObject {
     using ConstBindingIterator = BindingVector::const_iterator;
 
     DescriptorSet(const VkDescriptorSet handle, vvl::DescriptorPool *, const std::shared_ptr<DescriptorSetLayout const> &,
-                  uint32_t variable_count, Device *state_data);
+                  uint32_t variable_count, DeviceState *state_data);
     void LinkChildNodes() override;
-    void NotifyInvalidate(const NodeList &invalid_nodes, bool unlink) override;
+    void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
     ~DescriptorSet() { Destroy(); }
 
     // A number of common Get* functions that return data based on layout from which this set was created
@@ -830,6 +850,7 @@ class DescriptorSet : public StateObject {
     // Return true if given binding is present in this set
     bool HasBinding(const uint32_t binding) const { return layout_->HasBinding(binding); };
 
+    void NotifyUpdate();
     // Perform a push update whose contents were just validated using ValidatePushDescriptorsUpdate
     virtual void PerformPushDescriptorsUpdate(uint32_t write_count, const VkWriteDescriptorSet *write_descs);
     // Perform a WriteUpdate whose contents were just validated using ValidateWriteUpdate
@@ -841,7 +862,7 @@ class DescriptorSet : public StateObject {
     VkDescriptorSet VkHandle() const { return handle_.Cast<VkDescriptorSet>(); };
     // Bind given cmd_buffer to this descriptor set and
     // update CB image layout map with image/imagesampler descriptor image layouts
-    void UpdateImageLayoutDrawStates(Device *, vvl::CommandBuffer &cb_state, const BindingVariableMap &);
+    void UpdateImageLayoutDrawStates(DeviceState *, vvl::CommandBuffer &cb_state, const BindingVariableMap &);
 
     // For a particular binding, get the global index
     const IndexRange GetGlobalIndexRangeFromBinding(const uint32_t binding, bool actual_length = false) const {
@@ -906,6 +927,8 @@ class DescriptorSet : public StateObject {
     // The caller has to ensure that binding has dynamic descriptor type.
     uint32_t GetDynamicOffsetIndexFromBinding(uint32_t dynamic_binding) const;
 
+    std::pair<uint32_t, uint32_t> GetBindingAndIndex(const uint32_t global_descriptor_index) const;
+
     uint64_t GetChangeCount() const { return change_count_; }
 
     const std::vector<vku::safe_VkWriteDescriptorSet> &GetWrites() const { return push_descriptor_set_writes; }
@@ -922,20 +945,52 @@ class DescriptorSet : public StateObject {
         DescriptorIterator &operator=(const DescriptorIterator &rhs) = default;
 
         DescriptorIterator(DescriptorSet &descriptor_set, uint32_t binding, uint32_t index = 0)
-            : iter_(descriptor_set.FindBinding(binding)), end_(descriptor_set.end()), index_(index) {
-            if (!AtEnd()) {
-                assert(index_ < (*iter_)->count);
+            : iter_(descriptor_set.FindBinding(binding)), end_(descriptor_set.end()), index_(0) {
+            if (index < (*iter_)->count) {
+                index_ = index;
+            } else {
+                // This is a consecutive binding updates and need to find first used binding
+                // This is the "rare" case where people set `dstArrayElement` to skip to next binding after `dstBinding`
+                for (uint32_t i = 0; i < index; i++) {
+                    if (AtEnd()) {
+                        break;  // caller will handle invalid case
+                    }
+                    index_++;
+                    if (index_ >= (*iter_)->count) {
+                        index_ = 0;
+                        do {
+                            ++iter_;
+                        } while (!AtEnd() && (*iter_)->count == 0);
+                    }
+                }
             }
         }
 
         DescriptorIterator(const DescriptorSet &descriptor_set, uint32_t binding, uint32_t index = 0)
-            : iter_(descriptor_set.FindBinding(binding)), end_(descriptor_set.end()), index_(index) {
-            if (!AtEnd()) {
-                assert(index_ < (*iter_)->count);
+            : iter_(descriptor_set.FindBinding(binding)), end_(descriptor_set.end()), index_(0) {
+            if (index < (*iter_)->count) {
+                index_ = index;
+            } else {
+                // This is a consecutive binding updates and need to find first used binding
+                // This is the "rare" case where people set `dstArrayElement` to skip to next binding after `dstBinding`
+                for (uint32_t i = 0; i < index; i++) {
+                    if (AtEnd()) {
+                        break;  // caller will handle invalid case
+                    }
+                    index_++;
+                    if (index_ >= (*iter_)->count) {
+                        index_ = 0;
+                        do {
+                            ++iter_;
+                        } while (!AtEnd() && (*iter_)->count == 0);
+                    }
+                }
             }
         }
 
         bool AtEnd() const { return iter_ == end_; }
+
+        bool IsValid() const { return !AtEnd() && *iter_ && index_ < (*iter_)->count; }
 
         bool operator==(const DescriptorIterator &rhs) { return (iter_ == rhs.iter_) && (index_ == rhs.index_); }
 
@@ -995,7 +1050,7 @@ class DescriptorSet : public StateObject {
         return DescriptorIterator<ConstBindingIterator>(*this, binding, index);
     }
 
-    bool ValidateBindingOnGPU(const DescriptorBinding &binding, bool is_runtime_descriptor_array) const;
+    bool ValidateBindingOnGPU(const DescriptorBinding &binding, const spirv::ResourceInterfaceVariable &variable) const;
 
   protected:
     union AnyBinding {
@@ -1027,7 +1082,7 @@ class DescriptorSet : public StateObject {
     // "Destructors for nonstatic member objects are called in the reverse order in which they appear in the class declaration."
     std::vector<BindingBackingStore> bindings_store_;
     std::vector<BindingPtr> bindings_;
-    Device *state_data_;
+    DeviceState *state_data_;
     uint32_t variable_count_;
     std::atomic<uint64_t> change_count_;
 

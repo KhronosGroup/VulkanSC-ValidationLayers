@@ -31,22 +31,22 @@ TEST_F(NegativeBuffer, UpdateBufferAlignment) {
     m_command_buffer.Begin();
     // Introduce failure by using dstOffset that is not a multiple of 4
     m_errorMonitor->SetDesiredError(" is not a multiple of 4");
-    vk::CmdUpdateBuffer(m_command_buffer.handle(), buffer.handle(), 1, 4, updateData);
+    vk::CmdUpdateBuffer(m_command_buffer, buffer, 1, 4, updateData);
     m_errorMonitor->VerifyFound();
 
     // Introduce failure by using dataSize that is not a multiple of 4
     m_errorMonitor->SetDesiredError(" is not a multiple of 4");
-    vk::CmdUpdateBuffer(m_command_buffer.handle(), buffer.handle(), 0, 6, updateData);
+    vk::CmdUpdateBuffer(m_command_buffer, buffer, 0, 6, updateData);
     m_errorMonitor->VerifyFound();
 
     // Introduce failure by using dataSize that is < 0
     m_errorMonitor->SetDesiredError("must be greater than zero and less than or equal to 65536");
-    vk::CmdUpdateBuffer(m_command_buffer.handle(), buffer.handle(), 0, (VkDeviceSize)-44, updateData);
+    vk::CmdUpdateBuffer(m_command_buffer, buffer, 0, (VkDeviceSize)-44, updateData);
     m_errorMonitor->VerifyFound();
 
     // Introduce failure by using dataSize that is > 65536
     m_errorMonitor->SetDesiredError("must be greater than zero and less than or equal to 65536");
-    vk::CmdUpdateBuffer(m_command_buffer.handle(), buffer.handle(), 0, (VkDeviceSize)80000, updateData);
+    vk::CmdUpdateBuffer(m_command_buffer, buffer, 0, (VkDeviceSize)80000, updateData);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -61,27 +61,27 @@ TEST_F(NegativeBuffer, FillBufferAlignmentAndSize) {
 
     // Introduce failure by using dstOffset greater than bufferSize
     m_errorMonitor->SetDesiredError("VUID-vkCmdFillBuffer-dstOffset-00024");
-    vk::CmdFillBuffer(m_command_buffer.handle(), buffer.handle(), 40, 4, 0x11111111);
+    vk::CmdFillBuffer(m_command_buffer, buffer, 40, 4, 0x11111111);
     m_errorMonitor->VerifyFound();
 
     // Introduce failure by using size <= buffersize minus dstoffset
     m_errorMonitor->SetDesiredError("VUID-vkCmdFillBuffer-size-00027");
-    vk::CmdFillBuffer(m_command_buffer.handle(), buffer.handle(), 16, 12, 0x11111111);
+    vk::CmdFillBuffer(m_command_buffer, buffer, 16, 12, 0x11111111);
     m_errorMonitor->VerifyFound();
 
     // Introduce failure by using dstOffset that is not a multiple of 4
     m_errorMonitor->SetDesiredError(" is not a multiple of 4");
-    vk::CmdFillBuffer(m_command_buffer.handle(), buffer.handle(), 1, 4, 0x11111111);
+    vk::CmdFillBuffer(m_command_buffer, buffer, 1, 4, 0x11111111);
     m_errorMonitor->VerifyFound();
 
     // Introduce failure by using size that is not a multiple of 4
     m_errorMonitor->SetDesiredError(" is not a multiple of 4");
-    vk::CmdFillBuffer(m_command_buffer.handle(), buffer.handle(), 0, 6, 0x11111111);
+    vk::CmdFillBuffer(m_command_buffer, buffer, 0, 6, 0x11111111);
     m_errorMonitor->VerifyFound();
 
     // Introduce failure by using size that is zero
     m_errorMonitor->SetDesiredError("must be greater than zero");
-    vk::CmdFillBuffer(m_command_buffer.handle(), buffer.handle(), 0, 0, 0x11111111);
+    vk::CmdFillBuffer(m_command_buffer, buffer, 0, 0, 0x11111111);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -102,7 +102,7 @@ TEST_F(NegativeBuffer, BufferViewObject) {
     {
         vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
         VkBufferViewCreateInfo bvci = vku::InitStructHelper();
-        bvci.buffer = buffer.handle();
+        bvci.buffer = buffer;
         bvci.format = VK_FORMAT_R32_SFLOAT;
         bvci.range = VK_WHOLE_SIZE;
 
@@ -149,7 +149,6 @@ TEST_F(NegativeBuffer, CreateBufferViewNoMemoryBoundToBuffer) {
 TEST_F(NegativeBuffer, BufferViewCreateInfoEntries) {
     TEST_DESCRIPTION("Attempt to create a buffer view with invalid create info.");
     RETURN_IF_SKIP(Init());
-
     const VkPhysicalDeviceLimits &dev_limits = m_device->Physical().limits_;
     const VkDeviceSize minTexelBufferOffsetAlignment = dev_limits.minTexelBufferOffsetAlignment;
     if (minTexelBufferOffsetAlignment == 1) {
@@ -157,27 +156,26 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoEntries) {
     }
 
     const VkFormat format_with_uniform_texel_support = VK_FORMAT_R8G8B8A8_UNORM;
-    VkFormatProperties format_properties;
-    vk::GetPhysicalDeviceFormatProperties(Gpu(), format_with_uniform_texel_support, &format_properties);
-    if (!(format_properties.bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)) {
+    if (!BufferFormatAndFeaturesSupported(Gpu(), format_with_uniform_texel_support, VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)) {
         GTEST_SKIP() << "Test requires support for VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT";
     }
 
     // Create a test buffer--buffer must have been created using VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT or
     // VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, so use a different usage value instead to cause an error
-    vkt::Buffer bad_buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    const uint32_t buffer_size = 1024;
+    vkt::Buffer bad_buffer(*m_device, buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
     VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
-    buff_view_ci.buffer = bad_buffer.handle();
+    buff_view_ci.buffer = bad_buffer;
     buff_view_ci.format = format_with_uniform_texel_support;
     buff_view_ci.range = VK_WHOLE_SIZE;
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-buffer-00932");
 
-    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
+    vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 
     // Offset must be less than the size of the buffer, so set it equal to the buffer size to cause an error
-    buff_view_ci.buffer = buffer.handle();
-    buff_view_ci.offset = buffer.CreateInfo().size;
+    buff_view_ci.buffer = buffer;
+    buff_view_ci.offset = buffer_size;
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-00925");
 
     // Offset must be a multiple of VkPhysicalDeviceLimits::minTexelBufferOffsetAlignment so add 1 to ensure it is not
@@ -198,7 +196,10 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoEntries) {
     // Twice the element size of format multiplied by VkPhysicalDeviceLimits::maxTexelBufferElements guarantees range divided by the
     // element size is greater than maxTexelBufferElements, causing failure
     buff_view_ci.range = 2 * static_cast<VkDeviceSize>(format_size) * static_cast<VkDeviceSize>(dev_limits.maxTexelBufferElements);
-    m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-range-00930");
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-range-00930");
+
+    buff_view_ci.offset = minTexelBufferOffsetAlignment;
+    buff_view_ci.range = buffer_size;
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-00931");
 }
 
@@ -223,7 +224,7 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoFeatures) {
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
     VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
-    buff_view_ci.buffer = buffer.handle();
+    buff_view_ci.buffer = buffer;
     buff_view_ci.format = format_without_texel_support;
     buff_view_ci.range = VK_WHOLE_SIZE;
 
@@ -231,7 +232,7 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoFeatures) {
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-format-08778");
 
     vkt::Buffer storage_buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
-    buff_view_ci.buffer = storage_buffer.handle();
+    buff_view_ci.buffer = storage_buffer;
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-format-08779");
 }
 
@@ -249,9 +250,7 @@ TEST_F(NegativeBuffer, BufferViewMaxTexelBufferElements) {
     }
 
     const VkFormat format_with_uniform_texel_support = VK_FORMAT_R8G8B8A8_UNORM;
-    VkFormatProperties format_properties;
-    vk::GetPhysicalDeviceFormatProperties(Gpu(), format_with_uniform_texel_support, &format_properties);
-    if (!(format_properties.bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)) {
+    if (!BufferFormatAndFeaturesSupported(Gpu(), format_with_uniform_texel_support, VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)) {
         GTEST_SKIP() << "Test requires support for VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT";
     }
 
@@ -285,10 +284,7 @@ TEST_F(NegativeBuffer, TexelBufferAlignmentIn12) {
     if (minTexelBufferOffsetAlignment == 1) {
         GTEST_SKIP() << "Test requires minTexelOffsetAlignment to not be equal to 1";
     }
-
-    VkFormatProperties format_properties;
-    vk::GetPhysicalDeviceFormatProperties(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &format_properties);
-    if (!(format_properties.bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)) {
+    if (!BufferFormatAndFeaturesSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)) {
         GTEST_SKIP() << "Test requires support for VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT";
     }
 
@@ -297,7 +293,7 @@ TEST_F(NegativeBuffer, TexelBufferAlignmentIn12) {
     VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
     buff_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     buff_view_ci.range = VK_WHOLE_SIZE;
-    buff_view_ci.buffer = buffer.handle();
+    buff_view_ci.buffer = buffer;
     buff_view_ci.offset = minTexelBufferOffsetAlignment + 1;
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-02749");
 }
@@ -315,7 +311,7 @@ TEST_F(NegativeBuffer, TexelBufferAlignment) {
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
 
     VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
-    buff_view_ci.buffer = buffer.handle();
+    buff_view_ci.buffer = buffer;
     buff_view_ci.format = format_with_uniform_texel_support;
     buff_view_ci.range = VK_WHOLE_SIZE;
 
@@ -348,7 +344,7 @@ TEST_F(NegativeBuffer, TexelBufferAlignment) {
         vkt::Buffer buffer2(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 
         // Create a test buffer view
-        buff_view_ci.buffer = buffer2.handle();
+        buff_view_ci.buffer = buffer2;
 
         buff_view_ci.format = VK_FORMAT_R32G32B32_SFLOAT;
         buff_view_ci.offset = 1;
@@ -381,7 +377,7 @@ TEST_F(NegativeBuffer, FillBufferWithinRenderPass) {
     VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
     vkt::Buffer dst_buffer(*m_device, 1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT, reqs);
-    vk::CmdFillBuffer(m_command_buffer.handle(), dst_buffer.handle(), 0, 4, 0x11111111);
+    vk::CmdFillBuffer(m_command_buffer, dst_buffer, 0, 4, 0x11111111);
 
     m_errorMonitor->VerifyFound();
 
@@ -404,7 +400,7 @@ TEST_F(NegativeBuffer, UpdateBufferWithinRenderPass) {
     VkDeviceSize dstOffset = 0;
     uint32_t Data[] = {1, 2, 3, 4, 5, 6, 7, 8};
     VkDeviceSize dataSize = sizeof(Data) / sizeof(uint32_t);
-    vk::CmdUpdateBuffer(m_command_buffer.handle(), dst_buffer.handle(), dstOffset, dataSize, &Data);
+    vk::CmdUpdateBuffer(m_command_buffer, dst_buffer, dstOffset, dataSize, &Data);
 
     m_errorMonitor->VerifyFound();
 
@@ -418,7 +414,7 @@ TEST_F(NegativeBuffer, IdxBufferAlignmentError) {
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-offset-08783");
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), 7, VK_INDEX_TYPE_UINT16);
+    vk::CmdBindIndexBuffer(m_command_buffer, buffer, 7, VK_INDEX_TYPE_UINT16);
     m_errorMonitor->VerifyFound();
 }
 
@@ -466,18 +462,18 @@ TEST_F(NegativeBuffer, VertexBufferOffset) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers-pOffsets-00626");
     // Offset at the end of the buffer
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 1, 1, &vbo.handle(), &vbo_size);
+    vk::CmdBindVertexBuffers(m_command_buffer, 1, 1, &vbo.handle(), &vbo_size);
     m_errorMonitor->VerifyFound();
 
     // firstBinding set over limit
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers-firstBinding-00624");
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), maxVertexInputBindings + 1, 1, &vbo.handle(), &kZeroDeviceSize);
+    vk::CmdBindVertexBuffers(m_command_buffer, maxVertexInputBindings + 1, 1, &vbo.handle(), &kZeroDeviceSize);
     m_errorMonitor->VerifyFound();
 
     // sum of firstBinding and bindingCount set over limit
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers-firstBinding-00625");
     // bindingCount of 1 puts it over limit
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), maxVertexInputBindings, 1, &vbo.handle(), &kZeroDeviceSize);
+    vk::CmdBindVertexBuffers(m_command_buffer, maxVertexInputBindings, 1, &vbo.handle(), &kZeroDeviceSize);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -497,17 +493,17 @@ TEST_F(NegativeBuffer, IndexBufferOffset) {
 
     // Set offset over buffer size
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-offset-08782");
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), buffer_size + 4, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer(m_command_buffer, buffer, buffer_size + 4, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
     // Set offset to be misaligned with index buffer UINT32 type
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-offset-08783");
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), 1, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer(m_command_buffer, buffer, 1, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
     // Test for missing pNext struct for index buffer UINT8 type
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-indexType-08787");
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), 1, VK_INDEX_TYPE_UINT8);
+    vk::CmdBindIndexBuffer(m_command_buffer, buffer, 1, VK_INDEX_TYPE_UINT8);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -530,17 +526,17 @@ TEST_F(NegativeBuffer, IndexBuffer2Offset) {
 
     // Set offset over buffer size
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-offset-08782");
-    vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), buffer_size + 4, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer2KHR(m_command_buffer, buffer, buffer_size + 4, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
     // Set offset to be misaligned with index buffer UINT32 type
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-offset-08783");
-    vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 1, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer2KHR(m_command_buffer, buffer, 1, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
     // Test for missing pNext struct for index buffer UINT8 type
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-indexType-08787");
-    vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 1, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT8);
+    vk::CmdBindIndexBuffer2KHR(m_command_buffer, buffer, 1, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT8);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -558,16 +554,16 @@ TEST_F(NegativeBuffer, IndexBuffer2Size) {
     const uint32_t buffer_size = 32;
     vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     VkMemoryRequirements mem_reqs;
-    vk::GetBufferMemoryRequirements(device(), buffer.handle(), &mem_reqs);
+    vk::GetBufferMemoryRequirements(device(), buffer, &mem_reqs);
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-size-08767");
-    vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 4, 6, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer2KHR(m_command_buffer, buffer, 4, 6, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer2-size-08768");
-    vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 4, buffer_size, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer2KHR(m_command_buffer, buffer, 4, buffer_size, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -581,7 +577,7 @@ TEST_F(NegativeBuffer, IndexBufferNull) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-None-09493");
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), VK_NULL_HANDLE, 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer(m_command_buffer, VK_NULL_HANDLE, 0, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 }
 
@@ -595,7 +591,7 @@ TEST_F(NegativeBuffer, IndexBufferNullOffset) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-buffer-09494");
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), VK_NULL_HANDLE, 4, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer(m_command_buffer, VK_NULL_HANDLE, 4, VK_INDEX_TYPE_UINT32);
     m_errorMonitor->VerifyFound();
 }
 
@@ -614,7 +610,7 @@ TEST_F(NegativeBuffer, BufferUsageFlags2) {
     VkBufferViewCreateInfo buffer_view_ci = vku::InitStructHelper(&buffer_usage_flags);
     buffer_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     buffer_view_ci.range = VK_WHOLE_SIZE;
-    buffer_view_ci.buffer = buffer.handle();
+    buffer_view_ci.buffer = buffer;
     CreateBufferViewTest(buffer_view_ci, "VUID-VkBufferViewCreateInfo-pNext-08780");
 }
 
@@ -646,7 +642,7 @@ TEST_F(NegativeBuffer, BufferUsageFlags2Subset) {
     VkBufferViewCreateInfo buffer_view_ci = vku::InitStructHelper(&buffer_usage_flags);
     buffer_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     buffer_view_ci.range = VK_WHOLE_SIZE;
-    buffer_view_ci.buffer = buffer.handle();
+    buffer_view_ci.buffer = buffer;
     CreateBufferViewTest(buffer_view_ci, "VUID-VkBufferViewCreateInfo-pNext-08781");
 }
 
@@ -703,7 +699,7 @@ TEST_F(NegativeBuffer, FillBufferCmdPoolUnsupported) {
     vkt::Buffer buffer(*m_device, 20, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
     cb.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdFillBuffer-apiVersion-07894");
-    vk::CmdFillBuffer(cb.handle(), buffer.handle(), 0, 12, 0x11111111);
+    vk::CmdFillBuffer(cb, buffer, 0, 12, 0x11111111);
     m_errorMonitor->VerifyFound();
     cb.End();
 }
@@ -715,11 +711,11 @@ TEST_F(NegativeBuffer, ConditionalRenderingBufferUsage) {
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
     VkConditionalRenderingBeginInfoEXT conditional_rendering_begin = vku::InitStructHelper();
-    conditional_rendering_begin.buffer = buffer.handle();
+    conditional_rendering_begin.buffer = buffer;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkConditionalRenderingBeginInfoEXT-buffer-01982");
-    vk::CmdBeginConditionalRenderingEXT(m_command_buffer.handle(), &conditional_rendering_begin);
+    vk::CmdBeginConditionalRenderingEXT(m_command_buffer, &conditional_rendering_begin);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -733,18 +729,18 @@ TEST_F(NegativeBuffer, ConditionalRenderingOffset) {
     vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT);
 
     VkConditionalRenderingBeginInfoEXT conditional_rendering_begin = vku::InitStructHelper();
-    conditional_rendering_begin.buffer = buffer.handle();
+    conditional_rendering_begin.buffer = buffer;
     conditional_rendering_begin.offset = 3;
 
     m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkConditionalRenderingBeginInfoEXT-offset-01984");
-    vk::CmdBeginConditionalRenderingEXT(m_command_buffer.handle(), &conditional_rendering_begin);
+    vk::CmdBeginConditionalRenderingEXT(m_command_buffer, &conditional_rendering_begin);
     m_errorMonitor->VerifyFound();
 
     conditional_rendering_begin.offset = buffer_size;
     m_errorMonitor->SetDesiredError("VUID-VkConditionalRenderingBeginInfoEXT-offset-01983");
-    vk::CmdBeginConditionalRenderingEXT(m_command_buffer.handle(), &conditional_rendering_begin);
+    vk::CmdBeginConditionalRenderingEXT(m_command_buffer, &conditional_rendering_begin);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -757,14 +753,14 @@ TEST_F(NegativeBuffer, BeginConditionalRendering) {
     vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT);
 
     VkConditionalRenderingBeginInfoEXT conditional_rendering_begin = vku::InitStructHelper();
-    conditional_rendering_begin.buffer = buffer.handle();
+    conditional_rendering_begin.buffer = buffer;
 
     m_command_buffer.Begin();
-    vk::CmdBeginConditionalRenderingEXT(m_command_buffer.handle(), &conditional_rendering_begin);
+    vk::CmdBeginConditionalRenderingEXT(m_command_buffer, &conditional_rendering_begin);
     m_errorMonitor->SetDesiredError("VUID-vkCmdBeginConditionalRenderingEXT-None-01980");
-    vk::CmdBeginConditionalRenderingEXT(m_command_buffer.handle(), &conditional_rendering_begin);
+    vk::CmdBeginConditionalRenderingEXT(m_command_buffer, &conditional_rendering_begin);
     m_errorMonitor->VerifyFound();
-    vk::CmdEndConditionalRenderingEXT(m_command_buffer.handle());
+    vk::CmdEndConditionalRenderingEXT(m_command_buffer);
     m_command_buffer.End();
 }
 
@@ -821,7 +817,7 @@ TEST_F(NegativeBuffer, BindIdxBufferWithoutMemory) {
     m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-buffer-08785");
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), 0u, VK_INDEX_TYPE_UINT16);
+    vk::CmdBindIndexBuffer(m_command_buffer, buffer, 0u, VK_INDEX_TYPE_UINT16);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -840,7 +836,7 @@ TEST_F(NegativeBuffer, IdxBufferInvalidType) {
     m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-indexType-08786");
-    vk::CmdBindIndexBuffer(m_command_buffer.handle(), buffer.handle(), 0u, VK_INDEX_TYPE_NONE_KHR);
+    vk::CmdBindIndexBuffer(m_command_buffer, buffer, 0u, VK_INDEX_TYPE_NONE_KHR);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -858,7 +854,7 @@ TEST_F(NegativeBuffer, BindVertexBufferWithoutMemory) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers-pBuffers-00628");
     VkDeviceSize offset = 0u;
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0u, 1u, &buffer.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0u, 1u, &buffer.handle(), &offset);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -879,7 +875,7 @@ TEST_F(NegativeBuffer, BindVertexBuffer2WithoutMemory) {
     VkDeviceSize offset = 0u;
     VkDeviceSize size = buff_ci.size;
     VkDeviceSize stride = 4u;
-    vk::CmdBindVertexBuffers2(m_command_buffer.handle(), 0u, 1u, &buffer.handle(), &offset, &size, &stride);
+    vk::CmdBindVertexBuffers2(m_command_buffer, 0u, 1u, &buffer.handle(), &offset, &size, &stride);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -898,7 +894,7 @@ TEST_F(NegativeBuffer, BindNullVertexBufferWithOffset) {
     VkDeviceSize offset = 4u;
     VkDeviceSize size = 4u;
     VkDeviceSize stride = 4u;
-    vk::CmdBindVertexBuffers2(m_command_buffer.handle(), 0u, 1u, &buffer, &offset, &size, &stride);
+    vk::CmdBindVertexBuffers2(m_command_buffer, 0u, 1u, &buffer, &offset, &size, &stride);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();

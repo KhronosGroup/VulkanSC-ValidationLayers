@@ -28,27 +28,15 @@ struct ShaderObject;
 }  // namespace chassis
 
 namespace gpuav {
-class Buffer;
-class BufferView;
-class CommandBuffer;
-class ImageView;
-class Queue;
-class Sampler;
-class DescriptorSet;
+class CommandBufferSubState;
+class DescriptorSetSubState;
+class QueueSubState;
 }  // namespace gpuav
-
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkBuffer, gpuav::Buffer, vvl::Buffer)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkBufferView, gpuav::BufferView, vvl::BufferView)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandBuffer, gpuav::CommandBuffer, vvl::CommandBuffer)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkDescriptorSet, gpuav::DescriptorSet, vvl::DescriptorSet)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkImageView, gpuav::ImageView, vvl::ImageView)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkSampler, gpuav::Sampler, vvl::Sampler)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkQueue, gpuav::Queue, vvl::Queue)
 
 namespace gpuav {
 
-class Instance : public vvl::Instance {
-    using BaseClass = vvl::Instance;
+class Instance : public vvl::InstanceProxy {
+    using BaseClass = vvl::InstanceProxy;
 
   public:
     Instance(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch, LayerObjectTypeGpuAssisted) {}
@@ -63,6 +51,7 @@ class Instance : public vvl::Instance {
     void PostCallRecordGetPhysicalDeviceProperties2(VkPhysicalDevice physicalDevice,
                                                     VkPhysicalDeviceProperties2* pPhysicalDeviceProperties2,
                                                     const RecordObject& record_obj) final;
+
     void InternalWarning(LogObjectList objlist, const Location& loc, const char* const specific_message) const;
     void AddFeatures(VkPhysicalDevice physical_device, vku::safe_VkDeviceCreateInfo* modified_create_info, const Location& loc);
     bool timeline_khr_{false};
@@ -81,34 +70,13 @@ class Validator : public GpuShaderInstrumentor {
     // gpuav_setup.cpp
     // -------------
   public:
-    std::shared_ptr<vvl::Buffer> CreateBufferState(VkBuffer handle, const VkBufferCreateInfo* create_info) final;
-    std::shared_ptr<vvl::BufferView> CreateBufferViewState(const std::shared_ptr<vvl::Buffer>& buffer, VkBufferView handle,
-                                                           const VkBufferViewCreateInfo* create_info,
-                                                           VkFormatFeatureFlags2 format_features) final;
-    std::shared_ptr<vvl::ImageView> CreateImageViewState(const std::shared_ptr<vvl::Image>& image_state, VkImageView handle,
-                                                         const VkImageViewCreateInfo* create_info,
-                                                         VkFormatFeatureFlags2 format_features,
-                                                         const VkFilterCubicImageViewImageFormatPropertiesEXT& cubic_props) final;
-    std::shared_ptr<vvl::Sampler> CreateSamplerState(VkSampler handle, const VkSamplerCreateInfo* create_info) final;
-    std::shared_ptr<vvl::AccelerationStructureKHR> CreateAccelerationStructureState(
-        VkAccelerationStructureKHR handle, const VkAccelerationStructureCreateInfoKHR* create_info,
-        std::shared_ptr<vvl::Buffer>&& buf_state) final;
-    std::shared_ptr<vvl::CommandBuffer> CreateCmdBufferState(VkCommandBuffer handle,
-                                                             const VkCommandBufferAllocateInfo* allocate_info,
-                                                             const vvl::CommandPool* pool) final;
-    std::shared_ptr<vvl::DescriptorSet> CreateDescriptorSet(VkDescriptorSet handle, vvl::DescriptorPool* pool,
-                                                            const std::shared_ptr<vvl::DescriptorSetLayout const>& layout,
-                                                            uint32_t variable_count) final;
-    std::shared_ptr<vvl::Queue> CreateQueue(VkQueue handle, uint32_t family_index, uint32_t queue_index,
-                                            VkDeviceQueueCreateFlags flags,
-                                            const VkQueueFamilyProperties& queueFamilyProperties) override;
-
     void FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) final;
 
-    void InternalVmaError(LogObjectList objlist, const Location& loc, const char* const specific_message) const;
+    void InternalVmaError(LogObjectList objlist, VkResult result, const char* const specific_message) const;
 
   private:
     void InitSettings(const Location& loc);
+    void DestroySubstate();
 
     // gpuav_record.cpp
     // --------------
@@ -116,26 +84,8 @@ class Validator : public GpuShaderInstrumentor {
     void PreCallRecordDestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) final;
     void PreCallRecordCreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
                                    VkBuffer* pBuffer, const RecordObject& record_obj, chassis::CreateBuffer& chassis_state) final;
-    void PreCallRecordDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator,
-                                        const RecordObject& record_obj) final;
-
-    void RecordCmdBeginRenderPassLayouts(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
-                                         const VkSubpassContents contents);
-    void RecordCmdEndRenderPassLayouts(vvl::CommandBuffer& cb_state);
-    void PreCallRecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
-                                         VkSubpassContents contents, const RecordObject&) final;
-    void PreCallRecordCmdBeginRenderPass2KHR(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
-                                             const VkSubpassBeginInfo* pSubpassBeginInfo, const RecordObject&) final;
-    void PreCallRecordCmdBeginRenderPass2(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
-                                          const VkSubpassBeginInfo* pSubpassBeginInfo, const RecordObject&) final;
-
-    void RecordCmdNextSubpassLayouts(vvl::CommandBuffer& cb_state, VkSubpassContents contents);
-    void PostCallRecordCmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents,
-                                      const RecordObject& record_obj) final;
-    void PostCallRecordCmdNextSubpass2KHR(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo* pSubpassBeginInfo,
-                                          const VkSubpassEndInfo* pSubpassEndInfo, const RecordObject& record_obj) final;
-    void PostCallRecordCmdNextSubpass2(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo* pSubpassBeginInfo,
-                                       const VkSubpassEndInfo* pSubpassEndInfo, const RecordObject& record_obj) final;
+    void PreCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
+                                         const RecordObject& record_obj) final;
 
     void PostCallRecordCmdEndRenderPass(VkCommandBuffer commandBuffer, const RecordObject& record_obj) final;
     void PostCallRecordCmdEndRenderPass2KHR(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
@@ -144,8 +94,6 @@ class Validator : public GpuShaderInstrumentor {
                                          const RecordObject& record_obj) final;
     void PostCallRecordCmdEndRendering(VkCommandBuffer commandBuffer, const RecordObject& record_obj) final;
     void PostCallRecordCmdEndRenderingKHR(VkCommandBuffer commandBuffer, const RecordObject& record_obj) final;
-    void PostCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline,
-                                       const RecordObject& record_obj) final;
     void PostCallRecordCmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
                                               const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo,
                                               const RecordObject& record_obj) final;
@@ -167,6 +115,19 @@ class Validator : public GpuShaderInstrumentor {
     void PreCallRecordCmdPushDescriptorSet2KHR(VkCommandBuffer commandBuffer,
                                                const VkPushDescriptorSetInfoKHR* pPushDescriptorSetInfo,
                                                const RecordObject& record_obj) final;
+    void PreCallRecordCmdPushDescriptorSetWithTemplate2(
+        VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfoKHR* pPushDescriptorSetWithTemplateInfo,
+        const RecordObject& record_obj) final;
+    void PreCallRecordCmdPushDescriptorSetWithTemplate2KHR(
+        VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfoKHR* pPushDescriptorSetWithTemplateInfo,
+        const RecordObject& record_obj) final;
+    void PreCallRecordCmdPushDescriptorSetWithTemplate(VkCommandBuffer commandBuffer,
+                                                       VkDescriptorUpdateTemplate descriptorUpdateTemplate, VkPipelineLayout layout,
+                                                       uint32_t set, const void* pData, const RecordObject& record_obj) final;
+    void PreCallRecordCmdPushDescriptorSetWithTemplateKHR(VkCommandBuffer commandBuffer,
+                                                          VkDescriptorUpdateTemplate descriptorUpdateTemplate,
+                                                          VkPipelineLayout layout, uint32_t set, const void* pData,
+                                                          const RecordObject& record_obj) final;
     void PreCallRecordCmdBindDescriptorBuffersEXT(VkCommandBuffer commandBuffer, uint32_t bufferCount,
                                                   const VkDescriptorBufferBindingInfoEXT* pBindingInfos,
                                                   const RecordObject& record_obj) final;
@@ -177,6 +138,12 @@ class Validator : public GpuShaderInstrumentor {
         VkCommandBuffer commandBuffer,
         const VkBindDescriptorBufferEmbeddedSamplersInfoEXT* pBindDescriptorBufferEmbeddedSamplersInfo,
         const RecordObject& record_obj) final;
+
+    void PreCallActionCommand(Validator& gpuav, CommandBufferSubState& cb_state, VkPipelineBindPoint bind_point,
+                              const Location& loc);
+    void PostCallActionCommand(Validator& gpuav, CommandBufferSubState& cb_state, VkPipelineBindPoint bind_point,
+                               const Location& loc);
+
     void PreCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                               uint32_t firstInstance, const RecordObject& record_obj) final;
     void PostCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
@@ -336,47 +303,6 @@ class Validator : public GpuShaderInstrumentor {
     void PostCallRecordCmdExecuteGeneratedCommandsEXT(VkCommandBuffer commandBuffer, VkBool32 isPreprocessed,
                                                       const VkGeneratedCommandsInfoEXT* pGeneratedCommandsInfo,
                                                       const RecordObject& record_obj) final;
-
-    // gpuav_image_layout.cpp
-    // --------------------
-
-    void PostCallRecordCreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
-                                   VkImage* pImage, const RecordObject& record_obj) final;
-    void PreCallRecordDestroyImage(VkDevice device, VkImage image, const VkAllocationCallbacks* pAllocator,
-                                   const RecordObject&) final;
-
-    void PreCallRecordCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                         const VkClearColorValue* pColor, uint32_t rangeCount,
-                                         const VkImageSubresourceRange* pRanges, const RecordObject&) final;
-    void PreCallRecordCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                                const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount,
-                                                const VkImageSubresourceRange* pRanges, const RecordObject&) final;
-    void PreCallRecordCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
-                                          const VkClearAttachment* pAttachments, uint32_t rectCount, const VkClearRect* pRects,
-                                          const RecordObject&) final;
-    void PostCallRecordTransitionImageLayout(VkDevice device, uint32_t transitionCount,
-                                             const VkHostImageLayoutTransitionInfo* pTransitions,
-                                             const RecordObject& record_obj) final;
-    void PostCallRecordTransitionImageLayoutEXT(VkDevice device, uint32_t transitionCount,
-                                                const VkHostImageLayoutTransitionInfoEXT* pTransitions,
-                                                const RecordObject& record_obj) final;
-    void PreCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage,
-                                   VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageCopy* pRegions,
-                                   const RecordObject&) final;
-    void PreCallRecordCmdCopyImage2KHR(VkCommandBuffer commandBuffer, const VkCopyImageInfo2KHR* pCopyImageInfo,
-                                       const RecordObject&) final;
-    void PreCallRecordCmdCopyImage2(VkCommandBuffer commandBuffer, const VkCopyImageInfo2* pCopyImageInfo,
-                                    const RecordObject&) final;
-
-    void PreCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                           VkBuffer dstBuffer, uint32_t regionCount, const VkBufferImageCopy* pRegions,
-                                           const RecordObject&) final;
-    void PreCallRecordCmdCopyImageToBuffer2KHR(VkCommandBuffer commandBuffer,
-                                               const VkCopyImageToBufferInfo2KHR* pCopyImageToBufferInfo,
-                                               const RecordObject&) final;
-    void PreCallRecordCmdCopyImageToBuffer2(VkCommandBuffer commandBuffer, const VkCopyImageToBufferInfo2* pCopyImageToBufferInfo,
-                                            const RecordObject&) final;
-
     void PreCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
                                            VkImageLayout dstImageLayout, uint32_t regionCount, const VkBufferImageCopy* pRegions,
                                            const RecordObject&) final;
@@ -386,43 +312,6 @@ class Validator : public GpuShaderInstrumentor {
     void PreCallRecordCmdCopyBufferToImage2(VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo,
                                             const RecordObject&) final;
 
-    void PreCallRecordCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage,
-                                   VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageBlit* pRegions, VkFilter filter,
-                                   const RecordObject&) final;
-    void PreCallRecordCmdBlitImage2KHR(VkCommandBuffer commandBuffer, const VkBlitImageInfo2KHR* pBlitImageInfo,
-                                       const RecordObject&) final;
-    void PreCallRecordCmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2KHR* pBlitImageInfo,
-                                    const RecordObject&) final;
-
-    void PostCallRecordBindImageMemory(VkDevice device, VkImage image, VkDeviceMemory memory, VkDeviceSize memoryOffset,
-                                       const RecordObject& record_obj) final;
-    void PostCallRecordBindImageMemory2(VkDevice device, uint32_t bindInfoCount, const VkBindImageMemoryInfo* pBindInfos,
-                                        const RecordObject& record_obj) final;
-    void PostCallRecordBindImageMemory2KHR(VkDevice device, uint32_t bindInfoCount, const VkBindImageMemoryInfo* pBindInfos,
-                                           const RecordObject& record_obj) final;
-
-    void PreCallRecordCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
-                                    VkPipelineStageFlags sourceStageMask, VkPipelineStageFlags dstStageMask,
-                                    uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
-                                    uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
-                                    uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers,
-                                    const RecordObject&) final;
-    void PreCallRecordCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
-                                        const VkDependencyInfoKHR* pDependencyInfos, const RecordObject&) final;
-    void PreCallRecordCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
-                                     const VkDependencyInfo* pDependencyInfos, const RecordObject&) final;
-
-    void PreCallRecordCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask,
-                                         VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags,
-                                         uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
-                                         uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
-                                         uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers,
-                                         const RecordObject&) final;
-
-    void PreCallRecordCmdPipelineBarrier2KHR(VkCommandBuffer commandBuffer, const VkDependencyInfoKHR* pDependencyInfo,
-                                             const RecordObject&) final;
-    void PreCallRecordCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
-                                          const RecordObject&) final;
     bool ValidateProtectedImage(const vvl::CommandBuffer& cb_state, const vvl::Image& image_state, const Location& image_loc,
                                 const char* vuid, const char* more_message = "") const final;
     bool ValidateUnprotectedImage(const vvl::CommandBuffer& cb_state, const vvl::Image& image_state, const Location& image_loc,
@@ -432,12 +321,24 @@ class Validator : public GpuShaderInstrumentor {
     bool ValidateUnprotectedBuffer(const vvl::CommandBuffer& cb_state, const vvl::Buffer& buffer_state, const Location& buffer_loc,
                                    const char* vuid, const char* more_message = "") const final;
 
-    bool VerifyImageLayout(const vvl::CommandBuffer& cb_state, const vvl::ImageView& image_view_state,
-                           VkImageLayout explicit_layout, const Location& image_loc, const char* mismatch_layout_vuid,
-                           bool* error) const final;
+    void Created(vvl::DescriptorSet& set) final;
+    void Created(vvl::CommandBuffer& cb_state) final;
+    void Created(vvl::Queue& queue) final;
+    void Created(vvl::Image&) final;
+    void Created(vvl::ImageView&) final;
+    void Created(vvl::Buffer&) final;
+    void Created(vvl::BufferView&) final;
+    void Created(vvl::Sampler&) final;
+    void Created(vvl::AccelerationStructureNV&) final;
+    void Created(vvl::AccelerationStructureKHR&) final;
+    void Created(vvl::ShaderObject&) final;
+
+    void DebugCapture() final;
 
   public:
-    std::optional<DescriptorHeap> desc_heap_{};  // optional only to defer construction
+    // We find ourselves constantly needing to create some resource for the "lifetime of GPU-AV"
+    // We don't want a messy global space to managae it and use this to allow each check to manage the resource where it is used.
+    // The goal is the first time we need the resource, we create it then, and afterwards, its cached and we can regain
     vko::SharedResourcesCache shared_resources_manager;
 
     PFN_vkSetDeviceLoaderData vk_set_device_loader_data_;
@@ -445,8 +346,9 @@ class Validator : public GpuShaderInstrumentor {
     VmaAllocator vma_allocator_ = {};
     std::unique_ptr<vko::DescriptorSetManager> desc_set_manager_;
 
+    // This is so universally used, that we decided currently to not be in vko::SharedResourcesCache
     vko::Buffer indices_buffer_;
-    unsigned int indices_buffer_alignment_ = 0;
+    uint32_t indices_buffer_alignment_ = 0;
 
   private:
     std::string instrumented_shader_cache_path_{};

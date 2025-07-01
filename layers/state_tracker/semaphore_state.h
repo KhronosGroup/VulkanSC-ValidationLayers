@@ -20,16 +20,17 @@
 #include "state_tracker/state_object.h"
 #include "state_tracker/submission_reference.h"
 #include <future>
+#include <optional>
 #include <map>
 #include <shared_mutex>
-#include "containers/custom_containers.h"
 #include "error_message/error_location.h"
 
 namespace vvl {
 
-class Device;
+class DeviceState;
 class Queue;
 class Semaphore;
+class Swapchain;
 
 struct SemaphoreInfo {
     SemaphoreInfo(std::shared_ptr<Semaphore> &&sem, uint64_t pl) : semaphore(std::move(sem)), payload(pl) {}
@@ -49,6 +50,13 @@ class Semaphore : public RefcountedStateObject {
         kInternal,
         kExternalTemporary,
         kExternalPermanent,
+    };
+
+    // Swapchain information associated with QueuePresent wait semaphore
+    struct SwapchainWaitInfo {
+        std::shared_ptr<vvl::Swapchain> swapchain;
+        uint32_t image_index = vvl::kU32Max;  // image being presented
+        uint32_t acquire_counter_value = 0;   // value of vvl::Swapchain::acquire_count when the image was acquired
     };
 
     struct SemOp {
@@ -76,7 +84,7 @@ class Semaphore : public RefcountedStateObject {
         void Notify() const;
     };
 
-    Semaphore(Device &dev, VkSemaphore handle, const VkSemaphoreCreateInfo *pCreateInfo)
+    Semaphore(DeviceState &dev, VkSemaphore handle, const VkSemaphoreCreateInfo *pCreateInfo)
         : Semaphore(dev, handle, vku::FindStructInPNextChain<VkSemaphoreTypeCreateInfo>(pCreateInfo->pNext), pCreateInfo) {}
 
     std::shared_ptr<const Semaphore> shared_from_this() const { return SharedFromThisImpl(this); }
@@ -106,17 +114,14 @@ class Semaphore : public RefcountedStateObject {
     // Look for most recent / highest payload operation that matches
     std::optional<SemOp> LastOp(const std::function<bool(OpType op_type, uint64_t payload, bool is_pending)> &filter) const;
 
-    // Returns pending queue submission that signals this binary semaphore.
-    std::optional<SubmissionReference> GetPendingBinarySignalSubmission() const;
-
     // Returns pending queue submission that waits on this binary semaphore.
     std::optional<SubmissionReference> GetPendingBinaryWaitSubmission() const;
 
     // If a pending binary signal depends on an unresolved timeline wait, this function
-    // returns information about the timeline wait; otherwise, it returns an empty result.
+    // returns information about unresolved timeline wait; otherwise, it returns an empty result.
     // This is used to validate VUs (such as VUID-vkQueueSubmit-pWaitSemaphores-03238) that have this statement:
     // "and any semaphore signal operations on which it depends must have also been submitted for execution"
-    std::optional<SemaphoreInfo> GetPendingBinarySignalTimelineDependency() const;  
+    std::optional<SemaphoreInfo> GetPendingBinarySignalTimelineDependency() const;
 
     // Current payload value.
     // If a queue submission command is pending execution, then the returned value may immediately be out of date
@@ -127,6 +132,10 @@ class Semaphore : public RefcountedStateObject {
 
     void GetLastBinarySignalSource(VkQueue &queue, vvl::Func &acquire_command) const;
     bool HasResolvingTimelineSignal(uint64_t wait_payload) const;
+
+    void SetSwapchainWaitInfo(const SwapchainWaitInfo &info);
+    void ClearSwapchainWaitInfo();
+    std::optional<SwapchainWaitInfo> GetSwapchainWaitInfo() const;
 
     void Import(VkExternalSemaphoreHandleTypeFlagBits handle_type, VkSemaphoreImportFlags flags);
     void Export(VkExternalSemaphoreHandleTypeFlagBits handle_type);
@@ -143,7 +152,7 @@ class Semaphore : public RefcountedStateObject {
 #endif  // VK_USE_PLATFORM_METAL_EXT
 
   private:
-    Semaphore(Device &dev, VkSemaphore handle, const VkSemaphoreTypeCreateInfo *type_create_info,
+    Semaphore(DeviceState &dev, VkSemaphore handle, const VkSemaphoreTypeCreateInfo *type_create_info,
               const VkSemaphoreCreateInfo *pCreateInfo);
 
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock_); }
@@ -167,6 +176,7 @@ class Semaphore : public RefcountedStateObject {
 
     // the most recently completed operation
     SemOp completed_;
+
     // next payload value for binary semaphore operations
     uint64_t next_payload_;
 
@@ -175,7 +185,11 @@ class Semaphore : public RefcountedStateObject {
     // can use the same payload value.
     std::map<uint64_t, TimePoint> timeline_;
     mutable std::shared_mutex lock_;
-    Device &dev_data_;
+    DeviceState &dev_data_;
+
+    // Not empty when semaphore was used in QueuePresent but has not been re-acquired yet
+    // and the presentation fence (if provided) has not been waited on.
+    std::optional<SwapchainWaitInfo> swapchain_wait_info_;
 };
 
 }  // namespace vvl

@@ -20,62 +20,121 @@
 
 #include "cc_state_tracker.h"
 #include "core_validation.h"
+#include "cc_sync_vuid_maps.h"
+#include "error_message/error_strings.h"
+#include "state_tracker/image_state.h"
+#include "state_tracker/event_map.h"
 
-core::CommandBuffer::CommandBuffer(CoreChecks& core, VkCommandBuffer handle, const VkCommandBufferAllocateInfo* allocate_info,
-                                   const vvl::CommandPool* pool)
-    : vvl::CommandBuffer(core, handle, allocate_info, pool) {}
+// Location to add per-queue submit debug info if built with -D DEBUG_CAPTURE_KEYBOARD=ON
+void CoreChecks::DebugCapture() {}
 
-// Much of the data stored in vvl::CommandBuffer is only used by core validation, and is
-// set up by Record calls in class CoreChecks. Because both the state tracker and
-// core methods must lock vvl::CommandBuffer, it is possible for a Validate call to
-// 'interrupt' a Record call and get only the state updated by whichever code
-// locked and unlocked the CB first. This can only happen if the application
-// is violating section 3.6 'Threading Behavior' of the specification, which
-// requires that command buffers be externally synchronized. Still, we'd prefer
-// not to crash if that happens. In most cases the core Record method is operating
-// on separate data members from the state tracker. But in the case of vkCmdWaitEvents*,
-// both methods operate on the same state in ways that could very easily crash if
-// not done within the same lock guard. Overriding RecordWaitEvents() allows
-// this to all happen completely while the state tracker is holding the lock.
-// Eventually we'll probably want to move all of the core state into this derived
-// class.
-void core::CommandBuffer::RecordWaitEvents(vvl::Func command, uint32_t eventCount, const VkEvent* pEvents,
-                                           VkPipelineStageFlags2KHR srcStageMask) {
-    // vvl::CommandBuffer will add to the events vector.
-    auto first_event_index = events.size();
-    vvl::CommandBuffer::RecordWaitEvents(command, eventCount, pEvents, srcStageMask);
-    auto event_added_count = events.size() - first_event_index;
-    event_updates.emplace_back(
-        [command, event_added_count, first_event_index, srcStageMask](
+void CoreChecks::Created(vvl::CommandBuffer& cb) {
+    cb.SetSubState(container_type, std::make_unique<core::CommandBufferSubState>(cb, *this));
+}
+
+void CoreChecks::Created(vvl::Queue& queue) {
+    queue.SetSubState(container_type, std::make_unique<core::QueueSubState>(*this, queue));
+}
+
+namespace core {
+
+CommandBufferSubState::CommandBufferSubState(vvl::CommandBuffer& cb, CoreChecks& validator)
+    : vvl::CommandBufferSubState(cb), validator(validator) {
+    ResetCBState();
+}
+
+void CommandBufferSubState::RecordWaitEvents(vvl::Func command, uint32_t eventCount, const VkEvent* pEvents,
+                                             VkPipelineStageFlags2KHR srcStageMask, const VkDependencyInfo* dependency_info) {
+    // vvl::CommandBuffer will add to the events vector. TODO this is now incorrect
+    auto first_event_index = base.events.size();
+    auto event_added_count = eventCount;
+
+    vku::safe_VkDependencyInfo safe_dependency_info = {};
+    if (dependency_info) {
+        safe_dependency_info.initialize(dependency_info);
+    } else {
+        // Set sType to invalid, so following code can check sType to see if the struct is valid
+        safe_dependency_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    }
+
+    base.event_updates.emplace_back(
+        [command, event_added_count, first_event_index, srcStageMask, safe_dependency_info](
             vvl::CommandBuffer& cb_state, bool do_validate, EventMap& local_event_signal_info, VkQueue queue, const Location& loc) {
             if (!do_validate) return false;
             return CoreChecks::ValidateWaitEventsAtSubmit(command, cb_state, event_added_count, first_event_index, srcStageMask,
-                                                          local_event_signal_info, queue, loc);
+                                                          safe_dependency_info, local_event_signal_info, queue, loc);
         });
 }
 
-std::shared_ptr<vvl::CommandBuffer> CoreChecks::CreateCmdBufferState(VkCommandBuffer handle,
-                                                                     const VkCommandBufferAllocateInfo* allocate_info,
-                                                                     const vvl::CommandPool* pool) {
-    return std::static_pointer_cast<vvl::CommandBuffer>(std::make_shared<core::CommandBuffer>(*this, handle, allocate_info, pool));
+void CommandBufferSubState::Reset(const Location& loc) { ResetCBState(); }
+
+void CommandBufferSubState::Destroy() { ResetCBState(); }
+
+void CommandBufferSubState::ResetCBState() {
+    // QFO Tranfser
+    qfo_transfer_image_barriers.Reset();
+    qfo_transfer_buffer_barriers.Reset();
+
+    // VK_EXT_nested_command_buffer
+    nesting_level = 0;
+
+    // Submit time validation
+    submit_validate_dynamic_rendering_barrier_subresources.clear();
 }
 
-core::Queue::Queue(vvl::Device& dev_data, VkQueue handle, uint32_t family_index, uint32_t queue_index,
-                   VkDeviceQueueCreateFlags flags, const VkQueueFamilyProperties& queue_family_properties,
-                   const vvl::Device& error_logger)
-    : vvl::Queue(dev_data, handle, family_index, queue_index, flags, queue_family_properties),
-      queue_submission_validator_(error_logger) {}
-
-void core::Queue::Retire(vvl::QueueSubmission& submission) {
-    // Call validation before parent call. Validation needs initial submission state (Retire updates state)
-    queue_submission_validator_.Validate(submission);
-
-    vvl::Queue::Retire(submission);
+void CommandBufferSubState::ExecuteCommands(vvl::CommandBuffer& secondary_command_buffer) {
+    if (secondary_command_buffer.IsSecondary()) {
+        auto& secondary_sub_state = SubState(secondary_command_buffer);
+        nesting_level = std::max(nesting_level, secondary_sub_state.nesting_level + 1);
+    }
 }
 
-std::shared_ptr<vvl::Queue> CoreChecks::CreateQueue(VkQueue handle, uint32_t family_index, uint32_t queue_index,
-                                                    VkDeviceQueueCreateFlags flags,
-                                                    const VkQueueFamilyProperties& queue_family_properties) {
-    return std::static_pointer_cast<vvl::Queue>(
-        std::make_shared<core::Queue>(*this, handle, family_index, queue_index, flags, queue_family_properties, *this));
+void CommandBufferSubState::SubmitTimeValidate() {
+    for (const auto& [image, subresources] : submit_validate_dynamic_rendering_barrier_subresources) {
+        const auto image_state = validator.Get<vvl::Image>(image);
+        if (!image_state) {
+            continue;
+        }
+        const auto global_layout_map = image_state->layout_map.get();
+        ASSERT_AND_CONTINUE(global_layout_map);
+        auto global_layout_map_guard = image_state->LayoutMapReadLock();
+
+        for (const std::pair<VkImageSubresourceRange, vvl::LocationCapture>& entry : subresources) {
+            const VkImageSubresourceRange& subresource = entry.first;
+            const Location& barrier_loc = entry.second.Get();
+            subresource_adapter::RangeGenerator range_gen(image_state->subresource_encoder, subresource);
+            ForEachMatchingLayoutMapRange(
+                *global_layout_map, std::move(range_gen),
+                [this, &barrier_loc, &image_state](const ImageLayoutMap::key_type& range, const VkImageLayout& layout) {
+                    if (layout != VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ && layout != VK_IMAGE_LAYOUT_GENERAL) {
+                        const auto& vuid =
+                            GetDynamicRenderingBarrierVUID(barrier_loc, vvl::DynamicRenderingBarrierError::kImageLayout);
+                        const LogObjectList objlist(base.Handle(), image_state->Handle());
+                        const Location& image_loc = barrier_loc.dot(vvl::Field::image);
+                        const VkImageSubresource subresource =
+                            static_cast<VkImageSubresource>(image_state->subresource_encoder.Decode(range.begin));
+                        return validator.LogError(vuid, objlist, image_loc, "(%s, %s) has layout %s.",
+                                                  validator.FormatHandle(image_state->Handle()).c_str(),
+                                                  string_VkImageSubresource(subresource).c_str(), string_VkImageLayout(layout));
+                    }
+                    return false;
+                });
+        }
+    }
 }
+
+QueueSubState::QueueSubState(Logger& logger, vvl::Queue& q) : vvl::QueueSubState(q), queue_submission_validator_(logger) {}
+
+void QueueSubState::PreSubmit(std::vector<vvl::QueueSubmission>& submissions) {
+    for (const auto& submission : submissions) {
+        for (auto& cb : submission.cb_submissions) {
+            auto guard = cb.cb->ReadLock();
+            CommandBufferSubState& cb_substate = SubState(*cb.cb);
+            cb_substate.SubmitTimeValidate();
+        }
+    }
+}
+
+void QueueSubState::Retire(vvl::QueueSubmission& submission) { queue_submission_validator_.Validate(submission); }
+
+}  // namespace core

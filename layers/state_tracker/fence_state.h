@@ -21,34 +21,15 @@
 
 #include "state_tracker/state_object.h"
 #include "state_tracker/submission_reference.h"
+#include "containers/span.h"
+#include <optional>
 #include <future>
 
+class Logger;
+
 namespace vvl {
-
-class Device;
+class Semaphore;
 class Queue;
-class Swapchain;
-
-//
-// AcquireFenceSync synchronization is when a fence from the AcquireNextImage call is used to
-// synchronize with queue submissions that generated one of the previous frames.
-// This is in contrast to a more common approach when the fence from QueueSubmit is used for
-// host synchronization.
-//
-// The sequence that connects image acquire fence to one of the previous submissions
-// (in chronologically backward order):
-//  a) the wait on the image acquire fence is finished ->
-//  b) the corresponding image is acquired ->
-//  c) the previous presentation of this image is finished (except for the first acquire) ->
-//  d) corresponding present request finished waiting on the queue submit semaphore ->
-//  e) corresponding queue batch finished execution and signaled that semaphore
-//
-// Acquire fence synchronization allows the use of the fence from step a) to wait on the submit batch from step e).
-//
-struct AcquireFenceSync {
-    // The queue submissions that will be notified when WaitForFences is called.
-    small_vector<SubmissionReference, 2, uint32_t> submission_refs;
-};
 
 class Fence : public RefcountedStateObject {
   public:
@@ -59,7 +40,7 @@ class Fence : public RefcountedStateObject {
         kExternalPermanent,
     };
 
-    Fence(Device &dev, VkFence handle, const VkFenceCreateInfo *pCreateInfo);
+    Fence(Logger &logger, VkFence handle, const VkFenceCreateInfo *pCreateInfo);
 
     const VulkanTypedHandle *InUse() const override;
     VkFence VkHandle() const { return handle_.Cast<VkFence>(); }
@@ -86,7 +67,11 @@ class Fence : public RefcountedStateObject {
     void Export(VkExternalFenceHandleTypeFlagBits handle_type);
     std::optional<VkExternalFenceHandleTypeFlagBits> ImportedHandleType() const;
 
-    void SetAcquireFenceSync(const AcquireFenceSync &acquire_fence_sync);
+    // Called on AcquireNextImage fence
+    void SetPresentSubmissionRef(const SubmissionReference &present_submission_ref);
+
+    // Called on VkSwapchainPresentFenceInfoEXT fence
+    void SetPresentWaitSemaphores(vvl::span<std::shared_ptr<vvl::Semaphore>> present_wait_semaphores);
 
     const VkFenceCreateFlags flags;
     const VkExternalFenceHandleTypeFlags export_handle_types;
@@ -103,11 +88,27 @@ class Fence : public RefcountedStateObject {
     mutable std::shared_mutex lock_;
     std::promise<void> completed_;
     std::shared_future<void> waiter_;
+    Logger &logger_;
 
-    // Special frame synchronization based on acquire fence (check AcquireFenceSync documentation)
-    AcquireFenceSync acquire_fence_sync_;
+    // The present queue submission is notified when WaitForFences waits for the image acquire fence.
+    //
+    // This implements a synchronization scheme when a fence from the AcquireNextImage is used to
+    // synchronize with the last frame that used the same swapchain image. This is in contrast to
+    // a more common approach when the fence from QueueSubmit is used for frame synchronization.
+    //
+    // The sequence that connects image acquire fence to one of the previous submissions (in chronologically backward order):
+    //  a) the wait on the image acquire fence is finished ->
+    //  b) the corresponding image is acquired ->
+    //  c) the previous presentation of this image is finished (except for the first acquire) ->
+    //  d) corresponding present request finished waiting on the queue submit semaphore ->
+    //  e) corresponding queue batch finished execution and signaled that semaphore
+    //
+    // Acquire fence synchronization allows the use of the fence from step a) to wait on the
+    // submit batch from step e) and also to ensure that the semaphore from step e) is no longer in use.
+    //
+    std::optional<SubmissionReference> present_submission_ref_;
 
-    Device &dev_data_;
+    small_vector<std::shared_ptr<vvl::Semaphore>, 1> present_wait_semaphores_;
 };
 
 }  // namespace vvl

@@ -12,6 +12,7 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include <algorithm>
 
 bool HostImageCopyTest::CopyLayoutSupported(const std::vector<VkImageLayout> &src_layouts,
                                             const std::vector<VkImageLayout> &dst_layouts, VkImageLayout layout) {
@@ -56,8 +57,8 @@ TEST_F(PositiveHostImageCopy, BasicUsage) {
     }
 
     VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL;
-    vkt::Image image(*m_device, image_ci, vkt::set_layout);
-    image.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, layout);
+    vkt::Image image(*m_device, image_ci);
+    image.SetLayout(layout);
 
     std::vector<uint8_t> pixels(width * height * 4);
     // Fill image with random values
@@ -99,8 +100,8 @@ TEST_F(PositiveHostImageCopy, BasicUsage) {
     ASSERT_EQ(pixels, welcome_back);
 
     // Copy from one image to another
-    vkt::Image image2(*m_device, image_ci, vkt::set_layout);
-    image2.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, layout);
+    vkt::Image image2(*m_device, image_ci);
+    image2.SetLayout(layout);
 
     VkImageCopy2 image_copy_2 = vku::InitStructHelper();
     image_copy_2.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -134,19 +135,17 @@ TEST_F(PositiveHostImageCopy, BasicUsage) {
     transition_info.image = image2;
     result = vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
     ASSERT_EQ(VK_SUCCESS, result);
-    VkImageSubresource image_sub = vkt::Image::Subresource(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0);
-    VkImageSubresourceRange image_sub_range = vkt::Image::SubresourceRange(image_sub);
+    VkImageSubresourceRange image_sub_range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     VkImageMemoryBarrier image_barrier =
         image2.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
 
     image_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     image_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &image_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &image_barrier);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Get memory size of tiled image
     VkImageSubresource2 subresource = vku::InitStructHelper();
@@ -196,8 +195,8 @@ TEST_F(PositiveHostImageCopy, BasicUsage14) {
     image_ci = vkt::Image::ImageCreateInfo2D(
         width, height, 1, 1, format,
         VK_IMAGE_USAGE_HOST_TRANSFER_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-    vkt::Image image(*m_device, image_ci, vkt::set_layout);
-    image.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, layout);
+    vkt::Image image(*m_device, image_ci);
+    image.SetLayout(layout);
 
     std::vector<uint8_t> pixels(width * height * 4);
     // Fill image with random values
@@ -245,8 +244,8 @@ TEST_F(PositiveHostImageCopy, BasicUsage14) {
     ASSERT_EQ(pixels, welcome_back);
 
     // Copy from one image to another
-    vkt::Image image2(*m_device, image_ci, vkt::set_layout);
-    image2.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, layout);
+    vkt::Image image2(*m_device, image_ci);
+    image2.SetLayout(layout);
 
     VkImageCopy2 image_copy_2 = vku::InitStructHelper();
     image_copy_2.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -280,19 +279,17 @@ TEST_F(PositiveHostImageCopy, BasicUsage14) {
     transition_info.image = image2;
     result = vk::TransitionImageLayout(*m_device, 1, &transition_info);
     ASSERT_EQ(VK_SUCCESS, result);
-    VkImageSubresource image_sub = vkt::Image::Subresource(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0);
-    VkImageSubresourceRange image_sub_range = vkt::Image::SubresourceRange(image_sub);
+    VkImageSubresourceRange image_sub_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     VkImageMemoryBarrier image_barrier =
         image2.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
 
     image_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     image_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &image_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &image_barrier);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Get memory size of tiled image
     VkImageSubresource2 subresource = vku::InitStructHelper();
@@ -318,8 +315,8 @@ TEST_F(PositiveHostImageCopy, CopyImageToMemoryMipLevel) {
 
     image_ci.mipLevels = 4;
     VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL;
-    vkt::Image image(*m_device, image_ci, vkt::set_layout);
-    image.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, layout);
+    vkt::Image image(*m_device, image_ci);
+    image.SetLayout(layout);
 
     const uint32_t buffer_size = width * height * 4u;
     std::vector<uint8_t> data(buffer_size);
@@ -334,7 +331,7 @@ TEST_F(PositiveHostImageCopy, CopyImageToMemoryMipLevel) {
 
     VkCopyImageToMemoryInfo copy_to_image_memory = vku::InitStructHelper();
     copy_to_image_memory.flags = VK_HOST_IMAGE_COPY_MEMCPY;
-    copy_to_image_memory.srcImage = image.handle();
+    copy_to_image_memory.srcImage = image;
     copy_to_image_memory.srcImageLayout = layout;
     copy_to_image_memory.regionCount = 1u;
     copy_to_image_memory.pRegions = &region;
@@ -347,14 +344,13 @@ TEST_F(PositiveHostImageCopy, CompressedFormat) {
     RETURN_IF_SKIP(InitHostImageCopyTest());
 
     VkImageFormatProperties img_prop = {};
-    if (VK_SUCCESS != vk::GetPhysicalDeviceImageFormatProperties(m_device->Physical().handle(), VK_FORMAT_BC3_SRGB_BLOCK,
-                                                                 image_ci.imageType, image_ci.tiling, image_ci.usage,
-                                                                 image_ci.flags, &img_prop)) {
+    if (VK_SUCCESS != vk::GetPhysicalDeviceImageFormatProperties(m_device->Physical(), VK_FORMAT_BC3_SRGB_BLOCK, image_ci.imageType,
+                                                                 image_ci.tiling, image_ci.usage, image_ci.flags, &img_prop)) {
         GTEST_SKIP() << "Image format properties not supported";
     }
     image_ci.format = VK_FORMAT_BC3_SRGB_BLOCK;
     vkt::Image image(*m_device, image_ci);
-    image.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
 
     std::vector<uint8_t> pixels(width * height * 4);
 
@@ -371,4 +367,46 @@ TEST_F(PositiveHostImageCopy, CompressedFormat) {
 
     VkResult result = vk::CopyMemoryToImageEXT(*m_device, &copy_to_image);
     ASSERT_EQ(VK_SUCCESS, result);
+}
+
+TEST_F(PositiveHostImageCopy, TransitionImageLayoutDepthWrongAspect) {
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    VkImageCreateInfo depth_image_ci = vku::InitStructHelper();
+    depth_image_ci.imageType = VK_IMAGE_TYPE_2D;
+    depth_image_ci.format = VK_FORMAT_D32_SFLOAT;
+    depth_image_ci.extent = {32u, 32u, 1u};
+    depth_image_ci.mipLevels = 1u;
+    depth_image_ci.arrayLayers = 1u;
+    depth_image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    depth_image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    depth_image_ci.usage = VK_IMAGE_USAGE_HOST_TRANSFER_BIT;
+    depth_image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VkPhysicalDeviceImageFormatInfo2 image_format_info = vku::InitStructHelper();
+    image_format_info.format = depth_image_ci.format;
+    image_format_info.type = depth_image_ci.imageType;
+    image_format_info.tiling = depth_image_ci.tiling;
+    image_format_info.usage = depth_image_ci.usage;
+    image_format_info.flags = depth_image_ci.flags;
+
+    VkImageFormatProperties2 image_format_properties = vku::InitStructHelper();
+    VkResult res =
+        vk::GetPhysicalDeviceImageFormatProperties2(m_device->physical_device_, &image_format_info, &image_format_properties);
+    if (res == VK_ERROR_FORMAT_NOT_SUPPORTED) {
+        GTEST_SKIP() << "Required format not supported";
+    }
+    if (!(m_device->FormatFeaturesOptimal(depth_image_ci.format) & VK_FORMAT_FEATURE_2_HOST_IMAGE_TRANSFER_BIT)) {
+        GTEST_SKIP() << "Device does not support host image on depth format";
+    }
+
+    vkt::Image image(*m_device, depth_image_ci, vkt::set_layout);
+
+    VkImageSubresourceRange range = {VK_IMAGE_ASPECT_DEPTH_BIT, 0u, 1u, 0u, 1u};
+    VkHostImageLayoutTransitionInfo transition_info = vku::InitStructHelper();
+    transition_info.image = image;
+    transition_info.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition_info.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    transition_info.subresourceRange = range;
+    vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
 }

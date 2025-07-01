@@ -24,11 +24,11 @@ class CommandBufferAccessContext;
 class CommandExecutionContext;
 class RenderPassAccessContext;
 class ReplayState;
+class SyncValidator;
 
 namespace vvl {
 class ImageView;
 class RenderPass;
-class CommandBuffer;
 }  // namespace vvl
 
 struct SyncEventState {
@@ -124,14 +124,14 @@ struct SyncBufferMemoryBarrier {
 };
 
 struct SyncImageMemoryBarrier {
-    std::shared_ptr<const syncval_state::ImageState> image;
+    std::shared_ptr<const vvl::Image> image;
     SyncBarrier barrier;
     VkImageSubresourceRange subresource_range;
     bool layout_transition;
     uint32_t barrier_index;
     uint32_t handle_index = vvl::kNoIndex32;
 
-    SyncImageMemoryBarrier(const std::shared_ptr<const syncval_state::ImageState> &image, const SyncBarrier &barrier,
+    SyncImageMemoryBarrier(const std::shared_ptr<const vvl::Image> &image, const SyncBarrier &barrier,
                            const VkImageSubresourceRange &subresource_range, bool layout_transition, uint32_t barrier_index)
         : image(image),
           barrier(barrier),
@@ -285,7 +285,7 @@ class SyncOpBeginRenderPass : public SyncOpBase {
     vku::safe_VkRenderPassBeginInfo renderpass_begin_info_;
     vku::safe_VkSubpassBeginInfo subpass_begin_info_;
     std::vector<std::shared_ptr<const vvl::ImageView>> shared_attachments_;
-    std::vector<const syncval_state::ImageViewState *> attachments_;
+    std::vector<const vvl::ImageView *> attachments_;
     std::shared_ptr<const vvl::RenderPass> rp_state_;
     const RenderPassAccessContext *rp_context_;
 };
@@ -333,7 +333,7 @@ struct PipelineBarrierOp {
           layout_transition_handle_index(layout_transition_handle_index),
           scope(queue_id) {
         if (queue_id != kQueueIdInvalid) {
-            // This is a submit time application... supress layout transitions to not taint the QueueBatchContext write state
+            // This is a submit time application... suppress layout transitions to not taint the QueueBatchContext write state
             layout_transition = false;
             this->layout_transition_handle_index = vvl::kNoIndex32;
         }
@@ -373,7 +373,7 @@ struct WaitEventBarrierOp {
                        bool layout_transition_)
         : scope_ops(scope_queue_, scope_tag_), barrier(barrier_), layout_transition(layout_transition_) {
         if (scope_queue_ != kQueueIdInvalid) {
-            // This is a submit time application... supress layout transitions to not taint the QueueBatchContext write state
+            // This is a submit time application... suppress layout transitions to not taint the QueueBatchContext write state
             layout_transition = false;
         }
     }

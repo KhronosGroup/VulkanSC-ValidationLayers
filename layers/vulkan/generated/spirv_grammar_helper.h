@@ -263,6 +263,8 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpColorAttachmentReadEXT:
         case spv::OpDepthAttachmentReadEXT:
         case spv::OpStencilAttachmentReadEXT:
+        case spv::OpTensorReadARM:
+        case spv::OpTensorQuerySizeARM:
         case spv::OpSubgroupBallotKHR:
         case spv::OpSubgroupFirstInvocationKHR:
         case spv::OpSubgroupAllKHR:
@@ -414,7 +416,10 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpRayQueryGetIntersectionWorldToObjectKHR:
         case spv::OpAtomicFAddEXT:
         case spv::OpArithmeticFenceEXT:
+        case spv::OpTaskSequenceCreateINTEL:
+        case spv::OpTaskSequenceGetINTEL:
         case spv::OpSubgroupMatrixMultiplyAccumulateINTEL:
+        case spv::OpBitwiseFunctionINTEL:
         case spv::OpGroupIMulKHR:
         case spv::OpGroupFMulKHR:
         case spv::OpGroupBitwiseAndKHR:
@@ -423,6 +428,7 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpGroupLogicalAndKHR:
         case spv::OpGroupLogicalOrKHR:
         case spv::OpGroupLogicalXorKHR:
+        case spv::OpRoundFToTF32INTEL:
 #ifdef VK_ENABLE_BETA_EXTENSIONS
         case spv::OpUntypedVariableKHR:
         case spv::OpUntypedAccessChainKHR:
@@ -434,6 +440,9 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpFinishWritingNodePayloadAMDX:
         case spv::OpNodePayloadArrayLengthAMDX:
         case spv::OpIsNodePayloadValidAMDX:
+        case spv::OpConvertHandleToImageINTEL:
+        case spv::OpConvertHandleToSamplerINTEL:
+        case spv::OpConvertHandleToSampledImageINTEL:
 #endif
             return true;
         default:
@@ -683,6 +692,9 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpColorAttachmentReadEXT:
         case spv::OpDepthAttachmentReadEXT:
         case spv::OpStencilAttachmentReadEXT:
+        case spv::OpTypeTensorARM:
+        case spv::OpTensorReadARM:
+        case spv::OpTensorQuerySizeARM:
         case spv::OpSubgroupBallotKHR:
         case spv::OpSubgroupFirstInvocationKHR:
         case spv::OpSubgroupAllKHR:
@@ -842,7 +854,11 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpRayQueryGetIntersectionWorldToObjectKHR:
         case spv::OpAtomicFAddEXT:
         case spv::OpArithmeticFenceEXT:
+        case spv::OpTaskSequenceCreateINTEL:
+        case spv::OpTaskSequenceGetINTEL:
+        case spv::OpTypeTaskSequenceINTEL:
         case spv::OpSubgroupMatrixMultiplyAccumulateINTEL:
+        case spv::OpBitwiseFunctionINTEL:
         case spv::OpGroupIMulKHR:
         case spv::OpGroupFMulKHR:
         case spv::OpGroupBitwiseAndKHR:
@@ -851,6 +867,7 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpGroupLogicalAndKHR:
         case spv::OpGroupLogicalOrKHR:
         case spv::OpGroupLogicalXorKHR:
+        case spv::OpRoundFToTF32INTEL:
 #ifdef VK_ENABLE_BETA_EXTENSIONS
         case spv::OpTypeUntypedPointerKHR:
         case spv::OpUntypedVariableKHR:
@@ -866,6 +883,9 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpIsNodePayloadValidAMDX:
         case spv::OpConstantStringAMDX:
         case spv::OpSpecConstantStringAMDX:
+        case spv::OpConvertHandleToImageINTEL:
+        case spv::OpConvertHandleToSamplerINTEL:
+        case spv::OpConvertHandleToSampledImageINTEL:
 #endif
             return true;
         default:
@@ -1238,6 +1258,7 @@ enum class SpvType {
     kPointer,
     kFunction,
     kForwardPointer,
+    kTensorARM,
     kCooperativeMatrixKHR,
     kRayQueryKHR,
     kHitObjectNV,
@@ -1246,6 +1267,7 @@ enum class SpvType {
     kCooperativeMatrixNV,
     kTensorLayoutNV,
     kTensorViewNV,
+    kTaskSequenceINTEL,
 };
 
 static constexpr SpvType GetSpvType(uint32_t opcode) {
@@ -1280,6 +1302,8 @@ static constexpr SpvType GetSpvType(uint32_t opcode) {
             return SpvType::kFunction;
         case spv::OpTypeForwardPointer:
             return SpvType::kForwardPointer;
+        case spv::OpTypeTensorARM:
+            return SpvType::kTensorARM;
         case spv::OpTypeCooperativeMatrixKHR:
             return SpvType::kCooperativeMatrixKHR;
         case spv::OpTypeRayQueryKHR:
@@ -1296,6 +1320,8 @@ static constexpr SpvType GetSpvType(uint32_t opcode) {
             return SpvType::kTensorLayoutNV;
         case spv::OpTypeTensorViewNV:
             return SpvType::kTensorViewNV;
+        case spv::OpTypeTaskSequenceINTEL:
+            return SpvType::kTaskSequenceINTEL;
         default:
             return SpvType::Empty;
     }

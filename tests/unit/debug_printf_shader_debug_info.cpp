@@ -16,9 +16,7 @@
 class NegativeDebugPrintfShaderDebugInfo : public DebugPrintfTests {};
 
 // These tests print out the verbose info to make sure that info is correct
-static const VkBool32 verbose_value = true;
-static const VkLayerSettingEXT layer_setting = {OBJECT_LAYER_NAME, "printf_verbose", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
-                                                &verbose_value};
+static const VkLayerSettingEXT layer_setting = {OBJECT_LAYER_NAME, "printf_verbose", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
 static VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
                                                                   &layer_setting};
 
@@ -38,7 +36,7 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, PipelineHandle) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.CreateComputePipeline();
 
     const char *object_name = "bad_pipeline";
@@ -49,13 +47,12 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, PipelineHandle) {
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredInfo("Pipeline (bad_pipeline)");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -87,13 +84,12 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, ShaderObjectHandle) {
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
 
     m_command_buffer.Begin();
-    vk::CmdBindShadersEXT(m_command_buffer.handle(), 1, shader_stages, &comp_shader.handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindShadersEXT(m_command_buffer, 1, shader_stages, &comp_shader.handle());
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredInfo("Shader Object (bad_shader_object)");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -141,18 +137,17 @@ void main() {
     )";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredFailureMsg(
         kInformationBit, "Debug shader printf message generated at a.comp:5\n\n5:     debugPrintfEXT(\"float == %f\", myfloat);");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -229,18 +224,17 @@ void main() {
     )";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredFailureMsg(
         kInformationBit, "Debug shader printf message generated at a.comp:5\n\n5:     debugPrintfEXT(\"float == %f\", myfloat);");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -259,25 +253,24 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, CommandBufferCommandIndex) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.CreateComputePipeline();
 
     CreateComputePipelineHelper empty_pipe(*this);
     empty_pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, empty_pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, empty_pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
 
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredInfo("Compute Dispatch Index 3");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -303,8 +296,8 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, CommandBufferCommandIndexMulti) {
     vkt::PipelineLayout pipeline_layout(*m_device, pipe_layout_ci);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout.handle();
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
     vkt::CommandBuffer cb0(*m_device, m_command_pool);
@@ -313,29 +306,29 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, CommandBufferCommandIndexMulti) {
     uint32_t skip = 0;
     uint32_t good = 4;
     cb0.Begin();
-    vk::CmdBindPipeline(cb0.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdPushConstants(cb0.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &skip);
-    vk::CmdDispatch(cb0.handle(), 1, 1, 1);
-    vk::CmdDispatch(cb0.handle(), 1, 1, 1);
-    vk::CmdDispatch(cb0.handle(), 1, 1, 1);
-    vk::CmdPushConstants(cb0.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &good);
-    vk::CmdDispatch(cb0.handle(), 1, 1, 1);
-    vk::CmdPushConstants(cb0.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &skip);
-    vk::CmdDispatch(cb0.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(cb0, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdPushConstants(cb0, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &skip);
+    vk::CmdDispatch(cb0, 1, 1, 1);
+    vk::CmdDispatch(cb0, 1, 1, 1);
+    vk::CmdDispatch(cb0, 1, 1, 1);
+    vk::CmdPushConstants(cb0, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &good);
+    vk::CmdDispatch(cb0, 1, 1, 1);
+    vk::CmdPushConstants(cb0, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &skip);
+    vk::CmdDispatch(cb0, 1, 1, 1);
     cb0.End();
 
     cb1.Begin();
-    vk::CmdBindPipeline(cb1.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdPushConstants(cb1.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &good);
-    vk::CmdDispatch(cb1.handle(), 1, 1, 1);
-    vk::CmdPushConstants(cb1.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &skip);
-    vk::CmdDispatch(cb1.handle(), 1, 1, 1);
+    vk::CmdBindPipeline(cb1, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdPushConstants(cb1, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &good);
+    vk::CmdDispatch(cb1, 1, 1, 1);
+    vk::CmdPushConstants(cb1, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &skip);
+    vk::CmdDispatch(cb1, 1, 1, 1);
     cb1.End();
 
     m_errorMonitor->SetDesiredInfo("Compute Dispatch Index 3");  // cb0
     m_errorMonitor->SetDesiredInfo("Compute Dispatch Index 0");  // cb1
 
-    VkCommandBuffer cbs[2] = {cb0.handle(), cb1.handle()};
+    VkCommandBuffer cbs[2] = {cb0, cb1};
     VkSubmitInfo submit = vku::InitStructHelper();
     submit.commandBufferCount = 2;
     submit.pCommandBuffers = cbs;
@@ -361,20 +354,19 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, StageInfo) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.CreateComputePipeline();
 
     CreateComputePipelineHelper empty_pipe(*this);
     empty_pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 4, 4, 1);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 4, 4, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredInfo("Global invocation ID (x, y, z) = (3, 1, 0)");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -405,15 +397,14 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, Fragment) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredInfo("Stage = Fragment.  Fragment coord (x,y) = (10.5, 10.5)");
     m_errorMonitor->SetDesiredInfo("Stage = Fragment.  Fragment coord (x,y) = (10.5, 11.5)");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -512,15 +503,14 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, VertexFragmentMultiEntrypoint) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit,
                                          "Stage has multiple OpEntryPoint (Fragment, Vertex) and could not detect stage");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -542,20 +532,19 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, DISABLED_DebugLabelRegion1) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
     VkDebugUtilsLabelEXT region_0_label = vku::InitStructHelper();
     region_0_label.pLabelName = "region_0";
-    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer.handle(), &region_0_label);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &region_0_label);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredInfo("region_0");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -577,22 +566,21 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, DISABLED_DebugLabelRegion2) {
         )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
     VkDebugUtilsLabelEXT region_0_label = vku::InitStructHelper();
     region_0_label.pLabelName = "region_0";
-    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer.handle(), &region_0_label);
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &region_0_label);
     VkDebugUtilsLabelEXT region_1_label = vku::InitStructHelper();
     region_1_label.pLabelName = "region_1";
-    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer.handle(), &region_1_label);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &region_1_label);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredInfo("region_0::region_1");
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }

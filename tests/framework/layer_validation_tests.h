@@ -22,10 +22,6 @@
 #include <android_native_app_glue.h>
 #endif
 
-#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
-#include "wayland-client.h"
-#endif
-
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
 
@@ -36,15 +32,11 @@
 #endif
 
 #include "binding.h"
-#include "containers/custom_containers.h"
-#include "generated/vk_extension_helper.h"
+#include "containers/limits.h"
 #include "render.h"
 
-#include <cmath>
-#include <functional>
-#include <limits>
-#include <string>
 #include <vector>
+#include <array> // Required for Windows in many tests
 
 // MSVC and GCC define __SANITIZE_ADDRESS__ when compiling with address sanitization
 // However, clang doesn't. Instead you have to use __has_feature to check.
@@ -76,9 +68,11 @@
 
 #define OBJECT_LAYER_NAME "VK_LAYER_KHRONOS_validation"
 
+[[maybe_unused]] static const VkBool32 kVkFalse = VK_FALSE;
+[[maybe_unused]] static const VkBool32 kVkTrue = VK_TRUE;
+
 // This is only for tests where you have a good reason to have more than the default (10) duplicate message limit.
 // It is highly suggested you first try to breakup your test up into smaller tests if you are trying to use this.
-static VkBool32 kVkFalse = VK_FALSE;
 static const VkLayerSettingEXT kDisableMessageLimitSetting = {OBJECT_LAYER_NAME, "enable_message_limit",
                                                               VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse};
 [[maybe_unused]] static VkLayerSettingsCreateInfoEXT kDisableMessageLimit = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
@@ -117,7 +111,7 @@ bool ImageFormatIsSupported(const VkInstance inst, const VkPhysicalDevice phy, c
 bool BufferFormatAndFeaturesSupported(VkPhysicalDevice phy, VkFormat format, VkFormatFeatureFlags features);
 
 // Simple sane SamplerCreateInfo boilerplate
-VkSamplerCreateInfo SafeSaneSamplerCreateInfo();
+VkSamplerCreateInfo SafeSaneSamplerCreateInfo(void *p_next = nullptr);
 
 // Dependent "false" type for the static assert, as GCC will evaluate
 // non-dependent static_asserts even for non-instantiated templates
@@ -125,21 +119,8 @@ template <typename T>
 struct AlwaysFalse : std::false_type {};
 
 // Helpers to get nearest greater or smaller value (of float) -- useful for testing the boundary cases of Vulkan limits
-template <typename T>
-T NearestGreater(const T from) {
-    using Lim = std::numeric_limits<T>;
-    const auto positive_direction = Lim::has_infinity ? Lim::infinity() : Lim::max();
-
-    return std::nextafter(from, positive_direction);
-}
-
-template <typename T>
-T NearestSmaller(const T from) {
-    using Lim = std::numeric_limits<T>;
-    const auto negative_direction = Lim::has_infinity ? -Lim::infinity() : Lim::lowest();
-
-    return std::nextafter(from, negative_direction);
-}
+float NearestGreater(const float from);
+float NearestSmaller(const float from);
 
 // Defining VVL_TESTS_USE_CUSTOM_TEST_FRAMEWORK allows downstream users
 // to inject custom test framework changes. This includes the ability
@@ -243,48 +224,35 @@ class VkBestPracticesLayerTest : public VkLayerTest {
 
 class GpuAVTest : public virtual VkLayerTest {
   public:
-    void InitGpuAvFramework(void *p_next = nullptr);
+    void InitGpuAvFramework(std::vector<VkLayerSettingEXT> layer_settings = {}, bool safe_mode = true);
 
     VkValidationFeaturesEXT GetGpuAvValidationFeatures();
 };
 
 class GpuAVBufferDeviceAddressTest : public GpuAVTest {
   public:
-    void InitGpuVUBufferDeviceAddress(void *p_next = nullptr);
+    void InitGpuVUBufferDeviceAddress(bool safe_mode = true);
 };
 
 class GpuAVDescriptorIndexingTest : public GpuAVTest {
   public:
-    void InitGpuVUDescriptorIndexing();
+    void InitGpuVUDescriptorIndexing(bool safe_mode = true);
 };
 
 class GpuAVDescriptorClassGeneralBuffer : public GpuAVTest {
   public:
-    void ComputeStorageBufferTest(const char *shader, bool is_glsl, VkDeviceSize buffer_size, const char *expected_error = nullptr);
+    void ComputeStorageBufferTest(const char *shader, bool is_glsl, VkDeviceSize buffer_size, const char *expected_error = nullptr,
+                                  uint32_t error_count = 1);
 };
 
 class GpuAVRayQueryTest : public GpuAVTest {
   public:
-    void InitGpuAVRayQuery();
-};
-
-class GpuAVImageLayout : public GpuAVTest {
-  public:
-    void InitGpuAVImageLayout();
+    void InitGpuAVRayQuery(std::vector<VkLayerSettingEXT> layer_settings = {});
 };
 
 class DebugPrintfTests : public VkLayerTest {
   public:
     void InitDebugPrintfFramework(void *p_next = nullptr, bool reserve_slot = false);
-};
-
-struct SyncValSettings;
-class VkSyncValTest : public VkLayerTest {
-  public:
-    void InitSyncValFramework(const SyncValSettings *p_sync_settings = nullptr);
-    void InitSyncVal(const SyncValSettings *p_sync_settings = nullptr);
-    void InitTimelineSemaphore();
-    void InitRayTracing();
 };
 
 class AndroidExternalResolveTest : public VkLayerTest {
@@ -406,18 +374,6 @@ class WsiTest : public VkLayerTest {
   protected:
     // Find physical device group that contains physical device selected by the test framework
     std::optional<VkPhysicalDeviceGroupProperties> FindPhysicalDeviceGroup();
-
-  protected:
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-    struct WaylandContext {
-        wl_display *display = nullptr;
-        wl_registry *registry = nullptr;
-        wl_surface *surface = nullptr;
-        wl_compositor *compositor = nullptr;
-    };
-    void InitWaylandContext(WaylandContext& context);
-    void ReleaseWaylandContext(WaylandContext& context);
-#endif
 };
 
 class CooperativeMatrixTest : public VkLayerTest {
@@ -456,7 +412,7 @@ void PositiveTestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device
                                   bool rp2_supported);
 void PositiveTestRenderPass2KHRCreate(const vkt::Device &device, const VkRenderPassCreateInfo2KHR &create_info);
 void TestRenderPass2KHRCreate(ErrorMonitor &error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo2KHR &create_info,
-                              const std::initializer_list<const char *> &vuids);
+                              const std::vector<const char *> &vuids);
 void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, const VkCommandBuffer command_buffer,
                          const VkRenderPassBeginInfo *begin_info, bool rp2Supported, const char *rp1_vuid, const char *rp2_vuid);
 

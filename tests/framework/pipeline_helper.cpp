@@ -293,9 +293,9 @@ VkResult CreatePipelineHelper::CreateGraphicsPipeline(bool do_late_bind, bool no
                                        &pipeline_);
 }
 
-CreateComputePipelineHelper::CreateComputePipelineHelper(VkLayerTest &test, void *pNext) : layer_test_(test) {
+CreateComputePipelineHelper::CreateComputePipelineHelper(vkt::Device& device, void *pNext) {
     // default VkDevice, can be overwritten if multi-device tests
-    device_ = layer_test_.DeviceObj();
+    device_ = &device;
 
     cp_ci_ = vku::InitStructHelper();
     cp_ci_.pNext = pNext;
@@ -314,18 +314,49 @@ CreateComputePipelineHelper::CreateComputePipelineHelper(VkLayerTest &test, void
     pc_ci_.initialDataSize = 0;
     pc_ci_.pInitialData = nullptr;
 
-    InitShaderInfo();
+    cs_ = VkShaderObj(device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     cp_ci_.flags = 0;
     cp_ci_.layout = VK_NULL_HANDLE;
 }
 
-CreateComputePipelineHelper::~CreateComputePipelineHelper() { Destroy(); }
+CreateComputePipelineHelper::CreateComputePipelineHelper(VkLayerTest &test, void *pNext)
+    : CreateComputePipelineHelper(*test.DeviceObj(), pNext) {}
 
-void CreateComputePipelineHelper::InitShaderInfo() {
-    cs_ = std::make_unique<VkShaderObj>(&layer_test_, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-    // We shouldn't need a fragment shader but add it to be able to run on more devices
+CreateComputePipelineHelper::CreateComputePipelineHelper(CreateComputePipelineHelper &&rhs) noexcept { *this = std::move(rhs); }
+
+CreateComputePipelineHelper &CreateComputePipelineHelper::operator=(CreateComputePipelineHelper &&rhs) noexcept {
+    dsl_bindings_ = std::move(rhs.dsl_bindings_);
+    descriptor_set_ = std::move(rhs.descriptor_set_);
+
+    pipeline_layout_ci_ = rhs.pipeline_layout_ci_;
+    rhs.pipeline_layout_ci_ = {};
+
+    pipeline_layout_ = std::move(rhs.pipeline_layout_);
+
+    cp_ci_ = rhs.cp_ci_;
+    rhs.cp_ci_ = {};
+
+    pc_ci_ = rhs.pc_ci_;
+    rhs.pc_ci_ = {};
+
+    pipeline_cache_ = rhs.pipeline_cache_;
+    rhs.pipeline_cache_ = VK_NULL_HANDLE;
+
+    cs_ = std::move(rhs.cs_);
+
+    override_skip_ = rhs.override_skip_;
+    rhs.override_skip_ = false;
+
+    device_ = rhs.device_;
+    rhs.device_ = nullptr;
+
+    pipeline_ = rhs.pipeline_;
+    rhs.pipeline_ = VK_NULL_HANDLE;
+    return *this;
 }
+
+CreateComputePipelineHelper::~CreateComputePipelineHelper() noexcept { Destroy(); }
 
 void CreateComputePipelineHelper::InitPipelineCache() {
     if (pipeline_cache_ != VK_NULL_HANDLE) {
@@ -351,21 +382,21 @@ void CreateComputePipelineHelper::LateBindPipelineInfo() {
     if (cp_ci_.layout == VK_NULL_HANDLE) {
         // Create a default descriptor and pipeline layout
         if (pipeline_layout_.handle() == VK_NULL_HANDLE) {
-            if (!descriptor_set_) {
+            if (!descriptor_set_.Initialized()) {
                 // User can pass in own bindings
-                descriptor_set_.reset(new OneOffDescriptorSet(device_, dsl_bindings_));
-                ASSERT_TRUE(descriptor_set_->Initialized());
+                descriptor_set_ = OneOffDescriptorSet(device_, dsl_bindings_);
+                ASSERT_TRUE(descriptor_set_.Initialized());
             }
 
             const std::vector<VkPushConstantRange> push_ranges(
                 pipeline_layout_ci_.pPushConstantRanges,
                 pipeline_layout_ci_.pPushConstantRanges + pipeline_layout_ci_.pushConstantRangeCount);
-            pipeline_layout_ = vkt::PipelineLayout(*device_, {&descriptor_set_->layout_}, push_ranges, pipeline_layout_ci_.flags);
+            pipeline_layout_ = vkt::PipelineLayout(*device_, {&descriptor_set_.layout_}, push_ranges, pipeline_layout_ci_.flags);
         }
 
         cp_ci_.layout = pipeline_layout_.handle();
     }
-    cp_ci_.stage = cs_.get()->GetStageCreateInfo();
+    cp_ci_.stage = cs_.GetStageCreateInfo();
 }
 
 VkResult CreateComputePipelineHelper::CreateComputePipeline(bool do_late_bind, bool no_cache) {
@@ -418,10 +449,10 @@ SimpleGPL::SimpleGPL(VkLayerTest &test, VkPipelineLayout layout, const char *ver
     frag_out_lib_.CreateGraphicsPipeline(false);
 
     VkPipeline libraries[4] = {
-        vertex_input_lib_.Handle(),
-        pre_raster_lib_.Handle(),
-        frag_shader_lib_.Handle(),
-        frag_out_lib_.Handle(),
+        vertex_input_lib_,
+        pre_raster_lib_,
+        frag_shader_lib_,
+        frag_out_lib_,
     };
 
     VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();

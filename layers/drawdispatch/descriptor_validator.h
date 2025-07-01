@@ -26,7 +26,7 @@ struct ResourceInterfaceVariable;
 namespace vvl {
 struct DrawDispatchVuid;
 class DescriptorBinding;
-class Device;
+class DeviceProxy;
 class BufferDescriptor;
 class ImageDescriptor;
 class ImageSamplerDescriptor;
@@ -37,52 +37,58 @@ class CommandBuffer;
 class Sampler;
 class DescriptorSet;
 
-class DescriptorValidator {
- public:
-   DescriptorValidator(Device& dev, vvl::CommandBuffer& cb_state, vvl::DescriptorSet& descriptor_set, uint32_t set_index,
-                       VkFramebuffer framebuffer, const Location& loc);
+class DescriptorValidator : public Logger {
+  public:
+    DescriptorValidator(DeviceProxy& dev, vvl::CommandBuffer& cb_state, vvl::DescriptorSet& descriptor_set, uint32_t set_index,
+                        VkFramebuffer framebuffer, const VulkanTypedHandle* shader_handle, const Location& loc);
 
-   // Used with normal validation where we know which descriptors are accessed.
-   bool ValidateBindingStatic(const spirv::ResourceInterfaceVariable& binding_info, const vvl::DescriptorBinding& binding) const;
-   // Used with GPU-AV when we need to run the GPU to know which descriptors are accessed.
-   // The main reason we can't combine is one function needs to be const and the other is non-const.
-   bool ValidateBindingDynamic(const spirv::ResourceInterfaceVariable& binding_info, DescriptorBinding& binding,
-                               const uint32_t index);
+    // Used with normal validation where we know which descriptors are accessed.
+    bool ValidateBindingStatic(const spirv::ResourceInterfaceVariable& binding_info, const vvl::DescriptorBinding& binding) const;
+    // Used with GPU-AV when we need to run the GPU to know which descriptors are accessed.
+    // The main reason we can't combine is one function needs to be const and the other is non-const.
+    bool ValidateBindingDynamic(const spirv::ResourceInterfaceVariable& binding_info, DescriptorBinding& binding,
+                                const uint32_t index);
+    void SetSetIndexForGpuAv(uint32_t set_index) { this->set_index = set_index; }
+    void SetShaderHandleForGpuAv(const VulkanTypedHandle* shader_handle) { this->shader_handle = shader_handle; }
+    void SetLocationForGpuAv(const Location& loc) { this->loc = LocationCapture(loc); }
 
- private:
-   template <typename T>
-   bool ValidateDescriptorsStatic(const spirv::ResourceInterfaceVariable& binding_info, const T& binding) const;
+  private:
+    template <typename T>
+    bool ValidateDescriptorsStatic(const spirv::ResourceInterfaceVariable& binding_info, const T& binding) const;
 
-   template <typename T>
-   bool ValidateDescriptorsDynamic(const spirv::ResourceInterfaceVariable& binding_info, const T& binding, const uint32_t index);
+    template <typename T>
+    bool ValidateDescriptorsDynamic(const spirv::ResourceInterfaceVariable& binding_info, const T& binding, const uint32_t index);
 
-   bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
-                           VkDescriptorType descriptor_type, const vvl::BufferDescriptor& descriptor) const;
-   bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
-                           VkDescriptorType descriptor_type, const vvl::ImageDescriptor& descriptor) const;
-   bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
-                           VkDescriptorType descriptor_type, const vvl::ImageSamplerDescriptor& descriptor) const;
-   bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
-                           VkDescriptorType descriptor_type, const vvl::TexelDescriptor& descriptor) const;
-   bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
-                           VkDescriptorType descriptor_type, const vvl::AccelerationStructureDescriptor& descriptor) const;
-   bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
-                           VkDescriptorType descriptor_type, const vvl::SamplerDescriptor& descriptor) const;
+    bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                            VkDescriptorType descriptor_type, const vvl::BufferDescriptor& descriptor) const;
+    bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                            VkDescriptorType descriptor_type, const vvl::ImageDescriptor& descriptor) const;
+    bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                            VkDescriptorType descriptor_type, const vvl::ImageSamplerDescriptor& descriptor) const;
+    bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                            VkDescriptorType descriptor_type, const vvl::TexelDescriptor& descriptor) const;
+    bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                            VkDescriptorType descriptor_type, const vvl::AccelerationStructureDescriptor& descriptor) const;
+    bool ValidateDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                            VkDescriptorType descriptor_type, const vvl::SamplerDescriptor& descriptor) const;
 
-   // helper for the common parts of ImageSamplerDescriptor and SamplerDescriptor validation
-   bool ValidateSamplerDescriptor(const spirv::ResourceInterfaceVariable& binding_info, uint32_t index, VkSampler sampler,
-                                  bool is_immutable, const vvl::Sampler* sampler_state) const;
+    // helper for the common parts of ImageSamplerDescriptor and SamplerDescriptor validation
+    bool ValidateSamplerDescriptor(const spirv::ResourceInterfaceVariable& binding_info, uint32_t index, VkSampler sampler,
+                                   bool is_immutable, const vvl::Sampler* sampler_state) const;
 
-   std::string DescribeDescriptor(const spirv::ResourceInterfaceVariable& binding_info, uint32_t index,
-                                  VkDescriptorType type) const;
+    std::string DescribeDescriptor(const spirv::ResourceInterfaceVariable& binding_info, uint32_t index,
+                                   VkDescriptorType type) const;
 
-   vvl::Device& dev_state;
-   vvl::CommandBuffer& cb_state;
-   vvl::DescriptorSet& descriptor_set;
-   const uint32_t set_index;
-   const VkFramebuffer framebuffer;
-   const Location& loc;
-   const DrawDispatchVuid& vuids;
+    vvl::DeviceProxy& dev_proxy;
+    vvl::CommandBuffer& cb_state;
+    vvl::DescriptorSet& descriptor_set;
+    const VkFramebuffer framebuffer;
+    LocationCapture loc;
+    const DrawDispatchVuid& vuids;
 
+    // For GPU-AV, these can become aliased and need to be mutable between descriptor accesses
+    uint32_t set_index;
+    // A descriptor set might be used between multiple shaders and need to adjust which one was found
+    const VulkanTypedHandle* shader_handle;  // VkPipeline or VkShaderObject
 };
 }  // namespace vvl

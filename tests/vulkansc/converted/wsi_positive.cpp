@@ -30,8 +30,8 @@ void WsiTest::SetImageLayoutPresentSrc(VkImage image) {
                                         image,
                                         {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}};
 
-    vk::CmdPipelineBarrier(cmd_buf.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &layout_barrier);
+    vk::CmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
+                           nullptr, 1, &layout_barrier);
     cmd_buf.End();
     m_default_queue->Submit(cmd_buf);
     m_default_queue->Wait();
@@ -77,54 +77,6 @@ std::optional<VkPhysicalDeviceGroupProperties> WsiTest::FindPhysicalDeviceGroup(
     return {};
 }
 
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-void WsiTest::InitWaylandContext(WaylandContext &context) {
-    context.display = wl_display_connect(nullptr);
-    if (!context.display) {
-        GTEST_SKIP() << "couldn't create wayland surface";
-    }
-
-    auto global = [](void *data, struct wl_registry *registry, uint32_t id, const char *interface, uint32_t version) {
-        (void)version;
-        const std::string_view interface_str = interface;
-        if (interface_str == "wl_compositor") {
-            auto compositor = reinterpret_cast<wl_compositor **>(data);
-            *compositor = reinterpret_cast<wl_compositor *>(wl_registry_bind(registry, id, &wl_compositor_interface, 1));
-        }
-    };
-
-    auto global_remove = [](void *data, struct wl_registry *registry, uint32_t id) {
-        (void)data;
-        (void)registry;
-        (void)id;
-    };
-
-    context.registry = wl_display_get_registry(context.display);
-    ASSERT_TRUE(context.registry != nullptr);
-
-    const wl_registry_listener registry_listener = {global, global_remove};
-
-    wl_registry_add_listener(context.registry, &registry_listener, &context.compositor);
-
-    wl_display_dispatch(context.display);
-    ASSERT_TRUE(context.compositor);
-
-    context.surface = wl_compositor_create_surface(context.compositor);
-    ASSERT_TRUE(context.surface);
-
-    const uint32_t version = wl_surface_get_version(context.surface);
-    ASSERT_TRUE(version > 0);
-}
-
-void WsiTest::ReleaseWaylandContext(WaylandContext &context) {
-    wl_surface_destroy(context.surface);
-    wl_compositor_destroy(context.compositor);
-    wl_registry_destroy(context.registry);
-    wl_display_disconnect(context.display);
-    context = WaylandContext{};
-}
-#endif  // VK_USE_PLATFORM_WAYLAND_KHR
-
 class PositiveWsi : public WsiTest {};
 
 TEST_F(PositiveWsi, CreateWaylandSurface) {
@@ -138,7 +90,9 @@ TEST_F(PositiveWsi, CreateWaylandSurface) {
     RETURN_IF_SKIP(Init());
 
     WaylandContext wayland_ctx;
-    RETURN_IF_SKIP(InitWaylandContext(wayland_ctx));
+    if (!wayland_ctx.Init()) {
+        GTEST_SKIP() << "Failed to create wayland context.";
+    }
 
     VkWaylandSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
     surface_create_info.display = wayland_ctx.display;
@@ -148,7 +102,7 @@ TEST_F(PositiveWsi, CreateWaylandSurface) {
     vk::CreateWaylandSurfaceKHR(instance(), &surface_create_info, nullptr, &vulkan_surface);
 
     vk::DestroySurfaceKHR(instance(), vulkan_surface, nullptr);
-    ReleaseWaylandContext(wayland_ctx);
+    wayland_ctx.Release();
 #endif
 }
 
@@ -295,7 +249,7 @@ TEST_F(PositiveWsi, CmdCopySwapchainImage) {
     bind_swapchain_info.imageIndex = 0;
 
     VkBindImageMemoryInfo bind_info = vku::InitStructHelper(&bind_swapchain_info);
-    bind_info.image = image_from_swapchain.handle();
+    bind_info.image = image_from_swapchain;
     bind_info.memory = VK_NULL_HANDLE;
     bind_info.memoryOffset = 0;
 
@@ -311,8 +265,8 @@ TEST_F(PositiveWsi, CmdCopySwapchainImage) {
 
     m_command_buffer.Begin();
 
-    vk::CmdCopyImage(m_command_buffer.handle(), srcImage.handle(), VK_IMAGE_LAYOUT_GENERAL, image_from_swapchain.handle(),
-                     VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
+    vk::CmdCopyImage(m_command_buffer, srcImage, VK_IMAGE_LAYOUT_GENERAL, image_from_swapchain, VK_IMAGE_LAYOUT_GENERAL, 1,
+                     &copy_region);
 }
 
 TEST_F(PositiveWsi, TransferImageToSwapchainDeviceGroup) {
@@ -383,7 +337,7 @@ TEST_F(PositiveWsi, TransferImageToSwapchainDeviceGroup) {
     bind_swapchain_info.imageIndex = 0;
 
     VkBindImageMemoryInfo bind_info = vku::InitStructHelper(&bind_swapchain_info);
-    bind_info.image = peer_image.handle();
+    bind_info.image = peer_image;
     bind_info.memory = VK_NULL_HANDLE;
     bind_info.memoryOffset = 0;
 
@@ -410,8 +364,8 @@ TEST_F(PositiveWsi, TransferImageToSwapchainDeviceGroup) {
     img_barrier.subresourceRange.baseMipLevel = 0;
     img_barrier.subresourceRange.layerCount = 1;
     img_barrier.subresourceRange.levelCount = 1;
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &img_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &img_barrier);
 
     VkImageCopy copy_region = {};
     copy_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -419,12 +373,11 @@ TEST_F(PositiveWsi, TransferImageToSwapchainDeviceGroup) {
     copy_region.srcOffset = {0, 0, 0};
     copy_region.dstOffset = {0, 0, 0};
     copy_region.extent = {test_extent_value, test_extent_value, 1};
-    vk::CmdCopyImage(m_command_buffer.handle(), src_Image.handle(), VK_IMAGE_LAYOUT_GENERAL, peer_image.handle(),
-                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
+    vk::CmdCopyImage(m_command_buffer, src_Image, VK_IMAGE_LAYOUT_GENERAL, peer_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                     &copy_region);
 
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 TEST_F(PositiveWsi, SwapchainAcquireImageAndPresent) {
@@ -603,7 +556,6 @@ TEST_F(PositiveWsi, RetireSubmissionUsingAcquireFence2) {
     // Create new swapchain.
     m_swapchain = CreateSwapchain(m_surface.Handle(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
 
-    // The following Acquire will detect that fence's AcquireFenceSync belongs to the old swapchain and will invalidate it.
     image_index = m_swapchain.AcquireNextImage(acquire_fence, kWaitTimeout);
 
     vk::WaitForFences(device(), 1, &acquire_fence.handle(), VK_TRUE, kWaitTimeout);
@@ -696,19 +648,19 @@ TEST_F(PositiveWsi, SwapchainImageLayout) {
     ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vkt::ImageView view(*m_device, ivci);
 
-    vkt::Framebuffer fb1(*m_device, rp1.handle(), 1, &view.handle(), 1, 1);
-    vkt::Framebuffer fb2(*m_device, rp2.handle(), 1, &view.handle(), 1, 1);
+    vkt::Framebuffer fb1(*m_device, rp1, 1, &view.handle(), 1, 1);
+    vkt::Framebuffer fb2(*m_device, rp2, 1, &view.handle(), 1, 1);
 
     m_command_buffer.Begin();
-    m_command_buffer.BeginRenderPass(rp1.handle(), fb1.handle());
+    m_command_buffer.BeginRenderPass(rp1, fb1);
     m_command_buffer.EndRenderPass();
-    m_command_buffer.BeginRenderPass(rp2.handle(), fb2.handle());
+    m_command_buffer.BeginRenderPass(rp2, fb2);
     m_command_buffer.EndRenderPass();
 
     const VkImageMemoryBarrier present_transition =
         TransitionToPresent(swapchainImages[image_index], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0);
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-                           0, nullptr, 0, nullptr, 1, &present_transition);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
+                           nullptr, 0, nullptr, 1, &present_transition);
     m_command_buffer.End();
 
     vk::WaitForFences(device(), 1, &fence.handle(), VK_TRUE, kWaitTimeout);
@@ -943,7 +895,7 @@ TEST_F(PositiveWsi, SwapchainImageFormatProps) {
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
     CreatePipelineHelper pipe(*this);
-    pipe.gp_ci_.renderPass = render_pass.handle();
+    pipe.gp_ci_.renderPass = render_pass;
     pipe.cb_attachments_ = pcbas;
     pipe.CreateGraphicsPipeline();
 
@@ -964,13 +916,13 @@ TEST_F(PositiveWsi, SwapchainImageFormatProps) {
     ivci.format = format;
     ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vkt::ImageView image_view(*m_device, ivci);
-    vkt::Framebuffer framebuffer(*m_device, render_pass.handle(), 1, &image_view.handle(), 1, 1);
+    vkt::Framebuffer framebuffer(*m_device, render_pass, 1, &image_view.handle(), 1, 1);
 
     vkt::CommandBuffer cmdbuff(*m_device, m_command_pool);
     cmdbuff.Begin();
-    cmdbuff.BeginRenderPass(render_pass.handle(), framebuffer.handle());
+    cmdbuff.BeginRenderPass(render_pass, framebuffer);
 
-    vk::CmdBindPipeline(cmdbuff.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(cmdbuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 }
 
 TEST_F(PositiveWsi, SwapchainExclusiveModeQueueFamilyPropertiesReferences) {
@@ -1056,7 +1008,7 @@ TEST_F(PositiveWsi, DestroySwapchainWithBoundImages) {
         bind_swapchain_info.imageIndex = i++;
 
         VkBindImageMemoryInfo bind_info = vku::InitStructHelper(&bind_swapchain_info);
-        bind_info.image = image.handle();
+        bind_info.image = image;
         bind_info.memory = VK_NULL_HANDLE;
         bind_info.memoryOffset = 0;
 
@@ -1183,11 +1135,11 @@ TEST_F(PositiveWsi, ProtectedSwapchainImageColorAttachment) {
     VkRect2D render_area = {{0, 0}, swapchain_create_info.imageExtent};
     VkRenderPassBeginInfo render_pass_begin =
         vku::InitStruct<VkRenderPassBeginInfo>(nullptr, m_renderPass, fb.handle(), render_area, 0u, nullptr);
-    vk::CmdBeginRenderPass(protectedCommandBuffer.handle(), &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
-    vk::CmdBindPipeline(protectedCommandBuffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBeginRenderPass(protectedCommandBuffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBindPipeline(protectedCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     // This should be valid since the framebuffer color attachment is a protected swapchain image
-    vk::CmdDraw(protectedCommandBuffer.handle(), 3, 1, 0, 0);
-    vk::CmdEndRenderPass(protectedCommandBuffer.handle());
+    vk::CmdDraw(protectedCommandBuffer, 3, 1, 0, 0);
+    vk::CmdEndRenderPass(protectedCommandBuffer);
     protectedCommandBuffer.End();
 }
 
@@ -1342,8 +1294,8 @@ TEST_F(PositiveWsi, AcquireImageBeforeGettingSwapchainImages) {
 
     const VkImageMemoryBarrier present_transition = TransitionToPresent(images[imageIndex], VK_IMAGE_LAYOUT_UNDEFINED, 0);
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-                           0, nullptr, 0, nullptr, 1, &present_transition);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
+                           nullptr, 0, nullptr, 1, &present_transition);
     m_command_buffer.End();
     m_default_queue->Submit(m_command_buffer);
     m_default_queue->Present(swapchain, imageIndex, vkt::no_semaphore);
@@ -1546,12 +1498,12 @@ TEST_F(PositiveWsi, QueueWaitsForPresentFence2) {
 
     vkt::Fence present_fence(*m_device);
     vkt::Fence present_fence2(*m_device);
-    const VkFence present_fences[2] = {present_fence.handle(), present_fence2.handle()};
+    const VkFence present_fences[2] = {present_fence, present_fence2};
     VkSwapchainPresentFenceInfoEXT present_fence_info = vku::InitStructHelper();
     present_fence_info.swapchainCount = 2;
     present_fence_info.pFences = present_fences;
 
-    const VkSemaphore wait_semaphores[2] = {acquire_semaphore.handle(), acquire_semaphore2.handle()};
+    const VkSemaphore wait_semaphores[2] = {acquire_semaphore, acquire_semaphore2};
     const VkSwapchainKHR swapchains[2] = {m_swapchain, swapchain2};
     const uint32_t image_indices[2]{image_index, image_index2};
     VkPresentInfoKHR present = vku::InitStructHelper(&present_fence_info);
@@ -1646,7 +1598,8 @@ TEST_F(PositiveWsi, PresentFenceRetiresPresentSemaphores) {
     vk::WaitForFences(*m_device, 1, &present_fences_handles[1], VK_TRUE, kWaitTimeout);
 }
 
-TEST_F(PositiveWsi, DifferentPerPresentModeImageCount) {
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10285
+TEST_F(PositiveWsi, DISABLED_DifferentPerPresentModeImageCount) {
     TEST_DESCRIPTION("Create swapchain with per present mode minImageCount that is less than surface's general minImageCount");
 #ifndef VK_USE_PLATFORM_WAYLAND_KHR
     GTEST_SKIP() << "Test requires wayland platform support";
@@ -1659,7 +1612,9 @@ TEST_F(PositiveWsi, DifferentPerPresentModeImageCount) {
     RETURN_IF_SKIP(Init());
 
     WaylandContext wayland_ctx;
-    RETURN_IF_SKIP(InitWaylandContext(wayland_ctx));
+    if (!wayland_ctx.Init()) {
+        GTEST_SKIP() << "Failed to create wayland context.";
+    }
 
     VkWaylandSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
     surface_create_info.display = wayland_ctx.display;
@@ -1684,7 +1639,7 @@ TEST_F(PositiveWsi, DifferentPerPresentModeImageCount) {
 
     if (per_present_mode_min_image_count >= general_min_image_count) {
         vk::DestroySurfaceKHR(instance(), surface, nullptr);
-        ReleaseWaylandContext(wayland_ctx);
+        wayland_ctx.Release();
         GTEST_SKIP() << "Can't find present mode that uses less images than a general case";
     }
 
@@ -1696,7 +1651,7 @@ TEST_F(PositiveWsi, DifferentPerPresentModeImageCount) {
 
     VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper(&swapchain_present_mode_create_info);
     swapchain_create_info.surface = surface;
-    swapchain_create_info.minImageCount = surface_caps.surfaceCapabilities.minImageCount;
+    swapchain_create_info.minImageCount = per_present_mode_min_image_count;
     swapchain_create_info.imageFormat = info.surface_formats[0].format;
     swapchain_create_info.imageColorSpace = info.surface_formats[0].colorSpace;
     swapchain_create_info.imageExtent = surface_caps.surfaceCapabilities.minImageExtent;
@@ -1712,7 +1667,7 @@ TEST_F(PositiveWsi, DifferentPerPresentModeImageCount) {
     { vkt::Swapchain swapchain(*m_device, swapchain_create_info); }
 
     vk::DestroySurfaceKHR(instance(), surface, nullptr);
-    ReleaseWaylandContext(wayland_ctx);
+    wayland_ctx.Release();
 #endif
 }
 
@@ -1788,7 +1743,7 @@ TEST_F(PositiveWsi, ReleaseSwapchainImages) {
     m_default_queue->Present(m_swapchain, present_index, submit_semaphore);
 
     VkReleaseSwapchainImagesInfoEXT releaseInfo = vku::InitStructHelper();
-    releaseInfo.swapchain = m_swapchain.handle();
+    releaseInfo.swapchain = m_swapchain;
     releaseInfo.imageIndexCount = (uint32_t)release_indices.size();
     releaseInfo.pImageIndices = release_indices.data();
     vk::ReleaseSwapchainImagesEXT(device(), &releaseInfo);
@@ -1816,7 +1771,7 @@ TEST_F(PositiveWsi, ReleaseAndAcquireSwapchainImages) {
         vk::ResetFences(device(), 1, &fence.handle());
 
         VkReleaseSwapchainImagesInfoEXT releaseInfo = vku::InitStructHelper();
-        releaseInfo.swapchain = m_swapchain.handle();
+        releaseInfo.swapchain = m_swapchain;
         releaseInfo.imageIndexCount = 1u;
         releaseInfo.pImageIndices = &image_index;
         vk::ReleaseSwapchainImagesEXT(device(), &releaseInfo);
@@ -1860,7 +1815,11 @@ TEST_F(PositiveWsi, MultiSwapchainPresentWithOneBadSwapchain) {
     vkt::Semaphore acquire_semaphore2(*m_device);
     const VkSemaphore acquire_semaphore_handles[2] = {acquire_semaphore, acquire_semaphore2};
 
-    vkt::Semaphore submit_semaphore(*m_device);
+    std::vector<vkt::Semaphore> submit_semaphores;
+    for (size_t i = 0; i < swapchain_images.size(); i++) {
+        submit_semaphores.emplace_back(*m_device);
+    }
+
     vkt::Fence frame_fence(*m_device);
 
     const VkPipelineStageFlags wait_stage_masks[2] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
@@ -1890,12 +1849,12 @@ TEST_F(PositiveWsi, MultiSwapchainPresentWithOneBadSwapchain) {
         submit_info.pWaitSemaphores = acquire_semaphore_handles;
         submit_info.pWaitDstStageMask = wait_stage_masks;
         submit_info.signalSemaphoreCount = 1;
-        submit_info.pSignalSemaphores = &submit_semaphore.handle();
+        submit_info.pSignalSemaphores = &submit_semaphores[image_index].handle();
         vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, frame_fence);
 
         VkPresentInfoKHR present = vku::InitStructHelper();
         present.waitSemaphoreCount = 1;
-        present.pWaitSemaphores = &submit_semaphore.handle();
+        present.pWaitSemaphores = &submit_semaphores[image_index].handle();
         present.swapchainCount = 2;
         present.pSwapchains = swapchain_handles;
         present.pImageIndices = image_indices;
@@ -1920,11 +1879,12 @@ TEST_F(PositiveWsi, MultiSwapchainPresentWithOneBadSwapchain) {
         // image_index presentation should succeed, image_index2 should fail.
         const uint32_t image_indices[2] = {image_index, image_index2};
 
-        m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore), vkt::Signal(submit_semaphore), frame_fence);
+        m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore), vkt::Signal(submit_semaphores[image_index]),
+                                frame_fence);
 
         VkPresentInfoKHR present = vku::InitStructHelper();
         present.waitSemaphoreCount = 1;
-        present.pWaitSemaphores = &submit_semaphore.handle();
+        present.pWaitSemaphores = &submit_semaphores[image_index].handle();
         present.swapchainCount = 2;
         present.pSwapchains = swapchain_handles;
         present.pImageIndices = image_indices;
@@ -2078,4 +2038,575 @@ TEST_F(PositiveWsi, CreateSwapchainImagesWithConcurrentSharingMode) {
     image_create_info.queueFamilyIndexCount = 2u;
     image_create_info.pQueueFamilyIndices = queue_family_indices;
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
+}
+
+TEST_F(PositiveWsi, CreateSwapchainImagesWithExclusiveSharingMode) {
+    TEST_DESCRIPTION("Create images from swapchain with exclusive sharing mode");
+
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    if (!m_second_queue) {
+        GTEST_SKIP() << "Two queues are needed to run this test";
+    }
+    RETURN_IF_SKIP(InitSurface());
+    InitSwapchainInfo();
+
+    uint32_t queue_family_indices[] = {m_default_queue->family_index, m_second_queue->family_index};
+
+    VkSurfaceCapabilitiesKHR surface_caps;
+    vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(Gpu(), m_surface.Handle(), &surface_caps);
+
+    VkImageFormatProperties img_format_props;
+    vk::GetPhysicalDeviceImageFormatProperties(Gpu(), m_surface_formats[0].format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+                                               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &img_format_props);
+    VkExtent2D img_ext = {std::min(m_surface_capabilities.maxImageExtent.width, img_format_props.maxExtent.width),
+                          std::min(m_surface_capabilities.maxImageExtent.height, img_format_props.maxExtent.height)};
+
+    VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper();
+    swapchain_ci.surface = m_surface.Handle();
+    swapchain_ci.minImageCount = surface_caps.minImageCount;
+    swapchain_ci.imageFormat = m_surface_formats[0].format;
+    swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
+    swapchain_ci.imageExtent = img_ext;
+    swapchain_ci.imageArrayLayers = 1u;
+    swapchain_ci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchain_ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_ci.queueFamilyIndexCount = 1u;
+    swapchain_ci.pQueueFamilyIndices = queue_family_indices;
+    swapchain_ci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_ci.compositeAlpha = m_surface_composite_alpha;
+    swapchain_ci.presentMode = m_surface_non_shared_present_mode;
+    vkt::Swapchain swapchain(*m_device, swapchain_ci);
+
+    VkImageSwapchainCreateInfoKHR image_swapchain_ci = vku::InitStructHelper();
+    image_swapchain_ci.swapchain = swapchain.handle();
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper(&image_swapchain_ci);
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = swapchain_ci.imageFormat;
+    image_create_info.extent.width = swapchain_ci.imageExtent.width;
+    image_create_info.extent.height = swapchain_ci.imageExtent.height;
+    image_create_info.extent.depth = 1u;
+    image_create_info.mipLevels = 1u;
+    image_create_info.arrayLayers = 1u;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    image_create_info.queueFamilyIndexCount = 1u;
+    image_create_info.pQueueFamilyIndices = queue_family_indices;
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
+}
+
+TEST_F(PositiveWsi, CreateSwapchainWithOldSwapchain) {
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSurface());
+    InitSwapchainInfo();
+
+    VkSurfaceCapabilitiesKHR surface_caps;
+    vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(Gpu(), m_surface.Handle(), &surface_caps);
+
+    VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper();
+    swapchain_ci.surface = m_surface.Handle();
+    swapchain_ci.minImageCount = surface_caps.minImageCount;
+    swapchain_ci.imageFormat = m_surface_formats[0].format;
+    swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
+    swapchain_ci.imageExtent = surface_caps.minImageExtent;
+    swapchain_ci.imageArrayLayers = 1u;
+    swapchain_ci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchain_ci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_ci.compositeAlpha = m_surface_composite_alpha;
+    swapchain_ci.presentMode = m_surface_non_shared_present_mode;
+    vkt::Swapchain swapchain1(*m_device, swapchain_ci);
+
+    swapchain_ci.oldSwapchain = swapchain1;
+    vkt::Swapchain swapchain2(*m_device, swapchain_ci);
+}
+
+TEST_F(PositiveWsi, OldSwapchainFromAnotherSurface) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10112");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    if (IsPlatformMockICD()) {
+        GTEST_SKIP() << "Will leak in ANSN because headless machine uses xvfb, but can only handle a single surface";
+    }
+    RETURN_IF_SKIP(InitSurface());
+    InitSwapchainInfo();
+
+    VkSurfaceCapabilitiesKHR surface_caps;
+    vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(Gpu(), m_surface.Handle(), &surface_caps);
+
+    VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper();
+    swapchain_ci.surface = m_surface.Handle();
+    swapchain_ci.minImageCount = surface_caps.minImageCount;
+    swapchain_ci.imageFormat = m_surface_formats[0].format;
+    swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
+    swapchain_ci.imageExtent = surface_caps.minImageExtent;
+    swapchain_ci.imageArrayLayers = 1u;
+    swapchain_ci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchain_ci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_ci.compositeAlpha = m_surface_composite_alpha;
+    swapchain_ci.presentMode = m_surface_non_shared_present_mode;
+    vkt::Swapchain swapchain1(*m_device, swapchain_ci);
+
+    vkt::Surface surface2{};
+    VkResult result = CreateSurface(m_surface_context, surface2);
+    if (result != VK_SUCCESS) {
+        GTEST_SKIP() << "Failed to create surface.";
+    }
+
+    swapchain_ci.oldSwapchain = swapchain1;
+    swapchain_ci.surface = surface2.Handle();
+    vkt::Swapchain swapchain2(*m_device, swapchain_ci);
+}
+
+TEST_F(PositiveWsi, UseAcquireFenceToDeletePresentSemaphore) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9587
+    TEST_DESCRIPTION("Use acquire fence to safely delete present semaphore from previous present operations");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+    const auto swapchain_images = m_swapchain.GetImages();
+    for (auto image : swapchain_images) {
+        SetImageLayoutPresentSrc(image);
+    }
+
+    // Frame 0
+    vkt::Semaphore acquire_semaphore0(*m_device);
+    uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore0, kWaitTimeout);
+    if (image_index != 0) {
+        GTEST_SKIP() << "test scenario assumes the first acquired image index is 0";
+    }
+    vkt::Semaphore present_semaphore0(*m_device);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore0), vkt::Signal(present_semaphore0));
+    m_default_queue->Present(m_swapchain, image_index, present_semaphore0);
+
+    // Frame 1
+    vkt::Semaphore acquire_semaphore1(*m_device);
+    image_index = m_swapchain.AcquireNextImage(acquire_semaphore1, kWaitTimeout);
+    if (image_index != 1) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "test scenario assumes the second acquired image index is 1";
+    }
+    vkt::Semaphore present_semaphore1(*m_device);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore1), vkt::Signal(present_semaphore1));
+    m_default_queue->Present(m_swapchain, image_index, present_semaphore1);
+
+    // Frame 2
+    vkt::Fence acquire_fence2(*m_device);
+    image_index = m_swapchain.AcquireNextImage(acquire_fence2, kWaitTimeout);
+    if (image_index != 0) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "test scenario assumes the third acquired image index is 0";
+    }
+    acquire_fence2.Wait(kWaitTimeout);
+
+    // This test checks that destroying present semaphore from frame 0 does not generate in-use error.
+    present_semaphore0.destroy();
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveWsi, ExampleHowToReusePresentSemaphores) {
+    TEST_DESCRIPTION("Example of how to safely reuse present semaphores by allocating one per swapchain image");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+    const auto swapchain_images = m_swapchain.GetImages();
+    for (auto image : swapchain_images) {
+        SetImageLayoutPresentSrc(image);
+    }
+
+    // Use single fence to wait for every frame (not very effective but it's fine for testing purposes)
+    vkt::Fence frame_fence(*m_device, VK_FENCE_CREATE_SIGNALED_BIT);
+
+    // The acquire semaphore should be indexed by the current frame buffering index (0 in this case, 0/1 for double buffering).
+    vkt::Semaphore acquire_semaphore(*m_device);
+
+    // Present semaphores (signaled by submit and waited on by present) are allocated per swapchain image.
+    // When a swapchain image is acquired, we know that the previous presentation of this image has finished,
+    // so the associated semaphore is no longer in use.
+    //
+    // IMPORTANT: Present semaphores array should be indexed by the acquired image index.
+    std::vector<vkt::Semaphore> present_semaphores;
+    for (size_t i = 0; i < swapchain_images.size(); i++) {
+        present_semaphores.emplace_back(*m_device);
+    }
+
+    for (uint32_t i = 0; i < 10; i++) {
+        frame_fence.Wait(kWaitTimeout);
+        frame_fence.Reset();
+
+        uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+        m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore), vkt::Signal(present_semaphores[image_index]),
+                                frame_fence);
+        m_default_queue->Present(m_swapchain, image_index, present_semaphores[image_index]);
+    }
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveWsi, ExampleHowToReusePresentSemaphores2) {
+    TEST_DESCRIPTION("Example of how to safely reuse present semaphores by using presentation fence");
+    AddSurfaceExtension();
+    AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::swapchainMaintenance1);
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    const auto swapchain_images = m_swapchain.GetImages();
+    for (auto image : swapchain_images) {
+        SetImageLayoutPresentSrc(image);
+    }
+
+    vkt::CommandBuffer command_buffers[2] = {vkt::CommandBuffer{*m_device, m_command_pool},
+                                             vkt::CommandBuffer(*m_device, m_command_pool)};
+
+    // The acquire semaphores should be indexed by the current frame buffering index.
+    vkt::Semaphore acquire_semaphores[2] = {*m_device, *m_device};
+
+    // The present semaphores can also be indexed by the current frame index if we use presentation fence
+    // and associate presentation fence with each buffered frame.
+    vkt::Semaphore present_semaphores[2] = {*m_device, *m_device};
+
+    vkt::Fence present_fences[2] = {{*m_device, VK_FENCE_CREATE_SIGNALED_BIT}, {*m_device, VK_FENCE_CREATE_SIGNALED_BIT}};
+
+    int frame_index = 0;
+    for (uint32_t i = 0; i < 10; i++) {
+        vkt::Fence &present_fence = present_fences[frame_index];
+        vkt::CommandBuffer &command_buffer = command_buffers[frame_index];
+        vkt::Semaphore &acquire_semaphore = acquire_semaphores[frame_index];
+        vkt::Semaphore &present_semaphore = present_semaphores[frame_index];
+
+        present_fence.Wait(kWaitTimeout);
+        present_fence.Reset();
+
+        command_buffer.Begin();
+        command_buffer.End();
+
+        uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+        m_default_queue->Submit(command_buffer, vkt::Wait(acquire_semaphore), vkt::Signal(present_semaphore));
+
+        VkSwapchainPresentFenceInfoEXT present_fence_info = vku::InitStructHelper();
+        present_fence_info.swapchainCount = 1;
+        present_fence_info.pFences = &present_fence.handle();
+
+        m_default_queue->Present(m_swapchain, image_index, present_semaphore, &present_fence_info);
+        frame_index = 1 - frame_index;  // 0 or 1
+    }
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveWsi, SignalPresentSemaphoreAfterFenceWait) {
+    TEST_DESCRIPTION("Signal present wait semaphore after waiting on the presentation fence");
+    AddSurfaceExtension();
+    AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::swapchainMaintenance1);
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+    const auto swapchain_images = m_swapchain.GetImages();
+    for (auto image : swapchain_images) {
+        SetImageLayoutPresentSrc(image);
+    }
+
+    vkt::Semaphore acquire_semaphore(*m_device);
+    uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+
+    vkt::Fence present_fence(*m_device);
+    VkSwapchainPresentFenceInfoEXT present_fence_info = vku::InitStructHelper();
+    present_fence_info.swapchainCount = 1;
+    present_fence_info.pFences = &present_fence.handle();
+
+    vkt::Semaphore present_semaphore(*m_device);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore), vkt::Signal(present_semaphore));
+    m_default_queue->Present(m_swapchain, image_index, present_semaphore, &present_fence_info);
+
+    // Test that after waiting on the present fence it's safe to signal present semaphore again
+    vk::WaitForFences(device(), 1, &present_fence.handle(), VK_TRUE, kWaitTimeout);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(present_semaphore));
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveWsi, SignalPresentSemaphoreAfterQueueWait) {
+    TEST_DESCRIPTION("Signal present wait semaphore after waiting on device queue. Only works for pre-swapchain-maintenance1");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+    const auto swapchain_images = m_swapchain.GetImages();
+    for (auto image : swapchain_images) {
+        SetImageLayoutPresentSrc(image);
+    }
+
+    vkt::Semaphore acquire_semaphore(*m_device);
+    uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+
+    vkt::Semaphore present_semaphore(*m_device);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore), vkt::Signal(present_semaphore));
+    m_default_queue->Present(m_swapchain, image_index, present_semaphore);
+
+    m_default_queue->Wait();
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(present_semaphore));
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveWsi, GetDeviceGroupSurfacePresentModes) {
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    VkDeviceGroupPresentModeFlagsKHR present_mode_flags;
+    vk::GetDeviceGroupSurfacePresentModesKHR(*m_device, m_surface.Handle(), &present_mode_flags);
+}
+
+TEST_F(PositiveWsi, ProgressOnPresentOnlyQueue) {
+    TEST_DESCRIPTION("Enqueue presentation requests on the dedicated queue");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+    if (!m_second_queue) {
+        GTEST_SKIP() << "Two queues are needed to run this test";
+    }
+    VkBool32 supported;
+    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_second_queue->family_index, m_surface.Handle(), &supported);
+    if (!supported) {
+        GTEST_SKIP() << "The second queue does not support present";
+    }
+    const auto swapchain_images = m_swapchain.GetImages();
+    for (auto image : swapchain_images) {
+        SetImageLayoutPresentSrc(image);
+    }
+
+    std::vector<vkt::Semaphore> present_wait_semaphores;
+    for (size_t i = 0; i < swapchain_images.size(); i++) {
+        present_wait_semaphores.emplace_back(*m_device);
+    }
+
+    vkt::Fence frame_fences[2] = {{*m_device, VK_FENCE_CREATE_SIGNALED_BIT}, {*m_device, VK_FENCE_CREATE_SIGNALED_BIT}};
+    vkt::Semaphore acquire_semaphores[2] = {*m_device, *m_device};
+    vkt::CommandBuffer command_buffers[2] = {vkt::CommandBuffer{*m_device, m_command_pool},
+                                             vkt::CommandBuffer{*m_device, m_command_pool}};
+    uint32_t frame_index = 0;
+
+    // NOTE: This test can be used for manual inspection of memory usage.
+    // Increase frame count and observe that the test does not continuously allocate memory.
+    const int frame_count = 100;
+    for (int i = 0; i < frame_count; i++) {
+        const vkt::Fence &frame_fence = frame_fences[frame_index];
+        const vkt::Semaphore &acquire_semaphore = acquire_semaphores[frame_index];
+        vkt::CommandBuffer &command_buffer = command_buffers[frame_index];
+
+        frame_fence.Wait(kWaitTimeout);
+        frame_fence.Reset();
+
+        const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+        const vkt::Semaphore &present_wait_semaphore = present_wait_semaphores[image_index];
+
+        command_buffer.Begin();
+        command_buffer.End();
+
+        m_default_queue->Submit(command_buffer, vkt::Wait(acquire_semaphore), vkt::Signal(present_wait_semaphore), frame_fence);
+        m_second_queue->Present(m_swapchain, image_index, present_wait_semaphore);
+        frame_index = 1 - frame_index;  // 0 or 1
+    }
+    m_default_queue->Wait();
+    m_second_queue->Wait();
+}
+
+TEST_F(PositiveWsi, SharedPresentAndPresentSemaphoreReuse) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10201
+    TEST_DESCRIPTION("Present semaphore in-use check is disabled when shared present mode is used without swapchain maintenance1");
+    AddRequiredExtensions(VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME);
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSurface());
+    InitSwapchainInfo();
+
+    bool found = false;
+    for (VkPresentModeKHR present_mode : m_surface_present_modes) {
+        found |= (present_mode == VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR);
+    }
+    if (!found) {
+        GTEST_SKIP() << "Cannot find shared present mode";
+    }
+
+    VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper();
+    swapchain_ci.surface = m_surface.Handle();
+    swapchain_ci.minImageCount = 1;
+    swapchain_ci.imageFormat = m_surface_formats[0].format;
+    swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
+    swapchain_ci.imageExtent = m_surface_capabilities.minImageExtent;
+    swapchain_ci.imageArrayLayers = 1;
+    swapchain_ci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;  // implementations must support
+    swapchain_ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_ci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_ci.compositeAlpha = m_surface_composite_alpha;
+    swapchain_ci.presentMode = VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR;
+
+    vkt::Swapchain swapchain(*m_device, swapchain_ci);
+    const auto images = swapchain.GetImages();
+
+    vkt::Fence fence(*m_device);
+    const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
+    fence.Wait(kWaitTimeout);
+    SetImageLayoutPresentSrc(images[image_index]);
+
+    vkt::Semaphore semaphore(*m_device);
+
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(semaphore));
+    m_default_queue->Present(swapchain, image_index, semaphore);
+
+    // For poor apps without swapchain_maintenance1 that use shared present modes
+    // and call AcquireNextImage only once, the present semaphore in-use check is disabled.
+    // The app doesn't have an official ways to do this better.
+    // If supported, swapchain_maintenance1 should be used in such scenario.
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(semaphore));
+    m_default_queue->Present(swapchain, image_index, semaphore);
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveWsi, SharedPresentReuseSemaphoreAfterDestroy) {
+    TEST_DESCRIPTION("After swapchain with shared present mode is destroyed the present semaphore can be reused");
+    AddRequiredExtensions(VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME);
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSurface());
+    InitSwapchainInfo();
+
+    bool found = false;
+    for (VkPresentModeKHR present_mode : m_surface_present_modes) {
+        found |= (present_mode == VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR);
+    }
+    if (!found) {
+        GTEST_SKIP() << "Cannot find shared present mode";
+    }
+
+    VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper();
+    swapchain_ci.surface = m_surface.Handle();
+    swapchain_ci.minImageCount = 1;
+    swapchain_ci.imageFormat = m_surface_formats[0].format;
+    swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
+    swapchain_ci.imageExtent = m_surface_capabilities.minImageExtent;
+    swapchain_ci.imageArrayLayers = 1;
+    swapchain_ci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;  // implementations must support
+    swapchain_ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_ci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_ci.compositeAlpha = m_surface_composite_alpha;
+    swapchain_ci.presentMode = VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR;
+
+    vkt::Swapchain swapchain(*m_device, swapchain_ci);
+    const auto images = swapchain.GetImages();
+    for (auto image : images) {
+        SetImageLayoutPresentSrc(image);
+    }
+
+    vkt::Fence fence(*m_device);
+    const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
+    fence.Wait(kWaitTimeout);
+    fence.Reset();
+
+    vkt::Semaphore semaphore(*m_device);
+    vkt::Semaphore semaphore2(*m_device);
+
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(semaphore));
+    m_default_queue->Present(swapchain, image_index, semaphore);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Signal(semaphore2));
+    m_default_queue->Present(swapchain, image_index, semaphore2);
+
+    swapchain_ci.minImageCount = m_surface_capabilities.minImageCount;
+    swapchain_ci.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    swapchain_ci.oldSwapchain = swapchain;
+    vkt::Swapchain swapchain2(*m_device, swapchain_ci);
+    const auto images2 = swapchain2.GetImages();
+
+    const uint32_t image_index2 = swapchain2.AcquireNextImage(fence, kWaitTimeout);
+    fence.Wait(kWaitTimeout);
+    fence.Reset();
+
+    // Destroy swapchain!
+    swapchain.destroy();
+
+    // Transition layout manually, because SetImageLayoutPresentSrc calls QueueWaitIdle which
+    // resets semaphore swapchain state and this is not what we want for this test.
+    const VkImageMemoryBarrier present_transition = TransitionToPresent(images2[image_index2], VK_IMAGE_LAYOUT_UNDEFINED, 0);
+    m_command_buffer.Begin();
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0,
+                           nullptr, 1, &present_transition);
+    m_command_buffer.End();
+
+    // Test that semaphore does not assume it is still in use by swapchain that was just deleted.
+    // Swapchain2 is created with FIFO mode in order to enable semaphore-in-use-by-swapchain check
+    // (it is disabled for shared present modes)
+    m_default_queue->Submit(m_command_buffer, vkt::Signal(semaphore));
+    m_default_queue->Present(swapchain2, image_index2, semaphore);
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveWsi, PresentIdWait2) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddSurfaceExtension();
+    AddRequiredExtensions(VK_KHR_PRESENT_ID_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_PRESENT_WAIT_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::presentId2);
+    AddRequiredFeature(vkt::Feature::presentWait2);
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSurface());
+    RETURN_IF_SKIP(InitSwapchainInfo());
+
+    VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper();
+    swapchain_ci.flags = VK_SWAPCHAIN_CREATE_PRESENT_ID_2_BIT_KHR | VK_SWAPCHAIN_CREATE_PRESENT_WAIT_2_BIT_KHR;
+    swapchain_ci.surface = m_surface.Handle();
+    swapchain_ci.minImageCount = m_surface_capabilities.minImageCount;
+    swapchain_ci.imageFormat = m_surface_formats[0].format;
+    swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
+    swapchain_ci.imageExtent = m_surface_capabilities.minImageExtent;
+    swapchain_ci.imageArrayLayers = 1u;
+    swapchain_ci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchain_ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_ci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_ci.compositeAlpha = m_surface_composite_alpha;
+    swapchain_ci.presentMode = m_surface_non_shared_present_mode;
+    swapchain_ci.clipped = VK_FALSE;
+    swapchain_ci.oldSwapchain = VK_NULL_HANDLE;
+    vkt::Swapchain swapchain(*m_device, swapchain_ci);
+
+    VkSurfaceCapabilitiesPresentWait2KHR present_wait_2_capabilities = vku::InitStructHelper();
+    VkSurfaceCapabilitiesPresentId2KHR present_id_2_capabilities = vku::InitStructHelper(&present_wait_2_capabilities);
+    VkSurfaceCapabilities2KHR capabilities2 = vku::InitStructHelper(&present_id_2_capabilities);
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
+    surface_info.surface = m_surface.Handle();
+    vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu_, &surface_info, &capabilities2);
+
+    if (!present_id_2_capabilities.presentId2Supported || !present_wait_2_capabilities.presentWait2Supported) {
+        GTEST_SKIP() << "presentId2 and presentWait2 are not supported for the surface";
+    }
+
+    const auto images = swapchain.GetImages();
+
+    uint64_t present_id_value = 1u;
+    // TODO - understand why this timeout if set the loop to a large value
+    for (uint32_t i = 0; i < 4; ++i) {
+        vkt::Fence fence(*m_device);
+        const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
+        vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
+
+        SetImageLayoutPresentSrc(images[image_index]);
+
+        VkPresentId2KHR present_id = vku::InitStructHelper();
+        present_id.swapchainCount = 1u;
+        present_id.pPresentIds = &present_id_value;
+
+        m_default_queue->Present(swapchain, image_index, vkt::no_semaphore, &present_id);
+
+        VkPresentWait2InfoKHR present_wait_2_info = vku::InitStructHelper();
+        present_wait_2_info.presentId = present_id_value;
+        present_wait_2_info.timeout = kWaitTimeout;
+        vk::WaitForPresent2KHR(device(), swapchain, &present_wait_2_info);
+
+        ++present_id_value;
+    }
 }

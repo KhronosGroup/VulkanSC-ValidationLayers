@@ -65,6 +65,12 @@ khronos_validation.enables =
 
 # Shader instrumentation
 # =====================
+# Will have GPU-AV try and prevent crashes, but will be much slower to validate.
+# If using Safe Mode, consider using selective shader instrumentation, to only instrument the shaders/pipelines causing issues.
+#khronos_validation.gpuav_safe_mode = true
+
+# Shader instrumentation
+# =====================
 # Instrument shaders to validate descriptors, descriptor indexing, buffer device addresses and ray queries.
 # Warning: will considerably slow down shader executions
 #khronos_validation.gpuav_shader_instrumentation = true
@@ -74,10 +80,10 @@ khronos_validation.enables =
 # Enable descriptor indexing and buffer out of bounds checking
 #khronos_validation.gpuav_descriptor_checks = true
 
-# Generate warning on out of bounds accesses even if buffer robustness is enabled
+# Force robustness on behalf of the user
 # =====================
-# Warn on out of bounds accesses even if robustness is enabled
-#khronos_validation.gpuav_warn_on_robust_oob = true
+# When robustness is enabled, GPU-AV will skip checks already covered by robustness
+#khronos_validation.gpuav_force_on_robustness = true
 
 # Out of bounds buffer device addresses
 # =====================
@@ -140,13 +146,6 @@ khronos_validation.enables =
 # =====================
 # Use VMA linear memory allocations for GPU-AV output buffers
 #khronos_validation.gpuav_vma_linear_output = true
-
-# Use GPU-AV to do Image Layout checks
-# =====================
-# (Warning - still known to have false positives)
-# Use GPU-AV to detect which descriptors were accessed.
-# Then using post processing, check that the layout of each image subresource is correct whenever it is used by a command buffer
-#khronos_validation.gpuav_image_layout = true
 
 # Fine Grained Locking
 # =====================

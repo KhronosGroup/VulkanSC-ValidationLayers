@@ -98,8 +98,7 @@ TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer) {
     vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer2) {
@@ -141,8 +140,7 @@ TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer3) {
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     cb1.End();
 
-    std::array cbs = {&cb0, &cb1};
-    m_default_queue->Submit(cbs);
+    m_default_queue->Submit({cb0, cb1});
     m_default_queue->Wait();
 }
 

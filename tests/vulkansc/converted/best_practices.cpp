@@ -20,6 +20,7 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/render_pass_helper.h"
 #include "../framework/descriptor_helper.h"
+#include "../framework/sync_helper.h"
 #include "../framework/thread_helper.h"
 
 void VkBestPracticesLayerTest::InitBestPracticesFramework(const char *vendor_checks_to_enable) {
@@ -61,12 +62,11 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ReturnCodes) {
     image_format_info.type = VK_IMAGE_TYPE_3D;
     image_format_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
 
-    VkResult result =
-        vk::GetPhysicalDeviceImageFormatProperties2(m_device->Physical().handle(), &image_format_info, &image_format_prop);
+    VkResult result = vk::GetPhysicalDeviceImageFormatProperties2(m_device->Physical(), &image_format_info, &image_format_prop);
     // Only run this test if this super-wierd format is not supported
     if (VK_SUCCESS != result) {
         m_errorMonitor->SetDesiredWarning("BestPractices-Error-Result");
-        vk::GetPhysicalDeviceImageFormatProperties2(m_device->Physical().handle(), &image_format_info, &image_format_prop);
+        vk::GetPhysicalDeviceImageFormatProperties2(m_device->Physical(), &image_format_info, &image_format_prop);
         m_errorMonitor->VerifyFound();
     }
 
@@ -240,7 +240,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_CmdClearAttachmentTest) {
     // Call for full-sized FB Color attachment prior to issuing a Draw
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-DrawState-ClearCmdBeforeDraw");
 
-    vk::CmdClearAttachments(m_command_buffer.handle(), 1, &color_attachment, 1, &clear_rect);
+    vk::CmdClearAttachments(m_command_buffer, 1, &color_attachment, 1, &clear_rect);
     m_errorMonitor->VerifyFound();
 }
 
@@ -279,81 +279,37 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_CmdClearAttachmentTestSecondary) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     {
         // Small clears which don't cover the render area should not trigger the warning.
-        vk::CmdClearAttachments(m_command_buffer.handle(), 1, &color_attachment, 1, &clear_rect_small);
+        vk::CmdClearAttachments(m_command_buffer, 1, &color_attachment, 1, &clear_rect_small);
         // Call for full-sized FB Color attachment prior to issuing a Draw
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-DrawState-ClearCmdBeforeDraw");
         // This test may also trigger other warnings
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-AMD-VkCommandBuffer-AvoidSecondaryCmdBuffers");
 
-        vk::CmdClearAttachments(m_command_buffer.handle(), 1, &color_attachment, 1, &clear_rect);
+        vk::CmdClearAttachments(m_command_buffer, 1, &color_attachment, 1, &clear_rect);
         m_errorMonitor->VerifyFound();
     }
     m_command_buffer.EndRenderPass();
 
     secondary_small_clear.Begin(&begin_info);
     secondary_full_clear.Begin(&begin_info);
-    vk::CmdClearAttachments(secondary_small_clear.handle(), 1, &color_attachment, 1, &clear_rect_small);
-    vk::CmdClearAttachments(secondary_full_clear.handle(), 1, &color_attachment, 1, &clear_rect);
+    vk::CmdClearAttachments(secondary_small_clear, 1, &color_attachment, 1, &clear_rect_small);
+    vk::CmdClearAttachments(secondary_full_clear, 1, &color_attachment, 1, &clear_rect);
     secondary_small_clear.End();
     secondary_full_clear.End();
 
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
     {
         // Small clears which don't cover the render area should not trigger the warning.
-        vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_small_clear.handle());
+        vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_small_clear.handle());
         // Call for full-sized FB Color attachment prior to issuing a Draw
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-DrawState-ClearCmdBeforeDraw");
         // This test may also trigger other warnings
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-AMD-VkCommandBuffer-AvoidSecondaryCmdBuffers");
 
-        vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_full_clear.handle());
+        vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_full_clear.handle());
         m_errorMonitor->VerifyFound();
     }
     m_command_buffer.EndRenderPass();
-}
-
-// Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_CmdResolveImageTypeMismatch) {
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-
-    VkImageCreateInfo image_create_info = vku::InitStructHelper();
-    image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_create_info.extent = {32, 1, 1};
-    image_create_info.mipLevels = 1;
-    image_create_info.arrayLayers = 1;
-    image_create_info.samples = VK_SAMPLE_COUNT_4_BIT;  // guarantee support from sampledImageColorSampleCounts
-    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    // Note: Some implementations expect color attachment usage for any
-    // multisample surface
-    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_create_info.flags = 0;
-    vkt::Image srcImage(*m_device, image_create_info, vkt::set_layout);
-
-    image_create_info.imageType = VK_IMAGE_TYPE_1D;
-    // Note: Some implementations expect color attachment usage for any
-    // multisample surface
-    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    vkt::Image dstImage(*m_device, image_create_info, vkt::set_layout);
-
-    m_command_buffer.Begin();
-    // Need memory barrier to VK_IMAGE_LAYOUT_GENERAL for source and dest?
-    // VK_IMAGE_LAYOUT_UNDEFINED = 0,
-    // VK_IMAGE_LAYOUT_GENERAL = 1,
-    VkImageResolve resolveRegion;
-    resolveRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    resolveRegion.srcOffset = {0, 0, 0};
-    resolveRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    resolveRegion.dstOffset = {0, 0, 0};
-    resolveRegion.extent = {1, 1, 1};
-
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkCmdResolveImage-MismatchedImageType");
-    vk::CmdResolveImage(m_command_buffer.handle(), srcImage.handle(), VK_IMAGE_LAYOUT_GENERAL, dstImage.handle(),
-                        VK_IMAGE_LAYOUT_GENERAL, 1, &resolveRegion);
-    m_errorMonitor->VerifyFound();
-    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -363,10 +319,8 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ZeroSizeBlitRegion) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
-    vkt::Image image_src(*m_device, 128, 128, 1, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-    image_src.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
-    vkt::Image image_dst(*m_device, 128, 128, 1, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    image_dst.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image_src(*m_device, 128, 128, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    vkt::Image image_dst(*m_device, 128, 128, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     VkImageBlit blit_region = {};
     blit_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -379,53 +333,10 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ZeroSizeBlitRegion) {
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredWarning("BestPractices-DrawState-InvalidExtents-src");
     m_errorMonitor->SetDesiredWarning("BestPractices-DrawState-InvalidExtents-dst");
-    vk::CmdBlitImage(m_command_buffer.handle(), image_src.handle(), image_src.Layout(), image_dst.handle(), image_dst.Layout(), 1,
-                     &blit_region, VK_FILTER_LINEAR);
+    vk::CmdBlitImage(m_command_buffer, image_src, VK_IMAGE_LAYOUT_GENERAL, image_dst, VK_IMAGE_LAYOUT_GENERAL, 1, &blit_region,
+                     VK_FILTER_LINEAR);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
-}
-
-// Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_VtxBufferBadIndex) {
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-    InitRenderTarget();
-
-    CreatePipelineHelper pipe(*this);
-    pipe.CreateGraphicsPipeline();
-
-    // Don't care about actual data, just need to get to draw to flag error
-    vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkEndCommandBuffer-VtxIndexOutOfBounds");
-    m_command_buffer.Begin();
-    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    // VBO idx 1, but no VBO in PSO
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 1, 1, &vbo.handle(), &kZeroDeviceSize);
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
-    m_command_buffer.EndRenderPass();
-    vk::EndCommandBuffer(m_command_buffer.handle());
-    m_errorMonitor->VerifyFound();
-}
-
-// Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_CommandBufferReset) {
-    TEST_DESCRIPTION("Test for validating usage of vkCreateCommandPool with COMMAND_BUFFER_RESET_BIT");
-
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkCreateCommandPool-command-buffer-reset");
-
-    VkCommandPool command_pool;
-    VkCommandPoolCreateInfo pool_create_info{};
-    pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    pool_create_info.queueFamilyIndex = m_device->graphics_queue_node_index_;
-    pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    vk::CreateCommandPool(device(), &pool_create_info, nullptr, &command_pool);
-
-    m_errorMonitor->VerifyFound();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -461,7 +372,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SecondaryCommandBuffer) {
 
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
     VkCommandBufferAllocateInfo alloc_info = vku::InitStructHelper();
-    alloc_info.commandPool = command_pool.handle();
+    alloc_info.commandPool = command_pool;
     alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
     alloc_info.commandBufferCount = 1;
 
@@ -469,58 +380,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SecondaryCommandBuffer) {
     vk::AllocateCommandBuffers(device(), &alloc_info, &command_buffer);
     m_errorMonitor->VerifyFound();
 
-    vk::FreeCommandBuffers(device(), command_pool.handle(), 1, &command_buffer);
-}
-
-// Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SimultaneousUse) {
-    TEST_DESCRIPTION("Test for validating usage of vkBeginCommandBuffer with SIMULTANEOUS_USE");
-
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkBeginCommandBuffer-simultaneous-use");
-
-    m_errorMonitor->SetAllowedFailureMsg("vkBeginCommandBuffer-one-time-submit");
-
-    VkCommandBufferBeginInfo cmd_begin_info{};
-    cmd_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmd_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-    vk::BeginCommandBuffer(m_command_buffer.handle(), &cmd_begin_info);
-
-    m_errorMonitor->VerifyFound();
-}
-
-// Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SmallAllocation) {
-    TEST_DESCRIPTION("Test for small memory allocations");
-
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkAllocateMemory-small-allocation");
-
-    // Find appropriate memory type for given reqs
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    VkPhysicalDeviceMemoryProperties dev_mem_props = m_device->Physical().memory_properties_;
-
-    uint32_t mem_type_index = 0;
-    for (mem_type_index = 0; mem_type_index < dev_mem_props.memoryTypeCount; ++mem_type_index) {
-        if (mem_props == (mem_props & dev_mem_props.memoryTypes[mem_type_index].propertyFlags)) break;
-    }
-    EXPECT_LT(mem_type_index, dev_mem_props.memoryTypeCount) << "Could not find a suitable memory type.";
-
-    const uint32_t kSmallAllocationSize = 1024;
-
-    VkMemoryAllocateInfo alloc_info{};
-    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.allocationSize = kSmallAllocationSize;
-    alloc_info.memoryTypeIndex = mem_type_index;
-
-    VkDeviceMemory memory;
-    vk::AllocateMemory(device(), &alloc_info, nullptr, &memory);
-
-    m_errorMonitor->VerifyFound();
+    vk::FreeCommandBuffers(device(), command_pool, 1, &command_buffer);
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -532,8 +392,6 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SmallDedicatedAllocation) {
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkBindImageMemory-small-dedicated-allocation");
 
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkAllocateMemory-small-allocation");
-
     VkImageCreateInfo image_info =
         vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     // Create a small image with a dedicated allocation
@@ -542,7 +400,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SmallDedicatedAllocation) {
     vkt::DeviceMemory mem;
     mem.init(*m_device,
              vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-    vk::BindImageMemory(device(), image.handle(), mem.handle(), 0);
+    vk::BindImageMemory(device(), image, mem, 0);
 
     m_errorMonitor->VerifyFound();
 }
@@ -589,7 +447,6 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_AttachmentShouldNotBeTransient) {
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                          "BestPractices-vkCreateFramebuffer-attachment-should-not-be-transient");
 
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkAllocateMemory-small-allocation");
     m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkBindImageMemory-small-dedicated-allocation");
     m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkBindImageMemory-non-lazy-transient-image");
     m_errorMonitor->SetAllowedFailureMsg("BestPractices-AMD-vkImage-AvoidGeneral");
@@ -616,7 +473,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_AttachmentShouldNotBeTransient) {
     vkt::Image image(*m_device, image_info, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView();
 
-    vkt::Framebuffer fb(*m_device, rp.handle(), 1, &image_view.handle(), 1920, 1080);
+    vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), 1920, 1080);
 
     m_errorMonitor->VerifyFound();
 }
@@ -632,7 +489,6 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_TooManyInstancedVertexBuffers) {
                                          "BestPractices-vkCreateGraphicsPipelines-too-many-instanced-vertex-buffers");
 
     // This test may also trigger the small allocation warnings
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkAllocateMemory-small-allocation");
     m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkBindImageMemory-small-dedicated-allocation");
 
     // This test does not need for the shader to consume the vertex input
@@ -680,8 +536,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoad) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
-    vkt::Image image(*m_device, m_width, m_height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image(*m_device, m_width, m_height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     auto image_view = image.CreateView();
 
     RenderPassSingleSubpass rp(*this);
@@ -690,7 +545,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoad) {
     rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
     rp.AddColorAttachment(0);
     rp.CreateRenderPass();
-    vkt::Framebuffer fb(*m_device, rp.Handle(), 1, &image_view.handle(), m_width, m_height);
+    vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), m_width, m_height);
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkCmdClearAttachments-clear-after-load-color");
 
@@ -702,7 +557,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoad) {
     m_errorMonitor->SetAllowedFailureMsg("BestPractices-RenderPass-inefficient-clear");
 
     m_command_buffer.Begin();
-    m_command_buffer.BeginRenderPass(rp.Handle(), fb.handle(), m_width, m_height);
+    m_command_buffer.BeginRenderPass(rp, fb, m_width, m_height);
 
     VkClearAttachment color_attachment;
     color_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -713,7 +568,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoad) {
     color_attachment.colorAttachment = 0;
     VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
 
-    vk::CmdClearAttachments(m_command_buffer.handle(), 1, &color_attachment, 1, &clear_rect);
+    vk::CmdClearAttachments(m_command_buffer, 1, &color_attachment, 1, &clear_rect);
 
     m_errorMonitor->VerifyFound();
 }
@@ -731,8 +586,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     m_errorMonitor->SetAllowedFailureMsg("BestPractices-RenderPass-redundant-clear");
     m_errorMonitor->SetAllowedFailureMsg("BestPractices-RenderPass-inefficient-clear");
 
-    vkt::Image image(*m_device, m_width, m_height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image(*m_device, m_width, m_height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     auto image_view = image.CreateView();
 
     RenderPassSingleSubpass rp(*this);
@@ -741,15 +595,15 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
     rp.AddColorAttachment(0);
     rp.CreateRenderPass();
-    vkt::Framebuffer fb(*m_device, rp.Handle(), 1, &image_view.handle(), m_width, m_height);
+    vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), m_width, m_height);
 
     CreatePipelineHelper pipe_masked(*this);
-    pipe_masked.gp_ci_.renderPass = rp.Handle();
+    pipe_masked.gp_ci_.renderPass = rp;
     pipe_masked.cb_attachments_.colorWriteMask = 0;
     pipe_masked.CreateGraphicsPipeline();
 
     CreatePipelineHelper pipe_writes(*this);
-    pipe_writes.gp_ci_.renderPass = rp.Handle();
+    pipe_writes.gp_ci_.renderPass = rp;
     pipe_writes.cb_attachments_.colorWriteMask = 0xf;
     pipe_writes.CreateGraphicsPipeline();
 
@@ -765,8 +619,8 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
 
     VkRenderPassBeginInfo render_pass_begin_info = vku::InitStructHelper();
-    render_pass_begin_info.renderPass = rp.Handle();
-    render_pass_begin_info.framebuffer = fb.handle();
+    render_pass_begin_info.renderPass = rp;
+    render_pass_begin_info.framebuffer = fb;
     // need full clear
     render_pass_begin_info.renderArea.extent.width = m_width;
     render_pass_begin_info.renderArea.extent.height = m_height;
@@ -776,7 +630,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkCmdClearAttachments-clear-after-load-color");
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-DrawState-ClearCmdBeforeDraw");
     {
-        vk::CmdClearAttachments(m_command_buffer.handle(), 1, &color_attachment, 1, &clear_rect);
+        vk::CmdClearAttachments(m_command_buffer, 1, &color_attachment, 1, &clear_rect);
         m_errorMonitor->VerifyFound();
     }
     m_command_buffer.EndRenderPass();
@@ -785,9 +639,9 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     m_command_buffer.BeginRenderPass(render_pass_begin_info);
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkCmdClearAttachments-clear-after-load-color");
     {
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_masked.Handle());
-        vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
-        vk::CmdClearAttachments(m_command_buffer.handle(), 1, &color_attachment, 1, &clear_rect);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_masked);
+        vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
+        vk::CmdClearAttachments(m_command_buffer, 1, &color_attachment, 1, &clear_rect);
         m_errorMonitor->VerifyFound();
     }
     m_command_buffer.EndRenderPass();
@@ -795,9 +649,9 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     // Test that an actual write will not trigger the clear warning
     m_command_buffer.BeginRenderPass(render_pass_begin_info);
     {
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_writes.Handle());
-        vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
-        vk::CmdClearAttachments(m_command_buffer.handle(), 1, &color_attachment, 1, &clear_rect);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_writes);
+        vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
+        vk::CmdClearAttachments(m_command_buffer, 1, &color_attachment, 1, &clear_rect);
     }
     m_command_buffer.EndRenderPass();
 
@@ -807,7 +661,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     VkCommandBufferInheritanceInfo inherit_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO};
     begin_info.pInheritanceInfo = &inherit_info;
     inherit_info.subpass = 0;
-    inherit_info.renderPass = rp.Handle();
+    inherit_info.renderPass = rp;
 
     vkt::CommandBuffer secondary_clear(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     vkt::CommandBuffer secondary_draw_masked(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
@@ -817,13 +671,13 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     secondary_draw_masked.Begin(&begin_info);
     secondary_draw_write.Begin(&begin_info);
 
-    vk::CmdClearAttachments(secondary_clear.handle(), 1, &color_attachment, 1, &clear_rect);
+    vk::CmdClearAttachments(secondary_clear, 1, &color_attachment, 1, &clear_rect);
 
-    vk::CmdBindPipeline(secondary_draw_masked.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_masked.Handle());
-    vk::CmdDraw(secondary_draw_masked.handle(), 1, 0, 0, 0);
+    vk::CmdBindPipeline(secondary_draw_masked, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_masked);
+    vk::CmdDraw(secondary_draw_masked, 1, 0, 0, 0);
 
-    vk::CmdBindPipeline(secondary_draw_write.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_writes.Handle());
-    vk::CmdDraw(secondary_draw_write.handle(), 1, 0, 0, 0);
+    vk::CmdBindPipeline(secondary_draw_write, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_writes);
+    vk::CmdDraw(secondary_draw_write, 1, 0, 0, 0);
 
     secondary_clear.End();
     secondary_draw_masked.End();
@@ -834,7 +688,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkCmdClearAttachments-clear-after-load-color");
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-DrawState-ClearCmdBeforeDraw");
     {
-        vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_clear.handle());
+        vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_clear.handle());
         m_errorMonitor->VerifyFound();
     }
     m_command_buffer.EndRenderPass();
@@ -843,8 +697,8 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     m_command_buffer.BeginRenderPass(render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkCmdClearAttachments-clear-after-load-color");
     {
-        vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_draw_masked.handle());
-        vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_clear.handle());
+        vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_draw_masked.handle());
+        vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_clear.handle());
         m_errorMonitor->VerifyFound();
     }
     m_command_buffer.EndRenderPass();
@@ -852,8 +706,8 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     // Test that an actual write will not trigger the clear warning
     m_command_buffer.BeginRenderPass(render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
     {
-        vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_draw_write.handle());
-        vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_clear.handle());
+        vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_draw_write.handle());
+        vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_clear.handle());
     }
     m_command_buffer.EndRenderPass();
 }
@@ -998,28 +852,28 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExpectedQueryDetails) {
 
     // Ensure we can find a graphics queue family.
     uint32_t queue_count = 0;
-    vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj.handle(), &queue_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj, &queue_count, nullptr);
 
     queue_family_props.resize(queue_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj.handle(), &queue_count, queue_family_props.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj, &queue_count, queue_family_props.data());
 
     // Now  for GetPhysicalDeviceQueueFamilyProperties2
     std::vector<VkQueueFamilyProperties2> queue_family_props2;
-    vk::GetPhysicalDeviceQueueFamilyProperties2(phys_device_obj.handle(), &queue_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties2(phys_device_obj, &queue_count, nullptr);
 
     queue_family_props2.resize(queue_count);
     for (uint32_t i = 0; i < queue_count; i++) {
         queue_family_props2[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
     }
-    vk::GetPhysicalDeviceQueueFamilyProperties2(phys_device_obj.handle(), &queue_count, queue_family_props2.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties2(phys_device_obj, &queue_count, queue_family_props2.data());
 
     // And for GetPhysicalDeviceQueueFamilyProperties2KHR
-    vk::GetPhysicalDeviceQueueFamilyProperties2KHR(phys_device_obj.handle(), &queue_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties2KHR(phys_device_obj, &queue_count, nullptr);
 
     queue_family_props2.resize(queue_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties2KHR(phys_device_obj.handle(), &queue_count, queue_family_props2.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties2KHR(phys_device_obj, &queue_count, queue_family_props2.data());
 
-    vkt::Device device(phys_device_obj.handle());
+    vkt::Device device(phys_device_obj, m_device_extension_names);
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -1034,12 +888,12 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_MissingQueryDetails) {
 
     // might only be a queue_count of 1, so check and then do "real" test to make sure error is detected
     m_errorMonitor->SetUnexpectedError("BestPractices-GetPhysicalDeviceQueueFamilyProperties-CountMismatch");
-    vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj.handle(), &queue_count, queue_family_props.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj, &queue_count, queue_family_props.data());
     m_errorMonitor->VerifyFound();
 
     if (queue_count > 1) {
         m_errorMonitor->SetDesiredWarning("BestPractices-GetPhysicalDeviceQueueFamilyProperties-CountMismatch");
-        vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj.handle(), &queue_count, queue_family_props.data());
+        vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj, &queue_count, queue_family_props.data());
         m_errorMonitor->VerifyFound();
     }
 
@@ -1069,33 +923,8 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_MissingQueryDetails) {
     // vkGetPhysicalDeviceFeatures has not been called, so this should produce a warning
     m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateDevice-physical-device-features-not-retrieved");
     VkDevice device;
-    vk::CreateDevice(phys_device_obj.handle(), &device_ci, nullptr, &device);
+    vk::CreateDevice(phys_device_obj, &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
-}
-
-// Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_DepthBiasNoAttachment) {
-    TEST_DESCRIPTION("Enable depthBias without a depth attachment");
-
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-    InitRenderTarget();
-
-    CreatePipelineHelper pipe(*this);
-    pipe.rs_state_ci_.depthBiasEnable = VK_TRUE;
-    pipe.rs_state_ci_.depthBiasConstantFactor = 1.0f;
-    pipe.CreateGraphicsPipeline();
-
-    m_command_buffer.Begin();
-    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-
-    m_errorMonitor->SetDesiredWarning("BestPractices-vkCmdDraw-DepthBiasNoAttachment");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
-    m_errorMonitor->VerifyFound();
-
-    m_command_buffer.EndRenderPass();
-    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -1162,8 +991,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_WorkgroupSizeDeprecated) {
         )";
 
     const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ =
-            std::make_unique<VkShaderObj>(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+        helper.cs_ = VkShaderObj(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kWarningBit, "BestPractices-SpirvDeprecated_WorkgroupSize");
 }
@@ -1206,7 +1034,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ThreadUpdateDescriptorUpdateAfterBindN
     data.device = device();
     data.descriptorSet = descriptor_set.set_;
     data.binding = 0;
-    data.buffer = buffer.handle();
+    data.buffer = buffer;
     std::atomic<bool> bailout{false};
     data.bailout = &bailout;
     m_errorMonitor->SetBailout(data.bailout);
@@ -1219,7 +1047,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ThreadUpdateDescriptorUpdateAfterBindN
     data2.device = device();
     data2.descriptorSet = descriptor_set.set_;
     data2.binding = 1;
-    data2.buffer = buffer.handle();
+    data2.buffer = buffer;
     data2.bailout = &bailout;
 
     UpdateDescriptor(&data2);
@@ -1237,9 +1065,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_TransitionFromUndefinedToReadOnly) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
-    vkt::Image image(*m_device, 128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM,
-                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image(*m_device, 128, 128, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     VkClearColorValue color_clear_value = {};
     color_clear_value.uint32[0] = 255;
@@ -1255,7 +1081,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_TransitionFromUndefinedToReadOnly) {
     img_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    img_barrier.image = image.handle();
+    img_barrier.image = image;
     img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     img_barrier.subresourceRange.baseArrayLayer = 0;
     img_barrier.subresourceRange.baseMipLevel = 0;
@@ -1264,47 +1090,15 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_TransitionFromUndefinedToReadOnly) {
 
     m_command_buffer.Begin();
 
-    vk::CmdClearColorImage(m_command_buffer.handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
+    vk::CmdClearColorImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-pImageMemoryBarriers-02820");
     m_errorMonitor->SetDesiredWarning("BestPractices-ImageMemoryBarrier-TransitionUndefinedToReadOnly");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &img_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &img_barrier);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
-}
-
-// Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SemaphoreSetWhenCountIsZero) {
-    TEST_DESCRIPTION("Set semaphore in SubmitInfo but count is 0");
-
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-
-    vkt::Semaphore semaphore(*m_device);
-    VkSemaphore semaphore_handle = semaphore.handle();
-
-    VkSubmitInfo signal_submit_info = vku::InitStructHelper();
-    signal_submit_info.signalSemaphoreCount = 0;
-    signal_submit_info.pSignalSemaphores = &semaphore_handle;
-
-    m_errorMonitor->SetDesiredInfo("BestPractices-SignalSemaphores-SemaphoreCount");
-    vk::QueueSubmit(m_default_queue->handle(), 1, &signal_submit_info, VK_NULL_HANDLE);
-    m_errorMonitor->VerifyFound();
-
-    signal_submit_info.signalSemaphoreCount = 1;
-    vk::QueueSubmit(m_default_queue->handle(), 1, &signal_submit_info, VK_NULL_HANDLE);
-
-    VkSubmitInfo wait_submit_info = vku::InitStructHelper();
-    wait_submit_info.waitSemaphoreCount = 0;
-    wait_submit_info.pWaitSemaphores = &semaphore_handle;
-
-    m_errorMonitor->SetDesiredInfo("BestPractices-WaitSemaphores-SemaphoreCount");
-    vk::QueueSubmit(m_default_queue->handle(), 1, &wait_submit_info, VK_NULL_HANDLE);
-    m_errorMonitor->VerifyFound();
-
-    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -1339,10 +1133,10 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_OverAllocateFromDescriptorPool) {
 
     // Try to allocate 2 sets when pool only has 1 set
     VkDescriptorSet descriptor_sets[4];
-    VkDescriptorSetLayout set_layouts[2] = {ds_layout_samp.handle(), ds_layout_samp.handle()};
+    VkDescriptorSetLayout set_layouts[2] = {ds_layout_samp, ds_layout_samp};
     VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.descriptorSetCount = 2;
-    alloc_info.descriptorPool = ds_pool.handle();
+    alloc_info.descriptorPool = ds_pool;
     alloc_info.pSetLayouts = set_layouts;
     vk::AllocateDescriptorSets(device(), &alloc_info, &descriptor_sets[0]);
     m_errorMonitor->SetDesiredWarning("BestPractices-vkAllocateDescriptorSets-EmptyDescriptorPool");
@@ -1382,10 +1176,10 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_OverAllocateTypeFromDescriptorPool) {
 
     // Try to allocate 2 sets when pool only has 1 set
     VkDescriptorSet descriptor_sets[4];
-    VkDescriptorSetLayout set_layouts[2] = {ds_layout_samp.handle(), ds_layout_samp.handle()};
+    VkDescriptorSetLayout set_layouts[2] = {ds_layout_samp, ds_layout_samp};
     VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.descriptorSetCount = 2;
-    alloc_info.descriptorPool = ds_pool.handle();
+    alloc_info.descriptorPool = ds_pool;
     alloc_info.pSetLayouts = set_layouts;
     vk::AllocateDescriptorSets(device(), &alloc_info, &descriptor_sets[0]);
     m_errorMonitor->SetDesiredWarning("BestPractices-vkAllocateDescriptorSets-EmptyDescriptorPoolType");
@@ -1406,8 +1200,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearWithoutLoadOpClear) {
     const unsigned int w = 1920;
     const unsigned int h = 1080;
 
-    vkt::Image image(*m_device, w, h, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image(*m_device, w, h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView image_view = image.CreateView();
 
     // Setup RenderPass
@@ -1435,7 +1228,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearWithoutLoadOpClear) {
     rp_info.pSubpasses = &spd;
 
     vkt::RenderPass rp(*m_device, rp_info);
-    vkt::Framebuffer fb(*m_device, rp.handle(), 1, &image_view.handle(), w, h);
+    vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), w, h);
 
     m_command_buffer.Begin();
 
@@ -1447,10 +1240,10 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearWithoutLoadOpClear) {
     VkRenderPassBeginInfo begin_info = vku::InitStructHelper();
     begin_info.clearValueCount = 1;  // Pass one clearValue, in conflict with attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE
     begin_info.pClearValues = &cv;
-    begin_info.renderPass = rp.handle();
+    begin_info.renderPass = rp;
     begin_info.renderArea.extent.width = w;
     begin_info.renderArea.extent.height = h;
-    begin_info.framebuffer = fb.handle();
+    begin_info.framebuffer = fb;
 
     m_errorMonitor->SetDesiredWarning("BestPractices-ClearValueWithoutLoadOpClear");
     m_command_buffer.BeginRenderPass(begin_info);
@@ -1473,8 +1266,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearValueCountHigherThanAtt
     const unsigned int w = 1920;
     const unsigned int h = 1080;
 
-    vkt::Image image(*m_device, w, h, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image image(*m_device, w, h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView image_view = image.CreateView();
 
     // Setup RenderPass
@@ -1502,7 +1294,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearValueCountHigherThanAtt
     rp_info.pSubpasses = &spd;
 
     vkt::RenderPass rp(*m_device, rp_info);
-    vkt::Framebuffer fb(*m_device, rp.handle(), 1, &image_view.handle(), w, h);
+    vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), w, h);
 
     m_command_buffer.Begin();
 
@@ -1521,10 +1313,10 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearValueCountHigherThanAtt
     begin_info.clearValueCount = 2;  // Pass 2 clearValues, in conflict with VkRenderPassCreateInfo.attachmentCount == 1 meaning the
                                      // second clearValue will be ignored
     begin_info.pClearValues = cv;
-    begin_info.renderPass = rp.handle();
+    begin_info.renderPass = rp;
     begin_info.renderArea.extent.width = w;
     begin_info.renderArea.extent.height = h;
-    begin_info.framebuffer = fb.handle();
+    begin_info.framebuffer = fb;
 
     m_errorMonitor->SetDesiredWarning("BestPractices-ClearValueCountHigherThanAttachmentCount");
     m_command_buffer.BeginRenderPass(begin_info);
@@ -1545,7 +1337,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_DontCareThenLoad) {
     const unsigned int w = 100;
     const unsigned int h = 100;
 
-    vkt::Image image(*m_device, w, h, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, w, h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView image_view = image.CreateView();
 
@@ -1582,7 +1374,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_DontCareThenLoad) {
     attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     vkt::RenderPass rp2(*m_device, rp_info);
-    vkt::Framebuffer fb(*m_device, rp1.handle(), 1, &image_view.handle(), w, h);
+    vkt::Framebuffer fb(*m_device, rp1, 1, &image_view.handle(), w, h);
 
     m_command_buffer.Begin();
 
@@ -1592,12 +1384,12 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_DontCareThenLoad) {
     std::fill(std::begin(cv.color.float32), std::begin(cv.color.float32) + 4, 1.0f);
 
     // Begin first renderpass
-    m_command_buffer.BeginRenderPass(rp1.handle(), fb.handle(), w, h, 1, &cv);
+    m_command_buffer.BeginRenderPass(rp1, fb, w, h, 1, &cv);
 
     m_command_buffer.EndRenderPass();
 
     // Begin second renderpass
-    m_command_buffer.BeginRenderPass(rp2.handle(), fb.handle(), w, h, 0, nullptr);
+    m_command_buffer.BeginRenderPass(rp2, fb, w, h, 0, nullptr);
 
     m_command_buffer.EndRenderPass();
 
@@ -1677,8 +1469,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
     const unsigned int w = 100;
     const unsigned int h = 100;
 
-    vkt::Image image(*m_device, w, h, 1, VK_FORMAT_R8G8B8A8_UNORM,
-                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
+    vkt::Image image(*m_device, w, h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView image_view = image.CreateView();
 
@@ -1707,7 +1498,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
     rp_info.pSubpasses = &spd;
 
     vkt::RenderPass rp(*m_device, rp_info);
-    vkt::Framebuffer fb(*m_device, rp.handle(), 1, &image_view.handle(), w, h);
+    vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), w, h);
 
     vkt::CommandPool graphics_pool(*m_device, graphics_queue->family_index);
 
@@ -1720,10 +1511,10 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
     VkRenderPassBeginInfo begin_info = vku::InitStructHelper();
     begin_info.clearValueCount = 1;
     begin_info.pClearValues = &cv;
-    begin_info.renderPass = rp.handle();
+    begin_info.renderPass = rp;
     begin_info.renderArea.extent.width = w;
     begin_info.renderArea.extent.height = h;
-    begin_info.framebuffer = fb.handle();
+    begin_info.framebuffer = fb;
 
     // Prepare compute
 
@@ -1736,16 +1527,16 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, cs, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.dsl_bindings_[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     pipe.dsl_bindings_[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     pipe.CreateComputePipeline();
 
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
-    pipe.descriptor_set_->WriteDescriptorImageInfo(0, image_view, sampler.handle(), VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                                                   VK_IMAGE_LAYOUT_GENERAL);
-    pipe.descriptor_set_->UpdateDescriptorSets();
+    pipe.descriptor_set_.WriteDescriptorImageInfo(0, image_view, sampler, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                                  VK_IMAGE_LAYOUT_GENERAL);
+    pipe.descriptor_set_.UpdateDescriptorSets();
 
     vkt::CommandPool compute_pool(*m_device, compute_queue->family_index);
 
@@ -1768,12 +1559,12 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
     // Record compute command buffer
     compute_buffer.Begin();
 
-    vk::CmdBindPipeline(compute_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindPipeline(compute_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
 
-    vk::CmdBindDescriptorSets(compute_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
-                              &pipe.descriptor_set_->set_, 0, nullptr);
+    vk::CmdBindDescriptorSets(compute_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
 
-    vk::CmdDispatch(compute_buffer.handle(), w, h, 1);
+    vk::CmdDispatch(compute_buffer, w, h, 1);
 
     compute_buffer.End();
 
@@ -1783,14 +1574,14 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
     compute_queue->Wait();
     m_errorMonitor->VerifyFound();
 
-    vk::ResetCommandPool(device(), graphics_pool.handle(), 0);
-    vk::ResetCommandPool(device(), compute_pool.handle(), 0);
+    vk::ResetCommandPool(device(), graphics_pool, 0);
+    vk::ResetCommandPool(device(), compute_pool, 0);
 
     // Record command buffers with queue transition
 
     // Queue transition barrier, same for release and acquire
     VkImageMemoryBarrier barrier = vku::InitStructHelper();
-    barrier.image = image.handle();
+    barrier.image = image;
     barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;  // only matters for release
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;             // only matters for acquire
     barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -1808,8 +1599,8 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
 
     graphics_buffer.EndRenderPass();
 
-    vk::CmdPipelineBarrier(graphics_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
+    vk::CmdPipelineBarrier(graphics_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
 
     graphics_buffer.End();
     graphics_queue->Submit(graphics_buffer);
@@ -1818,15 +1609,15 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
     // Record compute command buffer
     compute_buffer.Begin();
 
-    vk::CmdPipelineBarrier(compute_buffer.handle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+    vk::CmdPipelineBarrier(compute_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
 
-    vk::CmdBindPipeline(compute_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindPipeline(compute_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
 
-    vk::CmdBindDescriptorSets(compute_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
-                              &pipe.descriptor_set_->set_, 0, nullptr);
+    vk::CmdBindDescriptorSets(compute_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
 
-    vk::CmdDispatch(compute_buffer.handle(), w, h, 1);
+    vk::CmdDispatch(compute_buffer, w, h, 1);
 
     compute_buffer.End();
 
@@ -1846,9 +1637,8 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ImageMemoryBarrierAccessLayoutCombinat
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
-    vkt::Image image(*m_device, 128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM,
+    vkt::Image image(*m_device, 128, 128, VK_FORMAT_B8G8R8A8_UNORM,
                      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
 
     VkClearColorValue color_clear_value = {};
     color_clear_value.uint32[0] = 255;
@@ -1864,7 +1654,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ImageMemoryBarrierAccessLayoutCombinat
     img_barrier.dstAccessMask = 0;
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    img_barrier.image = image.handle();
+    img_barrier.image = image;
     img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     img_barrier.subresourceRange.baseArrayLayer = 0;
     img_barrier.subresourceRange.baseMipLevel = 0;
@@ -1873,59 +1663,55 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ImageMemoryBarrierAccessLayoutCombinat
 
     m_command_buffer.Begin();
 
-    vk::CmdClearColorImage(m_command_buffer.handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
+    vk::CmdClearColorImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
 
     // GENERAL - Any
     // note: the table in PR 2918 originally said that 0 was not allowed, but this was incorrect. See Issue #4735
     img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     img_barrier.dstAccessMask = 0;
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &img_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &img_barrier);
 
     // Every table entry includes an implicit "can be 0"
     img_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     img_barrier.dstAccessMask = 0;
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &img_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &img_barrier);
 
     img_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     img_barrier.dstAccessMask = 0;
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &img_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &img_barrier);
 
     // PRESENT_SRC_KHR - Must be 0
     img_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     img_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
     m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &img_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &img_barrier);
     m_errorMonitor->VerifyFound();
 
     img_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     img_barrier.dstAccessMask = 0;
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &img_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &img_barrier);
 
     {
         VkImageMemoryBarrier2 img_barrier2 = vku::InitStructHelper();
         img_barrier2.srcAccessMask = 0;
         img_barrier2.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        img_barrier2.image = image.handle();
+        img_barrier2.image = image;
         img_barrier2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         img_barrier2.subresourceRange.baseArrayLayer = 0;
         img_barrier2.subresourceRange.baseMipLevel = 0;
         img_barrier2.subresourceRange.layerCount = 1;
         img_barrier2.subresourceRange.levelCount = 1;
 
-        VkDependencyInfo dependency_info = vku::InitStructHelper();
-        dependency_info.imageMemoryBarrierCount = 1;
-        dependency_info.pImageMemoryBarriers = &img_barrier2;
-
         img_barrier2.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
         img_barrier2.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageMemoryBarrier2-dstAccessMask-03903");
         m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
-        vk::CmdPipelineBarrier2KHR(m_command_buffer.handle(), &dependency_info);
+        m_command_buffer.BarrierKHR(img_barrier2);
         m_errorMonitor->VerifyFound();
 
         // make sure bits above UINT32_MAX are detected
@@ -1933,12 +1719,12 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ImageMemoryBarrierAccessLayoutCombinat
         img_barrier2.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageMemoryBarrier2-dstAccessMask-03907");
         m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
-        vk::CmdPipelineBarrier2KHR(m_command_buffer.handle(), &dependency_info);
+        m_command_buffer.BarrierKHR(img_barrier2);
         m_errorMonitor->VerifyFound();
 
         img_barrier2.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         img_barrier2.dstAccessMask = 0;
-        vk::CmdPipelineBarrier2KHR(m_command_buffer.handle(), &dependency_info);
+        m_command_buffer.BarrierKHR(img_barrier2);
 
         m_command_buffer.End();
     }
@@ -1963,7 +1749,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_NonSimultaneousSecondaryMarksPrimary) 
 
     m_command_buffer.Begin(&cbbi);
     m_errorMonitor->SetDesiredWarning("BestPractices-vkCmdExecuteCommands-CommandBufferSimultaneousUse");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -2013,15 +1799,14 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_GetQueryPoolResultsWithoutBegin) {
     vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 1);
 
     m_command_buffer.Begin();
-    vk::CmdResetQueryPool(m_command_buffer.handle(), query_pool.handle(), 0u, 1u);
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 1u);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     uint32_t data = 0u;
     m_errorMonitor->SetDesiredWarning("BestPractices-QueryPool-Unavailable");
-    vk::GetQueryPoolResults(*m_device, query_pool.handle(), 0u, 1u, sizeof(uint32_t), &data, sizeof(uint32_t), 0u);
+    vk::GetQueryPoolResults(*m_device, query_pool, 0u, 1u, sizeof(uint32_t), &data, sizeof(uint32_t), 0u);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2114,17 +1899,16 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetEnd) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(uint32_t),
-                         data);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(uint32_t), data);
 
     m_errorMonitor->SetDesiredWarning("BestPractices-PushConstants");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_VERTEX_BIT, sizeof(uint32_t),
-                         sizeof(uint32_t), &data[1]);
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, sizeof(uint32_t), sizeof(uint32_t),
+                         &data[1]);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
 
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -2162,14 +1946,13 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetMiddle) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(uint32_t),
-                         &data);
-    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_VERTEX_BIT,
-                         sizeof(uint32_t) * 2, sizeof(uint32_t), &data);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(uint32_t), &data);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, sizeof(uint32_t) * 2,
+                         sizeof(uint32_t), &data);
 
     m_errorMonitor->SetDesiredWarning("BestPractices-PushConstants");
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -2250,15 +2033,12 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEvent2) {
     VkMemoryBarrier2 barrier = vku::InitStructHelper();
     barrier.srcStageMask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
     barrier.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-    VkDependencyInfo dep_info = vku::InitStructHelper();
-    dep_info.memoryBarrierCount = 1;
-    dep_info.pMemoryBarriers = &barrier;
+    VkDependencyInfo dep_info = DependencyInfo(barrier);
 
     m_command_buffer.Begin();
-    vk::CmdSetEvent2(m_command_buffer.handle(), event, &dep_info);
+    vk::CmdSetEvent2(m_command_buffer, event, &dep_info);
     m_errorMonitor->SetDesiredWarning("BestPractices-Event-SignalSignaledEvent");
-    vk::CmdSetEvent2(m_command_buffer.handle(), event, &dep_info);
+    vk::CmdSetEvent2(m_command_buffer, event, &dep_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -2362,11 +2142,11 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventSecondary2) {
     cb.Begin(&cb_begin_info);
     cb.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
     cb.End();
-    const VkCommandBuffer secondary_cbs[2] = {cb.handle(), cb.handle()};
+    const VkCommandBuffer secondary_cbs[2] = {cb, cb};
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredWarning("BestPractices-Event-SignalSignaledEvent");
-    vk::CmdExecuteCommands(m_command_buffer.handle(), 2, secondary_cbs);
+    vk::CmdExecuteCommands(m_command_buffer, 2, secondary_cbs);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -2422,28 +2202,164 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetEndCompute) {
                                        {
                                            {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                                        });
-    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0u, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0u, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_}, {push_constant_range});
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0u, 1u,
-                              &descriptor_set.set_, 0u, nullptr);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                         sizeof(uint32_t), data);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0u, 1u, &descriptor_set.set_,
+                              0u, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), data);
 
     m_errorMonitor->SetDesiredWarning("BestPractices-PushConstants");
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_errorMonitor->VerifyFound();
 
-    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_COMPUTE_BIT, sizeof(uint32_t),
-                         sizeof(uint32_t), &data[1]);
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_COMPUTE_BIT, sizeof(uint32_t), sizeof(uint32_t),
+                         &data[1]);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
 
     m_command_buffer.End();
+}
+
+// Not supported in Vulkan SC: best practices layers
+TEST_F(VkBestPracticesLayerTest, DISABLED_UnneededQueueFamilyOwnershipTransfer) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance9);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    std::optional<uint32_t> transfer_only_family = m_device->TransferOnlyQueueFamily();
+    if (!transfer_only_family.has_value()) {
+        GTEST_SKIP() << "Transfer-only queue family is required";
+    }
+    vkt::CommandPool transfer_pool(*m_device, transfer_only_family.value(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    vkt::CommandBuffer transfer_cb(*m_device, transfer_pool);
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    VkBufferMemoryBarrier2 acquire_barrier = vku::InitStructHelper();
+    acquire_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    acquire_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    acquire_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    acquire_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    acquire_barrier.srcQueueFamilyIndex = m_default_queue->family_index;
+    acquire_barrier.dstQueueFamilyIndex = transfer_only_family.value();
+    acquire_barrier.buffer = buffer;
+    acquire_barrier.offset = 0;
+    acquire_barrier.size = 256;
+
+    transfer_cb.Begin();
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-PipelineBarrier-unneeded-QFOT");
+    transfer_cb.Barrier(acquire_barrier);
+    m_errorMonitor->VerifyFound();
+    transfer_cb.End();
+
+    VkBufferMemoryBarrier2 release_barrier = vku::InitStructHelper();
+    release_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    release_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    release_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    release_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    release_barrier.srcQueueFamilyIndex = transfer_only_family.value();
+    release_barrier.dstQueueFamilyIndex = m_default_queue->family_index;
+    release_barrier.buffer = buffer;
+    release_barrier.offset = 0;
+    release_barrier.size = 256;
+
+    transfer_cb.Begin();
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-PipelineBarrier-unneeded-QFOT");
+    transfer_cb.Barrier(release_barrier);
+    m_errorMonitor->VerifyFound();
+    transfer_cb.End();
+}
+
+// Not supported in Vulkan SC: best practices layers
+TEST_F(VkBestPracticesLayerTest, DISABLED_BadDestroy) {
+    TEST_DESCRIPTION(
+        "In PreCallRecordDestroyDevice, make sure CommandBufferSubState is destroyed before destroying device state and validation "
+        "does not crash");
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+
+    // Workaround for overzealous layers checking even the guaranteed 0th queue family
+    const auto q_props = vkt::PhysicalDevice(Gpu()).queue_properties_;
+    ASSERT_TRUE(q_props.size() > 0);
+    ASSERT_TRUE(q_props[0].queueCount > 0);
+
+    const float q_priority[] = {1.0f};
+    VkDeviceQueueCreateInfo queue_ci = vku::InitStructHelper();
+    queue_ci.queueFamilyIndex = 0;
+    queue_ci.queueCount = 1;
+    queue_ci.pQueuePriorities = q_priority;
+
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
+    device_ci.queueCreateInfoCount = 1;
+    device_ci.pQueueCreateInfos = &queue_ci;
+
+    VkDevice leaky_device;
+    ASSERT_EQ(VK_SUCCESS, vk::CreateDevice(Gpu(), &device_ci, nullptr, &leaky_device));
+
+    VkCommandPool command_pool;
+    VkCommandPoolCreateInfo pool_create_info = vku::InitStructHelper();
+    pool_create_info.queueFamilyIndex = 0;
+    vk::CreateCommandPool(leaky_device, &pool_create_info, nullptr, &command_pool);
+
+    VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+    VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
+    command_buffer_allocate_info.commandPool = command_pool;
+    command_buffer_allocate_info.commandBufferCount = 1;
+    command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    vk::AllocateCommandBuffers(leaky_device, &command_buffer_allocate_info, &command_buffer);
+
+    m_errorMonitor->SetDesiredError("VUID-vkDestroyDevice-device-05137");
+    m_errorMonitor->SetDesiredError("VUID-vkDestroyDevice-device-05137");
+    // Those 2 will come from self validation if it is enabled
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
+    vk::DestroyDevice(leaky_device, nullptr);
+    m_errorMonitor->VerifyFound();
+
+    // There's no way we can destroy the command pool at this point. Even though DestroyDevice failed, the loader has already
+    // removed references to the device
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyInstance-instance-00629");
+}
+
+// Not supported in Vulkan SC: best practices layers
+TEST_F(VkBestPracticesLayerTest, DISABLED_MutableDescriptors) {
+    AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::mutableDescriptorType);
+    RETURN_IF_SKIP(InitBestPractices());
+    VkDescriptorType descriptor_types[] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER};
+
+    VkMutableDescriptorTypeListEXT mutable_descriptor_type_lists[2] = {};
+    mutable_descriptor_type_lists[0].descriptorTypeCount = 1;
+    mutable_descriptor_type_lists[0].pDescriptorTypes = &descriptor_types[0];
+    mutable_descriptor_type_lists[1].descriptorTypeCount = 1;
+    mutable_descriptor_type_lists[1].pDescriptorTypes = &descriptor_types[1];
+
+    VkMutableDescriptorTypeCreateInfoEXT mdtci = vku::InitStructHelper();
+    mdtci.mutableDescriptorTypeListCount = 2;
+    mdtci.pMutableDescriptorTypeLists = mutable_descriptor_type_lists;
+
+    VkDescriptorPoolSize pool_size = {};
+    pool_size.type = VK_DESCRIPTOR_TYPE_MUTABLE_EXT;
+    pool_size.descriptorCount = 4;
+
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper(&mdtci);
+    ds_pool_ci.maxSets = 2;
+    ds_pool_ci.poolSizeCount = 1;
+    ds_pool_ci.pPoolSizes = &pool_size;
+
+    m_errorMonitor->SetDesiredWarning("BestPractices-MutableDescriptor-TypeListCount");
+    vkt::DescriptorPool pool(*m_device, ds_pool_ci);
+    m_errorMonitor->VerifyFound();
 }

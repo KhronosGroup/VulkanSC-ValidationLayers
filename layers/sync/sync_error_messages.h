@@ -17,47 +17,32 @@
 
 #pragma once
 
-#include "sync/sync_renderpass.h"  // DynamicRenderingInfo::Attachment
+#include "sync/sync_common.h"
 #include "sync/sync_reporting.h"
-
 #include <vulkan/vulkan.h>
 #include <string>
 
 class CommandBufferAccessContext;
+class CommandExecutionContext;
 class HazardResult;
-struct ReportKeyValues;
 class QueueBatchContext;
+class SyncValidator;
+struct Location;
+struct SyncImageMemoryBarrier;
 
 namespace vvl {
 class DescriptorSet;
-class Device;
 class Pipeline;
 }  // namespace vvl
 
 namespace syncval {
 
-struct AdditionalMessageInfo {
-    ReportKeyValues properties;
-
-    // When we need something more complex than vvl::Func
-    std::string access_initiator;
-
-    // Replaces standard "writes to"/"reads" access wording.
-    // For example, "clears" for a clear operation might be more specific than a write
-    std::string access_action;
-
-    std::string hazard_overview;
-    std::string brief_description_end_text;
-    std::string pre_synchronization_text;
-    std::string message_end_text;
-};
-
 class ErrorMessages {
   public:
-    explicit ErrorMessages(vvl::Device& validator);
+    explicit ErrorMessages(SyncValidator& validator);
 
     std::string Error(const HazardResult& hazard, const CommandExecutionContext& context, vvl::Func command,
-                      const std::string& resouce_description, const char* message_type,
+                      const std::string& resource_description, const char* message_type,
                       const AdditionalMessageInfo& additional_info = {}) const;
 
     std::string BufferError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context, vvl::Func command,
@@ -66,6 +51,11 @@ class ErrorMessages {
 
     std::string BufferCopyError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context, const vvl::Func command,
                                 const std::string& resouce_description, uint32_t region_index, ResourceAccessRange range) const;
+
+    std::string AccelerationStructureError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
+                                           const vvl::Func command, const std::string& resource_description,
+                                           const ResourceAccessRange range, VkAccelerationStructureKHR as,
+                                           const Location& as_location) const;
 
     std::string ImageCopyResolveBlitError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
                                           vvl::Func command, const std::string& resource_description, uint32_t region_index,
@@ -121,7 +111,6 @@ class ErrorMessages {
     std::string RenderPassStoreOpError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context, vvl::Func command,
                                        const std::string& resource_description, VkAttachmentStoreOp store_op) const;
 
-
     std::string RenderPassLayoutTransitionError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
                                                 vvl::Func command, const std::string& resource_description,
                                                 VkImageLayout old_layout, VkImageLayout new_layout) const;
@@ -151,9 +140,7 @@ class ErrorMessages {
                            const std::string& resource_description) const;
 
   private:
-    vvl::Device& validator_;
-    const bool& extra_properties_;
-    const bool& pretty_print_extra_;
+    SyncValidator& validator_;
 };
 
 }  // namespace syncval

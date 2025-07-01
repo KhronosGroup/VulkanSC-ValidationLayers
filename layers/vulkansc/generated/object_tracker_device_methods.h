@@ -1028,6 +1028,35 @@ bool PreCallValidateGetPipelineIndirectMemoryRequirementsNV(VkDevice device, con
                                                             const ErrorObject& error_obj) const override;
 bool PreCallValidateGetPipelineIndirectDeviceAddressNV(VkDevice device, const VkPipelineIndirectDeviceAddressInfoNV* pInfo,
                                                        const ErrorObject& error_obj) const override;
+void PostCallRecordCreateTensorARM(VkDevice device, const VkTensorCreateInfoARM* pCreateInfo,
+                                   const VkAllocationCallbacks* pAllocator, VkTensorARM* pTensor,
+                                   const RecordObject& record_obj) override;
+bool PreCallValidateDestroyTensorARM(VkDevice device, VkTensorARM tensor, const VkAllocationCallbacks* pAllocator,
+                                     const ErrorObject& error_obj) const override;
+void PreCallRecordDestroyTensorARM(VkDevice device, VkTensorARM tensor, const VkAllocationCallbacks* pAllocator,
+                                   const RecordObject& record_obj) override;
+bool PreCallValidateCreateTensorViewARM(VkDevice device, const VkTensorViewCreateInfoARM* pCreateInfo,
+                                        const VkAllocationCallbacks* pAllocator, VkTensorViewARM* pView,
+                                        const ErrorObject& error_obj) const override;
+void PostCallRecordCreateTensorViewARM(VkDevice device, const VkTensorViewCreateInfoARM* pCreateInfo,
+                                       const VkAllocationCallbacks* pAllocator, VkTensorViewARM* pView,
+                                       const RecordObject& record_obj) override;
+bool PreCallValidateDestroyTensorViewARM(VkDevice device, VkTensorViewARM tensorView, const VkAllocationCallbacks* pAllocator,
+                                         const ErrorObject& error_obj) const override;
+void PreCallRecordDestroyTensorViewARM(VkDevice device, VkTensorViewARM tensorView, const VkAllocationCallbacks* pAllocator,
+                                       const RecordObject& record_obj) override;
+bool PreCallValidateGetTensorMemoryRequirementsARM(VkDevice device, const VkTensorMemoryRequirementsInfoARM* pInfo,
+                                                   VkMemoryRequirements2* pMemoryRequirements,
+                                                   const ErrorObject& error_obj) const override;
+bool PreCallValidateBindTensorMemoryARM(VkDevice device, uint32_t bindInfoCount, const VkBindTensorMemoryInfoARM* pBindInfos,
+                                        const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdCopyTensorARM(VkCommandBuffer commandBuffer, const VkCopyTensorInfoARM* pCopyTensorInfo,
+                                     const ErrorObject& error_obj) const override;
+bool PreCallValidateGetTensorOpaqueCaptureDescriptorDataARM(VkDevice device, const VkTensorCaptureDescriptorDataInfoARM* pInfo,
+                                                            void* pData, const ErrorObject& error_obj) const override;
+bool PreCallValidateGetTensorViewOpaqueCaptureDescriptorDataARM(VkDevice device,
+                                                                const VkTensorViewCaptureDescriptorDataInfoARM* pInfo, void* pData,
+                                                                const ErrorObject& error_obj) const override;
 bool PreCallValidateGetShaderModuleCreateInfoIdentifierEXT(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
                                                            VkShaderModuleIdentifierEXT* pIdentifier,
                                                            const ErrorObject& error_obj) const override;
@@ -1066,8 +1095,62 @@ void PreCallRecordDestroySemaphoreSciSyncPoolNV(VkDevice device, VkSemaphoreSciS
 #endif  // VK_USE_PLATFORM_SCI
 bool PreCallValidateLatencySleepNV(VkDevice device, VkSwapchainKHR swapchain, const VkLatencySleepInfoNV* pSleepInfo,
                                    const ErrorObject& error_obj) const override;
+bool PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                                const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                const ErrorObject& error_obj) const override;
+void PostCallRecordCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                               VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                               const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                               const RecordObject& record_obj) override;
+bool PreCallValidateCreateDataGraphPipelineSessionARM(VkDevice device, const VkDataGraphPipelineSessionCreateInfoARM* pCreateInfo,
+                                                      const VkAllocationCallbacks* pAllocator,
+                                                      VkDataGraphPipelineSessionARM* pSession,
+                                                      const ErrorObject& error_obj) const override;
+void PostCallRecordCreateDataGraphPipelineSessionARM(VkDevice device, const VkDataGraphPipelineSessionCreateInfoARM* pCreateInfo,
+                                                     const VkAllocationCallbacks* pAllocator,
+                                                     VkDataGraphPipelineSessionARM* pSession,
+                                                     const RecordObject& record_obj) override;
+bool PreCallValidateGetDataGraphPipelineSessionBindPointRequirementsARM(
+    VkDevice device, const VkDataGraphPipelineSessionBindPointRequirementsInfoARM* pInfo, uint32_t* pBindPointRequirementCount,
+    VkDataGraphPipelineSessionBindPointRequirementARM* pBindPointRequirements, const ErrorObject& error_obj) const override;
+bool PreCallValidateGetDataGraphPipelineSessionMemoryRequirementsARM(
+    VkDevice device, const VkDataGraphPipelineSessionMemoryRequirementsInfoARM* pInfo, VkMemoryRequirements2* pMemoryRequirements,
+    const ErrorObject& error_obj) const override;
+bool PreCallValidateBindDataGraphPipelineSessionMemoryARM(VkDevice device, uint32_t bindInfoCount,
+                                                          const VkBindDataGraphPipelineSessionMemoryInfoARM* pBindInfos,
+                                                          const ErrorObject& error_obj) const override;
+bool PreCallValidateDestroyDataGraphPipelineSessionARM(VkDevice device, VkDataGraphPipelineSessionARM session,
+                                                       const VkAllocationCallbacks* pAllocator,
+                                                       const ErrorObject& error_obj) const override;
+void PreCallRecordDestroyDataGraphPipelineSessionARM(VkDevice device, VkDataGraphPipelineSessionARM session,
+                                                     const VkAllocationCallbacks* pAllocator,
+                                                     const RecordObject& record_obj) override;
+bool PreCallValidateGetDataGraphPipelineAvailablePropertiesARM(VkDevice device, const VkDataGraphPipelineInfoARM* pPipelineInfo,
+                                                               uint32_t* pPropertiesCount,
+                                                               VkDataGraphPipelinePropertyARM* pProperties,
+                                                               const ErrorObject& error_obj) const override;
+bool PreCallValidateGetDataGraphPipelinePropertiesARM(VkDevice device, const VkDataGraphPipelineInfoARM* pPipelineInfo,
+                                                      uint32_t propertiesCount,
+                                                      VkDataGraphPipelinePropertyQueryResultARM* pProperties,
+                                                      const ErrorObject& error_obj) const override;
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+bool PreCallValidateCmdBindTileMemoryQCOM(VkCommandBuffer commandBuffer, const VkTileMemoryBindInfoQCOM* pTileMemoryBindInfo,
+                                          const ErrorObject& error_obj) const override;
+bool PreCallValidateCreateExternalComputeQueueNV(VkDevice device, const VkExternalComputeQueueCreateInfoNV* pCreateInfo,
+                                                 const VkAllocationCallbacks* pAllocator, VkExternalComputeQueueNV* pExternalQueue,
+                                                 const ErrorObject& error_obj) const override;
+void PostCallRecordCreateExternalComputeQueueNV(VkDevice device, const VkExternalComputeQueueCreateInfoNV* pCreateInfo,
+                                                const VkAllocationCallbacks* pAllocator, VkExternalComputeQueueNV* pExternalQueue,
+                                                const RecordObject& record_obj) override;
+bool PreCallValidateDestroyExternalComputeQueueNV(VkDevice device, VkExternalComputeQueueNV externalQueue,
+                                                  const VkAllocationCallbacks* pAllocator,
+                                                  const ErrorObject& error_obj) const override;
+void PreCallRecordDestroyExternalComputeQueueNV(VkDevice device, VkExternalComputeQueueNV externalQueue,
+                                                const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) override;
 bool PreCallValidateGetGeneratedCommandsMemoryRequirementsEXT(VkDevice device,
                                                               const VkGeneratedCommandsMemoryRequirementsInfoEXT* pInfo,
                                                               VkMemoryRequirements2* pMemoryRequirements,

@@ -22,26 +22,15 @@
 #include <variant>
 
 #include "state_tracker/device_memory_state.h"
-#include "state_tracker/fence_state.h"
 #include "state_tracker/image_layout_map.h"
-#include "utils/vk_layer_utils.h"
 
 namespace vvl {
-class Device;
-class Fence;
-class Semaphore;
-class Surface;
+class DeviceState;
+class ImageSubState;
+class ImageViewSubState;
 class Swapchain;
 class VideoProfileDesc;
 }  // namespace vvl
-
-static inline bool operator==(const VkImageSubresource &lhs, const VkImageSubresource &rhs) {
-    return (lhs.aspectMask == rhs.aspectMask) && (lhs.mipLevel == rhs.mipLevel) && (lhs.arrayLayer == rhs.arrayLayer);
-}
-
-VkImageSubresourceRange NormalizeSubresourceRange(const VkImageCreateInfo &image_create_info, const VkImageSubresourceRange &range);
-VkImageSubresourceRange NormalizeSubresourceRange(const VkImageCreateInfo &image_create_info,
-                                                  const VkImageViewCreateInfo &view_create_info);
 
 // Transfer VkImageSubresourceRange into VkImageSubresourceLayers struct
 static inline VkImageSubresourceLayers LayersFromRange(const VkImageSubresourceRange &subresource_range) {
@@ -84,7 +73,7 @@ namespace vvl {
 //    Note that the images for *every* image_index will show up as parents of the swapchain,
 //    so swapchain_image_index values must be compared.
 //
-class Image : public Bindable {
+class Image : public Bindable, public SubStateManager<ImageSubState> {
   public:
     const vku::safe_VkImageCreateInfo safe_create_info;
     const VkImageCreateInfo &create_info;
@@ -97,19 +86,14 @@ class Image : public Bindable {
     std::shared_ptr<vvl::Swapchain> bind_swapchain;
     uint32_t swapchain_image_index;
     const VkFormatFeatureFlags2KHR format_features;
-    // Need to memory requirments for each plane if image is disjoint
+    // Need to memory requirements for each plane if image is disjoint
     const bool disjoint;  // True if image was created with VK_IMAGE_CREATE_DISJOINT_BIT
     static constexpr int kMaxPlanes = 3;
     using MemoryReqs = std::array<VkMemoryRequirements, kMaxPlanes>;
     const MemoryReqs requirements;
-    std::array<bool, kMaxPlanes> memory_requirements_checked = {};
 
     const bool sparse_residency;
-    using SparseReqs = std::vector<VkSparseImageMemoryRequirements>;
-    const SparseReqs sparse_requirements;
-    const bool sparse_metadata_required;  // Track if sparse metadata aspect is required for this image
-    bool get_sparse_reqs_called;          // Track if GetImageSparseMemoryRequirements() has been called for this image
-    bool sparse_metadata_bound;           // Track if sparse metadata aspect is bound to this image
+    const std::vector<VkSparseImageMemoryRequirements> sparse_requirements;
 
     VkImageFormatProperties image_format_properties = {};
 #ifdef VK_USE_PLATFORM_METAL_EXT
@@ -117,16 +101,21 @@ class Image : public Bindable {
     const bool metal_io_surface_export;
 #endif  // VK_USE_PLATFORM_METAL
 
-    const image_layout_map::Encoder subresource_encoder;                             // Subresource resolution encoder
-    std::unique_ptr<const subresource_adapter::ImageRangeEncoder> fragment_encoder;  // Fragment resolution encoder
-    const VkDevice store_device_as_workaround;                                       // TODO REMOVE WHEN encoder can be const
+    const subresource_adapter::RangeEncoder subresource_encoder;  // Subresource resolution encoder
+    const VkDevice store_device_as_workaround;                    // TODO REMOVE WHEN encoder can be const
 
-    std::shared_ptr<GlobalImageLayoutRangeMap> layout_range_map;
+    // Tracks current layouts of image subresources. Can be used by multiple threads, so should be locked when in use.
+    // Record time validation can't use this map. Global image layout is known only during queue submit time.
+    // When image is aliased with another compatible image this map an its lock are shared between images.
+    std::shared_ptr<ImageLayoutMap> layout_map;
+    std::shared_ptr<std::shared_mutex> layout_map_lock;
+    ReadLockGuard LayoutMapReadLock() const { return ReadLockGuard(*layout_map_lock); }
+    WriteLockGuard LayoutMapWriteLock() { return WriteLockGuard(*layout_map_lock); }
 
     vvl::unordered_set<std::shared_ptr<const vvl::VideoProfileDesc>> supported_video_profiles;
 
-    Image(const Device &dev_data, VkImage handle, const VkImageCreateInfo *pCreateInfo, VkFormatFeatureFlags2KHR features);
-    Image(const Device &dev_data, VkImage handle, const VkImageCreateInfo *pCreateInfo, VkSwapchainKHR swapchain,
+    Image(const DeviceState &dev_data, VkImage handle, const VkImageCreateInfo *pCreateInfo, VkFormatFeatureFlags2KHR features);
+    Image(const DeviceState &dev_data, VkImage handle, const VkImageCreateInfo *pCreateInfo, VkSwapchainKHR swapchain,
           uint32_t swapchain_index, VkFormatFeatureFlags2KHR features);
     Image(Image const &rh_obj) = delete;
     std::shared_ptr<const Image> shared_from_this() const { return SharedFromThisImpl(this); }
@@ -199,32 +188,20 @@ class Image : public Bindable {
     void Destroy() override;
 
     // Returns the effective extent of the provided subresource, adjusted for mip level and array depth.
-    VkExtent3D GetEffectiveSubresourceExtent(const VkImageSubresourceLayers &sub) const {
-        return GetEffectiveExtent(create_info, sub.aspectMask, sub.mipLevel);
-    }
+    VkExtent3D GetEffectiveSubresourceExtent(const VkImageSubresourceLayers &sub) const;
+    VkExtent3D GetEffectiveSubresourceExtent(const VkImageSubresource &sub) const;
+    VkExtent3D GetEffectiveSubresourceExtent(const VkImageSubresourceRange &range) const;
 
-    // Returns the effective extent of the provided subresource, adjusted for mip level and array depth.
-    VkExtent3D GetEffectiveSubresourceExtent(const VkImageSubresource &sub) const {
-        return GetEffectiveExtent(create_info, sub.aspectMask, sub.mipLevel);
-    }
+    std::string DescribeSubresourceLayers(const VkImageSubresourceLayers &subresource) const;
 
-    // Returns the effective extent of the provided subresource, adjusted for mip level and array depth.
-    VkExtent3D GetEffectiveSubresourceExtent(const VkImageSubresourceRange &range) const {
-        return GetEffectiveExtent(create_info, range.aspectMask, range.baseMipLevel);
-    }
-
-    VkImageSubresourceRange NormalizeSubresourceRange(const VkImageSubresourceRange &range) const {
-        return ::NormalizeSubresourceRange(create_info, range);
-    }
+    VkImageSubresourceRange NormalizeSubresourceRange(const VkImageSubresourceRange &range) const;
+    uint32_t NormalizeLayerCount(const VkImageSubresourceLayers &resource) const;
 
     void SetInitialLayoutMap();
     void SetImageLayout(const VkImageSubresourceRange &range, VkImageLayout layout);
 
     // This function is only used for comparing Imported External Dedicated Memory
     bool CompareCreateInfo(const Image &other) const;
-
-  protected:
-    void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
 
     template <typename UnaryPredicate>
     bool AnyAliasBindingOf(const StateObject::NodeMap &bindings, const UnaryPredicate &pred) const {
@@ -254,33 +231,60 @@ class Image : public Bindable {
         return false;
     }
 
+    template <typename RegionType>
+    VkDeviceSize GetBufferSizeFromCopyImage(const RegionType &region) const;
+
+  protected:
+    void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
+
   private:
+    VkImageSubresourceRange MakeImageFullRange();
+
+    // Subresource encoder need to take into account that 3d image can have a separate layout
+    // per slice, if supported by the implementation. This adjusts the layout range so
+    // layouts map can address each slice.
+    VkImageSubresourceRange GetSubresourceEncoderRange(const DeviceState &device_state, const VkImageSubresourceRange &full_range);
+
     std::variant<std::monostate, BindableNoMemoryTracker, BindableLinearMemoryTracker, BindableSparseMemoryTracker,
                  BindableMultiplanarMemoryTracker>
         tracker_;
 };
 
+class ImageSubState {
+  public:
+    explicit ImageSubState(Image &img) : base(img) {}
+    ImageSubState(const ImageSubState &) = delete;
+    ImageSubState &operator=(const ImageSubState &) = delete;
+    virtual ~ImageSubState() {}
+    virtual void Destroy() {}
+    virtual void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) {}
+
+    Image &base;
+};
+
 // State for VkImageView objects.
 // Parent -> child relationships in the object usage tree:
 //    ImageView [N] -> [1] vv::Image
-class ImageView : public StateObject {
+class ImageView : public StateObject, public SubStateManager<ImageViewSubState> {
   public:
     const vku::safe_VkImageViewCreateInfo safe_create_info;
     const VkImageViewCreateInfo &create_info;
 
+    std::shared_ptr<vvl::Image> image_state;
+
+#ifdef VK_USE_PLATFORM_METAL_EXT
+    const bool metal_imageview_export;
+#endif  // VK_USE_PLATFORM_METAL_EXT
+
+    const bool is_depth_sliced;
     const VkImageSubresourceRange normalized_subresource_range;
-    const image_layout_map::RangeGenerator range_generator;
+    const subresource_adapter::RangeGenerator range_generator;
     const VkSampleCountFlagBits samples;
     const VkSamplerYcbcrConversion samplerConversion;  // Handle of the ycbcr sampler conversion the image was created with, if any
     const VkFilterCubicImageViewImageFormatPropertiesEXT filter_cubic_props;
     const float min_lod;
     const VkFormatFeatureFlags2KHR format_features;
     const VkImageUsageFlags inherited_usage;  // from spec #resources-image-inherited-usage
-#ifdef VK_USE_PLATFORM_METAL_EXT
-    const bool metal_imageview_export;
-#endif  // VK_USE_PLATFORM_METAL_EXT
-    std::shared_ptr<vvl::Image> image_state;
-    const bool is_depth_sliced;
 
     ImageView(const std::shared_ptr<vvl::Image> &image_state, VkImageView handle, const VkImageViewCreateInfo *ci,
               VkFormatFeatureFlags2KHR ff, const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props);
@@ -301,177 +305,26 @@ class ImageView : public StateObject {
     bool OverlapSubresource(const ImageView &compare_view) const;
 
     void Destroy() override;
-
-    bool IsDepthSliced() const { return is_depth_sliced; }
+    void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
 
     uint32_t GetAttachmentLayerCount() const;
 
     bool Invalid() const override { return Destroyed() || !image_state || image_state->Invalid(); }
-};
-
-struct SwapchainImage {
-    vvl::Image *image_state = nullptr;
-    bool acquired = false;
-    std::shared_ptr<vvl::Semaphore> acquire_semaphore;
-    std::shared_ptr<vvl::Fence> acquire_fence;
-
-    // Each swapchain image keeps information about submissions associated with current present.
-    // When the image is re-acquired later this information can be used to synchronize with
-    // these submissions by using acquire fence.
-    AcquireFenceSync acquire_fence_sync;
-};
-
-// State for VkSwapchainKHR objects.
-// Parent -> child relationships in the object usage tree:
-//    vvl::Swapchain [N] -> [1] vvl::Surface
-//    However, only 1 swapchain for each surface can be !retired.
-class Swapchain : public StateObject {
-  public:
-    const vku::safe_VkSwapchainCreateInfoKHR safe_create_info;
-    const VkSwapchainCreateInfoKHR &create_info;
-
-    std::vector<VkPresentModeKHR> present_modes;
-    std::vector<SwapchainImage> images;
-    bool retired = false;
-    bool exclusive_full_screen_access;
-    const bool shared_presentable;
-    uint64_t max_present_id = 0;
-    const vku::safe_VkImageCreateInfo image_create_info;
-
-    std::shared_ptr<vvl::Surface> surface;
-    Device &dev_data;
-    uint32_t acquired_images = 0;
-
-    Swapchain(Device &dev_data, const VkSwapchainCreateInfoKHR *pCreateInfo, VkSwapchainKHR handle);
-
-    ~Swapchain() {
-        if (!Destroyed()) {
-            Destroy();
-        }
-    }
-
-    VkSwapchainKHR VkHandle() const { return handle_.Cast<VkSwapchainKHR>(); }
-
-    void PresentImage(uint32_t image_index, uint64_t present_id, const AcquireFenceSync &acquire_fence_sync);
-
-    void ReleaseImage(uint32_t image_index);
-
-    void AcquireImage(uint32_t image_index, const std::shared_ptr<vvl::Semaphore> &semaphore_state,
-                      const std::shared_ptr<vvl::Fence> &fence_state);
-
-    void Destroy() override;
-
-    SwapchainImage GetSwapChainImage(uint32_t index) const;
-
-    std::shared_ptr<const vvl::Image> GetSwapChainImageShared(uint32_t index) const;
-
-  protected:
-    void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
-};
-
-}  // namespace vvl
-
-struct GpuQueue {
-    VkPhysicalDevice gpu;
-    uint32_t queue_family_index;
-};
-
-inline bool operator==(GpuQueue const &lhs, GpuQueue const &rhs) {
-    return (lhs.gpu == rhs.gpu && lhs.queue_family_index == rhs.queue_family_index);
-}
-
-namespace std {
-template <>
-struct hash<GpuQueue> {
-    size_t operator()(GpuQueue gq) const throw() {
-        return hash<uint64_t>()((uint64_t)(gq.gpu)) ^ hash<uint32_t>()(gq.queue_family_index);
-    }
-};
-}  // namespace std
-
-namespace vvl {
-
-// Parent -> child relationships in the object usage tree:
-//    vvl::Surface -> nothing
-class Surface : public StateObject {
-  public:
-    Surface(VkSurfaceKHR handle) : StateObject(handle, kVulkanObjectTypeSurfaceKHR) {}
-
-    ~Surface() {
-        if (!Destroyed()) {
-            Destroy();
-        }
-    }
-
-    VkSurfaceKHR VkHandle() const { return handle_.Cast<VkSurfaceKHR>(); }
-
-    void Destroy() override;
-
-    void RemoveParent(StateObject *parent_node) override;
-
-    void SetQueueSupport(VkPhysicalDevice phys_dev, uint32_t qfi, bool supported);
-    bool GetQueueSupport(VkPhysicalDevice phys_dev, uint32_t qfi) const;
-
-    void SetPresentModes(VkPhysicalDevice phys_dev, vvl::span<const VkPresentModeKHR> modes);
-    std::vector<VkPresentModeKHR> GetPresentModes(VkPhysicalDevice phys_dev) const;
-
-    void SetFormats(VkPhysicalDevice phys_dev, std::vector<vku::safe_VkSurfaceFormat2KHR> &&fmts);
-    vvl::span<const vku::safe_VkSurfaceFormat2KHR> GetFormats(bool get_surface_capabilities2, VkPhysicalDevice phys_dev,
-                                                              const void *surface_info2_pnext) const;
-
-    // Cache capabilities that do not depend on the present mode
-    void UpdateCapabilitiesCache(VkPhysicalDevice phys_dev, const VkSurfaceCapabilitiesKHR &surface_caps);
-    // Cache per present mode capabilities
-    void UpdateCapabilitiesCache(VkPhysicalDevice phys_dev, const VkSurfaceCapabilities2KHR &surface_caps,
-                                 VkPresentModeKHR present_mode);
-
-    bool IsLastCapabilityQueryUsedPresentMode(VkPhysicalDevice phys_dev) const;
-    VkSurfaceCapabilitiesKHR GetSurfaceCapabilities(VkPhysicalDevice phys_dev, const void *surface_info_pnext) const;
-    VkSurfaceCapabilitiesKHR GetPresentModeSurfaceCapabilities(VkPhysicalDevice phys_dev, VkPresentModeKHR present_mode) const;
-    VkSurfacePresentScalingCapabilitiesEXT GetPresentModeScalingCapabilities(VkPhysicalDevice phys_dev,
-                                                                             VkPresentModeKHR present_mode) const;
-    std::vector<VkPresentModeKHR> GetCompatibleModes(VkPhysicalDevice phys_dev, VkPresentModeKHR present_mode) const;
-
-    vvl::Swapchain *swapchain{nullptr};
 
   private:
-    // Contains per present mode capabilities
-    struct PresentModeInfo {
-        VkPresentModeKHR present_mode;
-        VkSurfaceCapabilitiesKHR surface_capabilities;
-        std::optional<VkSurfacePresentScalingCapabilitiesEXT> scaling_capabilities;
-        std::optional<std::vector<VkPresentModeKHR>> compatible_present_modes;
-    };
-    // Cached information per physical device. Optional indicates if element is in the cache.
-    //
-    // NOTE: One of the reasons to cache surface caps is to prevent a false-positive
-    // when the surface change happens (e.g. resize) after the surface caps are queried
-    // and before the swapchain is created. The assumption is that with the current API,
-    // the app can't do better than this (no atomicity between query and swapchain creation).
-    // The caching ensures that validation sees the same surface state as the application.
-    //
-    // The priority is to avoid false-positives for correctly written application.
-    // When the application behaves incorrectly (e.g. forgets to query surface caps after
-    // it processed the resize event), then the caching can hide a problem, since validation
-    // will think that application respects surface caps values.
-    struct PhysDevCache {
-        std::optional<std::vector<VkPresentModeKHR>> present_modes;
-        std::optional<VkSurfaceCapabilitiesKHR> capabilities;
-        std::vector<PresentModeInfo> present_mode_infos;
-        bool last_capability_query_used_present_mode = false;
-
-        const PresentModeInfo *GetPresentModeInfo(VkPresentModeKHR present_mode) const;
-    };
-    const PhysDevCache *GetPhysDevCache(VkPhysicalDevice phys_dev) const;
-
-  private:
-    std::unique_lock<std::mutex> Lock() const { return std::unique_lock<std::mutex>(lock_); }
-    // TODO: make mutex shared, so multiple Validate can read simultaneously. Remove remaining mutations in Validate first
-    mutable std::mutex lock_;
-    mutable vvl::unordered_map<GpuQueue, bool> gpu_queue_support_;
-    mutable vvl::unordered_map<VkPhysicalDevice, std::vector<vku::safe_VkSurfaceFormat2KHR>> formats_;
-
-    vvl::unordered_map<VkPhysicalDevice, PhysDevCache> cache_;
+    VkImageSubresourceRange NormalizeSubresourceRange() const;
+    bool IsDepthSliced();
 };
 
+class ImageViewSubState {
+  public:
+    explicit ImageViewSubState(ImageView &view) : base(view) {}
+    ImageViewSubState(const ImageViewSubState &) = delete;
+    ImageViewSubState &operator=(const ImageViewSubState &) = delete;
+    virtual ~ImageViewSubState() {}
+    virtual void Destroy() {}
+    virtual void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) {}
+
+    ImageView &base;
+};
 }  // namespace vvl

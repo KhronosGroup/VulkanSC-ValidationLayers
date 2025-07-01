@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2024 The Khronos Group Inc.
- * Copyright (c) 2015-2024 Valve Corporation
- * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2025 The Khronos Group Inc.
+ * Copyright (c) 2015-2025 Valve Corporation
+ * Copyright (c) 2015-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,8 +71,8 @@ TEST_F(PositiveRobustness, BindVertexBuffers2EXTNullDescriptors) {
     m_command_buffer.Begin();
     VkBuffer buffer = VK_NULL_HANDLE;
     VkDeviceSize offset = 0;
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &buffer, &offset);
-    vk::CmdBindVertexBuffers2EXT(m_command_buffer.handle(), 0, 1, &buffer, &offset, nullptr, nullptr);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &buffer, &offset);
+    vk::CmdBindVertexBuffers2EXT(m_command_buffer, 0, 1, &buffer, &offset, nullptr, nullptr);
     m_command_buffer.End();
 }
 
@@ -95,11 +95,11 @@ TEST_F(PositiveRobustness, PipelineRobustnessRobustBufferAccess2Supported) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
-    AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::pipelineRobustness);
     RETURN_IF_SKIP(Init());
 
-    VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
+    VkPhysicalDeviceRobustness2FeaturesKHR robustness2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(robustness2_features);
 
     if (!robustness2_features.robustBufferAccess2) {
@@ -128,6 +128,28 @@ TEST_F(PositiveRobustness, PipelineRobustnessRobustBufferAccess2Supported) {
     }
 }
 
+TEST_F(PositiveRobustness, PipelineRobustnessRobustBufferAccess2SupportedEXT) {
+    TEST_DESCRIPTION("Create a pipeline using VK_EXT_pipeline_robustness with robustBufferAccess2 being supported");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);  // Using EXT version
+    AddRequiredFeature(vkt::Feature::pipelineRobustness);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceRobustness2FeaturesKHR robustness2_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(robustness2_features);
+
+    if (!robustness2_features.robustBufferAccess2) {
+        GTEST_SKIP() << "robustBufferAccess2 is not supported";
+    }
+
+    VkPipelineRobustnessCreateInfo pipeline_robustness_info = vku::InitStructHelper();
+    CreateComputePipelineHelper pipe(*this, &pipeline_robustness_info);
+    pipeline_robustness_info.storageBuffers = VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_2;
+    pipe.CreateComputePipeline();
+}
+
 TEST_F(PositiveRobustness, PipelineRobustnessRobustImageAccess2Supported) {
     TEST_DESCRIPTION("Create a pipeline using VK_EXT_pipeline_robustness with robustImageAccess2 being supported");
 
@@ -137,7 +159,7 @@ TEST_F(PositiveRobustness, PipelineRobustnessRobustImageAccess2Supported) {
     AddRequiredFeature(vkt::Feature::pipelineRobustness);
     RETURN_IF_SKIP(Init());
 
-    VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
+    VkPhysicalDeviceRobustness2FeaturesKHR robustness2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(robustness2_features);
 
     if (!robustness2_features.robustBufferAccess2) {

@@ -41,7 +41,6 @@
 #include "vulkansc/sc_vuid_enums.h"
 #include "vulkansc/core_checks/sc_core_validation.h"
 #include "vulkansc/state_tracker/sc_pipeline_state.h"
-#include "utils/vk_layer_utils.h"
 #include "generated/enum_flag_bits.h"
 #include "generated/dispatch_functions.h"
 
@@ -411,21 +410,22 @@ bool Device::ValidatePipelinePoolMemory(VkDevice device, const Location& loc, ui
         }
     }
 
-    std::unique_lock<std::mutex> lock(sc_used_pipeline_pool_size_map_mutex_);
+    std::unique_lock<std::mutex> lock(sc_device_state->sc_used_pipeline_pool_size_map_mutex_);
     for (const auto& it : reserved_pipeline_pool_entries) {
-        auto already_used_it = sc_used_pipeline_pool_size_map_.find(it.first);
-        auto total_entries_it = sc_pipeline_pool_size_map_.find(it.first);
+        auto already_used_it = sc_device_state->sc_used_pipeline_pool_size_map_.find(it.first);
+        auto total_entries_it = sc_device_state->sc_pipeline_pool_size_map_.find(it.first);
 
-        if (total_entries_it == sc_pipeline_pool_size_map_.end()) {
+        if (total_entries_it == sc_device_state->sc_pipeline_pool_size_map_.end()) {
             skip |= LogError("VUID-VkPipelineOfflineCreateInfo-poolEntrySize-05028", device, loc,
                              "poolEntrySize %" PRIu64 " was not requested at device creation time.", it.first);
         } else {
             uint32_t newly_reserved = it.second;
-            uint32_t already_used = (already_used_it != sc_used_pipeline_pool_size_map_.end()) ? already_used_it->second : 0;
+            uint32_t already_used =
+                (already_used_it != sc_device_state->sc_used_pipeline_pool_size_map_.end()) ? already_used_it->second : 0;
             uint32_t total_entries = total_entries_it->second;
 
             if (already_used + newly_reserved > total_entries) {
-                const char* vuid = phys_dev_props_sc_10_.recyclePipelineMemory
+                const char* vuid = sc_device_state->phys_dev_props_sc_10_.recyclePipelineMemory
                                        ? "VUID-VkPipelineOfflineCreateInfo-recyclePipelineMemory-05029"
                                        : "VUID-VkPipelineOfflineCreateInfo-recyclePipelineMemory-05030";
 
@@ -510,16 +510,14 @@ bool Instance::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, cons
 
         const auto* sc_10_features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkanSC10Features>(pCreateInfo->pNext);
         if (sc_10_features == nullptr) {
-            skip |= LogWarning(kVUID_SC_CreateDevice_MissingVulkanSC10Features, physicalDevice,
-                               create_info_loc.dot(Field::pNext), missing_pnext_msg,
-                               "VkPhysicalDeviceVulkanSC10Features");
+            skip |= LogWarning(kVUID_SC_CreateDevice_MissingVulkanSC10Features, physicalDevice, create_info_loc.dot(Field::pNext),
+                               missing_pnext_msg, "VkPhysicalDeviceVulkanSC10Features");
         }
 
         const auto* object_reservation_info = vku::FindStructInPNextChain<VkDeviceObjectReservationCreateInfo>(pCreateInfo->pNext);
         if (object_reservation_info == nullptr) {
             skip |= LogWarning(kVUID_SC_CreateDevice_MissingObjectReservationInfo, physicalDevice,
-                               create_info_loc.dot(Field::pNext), missing_pnext_msg,
-                               "VkDeviceObjectReservationCreateInfo");
+                               create_info_loc.dot(Field::pNext), missing_pnext_msg, "VkDeviceObjectReservationCreateInfo");
         }
 
         const auto* fault_callback_info = vku::FindStructInPNextChain<VkFaultCallbackInfo>(pCreateInfo->pNext);
@@ -632,8 +630,8 @@ bool Device::PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPo
     bool skip = BaseClass::PreCallValidateCreateCommandPool(device, pCreateInfo, pAllocator, pCommandPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateCommandPool-device-05068", "command pools",
-                                       sc_reserved_objects_.command_pools.load(), "commandPoolRequestCount",
-                                       sc_object_limits_.commandPoolRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.command_pools.load(), "commandPoolRequestCount",
+                                       sc_device_state->sc_object_limits_.commandPoolRequestCount, 1);
 
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
     const auto* mem_reservation_info = vku::FindStructInPNextChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
@@ -644,31 +642,29 @@ bool Device::PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPo
                              mem_reservation_info_loc.dot(Field::commandPoolReservedSize), "is zero.");
         }
         if (mem_reservation_info->commandPoolMaxCommandBuffers == 0) {
-            skip |=
-                LogError("VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05004", device,
-                         mem_reservation_info_loc.dot(Field::commandPoolMaxCommandBuffers), "is zero.");
-        } else if (mem_reservation_info->commandPoolMaxCommandBuffers > phys_dev_props_sc_10_.maxCommandPoolCommandBuffers) {
-            skip |=
-                LogError("VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05090", device,
-                         mem_reservation_info_loc.dot(Field::commandPoolMaxCommandBuffers),
-                         "(%u) is greater than VkPhysicalDeviceVulkanSC10Properties::maxCommandPoolCommandBuffers (%u).",
-                         mem_reservation_info->commandPoolMaxCommandBuffers, phys_dev_props_sc_10_.maxCommandPoolCommandBuffers);
+            skip |= LogError("VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05004", device,
+                             mem_reservation_info_loc.dot(Field::commandPoolMaxCommandBuffers), "is zero.");
+        } else if (mem_reservation_info->commandPoolMaxCommandBuffers >
+                   sc_device_state->phys_dev_props_sc_10_.maxCommandPoolCommandBuffers) {
+            skip |= LogError("VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05090", device,
+                             mem_reservation_info_loc.dot(Field::commandPoolMaxCommandBuffers),
+                             "(%u) is greater than VkPhysicalDeviceVulkanSC10Properties::maxCommandPoolCommandBuffers (%u).",
+                             mem_reservation_info->commandPoolMaxCommandBuffers,
+                             sc_device_state->phys_dev_props_sc_10_.maxCommandPoolCommandBuffers);
         }
-        uint32_t reserved_command_buffers = sc_reserved_objects_.command_buffers.load();
+        uint32_t reserved_command_buffers = sc_device_state->sc_reserved_objects_.command_buffers.load();
         if (reserved_command_buffers + mem_reservation_info->commandPoolMaxCommandBuffers >
-            sc_object_limits_.commandBufferRequestCount) {
+            sc_device_state->sc_object_limits_.commandBufferRequestCount) {
             skip |= LogError("VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05074", device,
                              mem_reservation_info_loc.dot(Field::commandPoolMaxCommandBuffers),
                              "(%u) plus the number of already reserved command buffers (%u) is greater than the total "
                              "number of command buffers requested (%u).",
                              mem_reservation_info->commandPoolMaxCommandBuffers, reserved_command_buffers,
-                             sc_object_limits_.commandBufferRequestCount);
+                             sc_device_state->sc_object_limits_.commandBufferRequestCount);
         }
     } else {
-        skip |=
-            LogError("VUID-VkCommandPoolCreateInfo-pNext-05002", device,
-                     create_info_loc.dot(Field::pNext),
-                     "chain does not contain a VkCommandPoolMemoryReservationCreateInfo structure.");
+        skip |= LogError("VUID-VkCommandPoolCreateInfo-pNext-05002", device, create_info_loc.dot(Field::pNext),
+                         "chain does not contain a VkCommandPoolMemoryReservationCreateInfo structure.");
     }
 
     return skip;
@@ -679,35 +675,37 @@ bool Device::PreCallValidateCreateDescriptorSetLayout(VkDevice device, const VkD
                                                       const ErrorObject& error_obj) const {
     bool skip = BaseClass::PreCallValidateCreateDescriptorSetLayout(device, pCreateInfo, pAllocator, pSetLayout, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateDescriptorSetLayout-device-05068",
-                                       "descriptor set layouts", sc_reserved_objects_.descriptor_set_layouts.load(),
-                                       "descriptorSetLayout", sc_object_limits_.descriptorSetLayoutRequestCount, 1);
+    skip |=
+        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateDescriptorSetLayout-device-05068",
+                                   "descriptor set layouts", sc_device_state->sc_reserved_objects_.descriptor_set_layouts.load(),
+                                   "descriptorSetLayout", sc_device_state->sc_object_limits_.descriptorSetLayoutRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
 
-        if (pCreateInfo->bindingCount > phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings) {
-            skip |= LogError("VUID-VkDescriptorSetLayoutCreateInfo-bindingCount-05011", device,
-                             create_info_loc.dot(Field::bindCount), "(%u) exceeds the device limit "
-                             "VkPhysicalDeviceVulkanSC10Properties::maxDescriptorSetLayoutBindings (%u).",
-                             pCreateInfo->bindingCount, phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings);
+        if (pCreateInfo->bindingCount > sc_device_state->phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings) {
+            skip |=
+                LogError("VUID-VkDescriptorSetLayoutCreateInfo-bindingCount-05011", device, create_info_loc.dot(Field::bindCount),
+                         "(%u) exceeds the device limit "
+                         "VkPhysicalDeviceVulkanSC10Properties::maxDescriptorSetLayoutBindings (%u).",
+                         pCreateInfo->bindingCount, sc_device_state->phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings);
         }
 
         skip |= ValidateCombinedRequestCount(
-            device, error_obj.location, "VUID-vkCreateDescriptorSetLayout-layoutbindings-device-05089",
-            "VkDescriptorSetLayout", "descriptor set layout bindings", sc_reserved_objects_.descriptor_set_layout_bindings.load(),
-            "descriptorSetLayoutBinding", sc_object_limits_.descriptorSetLayoutBindingRequestCount, "pCreateInfo->bindingCount",
-            pCreateInfo->bindingCount);
+            device, error_obj.location, "VUID-vkCreateDescriptorSetLayout-layoutbindings-device-05089", "VkDescriptorSetLayout",
+            "descriptor set layout bindings", sc_device_state->sc_reserved_objects_.descriptor_set_layout_bindings.load(),
+            "descriptorSetLayoutBinding", sc_device_state->sc_object_limits_.descriptorSetLayoutBindingRequestCount,
+            "pCreateInfo->bindingCount", pCreateInfo->bindingCount);
 
         uint32_t requested_immutable_samplers = 0;
         for (uint32_t i = 0; i < pCreateInfo->bindingCount; ++i) {
             const auto& binding = pCreateInfo->pBindings[i];
-            if (binding.binding >= sc_object_limits_.descriptorSetLayoutBindingLimit) {
+            if (binding.binding >= sc_device_state->sc_object_limits_.descriptorSetLayoutBindingLimit) {
                 skip |= LogError("VUID-VkDescriptorSetLayoutBinding-binding-05012", device,
                                  create_info_loc.dot(Field::pBindings, i).dot(Field::binding),
                                  "(%u) exceeds the limit requested in "
                                  "VkDeviceObjectReservationCreateInfo::descriptorSetLayoutBindingLimit (%u).",
-                                 binding.binding, sc_object_limits_.descriptorSetLayoutBindingLimit);
+                                 binding.binding, sc_device_state->sc_object_limits_.descriptorSetLayoutBindingLimit);
             }
 
             if ((binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER ||
@@ -717,11 +715,12 @@ bool Device::PreCallValidateCreateDescriptorSetLayout(VkDevice device, const VkD
             }
         }
 
-        if (requested_immutable_samplers > sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout) {
+        if (requested_immutable_samplers > sc_device_state->sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout) {
             skip |= LogError("VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071", device, error_obj.location,
                              "the total immutable samplers (%u) across the specified bindings exceeds the limit requested "
                              "in VkDeviceObjectReservationCreateInfo::maxImmutableSamplersPerDescriptorSetLayout (%u).",
-                             requested_immutable_samplers, sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout);
+                             requested_immutable_samplers,
+                             sc_device_state->sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout);
         }
     }
 
@@ -734,8 +733,8 @@ bool Device::PreCallValidateCreatePipelineLayout(VkDevice device, const VkPipeli
     bool skip = BaseClass::PreCallValidateCreatePipelineLayout(device, pCreateInfo, pAllocator, pPipelineLayout, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreatePipelineLayout-device-05068", "pipeline layouts",
-                                       sc_reserved_objects_.pipeline_layouts.load(), "pipelineLayout",
-                                       sc_object_limits_.pipelineLayoutRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.pipeline_layouts.load(), "pipelineLayout",
+                                       sc_device_state->sc_object_limits_.pipelineLayoutRequestCount, 1);
 
     return skip;
 }
@@ -746,8 +745,8 @@ bool Device::PreCallValidateCreateDescriptorPool(VkDevice device, const VkDescri
     bool skip = BaseClass::PreCallValidateCreateDescriptorPool(device, pCreateInfo, pAllocator, pDescriptorPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateDescriptorPool-device-05068", "descriptor pool",
-                                       sc_reserved_objects_.descriptor_pools.load(), "descriptorPool",
-                                       sc_object_limits_.descriptorPoolRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.descriptor_pools.load(), "descriptorPool",
+                                       sc_device_state->sc_object_limits_.descriptorPoolRequestCount, 1);
 
     return skip;
 }
@@ -779,9 +778,9 @@ bool Device::PreCallValidateAllocateDescriptorSets(VkDevice device, const VkDesc
 
     if (pAllocateInfo) {
         skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkAllocateDescriptorSets-device-05068",
-                                           "descriptor sets", sc_reserved_objects_.descriptor_sets.load(), "descriptorSet",
-                                           sc_object_limits_.descriptorSetRequestCount, "pAllocateInfo->descriptorSetCount",
-                                           pAllocateInfo->descriptorSetCount);
+                                           "descriptor sets", sc_device_state->sc_reserved_objects_.descriptor_sets.load(),
+                                           "descriptorSet", sc_device_state->sc_object_limits_.descriptorSetRequestCount,
+                                           "pAllocateInfo->descriptorSetCount", pAllocateInfo->descriptorSetCount);
     }
 
     return skip;
@@ -793,8 +792,8 @@ bool Device::PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAlloca
     bool skip = BaseClass::PreCallValidateAllocateMemory(device, pAllocateInfo, pAllocator, pMemory, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkAllocateMemory-device-05068", "device memory objects",
-                                       sc_reserved_objects_.device_memories.load(), "deviceMemory",
-                                       sc_object_limits_.deviceMemoryRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.device_memories.load(), "deviceMemory",
+                                       sc_device_state->sc_object_limits_.deviceMemoryRequestCount, 1);
 
     return skip;
 }
@@ -809,9 +808,10 @@ bool Device::PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCa
 
     auto pipeline_cache_state = Get<vvl::sc::PipelineCache>(pipelineCache);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateComputePipelines-device-05068",
-                                       "compute pipelines", sc_reserved_objects_.compute_pipelines.load(), "computePipeline",
-                                       sc_object_limits_.computePipelineRequestCount, "createInfoCount", count);
+    skip |=
+        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateComputePipelines-device-05068", "compute pipelines",
+                                   sc_device_state->sc_reserved_objects_.compute_pipelines.load(), "computePipeline",
+                                   sc_device_state->sc_object_limits_.computePipelineRequestCount, "createInfoCount", count);
 
     skip |= ValidatePipelinePoolMemory(device, error_obj.location, count, pCreateInfos);
 
@@ -824,9 +824,9 @@ bool Device::PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCa
                                  create_info_loc.dot(Field::basePipelineHandle), "is not VK_NULL_HANDLE.");
             }
             if (pCreateInfos[i].basePipelineIndex != 0) {
-                skip |= LogError("VUID-VkComputePipelineCreateInfo-basePipelineIndex-05025", device,
-                                 create_info_loc.dot(Field::basePipelineIndex), "(%u) is not zero.",
-                                 pCreateInfos[i].basePipelineIndex);
+                skip |=
+                    LogError("VUID-VkComputePipelineCreateInfo-basePipelineIndex-05025", device,
+                             create_info_loc.dot(Field::basePipelineIndex), "(%u) is not zero.", pCreateInfos[i].basePipelineIndex);
             }
 
             auto offline_create_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pCreateInfos[i].pNext);
@@ -848,9 +848,10 @@ bool Device::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineC
 
     auto pipeline_cache_state = Get<vvl::sc::PipelineCache>(pipelineCache);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateGraphicsPipelines-device-05068",
-                                       "graphics pipelines", sc_reserved_objects_.graphics_pipelines.load(), "graphicsPipeline",
-                                       sc_object_limits_.graphicsPipelineRequestCount, "createInfoCount", count);
+    skip |=
+        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateGraphicsPipelines-device-05068", "graphics pipelines",
+                                   sc_device_state->sc_reserved_objects_.graphics_pipelines.load(), "graphicsPipeline",
+                                   sc_device_state->sc_object_limits_.graphicsPipelineRequestCount, "createInfoCount", count);
 
     skip |= ValidatePipelinePoolMemory(device, error_obj.location, count, pCreateInfos);
 
@@ -863,9 +864,9 @@ bool Device::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineC
                                  create_info_loc.dot(Field::basePipelineHandle), "is not VK_NULL_HANDLE.");
             }
             if (pCreateInfos[i].basePipelineIndex != 0) {
-                skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-basePipelineIndex-05025", device,
-                                 create_info_loc.dot(Field::basePipelineIndex), "(%u) is not zero.",
-                                 pCreateInfos[i].basePipelineIndex);
+                skip |=
+                    LogError("VUID-VkGraphicsPipelineCreateInfo-basePipelineIndex-05025", device,
+                             create_info_loc.dot(Field::basePipelineIndex), "(%u) is not zero.", pCreateInfos[i].basePipelineIndex);
             }
 
             auto offline_create_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pCreateInfos[i].pNext);
@@ -886,16 +887,16 @@ bool Device::PreCallValidateCreatePipelineCache(VkDevice device, const VkPipelin
     bool skip = BaseClass::PreCallValidateCreatePipelineCache(device, pCreateInfo, pAllocator, pPipelineCache, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreatePipelineCache-device-05068", "pipeline caches",
-                                       sc_reserved_objects_.pipeline_caches.load(), "pipelineCache",
-                                       sc_object_limits_.pipelineCacheRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.pipeline_caches.load(), "pipelineCache",
+                                       sc_device_state->sc_object_limits_.pipelineCacheRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
 
         skip |= instance_vo_->ValidatePipelineCacheCreateInfo(device, create_info_loc, *pCreateInfo);
 
-        auto it = sc_pipeline_cache_map_.find(pCreateInfo->pInitialData);
-        if (it == sc_pipeline_cache_map_.end() || it->second->create_info.flags != pCreateInfo->flags ||
+        auto it = sc_device_state->sc_pipeline_cache_map_.find(pCreateInfo->pInitialData);
+        if (it == sc_device_state->sc_pipeline_cache_map_.end() || it->second->create_info.flags != pCreateInfo->flags ||
             it->second->create_info.initialDataSize != pCreateInfo->initialDataSize) {
             skip |= LogError("VUID-vkCreatePipelineCache-pCreateInfo-05045", device, create_info_loc,
                              "does not match any of the VkPipelineCacheCreateInfo structures specified in "
@@ -924,46 +925,42 @@ bool Device::PreCallValidateCreateQueryPool(VkDevice device, const VkQueryPoolCr
     bool skip = BaseClass::PreCallValidateCreateQueryPool(device, pCreateInfo, pAllocator, pQueryPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateQueryPool-device-05068", "query pools",
-                                       sc_reserved_objects_.query_pools.load(), "queryPool",
-                                       sc_object_limits_.queryPoolRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.query_pools.load(), "queryPool",
+                                       sc_device_state->sc_object_limits_.queryPoolRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
 
         if (pCreateInfo->queryType == VK_QUERY_TYPE_OCCLUSION &&
-            pCreateInfo->queryCount > sc_object_limits_.maxOcclusionQueriesPerPool) {
-            skip |= LogError("VUID-VkQueryPoolCreateInfo-queryType-05046", device,
-                             create_info_loc.dot(Field::queryCount),
+            pCreateInfo->queryCount > sc_device_state->sc_object_limits_.maxOcclusionQueriesPerPool) {
+            skip |= LogError("VUID-VkQueryPoolCreateInfo-queryType-05046", device, create_info_loc.dot(Field::queryCount),
                              "(%u) exceeds the limit requested in "
                              "VkDeviceObjectReservationCreateInfo::maxOcclusionQueriesPerPool (%u).",
-                             pCreateInfo->queryCount, sc_object_limits_.maxOcclusionQueriesPerPool);
+                             pCreateInfo->queryCount, sc_device_state->sc_object_limits_.maxOcclusionQueriesPerPool);
         }
 
         if (pCreateInfo->queryType == VK_QUERY_TYPE_PIPELINE_STATISTICS &&
-            pCreateInfo->queryCount > sc_object_limits_.maxPipelineStatisticsQueriesPerPool) {
-            skip |= LogError("VUID-VkQueryPoolCreateInfo-queryType-05047", device,
-                             create_info_loc.dot(Field::queryCount),
+            pCreateInfo->queryCount > sc_device_state->sc_object_limits_.maxPipelineStatisticsQueriesPerPool) {
+            skip |= LogError("VUID-VkQueryPoolCreateInfo-queryType-05047", device, create_info_loc.dot(Field::queryCount),
                              "(%u) exceeds the limit requested in "
                              "VkDeviceObjectReservationCreateInfo::maxPipelineStatisticsQueriesPerPool (%u).",
-                             pCreateInfo->queryCount, sc_object_limits_.maxPipelineStatisticsQueriesPerPool);
+                             pCreateInfo->queryCount, sc_device_state->sc_object_limits_.maxPipelineStatisticsQueriesPerPool);
         }
 
         if (pCreateInfo->queryType == VK_QUERY_TYPE_TIMESTAMP &&
-            pCreateInfo->queryCount > sc_object_limits_.maxTimestampQueriesPerPool) {
-            skip |= LogError("VUID-VkQueryPoolCreateInfo-queryType-05048", device,
-                             create_info_loc.dot(Field::queryCount),
+            pCreateInfo->queryCount > sc_device_state->sc_object_limits_.maxTimestampQueriesPerPool) {
+            skip |= LogError("VUID-VkQueryPoolCreateInfo-queryType-05048", device, create_info_loc.dot(Field::queryCount),
                              "(%u) exceeds the limit requested in "
                              "VkDeviceObjectReservationCreateInfo::maxTimestampQueriesPerPool (%u).",
-                             pCreateInfo->queryCount, sc_object_limits_.maxTimestampQueriesPerPool);
+                             pCreateInfo->queryCount, sc_device_state->sc_object_limits_.maxTimestampQueriesPerPool);
         }
 
         if (pCreateInfo->queryType == VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR &&
-            pCreateInfo->queryCount > sc_perf_query_limits_.maxPerformanceQueriesPerPool) {
-            skip |= LogError("VUID-VkQueryPoolCreateInfo-queryType-05049", device,
-                             create_info_loc.dot(Field::queryCount),
+            pCreateInfo->queryCount > sc_device_state->sc_perf_query_limits_.maxPerformanceQueriesPerPool) {
+            skip |= LogError("VUID-VkQueryPoolCreateInfo-queryType-05049", device, create_info_loc.dot(Field::queryCount),
                              "(%u) exceeds the limit requested in "
                              "VkPerformanceQueryReservationInfoKHR::maxPerformanceQueriesPerPool (%u).",
-                             pCreateInfo->queryCount, sc_perf_query_limits_.maxPerformanceQueriesPerPool);
+                             pCreateInfo->queryCount, sc_device_state->sc_perf_query_limits_.maxPerformanceQueriesPerPool);
         }
     }
 
@@ -976,55 +973,56 @@ bool Device::PreCallValidateCreateRenderPass(VkDevice device, const VkRenderPass
     bool skip = BaseClass::PreCallValidateCreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateRenderPass-device-05068", "render passes",
-                                       sc_reserved_objects_.render_passes.load(), "renderPass",
-                                       sc_object_limits_.renderPassRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.render_passes.load(), "renderPass",
+                                       sc_device_state->sc_object_limits_.renderPassRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
 
-        skip |= ValidateCombinedRequestCount(device, error_obj.location, "VUID-vkCreateRenderPass-subpasses-device-05089",
-                                             "VkRenderPass", "subpasses", sc_reserved_objects_.subpass_descriptions.load(),
-                                             "subpassDescription", sc_object_limits_.subpassDescriptionRequestCount,
-                                             "pCreateInfo->subpassCount", pCreateInfo->subpassCount);
-        skip |= ValidateCombinedRequestCount(device, error_obj.location, "VUID-vkCreateRenderPass-attachments-device-05089",
-                                             "VkRenderPass", "attachments", sc_reserved_objects_.attachment_descriptions.load(),
-                                             "attachmentDescription", sc_object_limits_.attachmentDescriptionRequestCount,
-                                             "pCreateInfo->attachmentCount", pCreateInfo->attachmentCount);
+        skip |= ValidateCombinedRequestCount(
+            device, error_obj.location, "VUID-vkCreateRenderPass-subpasses-device-05089", "VkRenderPass", "subpasses",
+            sc_device_state->sc_reserved_objects_.subpass_descriptions.load(), "subpassDescription",
+            sc_device_state->sc_object_limits_.subpassDescriptionRequestCount, "pCreateInfo->subpassCount",
+            pCreateInfo->subpassCount);
+        skip |= ValidateCombinedRequestCount(
+            device, error_obj.location, "VUID-vkCreateRenderPass-attachments-device-05089", "VkRenderPass", "attachments",
+            sc_device_state->sc_reserved_objects_.attachment_descriptions.load(), "attachmentDescription",
+            sc_device_state->sc_object_limits_.attachmentDescriptionRequestCount, "pCreateInfo->attachmentCount",
+            pCreateInfo->attachmentCount);
 
-        if (pCreateInfo->subpassCount > phys_dev_props_sc_10_.maxRenderPassSubpasses) {
-            skip |= LogError("VUID-VkRenderPassCreateInfo-subpassCount-05050", device,
-                             create_info_loc.dot(Field::subpassCount),
+        if (pCreateInfo->subpassCount > sc_device_state->phys_dev_props_sc_10_.maxRenderPassSubpasses) {
+            skip |= LogError("VUID-VkRenderPassCreateInfo-subpassCount-05050", device, create_info_loc.dot(Field::subpassCount),
                              "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxRenderPassSubpasses (%u).",
-                             pCreateInfo->subpassCount, phys_dev_props_sc_10_.maxRenderPassSubpasses);
+                             pCreateInfo->subpassCount, sc_device_state->phys_dev_props_sc_10_.maxRenderPassSubpasses);
         }
-        if (pCreateInfo->dependencyCount > phys_dev_props_sc_10_.maxRenderPassDependencies) {
-            skip |= LogError("VUID-VkRenderPassCreateInfo-dependencyCount-05051", device,
-                             create_info_loc.dot(Field::dependencyCount),
-                             "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxRenderPassDependencies (%u).",
-                             pCreateInfo->dependencyCount, phys_dev_props_sc_10_.maxRenderPassDependencies);
+        if (pCreateInfo->dependencyCount > sc_device_state->phys_dev_props_sc_10_.maxRenderPassDependencies) {
+            skip |=
+                LogError("VUID-VkRenderPassCreateInfo-dependencyCount-05051", device, create_info_loc.dot(Field::dependencyCount),
+                         "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxRenderPassDependencies (%u).",
+                         pCreateInfo->dependencyCount, sc_device_state->phys_dev_props_sc_10_.maxRenderPassDependencies);
         }
-        if (pCreateInfo->attachmentCount > phys_dev_props_sc_10_.maxFramebufferAttachments) {
-            skip |= LogError("VUID-VkRenderPassCreateInfo-attachmentCount-05052", device,
-                             create_info_loc.dot(Field::attachmentCount),
-                             "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
-                             pCreateInfo->attachmentCount, phys_dev_props_sc_10_.maxFramebufferAttachments);
+        if (pCreateInfo->attachmentCount > sc_device_state->phys_dev_props_sc_10_.maxFramebufferAttachments) {
+            skip |=
+                LogError("VUID-VkRenderPassCreateInfo-attachmentCount-05052", device, create_info_loc.dot(Field::attachmentCount),
+                         "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
+                         pCreateInfo->attachmentCount, sc_device_state->phys_dev_props_sc_10_.maxFramebufferAttachments);
         }
         for (uint32_t subpass_idx = 0; subpass_idx < pCreateInfo->subpassCount; ++subpass_idx) {
             const auto& subpass = pCreateInfo->pSubpasses[subpass_idx];
             const Location subpass_loc = create_info_loc.dot(Field::pSubpasses, subpass_idx);
 
-            if (subpass.inputAttachmentCount > phys_dev_props_sc_10_.maxSubpassInputAttachments) {
-                skip |= LogError("VUID-VkSubpassDescription-inputAttachmentCount-05053", device,
-                                 subpass_loc.dot(Field::inputAttachmentCount),
-                                 "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments (%u).",
-                                 subpass.inputAttachmentCount, phys_dev_props_sc_10_.maxSubpassInputAttachments);
+            if (subpass.inputAttachmentCount > sc_device_state->phys_dev_props_sc_10_.maxSubpassInputAttachments) {
+                skip |= LogError(
+                    "VUID-VkSubpassDescription-inputAttachmentCount-05053", device, subpass_loc.dot(Field::inputAttachmentCount),
+                    "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments (%u).",
+                    subpass.inputAttachmentCount, sc_device_state->phys_dev_props_sc_10_.maxSubpassInputAttachments);
             }
-            if (subpass.preserveAttachmentCount > phys_dev_props_sc_10_.maxSubpassPreserveAttachments) {
-                skip |=
-                    LogError("VUID-VkSubpassDescription-preserveAttachmentCount-05054", device,
-                             subpass_loc.dot(Field::preserveAttachmentCount),
-                             "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments (%u).",
-                             subpass.preserveAttachmentCount, phys_dev_props_sc_10_.maxSubpassPreserveAttachments);
+            if (subpass.preserveAttachmentCount > sc_device_state->phys_dev_props_sc_10_.maxSubpassPreserveAttachments) {
+                skip |= LogError(
+                    "VUID-VkSubpassDescription-preserveAttachmentCount-05054", device,
+                    subpass_loc.dot(Field::preserveAttachmentCount),
+                    "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments (%u).",
+                    subpass.preserveAttachmentCount, sc_device_state->phys_dev_props_sc_10_.maxSubpassPreserveAttachments);
             }
         }
     }
@@ -1038,55 +1036,56 @@ bool Device::PreCallValidateCreateRenderPass2(VkDevice device, const VkRenderPas
     bool skip = BaseClass::PreCallValidateCreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateRenderPass2-device-05068", "render passes",
-                                       sc_reserved_objects_.render_passes.load(), "renderPass",
-                                       sc_object_limits_.renderPassRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.render_passes.load(), "renderPass",
+                                       sc_device_state->sc_object_limits_.renderPassRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
 
-        skip |= ValidateCombinedRequestCount(device, error_obj.location, "VUID-vkCreateRenderPass2-subpasses-device-05089",
-                                             "VkRenderPass", "subpasses", sc_reserved_objects_.subpass_descriptions.load(),
-                                             "subpassDescription", sc_object_limits_.subpassDescriptionRequestCount,
-                                             "pCreateInfo->subpassCount", pCreateInfo->subpassCount);
-        skip |= ValidateCombinedRequestCount(device, error_obj.location, "VUID-vkCreateRenderPass2-attachments-device-05089",
-                                             "VkRenderPass", "attachments", sc_reserved_objects_.attachment_descriptions.load(),
-                                             "attachmentDescription", sc_object_limits_.attachmentDescriptionRequestCount,
-                                             "pCreateInfo->attachmentCount", pCreateInfo->attachmentCount);
+        skip |= ValidateCombinedRequestCount(
+            device, error_obj.location, "VUID-vkCreateRenderPass2-subpasses-device-05089", "VkRenderPass", "subpasses",
+            sc_device_state->sc_reserved_objects_.subpass_descriptions.load(), "subpassDescription",
+            sc_device_state->sc_object_limits_.subpassDescriptionRequestCount, "pCreateInfo->subpassCount",
+            pCreateInfo->subpassCount);
+        skip |= ValidateCombinedRequestCount(
+            device, error_obj.location, "VUID-vkCreateRenderPass2-attachments-device-05089", "VkRenderPass", "attachments",
+            sc_device_state->sc_reserved_objects_.attachment_descriptions.load(), "attachmentDescription",
+            sc_device_state->sc_object_limits_.attachmentDescriptionRequestCount, "pCreateInfo->attachmentCount",
+            pCreateInfo->attachmentCount);
 
-        if (pCreateInfo->subpassCount > phys_dev_props_sc_10_.maxRenderPassSubpasses) {
-            skip |= LogError("VUID-VkRenderPassCreateInfo2-subpassCount-05055", device,
-                             create_info_loc.dot(Field::subpassCount),
+        if (pCreateInfo->subpassCount > sc_device_state->phys_dev_props_sc_10_.maxRenderPassSubpasses) {
+            skip |= LogError("VUID-VkRenderPassCreateInfo2-subpassCount-05055", device, create_info_loc.dot(Field::subpassCount),
                              "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxRenderPassSubpasses (%u).",
-                             pCreateInfo->subpassCount, phys_dev_props_sc_10_.maxRenderPassSubpasses);
+                             pCreateInfo->subpassCount, sc_device_state->phys_dev_props_sc_10_.maxRenderPassSubpasses);
         }
-        if (pCreateInfo->dependencyCount > phys_dev_props_sc_10_.maxRenderPassDependencies) {
-            skip |= LogError("VUID-VkRenderPassCreateInfo2-dependencyCount-05056", device,
-                             create_info_loc.dot(Field::dependencyCount),
-                             "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxRenderPassDependencies (%u).",
-                             pCreateInfo->dependencyCount, phys_dev_props_sc_10_.maxRenderPassDependencies);
+        if (pCreateInfo->dependencyCount > sc_device_state->phys_dev_props_sc_10_.maxRenderPassDependencies) {
+            skip |=
+                LogError("VUID-VkRenderPassCreateInfo2-dependencyCount-05056", device, create_info_loc.dot(Field::dependencyCount),
+                         "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxRenderPassDependencies (%u).",
+                         pCreateInfo->dependencyCount, sc_device_state->phys_dev_props_sc_10_.maxRenderPassDependencies);
         }
-        if (pCreateInfo->attachmentCount > phys_dev_props_sc_10_.maxFramebufferAttachments) {
-            skip |= LogError("VUID-VkRenderPassCreateInfo2-attachmentCount-05057", device,
-                             create_info_loc.dot(Field::attachmentCount),
-                             "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
-                             pCreateInfo->attachmentCount, phys_dev_props_sc_10_.maxFramebufferAttachments);
+        if (pCreateInfo->attachmentCount > sc_device_state->phys_dev_props_sc_10_.maxFramebufferAttachments) {
+            skip |=
+                LogError("VUID-VkRenderPassCreateInfo2-attachmentCount-05057", device, create_info_loc.dot(Field::attachmentCount),
+                         "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
+                         pCreateInfo->attachmentCount, sc_device_state->phys_dev_props_sc_10_.maxFramebufferAttachments);
         }
         for (uint32_t subpass_idx = 0; subpass_idx < pCreateInfo->subpassCount; ++subpass_idx) {
             const auto& subpass = pCreateInfo->pSubpasses[subpass_idx];
             const Location subpass_loc = create_info_loc.dot(Field::pSubpasses, subpass_idx);
 
-            if (subpass.inputAttachmentCount > phys_dev_props_sc_10_.maxSubpassInputAttachments) {
-                skip |= LogError("VUID-VkSubpassDescription2-inputAttachmentCount-05058", device,
-                                 subpass_loc.dot(Field::inputAttachmentCount),
-                                 "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments (%u).",
-                                 subpass.inputAttachmentCount, phys_dev_props_sc_10_.maxSubpassInputAttachments);
+            if (subpass.inputAttachmentCount > sc_device_state->phys_dev_props_sc_10_.maxSubpassInputAttachments) {
+                skip |= LogError(
+                    "VUID-VkSubpassDescription2-inputAttachmentCount-05058", device, subpass_loc.dot(Field::inputAttachmentCount),
+                    "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments (%u).",
+                    subpass.inputAttachmentCount, sc_device_state->phys_dev_props_sc_10_.maxSubpassInputAttachments);
             }
-            if (subpass.preserveAttachmentCount > phys_dev_props_sc_10_.maxSubpassPreserveAttachments) {
-                skip |=
-                    LogError("VUID-VkSubpassDescription2-preserveAttachmentCount-05059", device,
-                             subpass_loc.dot(Field::preserveAttachmentCount),
-                             "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments (%u).",
-                             subpass.preserveAttachmentCount, phys_dev_props_sc_10_.maxSubpassPreserveAttachments);
+            if (subpass.preserveAttachmentCount > sc_device_state->phys_dev_props_sc_10_.maxSubpassPreserveAttachments) {
+                skip |= LogError(
+                    "VUID-VkSubpassDescription2-preserveAttachmentCount-05059", device,
+                    subpass_loc.dot(Field::preserveAttachmentCount),
+                    "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments (%u).",
+                    subpass.preserveAttachmentCount, sc_device_state->phys_dev_props_sc_10_.maxSubpassPreserveAttachments);
             }
         }
     }
@@ -1100,17 +1099,17 @@ bool Device::PreCallValidateCreateFramebuffer(VkDevice device, const VkFramebuff
     bool skip = BaseClass::PreCallValidateCreateFramebuffer(device, pCreateInfo, pAllocator, pFramebuffer, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateFramebuffer-device-05068", "framebuffers",
-                                       sc_reserved_objects_.framebuffers.load(), "framebuffer",
-                                       sc_object_limits_.framebufferRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.framebuffers.load(), "framebuffer",
+                                       sc_device_state->sc_object_limits_.framebufferRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
 
-        if (pCreateInfo->attachmentCount > phys_dev_props_sc_10_.maxFramebufferAttachments) {
-            skip |= LogError("VUID-VkFramebufferCreateInfo-attachmentCount-05060", device,
-                             create_info_loc.dot(Field::attachmentCount),
-                             "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
-                             pCreateInfo->attachmentCount, phys_dev_props_sc_10_.maxFramebufferAttachments);
+        if (pCreateInfo->attachmentCount > sc_device_state->phys_dev_props_sc_10_.maxFramebufferAttachments) {
+            skip |=
+                LogError("VUID-VkFramebufferCreateInfo-attachmentCount-05060", device, create_info_loc.dot(Field::attachmentCount),
+                         "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
+                         pCreateInfo->attachmentCount, sc_device_state->phys_dev_props_sc_10_.maxFramebufferAttachments);
         }
     }
 
@@ -1123,7 +1122,8 @@ bool Device::PreCallValidateCreateBuffer(VkDevice device, const VkBufferCreateIn
     bool skip = BaseClass::PreCallValidateCreateBuffer(device, pCreateInfo, pAllocator, pBuffer, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateBuffer-device-05068", "buffers",
-                                       sc_reserved_objects_.buffers.load(), "buffer", sc_object_limits_.bufferRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.buffers.load(), "buffer",
+                                       sc_device_state->sc_object_limits_.bufferRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -1132,9 +1132,8 @@ bool Device::PreCallValidateCreateBuffer(VkDevice device, const VkBufferCreateIn
             pCreateInfo->flags &
             (VK_BUFFER_CREATE_SPARSE_BINDING_BIT | VK_BUFFER_CREATE_SPARSE_RESIDENCY_BIT | VK_BUFFER_CREATE_SPARSE_ALIASED_BIT);
         if (unsupported_flags != 0) {
-            skip |= LogError("VUID-VkBufferCreateInfo-flags-05061", device,
-                             create_info_loc.dot(Field::flags), "contains unsupported flag(s) %s.",
-                             string_VkBufferCreateFlags(unsupported_flags).c_str());
+            skip |= LogError("VUID-VkBufferCreateInfo-flags-05061", device, create_info_loc.dot(Field::flags),
+                             "contains unsupported flag(s) %s.", string_VkBufferCreateFlags(unsupported_flags).c_str());
         }
     }
 
@@ -1147,8 +1146,8 @@ bool Device::PreCallValidateCreateBufferView(VkDevice device, const VkBufferView
     bool skip = BaseClass::PreCallValidateCreateBufferView(device, pCreateInfo, pAllocator, pView, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateBufferView-device-05068", "buffer views",
-                                       sc_reserved_objects_.buffer_views.load(), "bufferView",
-                                       sc_object_limits_.bufferViewRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.buffer_views.load(), "bufferView",
+                                       sc_device_state->sc_object_limits_.bufferViewRequestCount, 1);
 
     return skip;
 }
@@ -1159,7 +1158,8 @@ bool Device::PreCallValidateCreateImage(VkDevice device, const VkImageCreateInfo
     bool skip = BaseClass::PreCallValidateCreateImage(device, pCreateInfo, pAllocator, pImage, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateImage-device-05068", "images",
-                                       sc_reserved_objects_.images.load(), "image", sc_object_limits_.imageRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.images.load(), "image",
+                                       sc_device_state->sc_object_limits_.imageRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -1168,9 +1168,8 @@ bool Device::PreCallValidateCreateImage(VkDevice device, const VkImageCreateInfo
             pCreateInfo->flags & (VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT |
                                   VK_IMAGE_CREATE_SPARSE_ALIASED_BIT | VK_IMAGE_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT);
         if (unsupported_flags != 0) {
-            skip |= LogError("VUID-VkImageCreateInfo-flags-05062", device,
-                             create_info_loc.dot(Field::flags), "contains unsupported flag(s) %s.",
-                             string_VkImageCreateFlags(unsupported_flags).c_str());
+            skip |= LogError("VUID-VkImageCreateInfo-flags-05062", device, create_info_loc.dot(Field::flags),
+                             "contains unsupported flag(s) %s.", string_VkImageCreateFlags(unsupported_flags).c_str());
         }
     }
 
@@ -1187,50 +1186,51 @@ bool Device::PreCallValidateCreateImageView(VkDevice device, const VkImageViewCr
     }
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateImageView-device-05068", "image views",
-                                       sc_reserved_objects_.image_views.load(), "imageView",
-                                       sc_object_limits_.imageViewRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.image_views.load(), "imageView",
+                                       sc_device_state->sc_object_limits_.imageViewRequestCount, 1);
 
     if (pCreateInfo) {
         const auto normalized_subresource_range = image_state->NormalizeSubresourceRange(pCreateInfo->subresourceRange);
 
-        if (normalized_subresource_range.levelCount > sc_object_limits_.maxImageViewMipLevels) {
+        if (normalized_subresource_range.levelCount > sc_device_state->sc_object_limits_.maxImageViewMipLevels) {
             const char* vuid = pCreateInfo->subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS
                                    ? "VUID-VkImageViewCreateInfo-subresourceRange-05200"
                                    : "VUID-VkImageViewCreateInfo-subresourceRange-05064";
             skip |= LogError(vuid, device, error_obj.location,
                              "the requested mip level count (%u) exceeds the limit requested in "
                              "VkDeviceObjectReservationCreateInfo::maxImageViewMipLevels (%u).",
-                             normalized_subresource_range.levelCount, sc_object_limits_.maxImageViewMipLevels);
+                             normalized_subresource_range.levelCount, sc_device_state->sc_object_limits_.maxImageViewMipLevels);
         }
 
-        if (normalized_subresource_range.layerCount > sc_object_limits_.maxImageViewArrayLayers) {
+        if (normalized_subresource_range.layerCount > sc_device_state->sc_object_limits_.maxImageViewArrayLayers) {
             const char* vuid = pCreateInfo->subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS
                                    ? "VUID-VkImageViewCreateInfo-subresourceRange-05201"
                                    : "VUID-VkImageViewCreateInfo-subresourceRange-05065";
             skip |= LogError(vuid, device, error_obj.location,
                              "the requested array layer count (%u) exceeds the limit requested in "
                              "VkDeviceObjectReservationCreateInfo::maxImageViewArrayLayers (%u).",
-                             normalized_subresource_range.layerCount, sc_object_limits_.maxImageViewArrayLayers);
+                             normalized_subresource_range.layerCount, sc_device_state->sc_object_limits_.maxImageViewArrayLayers);
         }
 
         if (normalized_subresource_range.layerCount > 1) {
-            uint32_t reserved_layered_image_views = sc_reserved_objects_.layered_image_views.load();
-            if (reserved_layered_image_views >= sc_object_limits_.layeredImageViewRequestCount) {
+            uint32_t reserved_layered_image_views = sc_device_state->sc_reserved_objects_.layered_image_views.load();
+            if (reserved_layered_image_views >= sc_device_state->sc_object_limits_.layeredImageViewRequestCount) {
                 skip |= LogError("VUID-vkCreateImageView-subresourceRange-05063", device, error_obj.location,
                                  "the number of image views with more than one array layer currently allocated from the "
                                  "device (%u) plus 1 is greater than the total number of layered image views requested via "
                                  "VkDeviceObjectReservationCreateInfo::layeredImageViewRequestCount (%u).",
-                                 reserved_layered_image_views, sc_object_limits_.layeredImageViewRequestCount);
+                                 reserved_layered_image_views, sc_device_state->sc_object_limits_.layeredImageViewRequestCount);
             }
 
-            if (normalized_subresource_range.levelCount > sc_object_limits_.maxLayeredImageViewMipLevels) {
+            if (normalized_subresource_range.levelCount > sc_device_state->sc_object_limits_.maxLayeredImageViewMipLevels) {
                 const char* vuid = pCreateInfo->subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS
                                        ? "VUID-VkImageViewCreateInfo-subresourceRange-05202"
                                        : "VUID-VkImageViewCreateInfo-subresourceRange-05066";
                 skip |= LogError(vuid, device, error_obj.location,
                                  "the requested mip level count (%u) exceeds the limit requested in "
                                  "VkDeviceObjectReservationCreateInfo::maxLayeredImageViewMipLevels (%u).",
-                                 normalized_subresource_range.levelCount, sc_object_limits_.maxLayeredImageViewMipLevels);
+                                 normalized_subresource_range.levelCount,
+                                 sc_device_state->sc_object_limits_.maxLayeredImageViewMipLevels);
             }
         }
     }
@@ -1244,7 +1244,8 @@ bool Device::PreCallValidateCreateSampler(VkDevice device, const VkSamplerCreate
     bool skip = BaseClass::PreCallValidateCreateSampler(device, pCreateInfo, pAllocator, pSampler, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSampler-device-05068", "samplers",
-                                       sc_reserved_objects_.samplers.load(), "sampler", sc_object_limits_.samplerRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.samplers.load(), "sampler",
+                                       sc_device_state->sc_object_limits_.samplerRequestCount, 1);
 
     return skip;
 }
@@ -1256,9 +1257,10 @@ bool Device::PreCallValidateCreateSamplerYcbcrConversion(VkDevice device, const 
     bool skip =
         BaseClass::PreCallValidateCreateSamplerYcbcrConversion(device, pCreateInfo, pAllocator, pYcbcrConversion, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSamplerYcbcrConversion-device-05068",
-                                       "sampler conversions", sc_reserved_objects_.sampler_ycbcr_conversions.load(),
-                                       "samplerYcbcrConversion", sc_object_limits_.samplerYcbcrConversionRequestCount, 1);
+    skip |= ValidateObjectRequestCount(
+        device, error_obj.location, "VUID-vkCreateSamplerYcbcrConversion-device-05068", "sampler conversions",
+        sc_device_state->sc_reserved_objects_.sampler_ycbcr_conversions.load(), "samplerYcbcrConversion",
+        sc_device_state->sc_object_limits_.samplerYcbcrConversionRequestCount, 1);
 
     return skip;
 }
@@ -1269,7 +1271,8 @@ bool Device::PreCallValidateCreateFence(VkDevice device, const VkFenceCreateInfo
     bool skip = BaseClass::PreCallValidateCreateFence(device, pCreateInfo, pAllocator, pFence, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateFence-device-05068", "fences",
-                                       sc_reserved_objects_.fences.load(), "fence", sc_object_limits_.fenceRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.fences.load(), "fence",
+                                       sc_device_state->sc_object_limits_.fenceRequestCount, 1);
 
     return skip;
 }
@@ -1279,9 +1282,9 @@ bool Device::PreCallValidateCreateSemaphore(VkDevice device, const VkSemaphoreCr
                                             const ErrorObject& error_obj) const {
     bool skip = BaseClass::PreCallValidateCreateSemaphore(device, pCreateInfo, pAllocator, pSemaphore, error_obj);
 
-    skip |=
-        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSemaphore-device-05068", "semaphores",
-                                   sc_reserved_objects_.semaphores.load(), "semaphore", sc_object_limits_.semaphoreRequestCount, 1);
+    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSemaphore-device-05068", "semaphores",
+                                       sc_device_state->sc_reserved_objects_.semaphores.load(), "semaphore",
+                                       sc_device_state->sc_object_limits_.semaphoreRequestCount, 1);
 
     return skip;
 }
@@ -1292,7 +1295,8 @@ bool Device::PreCallValidateCreateEvent(VkDevice device, const VkEventCreateInfo
     bool skip = BaseClass::PreCallValidateCreateEvent(device, pCreateInfo, pAllocator, pEvent, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateEvent-device-05068", "events",
-                                       sc_reserved_objects_.events.load(), "event", sc_object_limits_.eventRequestCount, 1);
+                                       sc_device_state->sc_reserved_objects_.events.load(), "event",
+                                       sc_device_state->sc_object_limits_.eventRequestCount, 1);
 
     return skip;
 }
@@ -1302,9 +1306,9 @@ bool Device::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkSwapchai
                                                const ErrorObject& error_obj) const {
     bool skip = BaseClass::PreCallValidateCreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain, error_obj);
 
-    skip |=
-        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSwapchainKHR-device-05068", "swapchains",
-                                   sc_reserved_objects_.swapchains.load(), "swapchain", sc_object_limits_.swapchainRequestCount, 1);
+    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSwapchainKHR-device-05068", "swapchains",
+                                       sc_device_state->sc_reserved_objects_.swapchains.load(), "swapchain",
+                                       sc_device_state->sc_object_limits_.swapchainRequestCount, 1);
 
     skip |= ValidateSwapchainCreateInfo(device, *pCreateInfo, error_obj.location.dot(Field::pCreateInfo));
 
@@ -1319,8 +1323,8 @@ bool Device::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uint32_t 
                                                                     error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSharedSwapchainsKHR-device-05068", "swapchains",
-                                       sc_reserved_objects_.swapchains.load(), "swapchain", sc_object_limits_.swapchainRequestCount,
-                                       "swapchainCount", swapchainCount);
+                                       sc_device_state->sc_reserved_objects_.swapchains.load(), "swapchain",
+                                       sc_device_state->sc_object_limits_.swapchainRequestCount, "swapchainCount", swapchainCount);
 
     for (uint32_t i = 0; i < swapchainCount; i++) {
         skip |= ValidateSwapchainCreateInfo(device, pCreateInfos[i], error_obj.location.dot(Field::pCreateInfos, i));
@@ -1334,13 +1338,13 @@ bool Device::PreCallValidateCreatePrivateDataSlotEXT(VkDevice device, const VkPr
                                                      VkPrivateDataSlotEXT* pPrivateDataSlot, const ErrorObject& error_obj) const {
     bool skip = BaseClass::PreCallValidateCreatePrivateDataSlotEXT(device, pCreateInfo, pAllocator, pPrivateDataSlot, error_obj);
 
-    uint32_t reserved_private_data_slots = sc_reserved_objects_.private_data_slots.load();
-    if (reserved_private_data_slots >= sc_private_data_slot_limits_.privateDataSlotRequestCount) {
+    uint32_t reserved_private_data_slots = sc_device_state->sc_reserved_objects_.private_data_slots.load();
+    if (reserved_private_data_slots >= sc_device_state->sc_private_data_slot_limits_.privateDataSlotRequestCount) {
         skip |= LogError("VUID-vkCreatePrivateDataSlotEXT-device-05000", device, error_obj.location,
                          "the number of private data slots currently allocated from the device (%u) plus one "
                          "is greater than the total number of private data slots requested "
                          "via VkDevicePrivateDataCreateInfoEXT::privateDataSlotRequestCount (%u).",
-                         reserved_private_data_slots, sc_private_data_slot_limits_.privateDataSlotRequestCount);
+                         reserved_private_data_slots, sc_device_state->sc_private_data_slot_limits_.privateDataSlotRequestCount);
     }
 
     return skip;
@@ -1358,8 +1362,8 @@ bool Device::PreCallValidateBindImageMemory2(VkDevice device, uint32_t bindInfoC
 
         if (device_group_info && device_group_info->splitInstanceBindRegionCount != 0) {
             skip |= LogError("VUID-VkBindImageMemoryDeviceGroupInfo-splitInstanceBindRegionCount-05067", device,
-                             device_group_info_loc.dot(Field::splitInstanceBindRegionCount),
-                             "(%u) is not zero.", device_group_info->splitInstanceBindRegionCount);
+                             device_group_info_loc.dot(Field::splitInstanceBindRegionCount), "(%u) is not zero.",
+                             device_group_info->splitInstanceBindRegionCount);
         }
     }
 
@@ -1377,14 +1381,15 @@ bool Device::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer, co
 
     const Location begin_info_loc = error_obj.location.dot(Field::pBeginInfo);
 
-    if (cb_state->state != CbState::New && !phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
+    if (cb_state->state != CbState::New && !sc_device_state->phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
         skip |= LogError("VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136", commandBuffer, error_obj.location,
                          "call attempts to implicitly reset %s but "
                          "VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer is not supported.",
                          FormatHandle(commandBuffer).c_str());
     }
 
-    if (cp_state->command_buffers_recording.load() > 0 && !phys_dev_props_sc_10_.commandPoolMultipleCommandBuffersRecording) {
+    if (cp_state->command_buffers_recording.load() > 0 &&
+        !sc_device_state->phys_dev_props_sc_10_.commandPoolMultipleCommandBuffersRecording) {
         skip |= LogError("VUID-vkBeginCommandBuffer-commandPoolMultipleCommandBuffersRecording-05007", commandBuffer,
                          error_obj.location,
                          "%s %s was allocated from is already recording another command buffer but "
@@ -1392,7 +1397,8 @@ bool Device::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer, co
                          FormatHandle(cp_state->Handle()).c_str(), FormatHandle(commandBuffer).c_str());
     }
 
-    if ((pBeginInfo->flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT) && !phys_dev_props_sc_10_.commandBufferSimultaneousUse) {
+    if ((pBeginInfo->flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT) &&
+        !sc_device_state->phys_dev_props_sc_10_.commandBufferSimultaneousUse) {
         skip |= LogError("VUID-vkBeginCommandBuffer-commandBufferSimultaneousUse-05008", commandBuffer,
                          begin_info_loc.dot(Field::flags),
                          "(%s) includes VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT but "
@@ -1404,14 +1410,13 @@ bool Device::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer, co
         auto framebuffer = Get<vvl::Framebuffer>(pBeginInfo->pInheritanceInfo->framebuffer);
         if (framebuffer) {
             if (framebuffer->create_info.renderPass != pBeginInfo->pInheritanceInfo->renderPass) {
-                const char* vuid = phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer
+                const char* vuid = sc_device_state->phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer
                                        ? "VUID-VkCommandBufferBeginInfo-flags-05009"
                                        : "VUID-VkCommandBufferBeginInfo-flags-05010";
 
                 if ((framebuffer->create_info.flags & VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT) != 0 &&
-                    !phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
-                    skip |= LogError("VUID-VkCommandBufferBeginInfo-flags-05010", commandBuffer,
-                                     begin_info_loc.dot(Field::flags),
+                    !sc_device_state->phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
+                    skip |= LogError("VUID-VkCommandBufferBeginInfo-flags-05010", commandBuffer, begin_info_loc.dot(Field::flags),
                                      "has VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT set and "
                                      "pBeginInfo->pInheritanceInfo->framebuffer (%s) was created "
                                      "with VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT but "
@@ -1421,14 +1426,13 @@ bool Device::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer, co
                 } else {
                     auto render_pass = Get<vvl::RenderPass>(pBeginInfo->pInheritanceInfo->renderPass);
                     // renderPass that framebuffer was created with must be compatible with local renderPass
-                    skip |= ValidateRenderPassCompatibility(framebuffer->Handle(), *framebuffer->rp_state.get(),
-                        cb_state->Handle(), *render_pass.get(),
+                    skip |= ValidateRenderPassCompatibility(
+                        framebuffer->Handle(), *framebuffer->rp_state.get(), cb_state->Handle(), *render_pass.get(),
                         error_obj.location.dot(Field::pBeginInfo).dot(Field::pInheritanceInfo), vuid);
                 }
             }
-        } else if (!phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
-            skip |= LogError("VUID-VkCommandBufferBeginInfo-flags-05010", commandBuffer,
-                             begin_info_loc.dot(Field::flags),
+        } else if (!sc_device_state->phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
+            skip |= LogError("VUID-VkCommandBufferBeginInfo-flags-05010", commandBuffer, begin_info_loc.dot(Field::flags),
                              "has VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT set and "
                              "pBeginInfo->pInheritanceInfo->framebuffer is VK_NULL_HANDLE but "
                              "VkPhysicalDeviceVulkanSC10Properties::secondaryCommandBufferNullOrImagelessFramebuffer "
@@ -1443,7 +1447,7 @@ bool Device::PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuffer, Vk
                                                const ErrorObject& error_obj) const {
     bool skip = BaseClass::PreCallValidateResetCommandBuffer(commandBuffer, flags, error_obj);
 
-    if (!phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
+    if (!sc_device_state->phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
         skip |= LogError("VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135", commandBuffer, error_obj.location,
                          "VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer is not supported.");
     }
@@ -1456,10 +1460,10 @@ bool Device::PreCallValidateGetFaultData(VkDevice device, VkFaultQueryBehavior f
     bool skip =
         BaseClass::PreCallValidateGetFaultData(device, faultQueryBehavior, pUnrecordedFaults, pFaultCount, pFaults, error_obj);
 
-    if (*pFaultCount > phys_dev_props_sc_10_.maxQueryFaultCount) {
+    if (*pFaultCount > sc_device_state->phys_dev_props_sc_10_.maxQueryFaultCount) {
         skip |= LogError("VUID-vkGetFaultData-pFaultCount-05020", device, error_obj.location.dot(Field::pFaultCount),
                          "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxQueryFaultCount (%u).",
-                         *pFaultCount, phys_dev_props_sc_10_.maxQueryFaultCount);
+                         *pFaultCount, sc_device_state->phys_dev_props_sc_10_.maxQueryFaultCount);
     }
 
     return skip;

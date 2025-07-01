@@ -334,9 +334,7 @@ class ObjectTrackerOutputGenerator(BaseGenerator):
     def generateHeader(self, want_instance):
         out = []
         guard_helper = PlatformGuardHelper()
-        for command in self.vk.commands.values():
-            if command.instance != want_instance:
-                continue
+        for command in [x for x in self.vk.commands.values() if x.instance == want_instance]:
             out.extend(guard_helper.add_guard(command.protect))
             (pre_call_validate, pre_call_record, post_call_record) = self.generateFunctionBody(command)
 
@@ -498,8 +496,9 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
                 postPrototype = f'void {class_name}::PostCallRecord{prototype} {{\n'
                 postPrototype = postPrototype.replace(')', ', const RecordObject& record_obj)')
                 if command.returnType == 'VkResult':
-                    # The two createpipelines APIs may create on failure -- skip the success result check
-                    if 'CreateGraphicsPipelines' not in command.name and 'CreateComputePipelines' not in command.name and 'CreateRayTracingPipelines' not in command.name:
+                    # Some commands can have partial valid handles be created
+                    partial_success_commands = ['vkCreateGraphicsPipelines', 'vkCreateComputePipelines', 'vkCreateRayTracingPipelinesNV', 'vkCreateRayTracingPipelinesKHR', 'vkCreateShadersEXT']
+                    if command.name not in partial_success_commands:
                         postPrototype = postPrototype.replace('{', '{\n    if (record_obj.result < VK_SUCCESS) return;')
                 out.append(postPrototype)
 
@@ -819,9 +818,29 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
         if structName == 'VkVideoEncodeQuantizationMapInfoKHR' and memberName == 'quantizationMap':
             return '"UNASSIGNED-VkVideoEncodeQuantizationMapInfoKHR-quantizationMap-parent"'
         if structName == 'VkPipelineInfoKHR' and memberName == 'pipeline':
-            return '"VUID-VkPipelineInfoKHR-pipeline-parent"'
+            return '"UNASSIGNED-VkPipelineInfoKHR-pipeline-parent"'
         if structName == 'VkMemoryGetMetalHandleInfoEXT' and memberName == 'memory':
-            return '"VUID-VkMemoryGetMetalHandleInfoEXT-memory-parent"'
+            return '"UNASSIGNED-VkMemoryGetMetalHandleInfoEXT-memory-parent"'
+        if structName == 'VkTileMemoryBindInfoQCOM' and memberName == 'memory':
+            return '"UNASSIGNED-VkTileMemoryBindInfoQCOM-memory-parent"'
+        if structName == 'VkExternalComputeQueueCreateInfoNV' and memberName == 'preferredQueue':
+            return '"UNASSIGNED-VkExternalComputeQueueCreateInfoNV-preferredQueue-parent"'
+        if structName == 'VkFrameBoundaryTensorsARM' and memberName == 'pTensors':
+            return '"UNASSIGNED-VkFrameBoundaryTensorsARM-pTensors-parent"'
+        if structName == 'VkTensorMemoryBarrierARM' and memberName == 'tensor':
+            return '"UNASSIGNED-VkTensorMemoryBarrierARM-tensor-parent"'
+        if structName == 'VkMemoryDedicatedAllocateInfoTensorARM' and memberName == 'tensor':
+            return '"UNASSIGNED-VkMemoryDedicatedAllocateInfoTensorARM-tensor-parent"'
+        if structName == 'VkDescriptorGetTensorInfoARM' and memberName == 'tensorView':
+            return '"UNASSIGNED-VkDescriptorGetTensorInfoARM-tensorView-parent"'
+        if structName == 'VkTensorViewCreateInfoARM' and memberName == 'tensor':
+            return '"UNASSIGNED-VkTensorViewCreateInfoARM-tensor-parent"'
+        if structName == 'VkTensorMemoryRequirementsInfoARM' and memberName == 'tensor':
+            return '"UNASSIGNED-VkTensorMemoryRequirementsInfoARM-tensor-parent"'
+        if structName == 'VkTensorCaptureDescriptorDataInfoARM' and memberName == 'tensor':
+            return '"UNASSIGNED-VkTensorCaptureDescriptorDataInfoARM-tensor-parent"'
+        if structName == 'VkTensorViewCaptureDescriptorDataInfoARM' and memberName == 'tensorView':
+            return '"UNASSIGNED-VkTensorViewCaptureDescriptorDataInfoARM-tensorView-parent"'
 
         # Common parents because the structs have more then one handle that needs to be check
         if (structName == 'VkBufferMemoryBarrier' and memberName == 'buffer') or (structName == 'VkImageMemoryBarrier' and memberName == 'image'):
@@ -1076,25 +1095,24 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
         # Handle object create operations if last parameter is created by this call
         if isCreate:
             handle_type = command.params[-1].type
-            isCreatePipelines = 'CreateGraphicsPipelines' in command.name or 'CreateComputePipelines' in command.name or 'CreateRayTracingPipelines' in command.name
-            isCreateShaders = 'CreateShaders' in command.name
-
+            partial_success_commands = ['vkCreateGraphicsPipelines', 'vkCreateComputePipelines', 'vkCreateRayTracingPipelinesNV', 'vkCreateRayTracingPipelinesKHR', 'vkCreateShadersEXT']
             if handle_type in self.vk.handles:
                 # Check for special case where multiple handles are returned
                 objectArray = command.params[-1].length is not None
 
                 if objectArray:
-                    if isCreatePipelines:
+                    if command.name in partial_success_commands:
                         post_call_record += 'if (VK_ERROR_VALIDATION_FAILED_EXT == record_obj.result) return;\n'
 
                     post_call_record += f'if ({command.params[-1].name}) {{\n'
                     countIsPointer = '*' if command.params[-2].type == 'uint32_t' and command.params[-2].pointer else ''
                     post_call_record += f'for (uint32_t index = 0; index < {countIsPointer}{command.params[-1].length}; index++) {{\n'
 
-                if isCreatePipelines:
-                    post_call_record += 'if (!pPipelines[index]) continue;\n'
-                elif isCreateShaders:
-                    post_call_record += 'if (!pShaders[index]) break;\n'
+                if command.name in partial_success_commands:
+                    if command.name == 'vkCreateShadersEXT':
+                        post_call_record += 'if (!pShaders[index]) continue;\n'
+                    else:
+                        post_call_record += 'if (!pPipelines[index]) continue;\n'
 
                 allocator = command.params[-2].name if command.params[-2].type == 'VkAllocationCallbacks' else 'nullptr'
                 objectDest = f'{command.params[-1].name}[index]' if objectArray else f'*{command.params[-1].name}'

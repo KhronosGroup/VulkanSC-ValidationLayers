@@ -18,24 +18,12 @@
 #include "containers/subresource_adapter.h"
 #include "containers/range.h"
 #include "generated/sync_validation_types.h"
+#include "containers/limits.h"
 #include <set>
 
 namespace vvl {
 class Buffer;
-class BufferView;
-struct VertexBufferBinding;
-struct IndexBufferBinding;
 }  // namespace vvl
-
-namespace syncval_state {
-class CommandBuffer;
-class ImageState;
-class ImageViewState;
-class Swapchain;
-}  // namespace syncval_state
-
-class HazardResult;
-class SyncValidator;
 
 using ImageRangeGen = subresource_adapter::ImageRangeGenerator;
 
@@ -45,8 +33,11 @@ constexpr static QueueId kQueueIdInvalid = QueueId(vvl::kU32Max);
 constexpr static QueueId kQueueAny = kQueueIdInvalid - 1;
 
 using ResourceUsageTag = size_t;
-constexpr static ResourceUsageTag kMaxIndex = std::numeric_limits<ResourceUsageTag>::max();
-constexpr static ResourceUsageTag kInvalidTag = kMaxIndex;
+
+// TODO: in the current implementation invalid tag is used not only as initial value
+// but also in some other scenarios (e.g. error reporting classifies layout transition
+// based on tag validity). Clarify when tag can be invalid and document this.
+constexpr static ResourceUsageTag kInvalidTag = std::numeric_limits<ResourceUsageTag>::max();
 
 using ResourceUsageRange = vvl::range<ResourceUsageTag>;
 using ResourceAddress = VkDeviceSize;
@@ -58,45 +49,12 @@ struct ResourceUsageTagEx {
     uint32_t handle_index = vvl::kNoIndex32;
 };
 
-template <typename T>
-ResourceAccessRange MakeRange(const T &has_offset_and_size) {
-    return ResourceAccessRange(has_offset_and_size.offset, (has_offset_and_size.offset + has_offset_and_size.effective_size));
-}
 ResourceAccessRange MakeRange(VkDeviceSize start, VkDeviceSize size);
 ResourceAccessRange MakeRange(const vvl::Buffer &buffer, VkDeviceSize offset, VkDeviceSize size);
-ResourceAccessRange MakeRange(const vvl::BufferView &buf_view_state);
-ResourceAccessRange MakeRange(VkDeviceSize offset, uint32_t first_index, uint32_t count, uint32_t stride);
+inline const SyncAccessInfo &GetAccessInfo(SyncAccessIndex access) { return GetSyncAccessInfos()[access]; }
 
 extern const ResourceAccessRange kFullRange;
-
-constexpr VkImageAspectFlags kColorAspects =
-    VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT | VK_IMAGE_ASPECT_PLANE_2_BIT;
 constexpr VkImageAspectFlags kDepthStencilAspects = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-
-// Useful Utilites for manipulating StageAccess parameters, suitable as base class to save typing
-struct SyncStageAccess {
-    static inline const SyncAccessInfo &AccessInfo(SyncAccessIndex access_index) {
-        return syncAccessInfoByAccessIndex()[access_index];
-    }
-    static inline SyncAccessFlags FlagBit(SyncAccessIndex stage_access) {
-        return syncAccessInfoByAccessIndex()[stage_access].access_bit;
-    }
-
-    static bool IsRead(SyncAccessIndex access_index) { return syncAccessReadMask[access_index]; }
-    static bool IsRead(const SyncAccessInfo &info) { return IsRead(info.access_index); }
-    static bool IsWrite(SyncAccessIndex access_index) { return syncAccessWriteMask[access_index]; }
-    static bool IsWrite(const SyncAccessInfo &info) { return IsWrite(info.access_index); }
-
-    static VkPipelineStageFlags2 PipelineStageBit(SyncAccessIndex access_index) {
-        return syncAccessInfoByAccessIndex()[access_index].stage_mask;
-    }
-    static SyncAccessFlags AccessScopeByStage(VkPipelineStageFlags2 stages);
-    static SyncAccessFlags AccessScopeByAccess(VkAccessFlags2 access);
-    static SyncAccessFlags AccessScope(VkPipelineStageFlags2 stages, VkAccessFlags2 access);
-    static SyncAccessFlags AccessScope(const SyncAccessFlags &stage_scope, VkAccessFlags2 accesses) {
-        return stage_scope & AccessScopeByAccess(accesses);
-    }
-};
 
 // Notes:
 //  * Design goal is performance optimized set creation during specific SyncVal operations

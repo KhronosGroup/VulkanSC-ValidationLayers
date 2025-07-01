@@ -21,9 +21,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <set>
 
 #include <vulkan/vk_enum_string_helper.h>
+#include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/vulkan_core.h>
 #include "core_validation.h"
 #include "generated/spirv_grammar_helper.h"
@@ -32,7 +32,9 @@
 #include "state_tracker/shader_stage_state.h"
 #include "state_tracker/shader_module.h"
 #include "state_tracker/render_pass_state.h"
-#include "utils/vk_layer_utils.h"
+#include "state_tracker/cmd_buffer_state.h"
+#include "state_tracker/pipeline_state.h"
+#include "containers/limits.h"
 
 bool CoreChecks::ValidateInterfaceVertexInput(const vvl::Pipeline &pipeline, const spirv::Module &module_state,
                                               const spirv::EntryPoint &entrypoint, const Location &create_info_loc) const {
@@ -108,12 +110,12 @@ bool CoreChecks::ValidateInterfaceVertexInput(const vvl::Pipeline &pipeline, con
             skip |= LogPerformanceWarning("WARNING-Shader-OutputNotConsumed", module_state.handle(), vi_loc,
                                           "Vertex attribute at location %" PRIu32 " not consumed by vertex shader.", location);
         } else if (!attribute_input && shader_input) {
-            if (!enabled_features.vertexAttributeRobustness) {
+            if (!enabled_features.vertexAttributeRobustness && !enabled_features.maintenance9) {
                 skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-Input-07904", module_state.handle(),
                                  vi_loc.dot(Field::pVertexAttributeDescriptions),
                                  "does not have a Location %" PRIu32
                                  " but vertex shader has an input variable at that Location. (This can be valid if "
-                                 "vertexAttributeRobustness feature is enabled)",
+                                 "either the vertexAttributeRobustness or maintenance9 feature is enabled)",
                                  location);
             }
         } else if (attribute_input && shader_input) {
@@ -224,12 +226,13 @@ bool CoreChecks::ValidatePrimitiveTopology(const spirv::Module &module_state, co
         const VkShaderStageFlagBits stage = stage_state.GetStage();
         if (stage == VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT || stage == VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) {
             has_tess = true;
-            if (stage == VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) {
-                if (stage_state.entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
-                    topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-                } else {
-                    topology = stage_state.entrypoint->execution_mode.primitive_topology;
-                }
+            if (stage_state.entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
+                topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+                // Point Mode found will set the tessellation topology
+                // See https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9821
+                break;
+            } else {
+                topology = stage_state.entrypoint->execution_mode.primitive_topology;
             }
         }
     }
@@ -237,22 +240,12 @@ bool CoreChecks::ValidatePrimitiveTopology(const spirv::Module &module_state, co
     VkPrimitiveTopology geom_topology = entrypoint.execution_mode.input_primitive_topology;
     bool mismatch = false;
     mismatch |= (topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST && geom_topology != VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
-    mismatch |=
-        IsValueIn(topology, {VK_PRIMITIVE_TOPOLOGY_LINE_LIST, VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
-                             VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY}) &&
-        !IsValueIn(geom_topology,
-                   {VK_PRIMITIVE_TOPOLOGY_LINE_LIST, VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
-                    VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY});
-    mismatch |= IsValueIn(topology, {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-                                     VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY,
-                                     VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY}) &&
-                !IsValueIn(geom_topology, {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-                                           VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY,
-                                           VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY});
+    mismatch |= IsLineTopology(topology) && !IsLineTopology(geom_topology);
+    mismatch |= IsTriangleTopology(topology) && !IsTriangleTopology(geom_topology);
     if (mismatch) {
         if (has_tess) {
             skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pStages-00739", module_state.handle(), loc,
-                             "SPIR-V (Geometry stage) expects input topology %s, but tessellation evaluation shader output topology is %s.",
+                             "SPIR-V (Geometry stage) expects input topology %s, but tessellation shader output topology is %s.",
                              string_VkPrimitiveTopology(geom_topology), string_VkPrimitiveTopology(topology));
         } else {
             skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pStages-00738", module_state.handle(), loc,
@@ -599,7 +592,7 @@ bool CoreChecks::ValidateDrawDynamicRenderingFsOutputs(const LastBound &last_bou
             // Need to understand when undefined or not
         } else if (!has_attachment && output) {
             // With alphaToCoverage, the write is not "discarded" as the alpha mask is still updated
-            if (!last_bound_state.IsAlphaToCoverage() || location != 0) {
+            if (!last_bound_state.IsAlphaToCoverageEnable() || location != 0) {
                 const bool null_image_view = attachment_info.rendering_attachment_info &&
                                              attachment_info.rendering_attachment_info->imageView == VK_NULL_HANDLE;
                 const LogObjectList objlist = last_bound_state.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);

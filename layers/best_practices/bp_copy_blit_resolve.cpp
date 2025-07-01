@@ -20,17 +20,13 @@
 #include "best_practices/best_practices_validation.h"
 #include "best_practices/bp_state.h"
 #include "state_tracker/render_pass_state.h"
-#include "utils/vk_layer_utils.h"
 
 void BestPractices::PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
                                                       const VkClearAttachment* pClearAttachments, uint32_t rectCount,
                                                       const VkClearRect* pRects, const RecordObject& record_obj) {
-    BaseClass::PostCallRecordCmdClearAttachments(commandBuffer, attachmentCount, pClearAttachments, rectCount, pRects,
-                                                              record_obj);
-
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     auto* rp_state = cb_state->active_render_pass.get();
-    auto* fb_state = cb_state->activeFramebuffer.get();
+    auto* fb_state = cb_state->active_framebuffer.get();
 
     if (rectCount == 0 || !rp_state) {
         return;
@@ -39,9 +35,9 @@ void BestPractices::PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuf
     if (!cb_state->IsSecondary() && !fb_state && !rp_state->UsesDynamicRendering()) {
         return;
     }
-
+    auto& sub_state = bp_state::SubState(*cb_state);
     // If we have a rect which covers the entire frame buffer, we have a LOAD_OP_CLEAR-like command.
-    const bool full_clear = ClearAttachmentsIsFullClear(*cb_state, rectCount, pRects);
+    const bool full_clear = ClearAttachmentsIsFullClear(sub_state, rectCount, pRects);
 
     if (rp_state->UsesDynamicRendering()) {
         if (VendorCheckEnabled(kBPVendorNVIDIA)) {
@@ -51,7 +47,7 @@ void BestPractices::PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuf
                 auto& clear_attachment = pClearAttachments[i];
 
                 if (clear_attachment.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
-                    RecordResetScopeZcullDirection(*cb_state);
+                    RecordResetScopeZcullDirection(sub_state);
                 }
                 if ((clear_attachment.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) &&
                     clear_attachment.colorAttachment != VK_ATTACHMENT_UNUSED && pColorAttachments) {
@@ -77,7 +73,7 @@ void BestPractices::PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuf
 
             if (aspects & VK_IMAGE_ASPECT_DEPTH_BIT) {
                 if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-                    RecordResetScopeZcullDirection(*cb_state);
+                    RecordResetScopeZcullDirection(sub_state);
                 }
             }
             if (aspects & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
@@ -89,10 +85,10 @@ void BestPractices::PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuf
             }
             if (fb_attachment != VK_ATTACHMENT_UNUSED) {
                 if (full_clear) {
-                    RecordAttachmentClearAttachments(*cb_state, fb_attachment, attachment.colorAttachment, aspects, rectCount,
+                    RecordAttachmentClearAttachments(sub_state, fb_attachment, attachment.colorAttachment, aspects, rectCount,
                                                      pRects);
                 } else {
-                    RecordAttachmentAccess(*cb_state, fb_attachment, aspects);
+                    RecordAttachmentAccess(sub_state, fb_attachment, aspects);
                 }
                 if (VendorCheckEnabled(kBPVendorNVIDIA)) {
                     const VkFormat format = rp_state->create_info.pAttachments[fb_attachment].format;
@@ -103,9 +99,9 @@ void BestPractices::PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuf
     }
 }
 
-bool BestPractices::ClearAttachmentsIsFullClear(const bp_state::CommandBuffer& cb_state, uint32_t rectCount,
+bool BestPractices::ClearAttachmentsIsFullClear(const bp_state::CommandBufferSubState& cb_state, uint32_t rectCount,
                                                 const VkClearRect* pRects) const {
-    if (cb_state.IsSecondary()) {
+    if (cb_state.base.IsSecondary()) {
         // We don't know the accurate render area in a secondary,
         // so assume we clear the entire frame buffer.
         // This is resolved in CmdExecuteCommands where we can check if the clear is a full clear.
@@ -115,8 +111,8 @@ bool BestPractices::ClearAttachmentsIsFullClear(const bp_state::CommandBuffer& c
     // If we have a rect which covers the entire frame buffer, we have a LOAD_OP_CLEAR-like command.
     for (uint32_t i = 0; i < rectCount; i++) {
         auto& rect = pRects[i];
-        if (rect.rect.extent.width == cb_state.render_area.extent.width &&
-            rect.rect.extent.height == cb_state.render_area.extent.height) {
+        if (rect.rect.extent.width == cb_state.base.render_area.extent.width &&
+            rect.rect.extent.height == cb_state.base.render_area.extent.height) {
             return true;
         }
     }
@@ -124,10 +120,10 @@ bool BestPractices::ClearAttachmentsIsFullClear(const bp_state::CommandBuffer& c
     return false;
 }
 
-bool BestPractices::ValidateClearAttachment(const bp_state::CommandBuffer& cb_state, uint32_t fb_attachment,
+bool BestPractices::ValidateClearAttachment(const bp_state::CommandBufferSubState& cb_state, uint32_t fb_attachment,
                                             uint32_t color_attachment, VkImageAspectFlags aspects, const Location& loc) const {
     bool skip = false;
-    const vvl::RenderPass* rp = cb_state.active_render_pass.get();
+    const vvl::RenderPass* rp = cb_state.base.active_render_pass.get();
 
     if (!rp || fb_attachment == VK_ATTACHMENT_UNUSED) {
         return skip;
@@ -146,12 +142,12 @@ bool BestPractices::ValidateClearAttachment(const bp_state::CommandBuffer& cb_st
     }
 
     // Warn if this is issued prior to Draw Cmd and clearing the entire attachment
-    if (!cb_state.has_draw_cmd) {
+    if (!rp_state.has_draw_cmd) {
         const LogObjectList objlist(cb_state.Handle(), rp->Handle());
         skip |= LogPerformanceWarning("BestPractices-DrawState-ClearCmdBeforeDraw", objlist, loc,
                                       "issued on %s prior to any Draw Cmds in current render pass. It is recommended you "
                                       "use RenderPass LOAD_OP_CLEAR on attachments instead.",
-                                      FormatHandle(cb_state).c_str());
+                                      FormatHandle(cb_state.Handle()).c_str());
     }
 
     if ((new_aspects & VK_IMAGE_ASPECT_COLOR_BIT) &&
@@ -162,7 +158,7 @@ bool BestPractices::ValidateClearAttachment(const bp_state::CommandBuffer& cb_st
                                   "issued on %s for color attachment #%u in this subpass, "
                                   "but LOAD_OP_LOAD was used. If you need to clear the framebuffer, always use LOAD_OP_CLEAR as "
                                   "it is more efficient.",
-                                  FormatHandle(cb_state).c_str(), color_attachment);
+                                  FormatHandle(cb_state.Handle()).c_str(), color_attachment);
     }
 
     if ((new_aspects & VK_IMAGE_ASPECT_DEPTH_BIT) &&
@@ -173,7 +169,7 @@ bool BestPractices::ValidateClearAttachment(const bp_state::CommandBuffer& cb_st
                                   "issued on %s for the depth attachment in this subpass, "
                                   "but LOAD_OP_LOAD was used. If you need to clear the framebuffer, always use LOAD_OP_CLEAR as "
                                   "it is more efficient.",
-                                  FormatHandle(cb_state).c_str());
+                                  FormatHandle(cb_state.Handle()).c_str());
 
         if (VendorCheckEnabled(kBPVendorNVIDIA)) {
             skip |= ValidateZcullScope(cb_state, loc);
@@ -188,7 +184,7 @@ bool BestPractices::ValidateClearAttachment(const bp_state::CommandBuffer& cb_st
                                   "issued on %s for the stencil attachment in this subpass, "
                                   "but LOAD_OP_LOAD was used. If you need to clear the framebuffer, always use LOAD_OP_CLEAR as "
                                   "it is more efficient.",
-                                  FormatHandle(cb_state).c_str());
+                                  FormatHandle(cb_state.Handle()).c_str());
     }
 
     return skip;
@@ -198,7 +194,8 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                                                        const VkClearAttachment* pAttachments, uint32_t rectCount,
                                                        const VkClearRect* pRects, const ErrorObject& error_obj) const {
     bool skip = false;
-    const auto cb_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
+    const auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
+    const auto& sub_state = bp_state::SubState(*cb_state);
 
     if (cb_state->IsSecondary()) {
         // Defer checks to ExecuteCommands.
@@ -206,7 +203,7 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
     }
 
     // Only care about full clears, partial clears might have legitimate uses.
-    const bool is_full_clear = ClearAttachmentsIsFullClear(*cb_state, rectCount, pRects);
+    const bool is_full_clear = ClearAttachmentsIsFullClear(sub_state, rectCount, pRects);
 
     // Check for uses of ClearAttachments along with LOAD_OP_LOAD,
     // as it can be more efficient to just use LOAD_OP_CLEAR
@@ -219,7 +216,7 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                 for (uint32_t i = 0; i < attachmentCount; i++) {
                     const auto& attachment = pAttachments[i];
                     if (attachment.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) {
-                        skip |= ValidateZcullScope(*cb_state, error_obj.location);
+                        skip |= ValidateZcullScope(sub_state, error_obj.location);
                     }
                     if ((attachment.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) && attachment.colorAttachment != VK_ATTACHMENT_UNUSED) {
                         const auto& color_attachment = pColorAttachments[attachment.colorAttachment];
@@ -247,14 +244,14 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                     if (attachment.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) {
                         uint32_t color_attachment = attachment.colorAttachment;
                         uint32_t fb_attachment = subpass.pColorAttachments[color_attachment].attachment;
-                        skip |= ValidateClearAttachment(*cb_state, fb_attachment, color_attachment, attachment.aspectMask,
+                        skip |= ValidateClearAttachment(sub_state, fb_attachment, color_attachment, attachment.aspectMask,
                                                         error_obj.location);
                     }
 
                     if (subpass.pDepthStencilAttachment &&
                         (attachment.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))) {
                         uint32_t fb_attachment = subpass.pDepthStencilAttachment->attachment;
-                        skip |= ValidateClearAttachment(*cb_state, fb_attachment, VK_ATTACHMENT_UNUSED, attachment.aspectMask,
+                        skip |= ValidateClearAttachment(sub_state, fb_attachment, VK_ATTACHMENT_UNUSED, attachment.aspectMask,
                                                         error_obj.location);
                     }
                 }
@@ -297,10 +294,10 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                                                   error_obj.location,
                                                   "%s clear value for color attachment %" PRId32
                                                   " is not a fast clear value."
-                                                  "Consider changing to one of the following:"
-                                                  "RGBA(0, 0, 0, 0) "
-                                                  "RGBA(0, 0, 0, 1) "
-                                                  "RGBA(1, 1, 1, 0) "
+                                                  "Consider changing to one of the following:\n"
+                                                  "RGBA(0, 0, 0, 0)\n "
+                                                  "RGBA(0, 0, 0, 1)\n "
+                                                  "RGBA(1, 1, 1, 0)\n "
                                                   "RGBA(1, 1, 1, 1)",
                                                   VendorSpecificTag(kBPVendorAMD), attachment_idx);
                 }
@@ -313,8 +310,8 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                                                   "%s clear value for depth/stencil "
                                                   "attachment %" PRId32
                                                   " is not a fast clear value."
-                                                  "Consider changing to one of the following:"
-                                                  "D=0.0f, S=0"
+                                                  "Consider changing to one of the following:\n"
+                                                  "D=0.0f, S=0\n"
                                                   "D=1.0f, S=0",
                                                   VendorSpecificTag(kBPVendorAMD), attachment_idx);
                 }
@@ -331,16 +328,6 @@ bool BestPractices::ValidateCmdResolveImage(VkCommandBuffer command_buffer, VkIm
     auto src_image_state = Get<vvl::Image>(src_image);
     auto dst_image_state = Get<vvl::Image>(dst_image);
     ASSERT_AND_RETURN_SKIP(src_image_state && dst_image_state);
-
-    auto src_image_type = src_image_state->create_info.imageType;
-    auto dst_image_type = dst_image_state->create_info.imageType;
-
-    if (src_image_type != dst_image_type) {
-        const LogObjectList objlist(command_buffer, src_image, dst_image);
-        skip |= LogPerformanceWarning("BestPractices-vkCmdResolveImage-MismatchedImageType", objlist, loc,
-                                      "srcImage type (%s) and dstImage type (%s) are not the same.",
-                                      string_VkImageType(src_image_type), string_VkImageType(dst_image_type));
-    }
 
     if (VendorCheckEnabled(kBPVendorArm)) {
         const LogObjectList objlist(command_buffer, src_image, dst_image);
@@ -379,10 +366,10 @@ bool BestPractices::PreCallValidateCmdResolveImage2(VkCommandBuffer commandBuffe
 void BestPractices::PostCallRecordCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                   VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
                                                   const VkImageResolve* pRegions, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<bp_state::Image>(srcImage);
-    auto dst = Get<bp_state::Image>(dstImage);
+    auto src = Get<vvl::Image>(srcImage);
+    auto dst = Get<vvl::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
         QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
@@ -400,10 +387,10 @@ void BestPractices::PostCallRecordCmdResolveImage2KHR(VkCommandBuffer commandBuf
 
 void BestPractices::PostCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo,
                                                    const RecordObject& record_obj) {
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<bp_state::Image>(pResolveImageInfo->srcImage);
-    auto dst = Get<bp_state::Image>(pResolveImageInfo->dstImage);
+    auto src = Get<vvl::Image>(pResolveImageInfo->srcImage);
+    auto dst = Get<vvl::Image>(pResolveImageInfo->dstImage);
     uint32_t region_count = pResolveImageInfo->regionCount;
 
     for (uint32_t i = 0; i < region_count; i++) {
@@ -417,9 +404,9 @@ void BestPractices::PostCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer
 void BestPractices::PostCallRecordCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
                                                      const VkClearColorValue* pColor, uint32_t rangeCount,
                                                      const VkImageSubresourceRange* pRanges, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     auto& funcs = cb_state->queue_submit_functions;
-    auto dst = Get<bp_state::Image>(image);
+    auto dst = Get<vvl::Image>(image);
 
     for (uint32_t i = 0; i < rangeCount; i++) {
         QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
@@ -434,19 +421,17 @@ void BestPractices::PostCallRecordCmdClearDepthStencilImage(VkCommandBuffer comm
                                                             const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount,
                                                             const VkImageSubresourceRange* pRanges,
                                                             const RecordObject& record_obj) {
-    BaseClass::PostCallRecordCmdClearDepthStencilImage(commandBuffer, image, imageLayout, pDepthStencil, rangeCount,
-                                                                    pRanges, record_obj);
-
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     auto& funcs = cb_state->queue_submit_functions;
-    auto dst = Get<bp_state::Image>(image);
+    auto dst = Get<vvl::Image>(image);
 
     for (uint32_t i = 0; i < rangeCount; i++) {
         QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
     }
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
+        auto& sub_state = bp_state::SubState(*cb_state);
         for (uint32_t i = 0; i < rangeCount; i++) {
-            RecordResetZcullDirection(*cb_state, image, pRanges[i]);
+            RecordResetZcullDirection(sub_state, image, pRanges[i]);
         }
     }
 }
@@ -454,13 +439,10 @@ void BestPractices::PostCallRecordCmdClearDepthStencilImage(VkCommandBuffer comm
 void BestPractices::PostCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
                                                const VkImageCopy* pRegions, const RecordObject& record_obj) {
-    BaseClass::PostCallRecordCmdCopyImage(commandBuffer, srcImage, srcImageLayout, dstImage, dstImageLayout,
-                                                       regionCount, pRegions, record_obj);
-
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<bp_state::Image>(srcImage);
-    auto dst = Get<bp_state::Image>(dstImage);
+    auto src = Get<vvl::Image>(srcImage);
+    auto dst = Get<vvl::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
         QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ,
@@ -473,9 +455,9 @@ void BestPractices::PostCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, Vk
 void BestPractices::PostCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
                                                        VkImageLayout dstImageLayout, uint32_t regionCount,
                                                        const VkBufferImageCopy* pRegions, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     auto& funcs = cb_state->queue_submit_functions;
-    auto dst = Get<bp_state::Image>(dstImage);
+    auto dst = Get<vvl::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
         QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE,
@@ -486,9 +468,9 @@ void BestPractices::PostCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBu
 void BestPractices::PostCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage,
                                                        VkImageLayout srcImageLayout, VkBuffer dstBuffer, uint32_t regionCount,
                                                        const VkBufferImageCopy* pRegions, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<bp_state::Image>(srcImage);
+    auto src = Get<vvl::Image>(srcImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
         QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ,
@@ -499,10 +481,10 @@ void BestPractices::PostCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBu
 void BestPractices::PostCallRecordCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
                                                const VkImageBlit* pRegions, VkFilter filter, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<bp_state::Image>(srcImage);
-    auto dst = Get<bp_state::Image>(dstImage);
+    auto src = Get<vvl::Image>(srcImage);
+    auto dst = Get<vvl::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
         QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_READ,
@@ -554,7 +536,7 @@ bool BestPractices::PreCallValidateCmdClearColorImage(VkCommandBuffer commandBuf
                                                       const VkImageSubresourceRange* pRanges, const ErrorObject& error_obj) const {
     bool skip = false;
 
-    auto dst_image = Get<bp_state::Image>(image);
+    auto dst_image = Get<vvl::Image>(image);
     ASSERT_AND_RETURN_SKIP(dst_image);
 
     if (VendorCheckEnabled(kBPVendorAMD)) {
@@ -583,10 +565,11 @@ bool BestPractices::PreCallValidateCmdClearDepthStencilImage(VkCommandBuffer com
                                   "vkCmdClearAttachments instead",
                                   VendorSpecificTag(kBPVendorAMD));
     }
-    const auto cb_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
+    const auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
+        const auto& sub_state = bp_state::SubState(*cb_state);
         for (uint32_t i = 0; i < rangeCount; i++) {
-            skip |= ValidateZcull(*cb_state, image, pRanges[i], error_obj.location);
+            skip |= ValidateZcull(sub_state, image, pRanges[i], error_obj.location);
         }
     }
 

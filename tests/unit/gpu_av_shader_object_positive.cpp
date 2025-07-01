@@ -9,10 +9,9 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
-#include "../framework/descriptor_helper.h"
 #include "../framework/shader_object_helper.h"
-#include "../framework/shader_templates.h"
 #include "../framework/pipeline_helper.h"
 
 class PositiveGpuAVShaderObject : public GpuAVTest {
@@ -25,93 +24,6 @@ class PositiveGpuAVShaderObject : public GpuAVTest {
         AddRequiredFeature(vkt::Feature::shaderObject);
     }
 };
-
-TEST_F(PositiveGpuAVShaderObject, SelectInstrumentedShaders) {
-    TEST_DESCRIPTION("GPU validation: Validate selection of which shaders get instrumented for GPU-AV");
-    InitBasicShaderObject();
-
-    AddRequiredFeature(vkt::Feature::robustBufferAccess);
-    const VkBool32 value = true;
-    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
-                                       &value};
-    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
-                                                               &setting};
-    RETURN_IF_SKIP(InitGpuAvFramework(&layer_settings_create_info));
-
-    // Robust buffer access will be on by default
-    VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    InitState(nullptr, nullptr, pool_flags);
-    InitDynamicRenderTarget();
-
-    OneOffDescriptorSet vert_descriptor_set(m_device,
-                                            {
-                                                {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
-                                            });
-    vkt::PipelineLayout pipeline_layout(*m_device, {&vert_descriptor_set.layout_});
-
-    static const char vert_src[] = R"glsl(
-        #version 460
-        layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;
-        void main() {
-            Data.data[4] = 0xdeadca71;
-        }
-    )glsl";
-
-    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert_src);
-    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
-
-    VkDescriptorSetLayout descriptor_set_layouts[] = {vert_descriptor_set.layout_.handle()};
-
-    VkShaderCreateInfoEXT vert_create_info = ShaderCreateInfo(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, 1, descriptor_set_layouts);
-    VkShaderCreateInfoEXT frag_create_info = ShaderCreateInfo(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT, 1, descriptor_set_layouts);
-
-    VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT};
-    VkValidationFeaturesEXT features = vku::InitStructHelper();
-    features.enabledValidationFeatureCount = 1;
-    features.pEnabledValidationFeatures = enabled;
-    vert_create_info.pNext = &features;
-    frag_create_info.pNext = &features;
-
-    const vkt::Shader vertShader(*m_device, vert_create_info);
-    const vkt::Shader fragShader(*m_device, frag_create_info);
-
-    vkt::Buffer buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    vert_descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    vert_descriptor_set.UpdateDescriptorSets();
-
-    m_command_buffer.Begin();
-    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindShaders(vertShader, fragShader);
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0u, 1u,
-                              &vert_descriptor_set.set_, 0u, nullptr);
-    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
-    m_command_buffer.EndRendering();
-    m_command_buffer.End();
-
-    // Should get a warning since shader was instrumented
-    m_errorMonitor->SetDesiredWarning("VUID-vkCmdDraw-None-08613", 3);
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
-    m_errorMonitor->VerifyFound();
-
-    vert_create_info.pNext = nullptr;
-    const vkt::Shader vertShader2(*m_device, vert_create_info);
-    m_command_buffer.Begin();
-    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindShaders(vertShader2, fragShader);
-    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0u, 1u,
-                              &vert_descriptor_set.set_, 0u, nullptr);
-    vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
-    m_command_buffer.EndRendering();
-    m_command_buffer.End();
-
-    // Should not get a warning since shader was not instrumented
-    m_errorMonitor->ExpectSuccess(kWarningBit | kErrorBit);
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
-}
 
 TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants) {
     TEST_DESCRIPTION("Test that user supplied push constants are correctly restored. One graphics pipeline, indirect draw.");
@@ -129,8 +41,6 @@ TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants) {
     indirect_draw_parameters.instanceCount = 1;
     indirect_draw_parameters.firstVertex = 0;
     indirect_draw_parameters.firstInstance = 0;
-
-    indirect_draw_parameters_buffer.Memory().Unmap();
 
     constexpr int32_t int_count = 16;
     vkt::Buffer storage_buffer(*m_device, int_count * sizeof(int32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
@@ -230,27 +140,23 @@ TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants) {
     SetDefaultDynamicStatesExclude();
     m_command_buffer.BindShaders(vs, fs);
 
-    vk::CmdPushConstants(m_command_buffer.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, shader_pcr_byte_size,
-                         &push_constants);
-    vk::CmdPushConstants(m_command_buffer.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_FRAGMENT_BIT, shader_pcr_byte_size,
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, shader_pcr_byte_size, &push_constants);
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, shader_pcr_byte_size,
                          shader_pcr_byte_size, &push_constants.storage_buffer_ptr_2);
     // Make sure pushing the same push constants twice does not break internal management
-    vk::CmdPushConstants(m_command_buffer.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, shader_pcr_byte_size,
-                         &push_constants);
-    vk::CmdPushConstants(m_command_buffer.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_FRAGMENT_BIT, shader_pcr_byte_size,
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, shader_pcr_byte_size, &push_constants);
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, shader_pcr_byte_size,
                          shader_pcr_byte_size, &push_constants.storage_buffer_ptr_2);
     // Vertex shader will write 8 values to storage buffer, fragment shader another 8
-    vk::CmdDrawIndirect(m_command_buffer.handle(), indirect_draw_parameters_buffer.handle(), 0, 1, sizeof(VkDrawIndirectCommand));
+    vk::CmdDrawIndirect(m_command_buffer, indirect_draw_parameters_buffer.handle(), 0, 1, sizeof(VkDrawIndirectCommand));
     m_command_buffer.EndRendering();
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     auto storage_buffer_ptr = static_cast<int32_t *>(storage_buffer.Memory().Map());
     for (int32_t i = 0; i < int_count; ++i) {
         ASSERT_EQ(storage_buffer_ptr[i], i);
     }
-    storage_buffer.Memory().Unmap();
 }
 
 TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants2) {
@@ -350,7 +256,6 @@ TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants2) {
     indirect_draw_parameters.instanceCount = 1;
     indirect_draw_parameters.firstVertex = 0;
     indirect_draw_parameters.firstInstance = 0;
-    indirect_draw_parameters_buffer.Memory().Unmap();
 
     VkShaderCreateInfoEXT vs_ci =
         ShaderCreateInfo(vs_spv, VK_SHADER_STAGE_VERTEX_BIT, 0, nullptr, 1, &graphics_push_constant_ranges);
@@ -414,7 +319,6 @@ TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants2) {
     indirect_dispatch_parameters.x = 1;
     indirect_dispatch_parameters.y = 1;
     indirect_dispatch_parameters.z = 1;
-    indirect_dispatch_parameters_buffer.Memory().Unmap();
 
     // Submit commands
     // ---
@@ -426,33 +330,30 @@ TEST_F(PositiveGpuAVShaderObject, RestoreUserPushConstants2) {
     m_command_buffer.BindShaders(vs, fs);
     m_command_buffer.BindCompShader(cs);
 
-    vk::CmdPushConstants(m_command_buffer.handle(), graphics_pipeline_layout.handle(),
+    vk::CmdPushConstants(m_command_buffer, graphics_pipeline_layout.handle(),
                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(graphics_push_constants),
                          &graphics_push_constants);
 
     // Vertex shader will write 4 values to graphics storage buffer, fragment shader another 4
-    vk::CmdDrawIndirect(m_command_buffer.handle(), indirect_draw_parameters_buffer.handle(), 0, 1, sizeof(VkDrawIndirectCommand));
+    vk::CmdDrawIndirect(m_command_buffer, indirect_draw_parameters_buffer.handle(), 0, 1, sizeof(VkDrawIndirectCommand));
     m_command_buffer.EndRendering();
 
-    vk::CmdPushConstants(m_command_buffer.handle(), compute_pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+    vk::CmdPushConstants(m_command_buffer, compute_pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(compute_push_constants), &compute_push_constants);
     // Compute shaders will write 8 values to compute storage buffer
-    vk::CmdDispatchIndirect(m_command_buffer.handle(), indirect_dispatch_parameters_buffer.handle(), 0);
+    vk::CmdDispatchIndirect(m_command_buffer, indirect_dispatch_parameters_buffer.handle(), 0);
     m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     auto compute_storage_buffer_ptr = static_cast<int32_t *>(compute_storage_buffer.Memory().Map());
     for (int32_t i = 0; i < int_count; ++i) {
         ASSERT_EQ(compute_storage_buffer_ptr[i], int_count + i);
     }
-    compute_storage_buffer.Memory().Unmap();
 
     auto graphics_storage_buffer_ptr = static_cast<int32_t *>(graphics_storage_buffer.Memory().Map());
     for (int32_t i = 0; i < int_count; ++i) {
         ASSERT_EQ(graphics_storage_buffer_ptr[i], i);
     }
-    graphics_storage_buffer.Memory().Unmap();
 }
 
 TEST_F(PositiveGpuAVShaderObject, DispatchShaderObjectAndPipeline) {
@@ -460,13 +361,10 @@ TEST_F(PositiveGpuAVShaderObject, DispatchShaderObjectAndPipeline) {
     InitBasicShaderObject();
 
     AddRequiredFeature(vkt::Feature::robustBufferAccess);
-    const VkBool32 value = true;
-    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
-                                       &value};
-    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
-                                                               &setting};
-    RETURN_IF_SKIP(InitGpuAvFramework(&layer_settings_create_info));
-    InitState();
+    std::vector<VkLayerSettingEXT> layer_settings = {
+        {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue}};
+    RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
+    RETURN_IF_SKIP(InitState());
 
     static const char comp_src[] = R"glsl(
         #version 450
@@ -488,7 +386,7 @@ TEST_F(PositiveGpuAVShaderObject, DispatchShaderObjectAndPipeline) {
     const vkt::Shader compShader(*m_device, comp_create_info);
 
     CreateComputePipelineHelper compute_pipe(*this);
-    compute_pipe.cs_ = std::make_unique<VkShaderObj>(this, comp_src, VK_SHADER_STAGE_COMPUTE_BIT);
+    compute_pipe.cs_ = VkShaderObj(this, comp_src, VK_SHADER_STAGE_COMPUTE_BIT);
     compute_pipe.CreateComputePipeline();
 
     vkt::Buffer indirect_dispatch_parameters_buffer(*m_device, sizeof(VkDispatchIndirectCommand),
@@ -498,15 +396,127 @@ TEST_F(PositiveGpuAVShaderObject, DispatchShaderObjectAndPipeline) {
     indirect_dispatch_parameters.x = 1u;
     indirect_dispatch_parameters.y = 1u;
     indirect_dispatch_parameters.z = 1u;
-    indirect_dispatch_parameters_buffer.Memory().Unmap();
 
     m_command_buffer.Begin();
     SetDefaultDynamicStatesExclude();
     m_command_buffer.BindCompShader(compShader);
-    vk::CmdDispatchIndirect(m_command_buffer.handle(), indirect_dispatch_parameters_buffer.handle(), 0u);
+    vk::CmdDispatchIndirect(m_command_buffer, indirect_dispatch_parameters_buffer.handle(), 0u);
 
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipe.Handle());
-    vk::CmdDispatchIndirect(m_command_buffer.handle(), indirect_dispatch_parameters_buffer.handle(), 0u);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipe);
+    vk::CmdDispatchIndirect(m_command_buffer, indirect_dispatch_parameters_buffer.handle(), 0u);
 
     m_command_buffer.End();
+}
+
+TEST_F(PositiveGpuAVShaderObject, GetShaderBinaryDataSimple) {
+    InitBasicShaderObject();
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    // no descriptor and nothing to instrument
+    vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    size_t binary_data_size;
+    vk::GetShaderBinaryDataEXT(*m_device, frag_shader, &binary_data_size, nullptr);
+    std::vector<uint8_t> frag_data(binary_data_size);
+    vk::GetShaderBinaryDataEXT(*m_device, frag_shader, &binary_data_size, frag_data.data());
+
+    vkt::Shader binary_frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, frag_data);
+}
+
+TEST_F(PositiveGpuAVShaderObject, GetShaderBinaryData) {
+    InitBasicShaderObject();
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    static const char frag_src[] = R"glsl(
+        #version 450
+        layout(location = 0) in highp vec4 vtxColor;
+        layout(location = 0) out highp vec4 fragColor;
+        layout(set = 0, binding = 0) uniform Block { vec4 color; };
+        void main (void) {
+            fragColor = vtxColor + color;
+        }
+    )glsl";
+
+    OneOffDescriptorSet descriptor_set(m_device, {
+                                                     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                 });
+
+    vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, frag_src, &descriptor_set.layout_.handle());
+
+    size_t binary_data_size;
+    vk::GetShaderBinaryDataEXT(*m_device, frag_shader, &binary_data_size, nullptr);
+    std::vector<uint8_t> frag_data(binary_data_size);
+    vk::GetShaderBinaryDataEXT(*m_device, frag_shader, &binary_data_size, frag_data.data());
+
+    vkt::Shader binary_frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, frag_data, &descriptor_set.layout_.handle());
+}
+
+TEST_F(PositiveGpuAVShaderObject, BinaryShaderObjects) {
+    InitBasicShaderObject();
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitDynamicRenderTarget();
+
+    static const char vert_src[] = R"glsl(
+        #version 450
+        layout(location = 0) out highp vec4 vtxColor;
+        layout(set = 0, binding = 0) uniform Block { vec4 color; };
+        void main() {
+            gl_Position = vec4(1.0f);
+            vtxColor = color;
+        }
+    )glsl";
+
+    static const char frag_src[] = R"glsl(
+        #version 450
+        layout(location = 0) in highp vec4 vtxColor;
+        layout(location = 0) out highp vec4 fragColor;
+        layout(set = 0, binding = 0) uniform Block { vec4 color; };
+
+        void main (void) {
+            fragColor = vtxColor + color;
+        }
+    )glsl";
+
+    OneOffDescriptorSet descriptor_set(m_device, {
+                                                     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                 });
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    vkt::Buffer buffer(*m_device, 16u, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE);
+    descriptor_set.UpdateDescriptorSets();
+
+    vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vert_src, &descriptor_set.layout_.handle());
+    vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, frag_src, &descriptor_set.layout_.handle());
+
+    size_t binary_data_size;
+    vk::GetShaderBinaryDataEXT(*m_device, vert_shader, &binary_data_size, nullptr);
+    std::vector<uint8_t> vert_data(binary_data_size);
+    vk::GetShaderBinaryDataEXT(*m_device, vert_shader, &binary_data_size, vert_data.data());
+
+    vk::GetShaderBinaryDataEXT(*m_device, frag_shader, &binary_data_size, nullptr);
+    std::vector<uint8_t> frag_data(binary_data_size);
+    vk::GetShaderBinaryDataEXT(*m_device, frag_shader, &binary_data_size, frag_data.data());
+
+    vkt::Shader binary_vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vert_data, &descriptor_set.layout_.handle());
+    vkt::Shader binary_frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, frag_data, &descriptor_set.layout_.handle());
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+
+    VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    VkShaderEXT shaders[] = {binary_vert_shader, binary_frag_shader};
+    vk::CmdBindShadersEXT(m_command_buffer, 2u, stages, shaders);
+
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0u, 1u, &descriptor_set.set_, 0u,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }

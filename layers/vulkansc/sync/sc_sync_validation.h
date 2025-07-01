@@ -23,23 +23,19 @@
 
 namespace syncval::sc {
 
-class Instance : public vvl::sc::Instance<syncval::Instance> {
+class Instance : public vvl::sc::InstanceProxy<syncval::Instance> {
   protected:
-    using BaseClass = vvl::sc::Instance<syncval::Instance>;
+    using BaseClass = vvl::sc::InstanceProxy<syncval::Instance>;
 
   public:
-    using StateTracker = vvl::sc::Instance<syncval::Instance>;
-
     Instance(vvl::dispatch::Instance *dispatch) : BaseClass(dispatch) {}
 };
 
-class Device : public vvl::sc::Device<SyncValidator> {
+class Device : public vvl::sc::DeviceProxy<SyncValidator> {
   protected:
-    using BaseClass = vvl::sc::Device<SyncValidator>;
+    using BaseClass = vvl::sc::DeviceProxy<SyncValidator>;
 
   public:
-    using StateTracker = vvl::sc::Device<SyncValidator>;
-
     Device(vvl::dispatch::Device *dev, syncval::sc::Instance *instance_vo) : BaseClass(dev, instance_vo) {}
 };
 

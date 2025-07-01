@@ -16,9 +16,15 @@
  * limitations under the License.
  */
 
+#include <vulkan/utility/vk_format_utils.h>
+#include "error_message/error_location.h"
 #include "stateless/stateless_validation.h"
 #include "generated/enum_flag_bits.h"
 #include "error_message/error_strings.h"
+#include "containers/span.h"
+#include "containers/container_utils.h"
+#include "utils/image_utils.h"
+#include "utils/math_utils.h"
 
 namespace stateless {
 bool Device::ValidateCoarseSampleOrderCustomNV(const VkCoarseSampleOrderCustomNV &order, const Location &order_loc) const {
@@ -86,7 +92,7 @@ bool Device::ValidateCoarseSampleOrderCustomNV(const VkCoarseSampleOrderCustomNV
     // guarantee that 64 bits is enough, but practically it's unlikely for an
     // implementation to support more than 32 bits for samplemask.
     assert(phys_dev_ext_props.shading_rate_image_props.shadingRateMaxCoarseSamples <= 64);
-    uint64_t sample_locations_mask = 0;
+    std::bitset<64> sample_locations_mask = 0;
     for (uint32_t i = 0; i < order.sampleLocationCount; ++i) {
         const VkCoarseSampleLocationNV *sample_loc = &order.pSampleLocations[i];
         if (sample_loc->pixelX >= sample_order_info->width) {
@@ -108,10 +114,13 @@ bool Device::ValidateCoarseSampleOrderCustomNV(const VkCoarseSampleOrderCustomNV
         }
         uint32_t idx =
             sample_loc->sample + order.sampleCount * (sample_loc->pixelX + sample_order_info->width * sample_loc->pixelY);
-        sample_locations_mask |= 1ULL << idx;
+        // Account for idx being greater than or equal to 64 to prevent undefined behavior
+        if (idx < sample_locations_mask.size()) {
+            sample_locations_mask[idx] = 1;
+        }
     }
 
-    uint64_t expected_mask = (order.sampleLocationCount == 64) ? ~0ULL : ((1ULL << order.sampleLocationCount) - 1);
+    std::bitset<64> expected_mask = (order.sampleLocationCount == 64) ? ~0ULL : ((1ULL << order.sampleLocationCount) - 1);
     if (sample_locations_mask != expected_mask) {
         skip |= LogError(
             "VUID-VkCoarseSampleOrderCustomNV-pSampleLocations-02077", device, order_loc,
@@ -191,8 +200,9 @@ bool Device::ValidateSamplerCustomBoarderColor(const VkSamplerCreateInfo &create
         if (!custom_create_info) {
             skip |= LogError("VUID-VkSamplerCreateInfo-borderColor-04011", device, create_info_loc.dot(Field::borderColor),
                              "is %s but there is no VkSamplerCustomBorderColorCreateInfoEXT "
-                             "struct in pNext chain.",
-                             string_VkBorderColor(create_info.borderColor));
+                             "struct in pNext chain.\n%s",
+                             string_VkBorderColor(create_info.borderColor),
+                             PrintPNextChain(Struct::VkSamplerCreateInfo, create_info.pNext).c_str());
         } else {
             if ((custom_create_info->format != VK_FORMAT_UNDEFINED) && !vkuFormatIsDepthAndStencil(custom_create_info->format) &&
                 ((create_info.borderColor == VK_BORDER_COLOR_INT_CUSTOM_EXT &&
@@ -490,8 +500,9 @@ bool Device::manual_PreCallValidateCreateSampler(VkDevice device, const VkSample
     if (vku::FindStructInPNextChain<VkOpaqueCaptureDescriptorDataCreateInfoEXT>(pCreateInfo->pNext)) {
         if (!(pCreateInfo->flags & VK_SAMPLER_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)) {
             skip |= LogError("VUID-VkSamplerCreateInfo-pNext-08111", device, create_info_loc.dot(Field::flags),
-                             "is %s but VkOpaqueCaptureDescriptorDataCreateInfoEXT is in pNext chain.",
-                             string_VkSamplerCreateFlags(pCreateInfo->flags).c_str());
+                             "is %s but VkOpaqueCaptureDescriptorDataCreateInfoEXT is in pNext chain.\n%s",
+                             string_VkSamplerCreateFlags(pCreateInfo->flags).c_str(),
+                             PrintPNextChain(Struct::VkSamplerCreateInfo, pCreateInfo->pNext).c_str());
         }
     }
 
@@ -618,7 +629,8 @@ bool Device::ValidateDescriptorSetLayoutCreateInfo(const VkDescriptorSetLayoutCr
                     skip |= LogError("VUID-VkDescriptorSetLayoutCreateInfo-pBindings-07303", device,
                                      binding_loc.dot(Field::descriptorType),
                                      "is VK_DESCRIPTOR_TYPE_MUTABLE_EXT but VkMutableDescriptorTypeCreateInfoEXT is not "
-                                     "included in the pNext chain.");
+                                     "included in the pNext chain.\n%s",
+                                     PrintPNextChain(Struct::VkDescriptorSetLayoutCreateInfo, create_info.pNext).c_str());
                 }
                 if (binding.pImmutableSamplers) {
                     skip |= LogError("VUID-VkDescriptorSetLayoutCreateInfo-descriptorType-04594", device,
@@ -1031,17 +1043,22 @@ bool Device::manual_PreCallValidateCreateSamplerYcbcrConversion(VkDevice device,
     }
 
     if (pCreateInfo->ycbcrModel != VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY) {
-        // Checks same VU multiple ways in order to give a more useful error message
+        // This VU covers a lot, could have been multiple VUs, so provide a good error message for all cases.
         const char *vuid = "VUID-VkSamplerYcbcrConversionCreateInfo-ycbcrModel-01655";
-        if ((components.r == VK_COMPONENT_SWIZZLE_ONE) || (components.r == VK_COMPONENT_SWIZZLE_ZERO) ||
-            (components.g == VK_COMPONENT_SWIZZLE_ONE) || (components.g == VK_COMPONENT_SWIZZLE_ZERO) ||
-            (components.b == VK_COMPONENT_SWIZZLE_ONE) || (components.b == VK_COMPONENT_SWIZZLE_ZERO)) {
-            skip |=
-                LogError(vuid, device, create_info_loc,
-                         "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY so components.r (%s), "
-                         "components.g (%s), nor components.b (%s) can't be VK_COMPONENT_SWIZZLE_ZERO or VK_COMPONENT_SWIZZLE_ONE.",
-                         string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel), string_VkComponentSwizzle(components.r),
-                         string_VkComponentSwizzle(components.g), string_VkComponentSwizzle(components.b));
+        if (components.r == VK_COMPONENT_SWIZZLE_ZERO || components.g == VK_COMPONENT_SWIZZLE_ZERO ||
+            components.b == VK_COMPONENT_SWIZZLE_ZERO) {
+            skip |= LogError(vuid, device, create_info_loc,
+                             "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY so the r, g, and b in "
+                             "pCreateInfo->components can't all be VK_COMPONENT_SWIZZLE_ZERO\n%s",
+                             string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel),
+                             string_VkComponentMapping(components).c_str());
+        } else if (components.r == VK_COMPONENT_SWIZZLE_ONE || components.g == VK_COMPONENT_SWIZZLE_ONE ||
+                   components.b == VK_COMPONENT_SWIZZLE_ONE) {
+            skip |= LogError(vuid, device, create_info_loc,
+                             "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY so the r, g, and b in "
+                             "pCreateInfo->components can't all be VK_COMPONENT_SWIZZLE_ONE\n%s",
+                             string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel),
+                             string_VkComponentMapping(components).c_str());
         }
 
         // "must not correspond to a component which contains zero or one as a consequence of conversion to RGBA"
@@ -1052,31 +1069,50 @@ bool Device::manual_PreCallValidateCreateSamplerYcbcrConversion(VkDevice device,
         // depth/stencil = no [g,b,a] (shouldn't ever occur, but no VU preventing it)
         const uint32_t component_count = (vkuFormatIsDepthOrStencil(format) == true) ? 1 : vkuFormatComponentCount(format);
 
-        if ((component_count < 4) && ((components.r == VK_COMPONENT_SWIZZLE_A) || (components.g == VK_COMPONENT_SWIZZLE_A) ||
-                                      (components.b == VK_COMPONENT_SWIZZLE_A))) {
+        if (format == VK_FORMAT_UNDEFINED) {
+            // If using external format they should have been caught in GetExternalFormat above. This means the user forgot to pass
+            // in the VkExternalFormatANDROID and will get an error below which will not be obvious what is going on.
             skip |= LogError(vuid, device, create_info_loc,
-                             "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY so components.r (%s), "
-                             "components.g (%s), or components.b (%s) can't be VK_COMPONENT_SWIZZLE_A.",
-                             string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel), string_VkComponentSwizzle(components.r),
-                             string_VkComponentSwizzle(components.g), string_VkComponentSwizzle(components.b));
+                             "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY and pCreateInfo->format is "
+                             "VK_FORMAT_UNDEFINED. Either you forgot to set the format here or if you are trying to use an "
+                             "external format, and forgot to pass in VkExternalFormatANDROID (or equivalent) into the "
+                             "pCreateInfo->pNext chain as this check doesn't apply for if externalFormat is non-zero.",
+                             string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel));
+
+        } else if ((component_count < 4) && ((components.r == VK_COMPONENT_SWIZZLE_A) || (components.g == VK_COMPONENT_SWIZZLE_A) ||
+                                             (components.b == VK_COMPONENT_SWIZZLE_A))) {
+            skip |= LogError(vuid, device, create_info_loc,
+                             "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY so the r, g, and b in "
+                             "pCreateInfo->components can't all be VK_COMPONENT_SWIZZLE_A because %s only has %" PRIu32
+                             " components (not 4) so the 'a' component is invalid\n%s",
+                             string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel), string_VkFormat(format),
+                             component_count, string_VkComponentMapping(components).c_str());
         } else if ((component_count < 3) &&
                    ((components.r == VK_COMPONENT_SWIZZLE_B) || (components.g == VK_COMPONENT_SWIZZLE_B) ||
                     (components.b == VK_COMPONENT_SWIZZLE_B) || (components.b == VK_COMPONENT_SWIZZLE_IDENTITY))) {
-            skip |= LogError(vuid, device, create_info_loc,
-                             "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY so components.r (%s), "
-                             "components.g (%s), or components.b (%s) can't be VK_COMPONENT_SWIZZLE_B "
-                             "(components.b also can't be VK_COMPONENT_SWIZZLE_IDENTITY).",
-                             string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel), string_VkComponentSwizzle(components.r),
-                             string_VkComponentSwizzle(components.g), string_VkComponentSwizzle(components.b));
+            skip |= LogError(
+                vuid, device, create_info_loc,
+                "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY so the r, g, and b in "
+                "pCreateInfo->components can't all be VK_COMPONENT_SWIZZLE_B because %s only has %" PRIu32
+                " components (not 3 or 4) so the 'b' component is invalid\n%s%s",
+                string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel), string_VkFormat(format), component_count,
+                string_VkComponentMapping(components).c_str(),
+                (components.b == VK_COMPONENT_SWIZZLE_IDENTITY)
+                    ? "\n(components.b also can't be VK_COMPONENT_SWIZZLE_IDENTITY as the is equivalent to VK_COMPONENT_SWIZZLE_B)"
+                    : "");
         } else if ((component_count < 2) &&
                    ((components.r == VK_COMPONENT_SWIZZLE_G) || (components.g == VK_COMPONENT_SWIZZLE_G) ||
                     (components.g == VK_COMPONENT_SWIZZLE_IDENTITY) || (components.b == VK_COMPONENT_SWIZZLE_G))) {
-            skip |= LogError(vuid, device, create_info_loc,
-                             "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY so components.r (%s), "
-                             "components.g (%s), or components.b (%s) can't be VK_COMPONENT_SWIZZLE_G "
-                             "(components.g also can't be VK_COMPONENT_SWIZZLE_IDENTITY).",
-                             string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel), string_VkComponentSwizzle(components.r),
-                             string_VkComponentSwizzle(components.g), string_VkComponentSwizzle(components.b));
+            skip |= LogError(
+                vuid, device, create_info_loc,
+                "The ycbcrModel (%s) is not VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY so the r, g, and b in "
+                "pCreateInfo->components can't all be VK_COMPONENT_SWIZZLE_G because %s only has %" PRIu32
+                " components (not 2, 3 or 4) so the 'g' component is invalid\n%s%s",
+                string_VkSamplerYcbcrModelConversion(pCreateInfo->ycbcrModel), string_VkFormat(format), component_count,
+                string_VkComponentMapping(components).c_str(),
+                (components.g == VK_COMPONENT_SWIZZLE_IDENTITY)
+                    ? "\n(components.g also can't be VK_COMPONENT_SWIZZLE_IDENTITY as the is equivalent to VK_COMPONENT_SWIZZLE_G)"
+                    : "");
         }
     }
 

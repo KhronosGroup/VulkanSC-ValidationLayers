@@ -326,7 +326,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy) {
     m_command_buffer.Begin();
     // This copy is not legal since both buffers share same device memory range, and none of them will be rebound
     // to non overlapping device memory ranges. Reported at queue submit
-    vk::CmdCopyBuffer(m_command_buffer.handle(), buffer_sparse.handle(), buffer_sparse2.handle(), 1, &copy_info);
+    vk::CmdCopyBuffer(m_command_buffer, buffer_sparse.handle(), buffer_sparse2.handle(), 1, &copy_info);
     m_command_buffer.End();
 
     // Submitting copy command with overlapping device memory regions
@@ -412,7 +412,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy2) {
     // Set up complete
 
     m_command_buffer.Begin();
-    vk::CmdCopyBuffer(m_command_buffer.handle(), buffer_sparse.handle(), buffer_sparse.handle(), size32(copy_info_list),
+    vk::CmdCopyBuffer(m_command_buffer, buffer_sparse.handle(), buffer_sparse.handle(), size32(copy_info_list),
                       copy_info_list.data());
     m_command_buffer.End();
 
@@ -497,7 +497,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy3) {
                                                           // => since overlaps are computed in buffer space, none should be detected
     copy_info.size = buffer_mem_reqs.alignment;
     m_command_buffer.Begin();
-    vk::CmdCopyBuffer(m_command_buffer.handle(), buffer_sparse.handle(), buffer_sparse.handle(), 1, &copy_info);
+    vk::CmdCopyBuffer(m_command_buffer, buffer_sparse.handle(), buffer_sparse.handle(), 1, &copy_info);
     m_command_buffer.End();
 
     // Submitting copy command with overlapping device memory regions
@@ -582,7 +582,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy4) {
     m_command_buffer.Begin();
     // This copy is not legal since both buffers share same device memory range, and none of them will be rebound
     // to non overlapping device memory ranges. Reported at queue submit
-    vk::CmdCopyBuffer(m_command_buffer.handle(), buffer_not_sparse.handle(), buffer_sparse.handle(), 1, &copy_info);
+    vk::CmdCopyBuffer(m_command_buffer, buffer_not_sparse.handle(), buffer_sparse.handle(), 1, &copy_info);
     m_command_buffer.End();
 
     // Submitting copy command with overlapping device memory regions
@@ -656,7 +656,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_VkSparseMemoryBindMemory) {
     buffer_memory_bind.memoryOffset = 0;
 
     VkSparseBufferMemoryBindInfo buffer_memory_bind_info = {};
-    buffer_memory_bind_info.buffer = buffer.handle();
+    buffer_memory_bind_info.buffer = buffer;
     buffer_memory_bind_info.bindCount = 1;
     buffer_memory_bind_info.pBinds = &buffer_memory_bind;
 
@@ -689,7 +689,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_VkSparseMemoryBindFlags) {
     vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
 
     VkMemoryRequirements buffer_mem_reqs;
-    vk::GetBufferMemoryRequirements(device(), buffer.handle(), &buffer_mem_reqs);
+    vk::GetBufferMemoryRequirements(device(), buffer, &buffer_mem_reqs);
     VkMemoryAllocateInfo buffer_mem_alloc =
         vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer_mem_reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
@@ -703,7 +703,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_VkSparseMemoryBindFlags) {
     buffer_memory_bind.flags = 0xBAD00000;
 
     VkSparseBufferMemoryBindInfo buffer_memory_bind_info = {};
-    buffer_memory_bind_info.buffer = buffer.handle();
+    buffer_memory_bind_info.buffer = buffer;
     buffer_memory_bind_info.bindCount = 1;
     buffer_memory_bind_info.pBinds = &buffer_memory_bind;
 

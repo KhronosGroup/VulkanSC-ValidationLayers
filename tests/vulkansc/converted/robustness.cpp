@@ -113,7 +113,7 @@ TEST_F(NegativeRobustness, PipelineRobustnessDisabledShaderStageWithIdentifier) 
     VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     VkShaderModuleIdentifierEXT get_identifier = vku::InitStructHelper();
-    vk::GetShaderModuleIdentifierEXT(device(), cs.handle(), &get_identifier);
+    vk::GetShaderModuleIdentifierEXT(device(), cs, &get_identifier);
     sm_id_create_info.identifierSize = get_identifier.identifierSize;
     sm_id_create_info.pIdentifier = get_identifier.identifier;
 
@@ -133,12 +133,13 @@ TEST_F(NegativeRobustness, PipelineRobustnessRobustBufferAccess2Unsupported) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
 
     RETURN_IF_SKIP(InitFramework());
 
-    if (IsExtensionsEnabled(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME)) {
-        VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
+    if (IsExtensionsEnabled(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME) || IsExtensionsEnabled(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME)) {
+        VkPhysicalDeviceRobustness2FeaturesKHR robustness2_features = vku::InitStructHelper();
         GetPhysicalDeviceFeatures2(robustness2_features);
 
         if (robustness2_features.robustBufferAccess2) {
@@ -190,13 +191,14 @@ TEST_F(NegativeRobustness, PipelineRobustnessRobustImageAccess2Unsupported) {
     TEST_DESCRIPTION("Create a pipeline using VK_EXT_pipeline_robustness with robustImageAccess2 being unsupported");
 
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
+    AddOptionalExtensions(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(InitFramework());
 
-    if (IsExtensionsEnabled(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME)) {
-        VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
+    if (IsExtensionsEnabled(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME) || IsExtensionsEnabled(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME)) {
+        VkPhysicalDeviceRobustness2FeaturesKHR robustness2_features = vku::InitStructHelper();
         GetPhysicalDeviceFeatures2(robustness2_features);
 
         if (robustness2_features.robustImageAccess2) {

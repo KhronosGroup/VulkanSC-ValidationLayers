@@ -169,17 +169,17 @@ TEST_F(NegativeDeviceFeatureProperty, PromotedFeaturesExtensions11) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitDeviceFeatureProperty());
 
-    std::vector<const char *> device_extensions;
+    std::vector<const char *> extension_list;
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME)) {
-        device_extensions.push_back(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
+        extension_list.push_back(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
     }
 
     VkPhysicalDeviceVulkan11Features features11 = vku::InitStructHelper();
     features11.shaderDrawParameters = VK_FALSE;
 
     m_second_device_ci.pNext = &features11;
-    m_second_device_ci.ppEnabledExtensionNames = device_extensions.data();
-    m_second_device_ci.enabledExtensionCount = device_extensions.size();
+    m_second_device_ci.ppEnabledExtensionNames = extension_list.data();
+    m_second_device_ci.enabledExtensionCount = extension_list.size();
 
     m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-04476");
     m_errorMonitor->SetUnexpectedError("Failed to create device chain");  // for android loader
@@ -191,26 +191,26 @@ TEST_F(NegativeDeviceFeatureProperty, PromotedFeaturesExtensions12) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitDeviceFeatureProperty());
 
-    std::vector<const char *> device_extensions;
+    std::vector<const char *> extension_list;
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME)) {
-        device_extensions.push_back(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
+        extension_list.push_back(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
         m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-02831");
     }
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME)) {
-        device_extensions.push_back(VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME);
+        extension_list.push_back(VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME);
         m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-02832");
     }
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
-        device_extensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-        device_extensions.push_back(VK_KHR_MAINTENANCE_3_EXTENSION_NAME);
+        extension_list.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+        extension_list.push_back(VK_KHR_MAINTENANCE_3_EXTENSION_NAME);
         m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-02833");
     }
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME)) {
-        device_extensions.push_back(VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME);
+        extension_list.push_back(VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME);
         m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-02834");
     }
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME)) {
-        device_extensions.push_back(VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME);
+        extension_list.push_back(VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME);
         m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-02835");
     }
 
@@ -223,8 +223,8 @@ TEST_F(NegativeDeviceFeatureProperty, PromotedFeaturesExtensions12) {
     features12.shaderOutputLayer = VK_TRUE;  // Set true since both shader_viewport features need to true
 
     m_second_device_ci.pNext = &features12;
-    m_second_device_ci.ppEnabledExtensionNames = device_extensions.data();
-    m_second_device_ci.enabledExtensionCount = device_extensions.size();
+    m_second_device_ci.ppEnabledExtensionNames = extension_list.data();
+    m_second_device_ci.enabledExtensionCount = extension_list.size();
 
     m_errorMonitor->SetUnexpectedError("Failed to create device chain");  // for android loader
     vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
@@ -258,6 +258,12 @@ TEST_F(NegativeDeviceFeatureProperty, PhysicalDeviceVulkan12Features) {
     m_second_device_ci.pNext = &features12;
 
     m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-02830");
+    m_errorMonitor->SetUnexpectedError("Failed to create device chain");  // for android loader
+    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
+    m_errorMonitor->VerifyFound();
+
+    // Once more and check for pNext string
+    m_errorMonitor->SetDesiredError("[VkPhysicalDeviceVulkan12Features] -> [VkPhysicalDevice8BitStorageFeatures]");
     m_errorMonitor->SetUnexpectedError("Failed to create device chain");  // for android loader
     vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
     m_errorMonitor->VerifyFound();
@@ -358,11 +364,11 @@ TEST_F(NegativeDeviceFeatureProperty, BufferDeviceAddress) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDeviceFeatureProperty, Robustness2WithoutRobustness) {
+TEST_F(NegativeDeviceFeatureProperty, Robustness2WithoutRobustnessEXT) {
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     RETURN_IF_SKIP(InitDeviceFeatureProperty());
 
-    VkPhysicalDeviceRobustness2FeaturesEXT robustness_2_features = vku::InitStructHelper();
+    VkPhysicalDeviceRobustness2FeaturesKHR robustness_2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(robustness_2_features);
     if (!robustness_2_features.robustBufferAccess2) {
         GTEST_SKIP() << "robustBufferAccess2 not supported.";
@@ -371,7 +377,25 @@ TEST_F(NegativeDeviceFeatureProperty, Robustness2WithoutRobustness) {
     VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&robustness_2_features);
     m_second_device_ci.pNext = &features2;
 
-    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceRobustness2FeaturesEXT-robustBufferAccess2-04000");
+    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceRobustness2FeaturesKHR-robustBufferAccess2-04000");
+    vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDeviceFeatureProperty, Robustness2WithoutRobustnessKHR) {
+    AddRequiredExtensions(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitDeviceFeatureProperty());
+
+    VkPhysicalDeviceRobustness2FeaturesKHR robustness_2_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(robustness_2_features);
+    if (!robustness_2_features.robustBufferAccess2) {
+        GTEST_SKIP() << "robustBufferAccess2 not supported.";
+    }
+
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&robustness_2_features);
+    m_second_device_ci.pNext = &features2;
+
+    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceRobustness2FeaturesKHR-robustBufferAccess2-04000");
     vk::CreateDevice(Gpu(), &m_second_device_ci, nullptr, &m_second_device);
     m_errorMonitor->VerifyFound();
 }

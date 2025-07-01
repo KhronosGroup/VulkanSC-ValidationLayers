@@ -21,9 +21,11 @@
 #pragma once
 
 #include <cstddef>
+#include <variant>
 #include <vector>
 #include "containers/range.h"
 #include "containers/range_map.h"
+#include "containers/small_vector.h"
 #include "vulkan/vulkan.h"
 
 namespace vvl {
@@ -33,11 +35,8 @@ class Image;
 namespace subresource_adapter {
 
 class RangeEncoder;
-using IndexType = uint64_t;
-template <typename Element>
-using Range = vvl::range<Element>;
-using IndexRange = Range<IndexType>;
-using WritePolicy = sparse_container::value_precedence;
+using IndexType = uint64_t;  // TODO: just update to 32 bit, but before collect memory usage stats, perf stats
+using IndexRange = vvl::range<IndexType>;
 using split_op_keep_both = sparse_container::split_op_keep_both;
 
 // Interface for aspect specific traits objects (now isolated in the cpp file)
@@ -323,12 +322,8 @@ class RangeGenerator {
     bool operator!=(const RangeGenerator& rhs) { return (pos_ != rhs.pos_) || (&encoder_ != &rhs.encoder_); }
     explicit RangeGenerator(const RangeEncoder& encoder) : RangeGenerator(encoder, encoder.FullRange()) {}
     RangeGenerator(const RangeEncoder& encoder, const VkImageSubresourceRange& subres_range);
-    inline const IndexRange& operator*() const { return pos_; }
-    inline const IndexRange* operator->() const { return &pos_; }
-    // Returns a generator suitable for iterating within a range, is modified by operator ++ to bring
-    // it in line with sync.
-    SubresourceGenerator& GetSubresourceGenerator() { return isr_pos_; }
-    Subresource& GetSubresource() { return isr_pos_; }
+    const IndexRange& operator*() const { return pos_; }
+    const IndexRange* operator->() const { return &pos_; }
     RangeGenerator& operator++();
 
   private:
@@ -472,51 +467,41 @@ class ImageRangeGenerator {
 // double wrapped map variants.. to avoid needing to templatize on the range map type.  The underlying maps are available for
 // use in performance sensitive places that are *already* templatized (for example update_range_value).
 // In STL style.  Note that N must be < uint8_t max
-enum BothRangeMapMode { kTristate, kSmall, kBig };
 template <typename T, size_t N>
 class BothRangeMap {
-    using BigMap = sparse_container::range_map<IndexType, T>;
-    using RangeType = vvl::range<IndexType>;
-    using SmallMap = sparse_container::small_range_map<IndexType, T, RangeType, N>;
+    using SmallMap = sparse_container::small_range_map<IndexType, T, vvl::range<IndexType>, N>;
     using SmallMapIterator = typename SmallMap::iterator;
     using SmallMapConstIterator = typename SmallMap::const_iterator;
+
+    using BigMap = sparse_container::range_map<IndexType, T>;
     using BigMapIterator = typename BigMap::iterator;
     using BigMapConstIterator = typename BigMap::const_iterator;
 
   public:
-    using value_type = typename SmallMap::value_type;
-    using key_type = typename SmallMap::key_type;
-    using index_type = typename SmallMap::index_type;
-    using mapped_type = typename SmallMap::mapped_type;
-    using small_map = SmallMap;
-    using big_map = BigMap;
+    using index_type = IndexType;
+    using key_type = vvl::range<IndexType>;
+    using mapped_type = T;
+    using value_type = std::pair<const key_type, mapped_type>;
 
-    template <typename Map, typename Value, typename SmallIt, typename BigIt>
+    template <typename Value, typename SmallIt, typename BigIt>
     class IteratorImpl {
-      protected:
-        friend BothRangeMap;
-
       public:
         Value* operator->() const {
-            assert(!Tristate());
-            if (SmallMode()) {
+            if (is_small_it_) {
                 return small_it_.operator->();
             } else {
                 return big_it_.operator->();
             }
         }
-
         Value& operator*() const {
-            assert(!Tristate());
-            if (SmallMode()) {
+            if (is_small_it_) {
                 return small_it_.operator*();
             } else {
                 return big_it_.operator*();
             }
         }
         IteratorImpl& operator++() {
-            assert(!Tristate());
-            if (SmallMode()) {
+            if (is_small_it_) {
                 small_it_.operator++();
             } else {
                 big_it_.operator++();
@@ -524,8 +509,7 @@ class BothRangeMap {
             return *this;
         }
         IteratorImpl& operator--() {
-            assert(!Tristate());
-            if (SmallMode()) {
+            if (is_small_it_) {
                 small_it_.operator--();
             } else {
                 big_it_.operator--();
@@ -533,252 +517,185 @@ class BothRangeMap {
             return *this;
         }
         IteratorImpl& operator=(const IteratorImpl& other) {
-            if (other.Tristate()) {
-                // Transition to tristate
-                small_it_ = SmallIt();
-                big_it_ = BigIt();
-            } else if (other.SmallMode()) {
-                small_it_ = other.small_it_;
-                if (mode_ != other.mode_) {
-                    big_it_ = BigIt();
-                }
-            } else {
-                big_it_ = other.big_it_;
-                if (mode_ != other.mode_) {
-                    small_it_ = SmallIt();
-                }
-            }
-            mode_ = other.mode_;
+            is_small_it_ = other.is_small_it_;
+            small_it_ = other.small_it_;
+            big_it_ = other.big_it_;
             return *this;
         }
         bool operator==(const IteratorImpl& other) const {
-            if (other.Tristate()) return Tristate();  // both Tristate -> equal, any other comparison !equal
-            if (Tristate()) return false;
-
-            // Since we know neither are tristate....
-            assert(mode_ == other.mode_);
-            if (SmallMode()) {
-                return small_it_ == other.small_it_;
-            } else {
-                return big_it_ == other.big_it_;
-            }
+            // It's enough just to compare both iterators.
+            return small_it_ == other.small_it_ && big_it_ == other.big_it_;
         }
         bool operator!=(const IteratorImpl& other) const { return !(*this == other); }
-        IteratorImpl() : small_it_(), big_it_(), mode_(BothRangeMapMode::kTristate) {}
-        IteratorImpl(const IteratorImpl& other)
-            : small_it_(other.SmallMode() ? other.small_it_ : SmallIt()),
-              big_it_(other.BigMode() ? other.big_it_ : BigIt()),
-              mode_(other.mode_){};
+
+        IteratorImpl() = default;
+        IteratorImpl(const IteratorImpl& other) = default;
+        IteratorImpl(const SmallIt& it) : is_small_it_(true), small_it_(it) {}
+        IteratorImpl(const BigIt& it) : is_small_it_(false), big_it_(it) {}
 
       private:
-        IteratorImpl(BothRangeMapMode mode) : small_it_(), big_it_(), mode_(mode) {}
-        IteratorImpl(const SmallIt& it) : small_it_(it), big_it_(), mode_(BothRangeMapMode::kSmall) {}
-        IteratorImpl(const BigIt& it) : small_it_(), big_it_(it), mode_(BothRangeMapMode::kBig) {}
-        inline bool SmallMode() const { return BothRangeMapMode::kSmall == mode_; }
-        inline bool BigMode() const { return BothRangeMapMode::kBig == mode_; }
-        inline bool Tristate() const { return BothRangeMapMode::kTristate == mode_; }
-        SmallIt small_it_;  // only one of these will be initialized non trivially (and they should be small)
+        friend BothRangeMap;
+
+        bool is_small_it_ = false;
+        SmallIt small_it_;
         BigIt big_it_;
-        BothRangeMapMode mode_;
     };
 
-    using iterator = IteratorImpl<BothRangeMap, value_type, SmallMapIterator, BigMapIterator>;
+    using iterator = IteratorImpl<value_type, SmallMapIterator, BigMapIterator>;
     // TODO change const iterator to derived class if iterator -> const_iterator constructor is needed
-    using const_iterator = IteratorImpl<const BothRangeMap, const value_type, SmallMapConstIterator, BigMapConstIterator>;
+    using const_iterator = IteratorImpl<const value_type, SmallMapConstIterator, BigMapConstIterator>;
 
-    inline iterator begin() {
-        if (SmallMode()) {
-            return iterator(small_map_->begin());
+    iterator begin() {
+        if (UsesSmallMap()) {
+            return iterator(GetSmallMap().begin());
         } else {
-            return iterator(big_map_->begin());
+            return iterator(GetBigMap().begin());
         }
     }
-    inline const_iterator cbegin() const {
-        if (SmallMode()) {
-            return const_iterator(small_map_->begin());
+    const_iterator cbegin() const {
+        if (UsesSmallMap()) {
+            return const_iterator(GetSmallMap().begin());
         } else {
-            return const_iterator(big_map_->begin());
+            return const_iterator(GetBigMap().begin());
         }
     }
-    inline const_iterator begin() const { return cbegin(); }
+    const_iterator begin() const { return cbegin(); }
 
-    inline iterator end() {
-        if (SmallMode()) {
-            return iterator(small_map_->end());
+    iterator end() {
+        if (UsesSmallMap()) {
+            return iterator(GetSmallMap().end());
         } else {
-            return iterator(big_map_->end());
+            return iterator(GetBigMap().end());
         }
     }
-    inline const_iterator cend() const {
-        if (SmallMode()) {
-            return const_iterator(small_map_->end());
+    const_iterator cend() const {
+        if (UsesSmallMap()) {
+            return const_iterator(GetSmallMap().end());
         } else {
-            return const_iterator(big_map_->end());
+            return const_iterator(GetBigMap().end());
         }
     }
-    inline const_iterator end() const { return cend(); }
+    const_iterator end() const { return cend(); }
 
-    inline iterator find(const key_type& key) {
-        assert(!Tristate());
-        if (SmallMode()) {
-            return iterator(small_map_->find(key));
+    iterator find(const key_type& key) {
+        if (UsesSmallMap()) {
+            return iterator(GetSmallMap().find(key));
         } else {
-            return iterator(big_map_->find(key));
-        }
-    }
-
-    inline const_iterator find(const key_type& key) const {
-        assert(!Tristate());
-        if (SmallMode()) {
-            return const_iterator(small_map_->find(key));
-        } else {
-            return const_iterator(big_map_->find(key));
+            return iterator(GetBigMap().find(key));
         }
     }
 
-    inline iterator find(const index_type& index) {
-        assert(!Tristate());
-        if (SmallMode()) {
-            return iterator(small_map_->find(index));
+    const_iterator find(const key_type& key) const {
+        if (UsesSmallMap()) {
+            return const_iterator(GetSmallMap().find(key));
         } else {
-            return iterator(big_map_->find(index));
+            return const_iterator(GetBigMap().find(key));
         }
     }
 
-    inline const_iterator find(const index_type& index) const {
-        assert(!Tristate());
-        if (SmallMode()) {
-            return const_iterator(static_cast<const SmallMap*>(small_map_)->find(index));
+    iterator find(const index_type& index) {
+        if (UsesSmallMap()) {
+            return iterator(GetSmallMap().find(index));
         } else {
-            return const_iterator(static_cast<const BigMap*>(big_map_)->find(index));
+            return iterator(GetBigMap().find(index));
+        }
+    }
+
+    const_iterator find(const index_type& index) const {
+        if (UsesSmallMap()) {
+            return const_iterator(GetSmallMap().find(index));
+        } else {
+            return const_iterator(GetBigMap().find(index));
         }
     }
 
     // TODO -- this is supposed to be a const_iterator, which is constructable from an iterator
-    inline void insert(const iterator& hint, const value_type& value) {
-        assert(!Tristate());
-        if (SmallMode()) {
-            assert(hint.SmallMode());
-            small_map_->insert(hint.small_it_, value);
+    void insert(const iterator& hint, const value_type& value) {
+        if (UsesSmallMap()) {
+            assert(hint.is_small_it_);
+            GetSmallMap().insert(hint.small_it_, value);
         } else {
-            assert(hint.BigMode());
-            big_map_->insert(hint.big_it_, value);
+            assert(!hint.is_small_it_);
+            GetBigMap().insert(hint.big_it_, value);
         }
     }
 
-    template <typename SplitOp>
-    iterator split(const iterator whole_it, const index_type& index, const SplitOp& split_op) {
-        assert(!Tristate());
-        if (SmallMode()) {
-            return small_map_->split(whole_it.small_it_, index, split_op);
+    iterator lower_bound(const key_type& key) {
+        if (UsesSmallMap()) {
+            return iterator(GetSmallMap().lower_bound(key));
         } else {
-            return big_map_->split(whole_it.big_it_, index, split_op);
+            return iterator(GetBigMap().lower_bound(key));
         }
     }
 
-    inline iterator lower_bound(const key_type& key) {
-        if (SmallMode()) {
-            return iterator(small_map_->lower_bound(key));
+    const_iterator lower_bound(const key_type& key) const {
+        if (UsesSmallMap()) {
+            return const_iterator(GetSmallMap().lower_bound(key));
         } else {
-            return iterator(big_map_->lower_bound(key));
-        }
-    }
-
-    inline const_iterator lower_bound(const key_type& key) const {
-        if (SmallMode()) {
-            return const_iterator(small_map_->lower_bound(key));
-        } else {
-            return const_iterator(big_map_->lower_bound(key));
+            return const_iterator(GetBigMap().lower_bound(key));
         }
     }
 
     template <typename Value>
-    inline iterator overwrite_range(const iterator& lower, Value&& value) {
-        if (SmallMode()) {
-            assert(lower.SmallMode());
-            return small_map_->overwrite_range(lower.small_it_, std::forward<Value>(value));
+    iterator overwrite_range(const iterator& lower, Value&& value) {
+        if (UsesSmallMap()) {
+            assert(lower.is_small_it_);
+            return GetSmallMap().overwrite_range(lower.small_it_, std::forward<Value>(value));
         } else {
-            assert(lower.BigMode());
-            return big_map_->overwrite_range(lower.big_it_, std::forward<Value>(value));
+            assert(!lower.is_small_it_);
+            return GetBigMap().overwrite_range(lower.big_it_, std::forward<Value>(value));
         }
     }
 
-    // With power comes responsibility.  You can get to the underlying maps, s.t. in inner loops, the "SmallMode" checks can be
+    // With power comes responsibility (🕷).  You can get to the underlying maps, s.t. in inner loops, the "SmallMode" checks can be
     // avoided per call, just be sure and Get the correct one.
-    BothRangeMapMode GetMode() const { return mode_; }
-    const small_map& GetSmallMap() const {
-        assert(SmallMode());
-        return *small_map_;
+    const SmallMap& GetSmallMap() const {
+        assert(UsesSmallMap());
+        return std::get<SmallMap>(map_);
     }
-    small_map& GetSmallMap() {
-        assert(SmallMode());
-        return *small_map_;
+    SmallMap& GetSmallMap() {
+        assert(UsesSmallMap());
+        return std::get<SmallMap>(map_);
     }
-    const big_map& GetBigMap() const {
-        assert(BigMode());
-        return *big_map_;
+    const BigMap& GetBigMap() const {
+        assert(!UsesSmallMap());
+        return std::get<BigMap>(map_);
     }
-    big_map& GetBigMap() {
-        assert(BigMode());
-        return *big_map_;
+    BigMap& GetBigMap() {
+        assert(!UsesSmallMap());
+        return std::get<BigMap>(map_);
     }
+
     BothRangeMap() = delete;
-    BothRangeMap(index_type limit) : mode_(ComputeMode(limit)), big_map_(MakeBigMap()), small_map_(MakeSmallMap(limit)) {}
 
-    ~BothRangeMap() {
-        if (big_map_) {
-            big_map_->~BigMap();
-        }
-        if (small_map_) {
-            small_map_->~SmallMap();
-        }
-    }
-
-    inline bool empty() const {
-        if (SmallMode()) {
-            return small_map_->empty();
+    BothRangeMap(index_type limit) {
+        if (limit <= N) {
+            map_ = SmallMap(limit);
         } else {
-            assert(BigMode());
-            return big_map_->empty();
+            map_ = BigMap();
         }
     }
 
-    inline size_t size() const {
-        if (SmallMode()) {
-            return small_map_->size();
+    bool empty() const {
+        if (UsesSmallMap()) {
+            return GetSmallMap().empty();
         } else {
-            assert(BigMode());
-            return big_map_->size();
+            return GetBigMap().empty();
         }
     }
 
-    inline bool SmallMode() const { return BothRangeMapMode::kSmall == mode_; }
-    inline bool BigMode() const { return BothRangeMapMode::kBig == mode_; }
-    inline bool Tristate() const { return BothRangeMapMode::kTristate == mode_; }
+    size_t size() const {
+        if (UsesSmallMap()) {
+            return GetSmallMap().size();
+        } else {
+            return GetBigMap().size();
+        }
+    }
+
+    bool UsesSmallMap() const { return std::holds_alternative<SmallMap>(map_); }
 
   private:
-    static BothRangeMapMode ComputeMode(index_type size_limit) {
-        return size_limit <= N ? BothRangeMapMode::kSmall : BothRangeMapMode::kBig;
-    }
-    BigMap* MakeBigMap() {
-        if (BigMode()) {
-            return new (backing_store) BigMap();
-        }
-        return nullptr;
-    }
-    SmallMap* MakeSmallMap(index_type limit) {
-        if (SmallMode()) {
-            return new (backing_store) SmallMap(limit);
-        }
-        return nullptr;
-    }
-
-    BothRangeMapMode mode_ = BothRangeMapMode::kTristate;
-    // Must be after mode_ as they use mode for initialization logic
-    BigMap* big_map_ = nullptr;
-    SmallMap* small_map_ = nullptr;
-
-    alignas(std::max(alignof(SmallMap), alignof(BigMap))) std::byte backing_store[std::max(sizeof(SmallMap), sizeof(BigMap))];
+    std::variant<SmallMap, BigMap> map_;
 };
 
 }  // namespace subresource_adapter

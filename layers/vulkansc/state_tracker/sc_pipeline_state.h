@@ -168,7 +168,7 @@ class PipelineCache : public vvl::PipelineCache {
         using ID = PipelineCacheData::Entry::ID;
         using StageModules = std::vector<std::shared_ptr<vvl::ShaderModule>>;
 
-        Entry(const Device& state_data, const PipelineCacheData::Entry& cache_entry)
+        Entry(const DeviceState& state_data, const PipelineCacheData::Entry& cache_entry)
             : id_(cache_entry.PipelineID()),
               shader_modules_(InitShaderModules(state_data, cache_entry)),
               json_data_(ParseJsonData(cache_entry)) {}
@@ -206,7 +206,7 @@ class PipelineCache : public vvl::PipelineCache {
             std::vector<std::unique_ptr<vku::safe_VkSpecializationInfo>> specialization_info{};
         };
 
-        StageModules InitShaderModules(const Device& state_data, const PipelineCacheData::Entry& cache_entry);
+        StageModules InitShaderModules(const DeviceState& state_data, const PipelineCacheData::Entry& cache_entry);
         JsonData ParseJsonData(const PipelineCacheData::Entry& cache_entry);
 
         ID id_;
@@ -214,7 +214,7 @@ class PipelineCache : public vvl::PipelineCache {
         JsonData json_data_;
     };
 
-    PipelineCache(const Device& state_data, VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo* pCreateInfo);
+    PipelineCache(const DeviceState& state_data, VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo* pCreateInfo);
 
     const Entry* GetPipeline(const VkPipelineOfflineCreateInfo* offline_info) const {
         if (offline_info) {
@@ -248,10 +248,10 @@ class PipelineCache : public vvl::PipelineCache {
 
 class Pipeline : public vvl::Pipeline {
   public:
-    const VkPipelineOfflineCreateInfo *offline_info;
+    const VkPipelineOfflineCreateInfo* offline_info;
 
     template <typename CreateInfo, typename... Args>
-    Pipeline(const Device& state_data, const CreateInfo* pCreateInfo, Args&&... args)
+    Pipeline(const DeviceState& state_data, const CreateInfo* pCreateInfo, Args&&... args)
         : vvl::Pipeline(state_data, pCreateInfo, std::forward<Args>(args)...), offline_info(FindOfflineCreateInfo()) {}
 
   private:
