@@ -549,6 +549,13 @@ static VKAPI_ATTR void VKAPI_CALL DestroyDevice(VkDevice device, const VkAllocat
     }
     command_pool_map[device].clear();
 
+#ifdef VULKANSC
+    // Vulkan SC does not support vkFreeMemory therefore all mapped memory is implicitly unmapped during device destruction
+    for (auto it : mapped_memory_map) {
+        UnmapMemory(device, it.first);
+    }
+#endif  // VULKANSC
+
     queue_map.erase(device);
     buffer_map.erase(device);
     image_memory_size_map.erase(device);
@@ -1754,6 +1761,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixProperti
 }
 #endif  // VULKANSC
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_NV_cooperative_vector
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeVectorPropertiesNV(VkPhysicalDevice physicalDevice,
                                                                                      uint32_t* pPropertyCount,
                                                                                      VkCooperativeVectorPropertiesNV* pProperties) {
@@ -1798,6 +1806,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeVectorProperti
     }
     return VK_SUCCESS;
 }
+#endif  // VULKANSC
 
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCalibrateableTimeDomainsKHR(VkPhysicalDevice physicalDevice,
                                                                                    uint32_t* pTimeDomainCount,
