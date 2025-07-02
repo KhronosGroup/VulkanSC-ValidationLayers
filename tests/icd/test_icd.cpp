@@ -552,8 +552,16 @@ static VKAPI_ATTR void VKAPI_CALL DestroyDevice(VkDevice device, const VkAllocat
 #ifdef VULKANSC
     // Vulkan SC does not support vkFreeMemory therefore all mapped memory is implicitly unmapped during device destruction
     for (auto it : mapped_memory_map) {
-        UnmapMemory(device, it.first);
+        for (auto map_addr : it.second) {
+#if defined(_WIN32)
+            _aligned_free(map_addr);
+#else
+            free(map_addr);
+#endif
+        }
     }
+    mapped_memory_map.clear();
+    allocated_memory_size_map.clear();
 #endif  // VULKANSC
 
     queue_map.erase(device);
