@@ -2846,11 +2846,11 @@ bool Instance::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, cons
         skip |= context.ValidateReservedFlags(pCreateInfo_loc.dot(Field::flags), pCreateInfo->flags,
                                               "VUID-VkDeviceCreateInfo-flags-zerobitmask");
 
-        skip |= context.ValidateStructTypeArray(
-            pCreateInfo_loc.dot(Field::queueCreateInfoCount), pCreateInfo_loc.dot(Field::pQueueCreateInfos),
-            pCreateInfo->queueCreateInfoCount, pCreateInfo->pQueueCreateInfos, VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, false,
-            true, "VUID-VkDeviceQueueCreateInfo-sType-sType", "VUID-VkDeviceCreateInfo-pQueueCreateInfos-parameter",
-            "VUID-VkDeviceCreateInfo-queueCreateInfoCount-arraylength");
+        skip |= context.ValidateStructTypeArray(pCreateInfo_loc.dot(Field::queueCreateInfoCount),
+                                                pCreateInfo_loc.dot(Field::pQueueCreateInfos), pCreateInfo->queueCreateInfoCount,
+                                                pCreateInfo->pQueueCreateInfos, VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, false,
+                                                true, "VUID-VkDeviceQueueCreateInfo-sType-sType",
+                                                "VUID-VkDeviceCreateInfo-pQueueCreateInfos-parameter", kVUIDUndefined);
 
         if (pCreateInfo->pQueueCreateInfos != nullptr) {
             for (uint32_t queueCreateInfoIndex = 0; queueCreateInfoIndex < pCreateInfo->queueCreateInfoCount;
