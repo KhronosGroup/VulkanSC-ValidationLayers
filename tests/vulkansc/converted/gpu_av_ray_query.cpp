@@ -30,7 +30,7 @@ TEST_F(NegativeGpuAVRayQuery, NegativeTmin) {
     TEST_DESCRIPTION("Ray query with a negative value for Ray TMin");
     RETURN_IF_SKIP(InitGpuAVRayQuery());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_ray_query : require
 
@@ -82,7 +82,7 @@ TEST_F(NegativeGpuAVRayQuery, TMaxLessThenTmin) {
     TEST_DESCRIPTION("Ray query with a Ray TMax less than Ray TMin");
     RETURN_IF_SKIP(InitGpuAVRayQuery());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_ray_query : require
 
@@ -133,7 +133,7 @@ TEST_F(NegativeGpuAVRayQuery, ComputeRayFlagsBothSkip) {
     TEST_DESCRIPTION("Ray query in a compute shader, with dynamically set ray flags");
     RETURN_IF_SKIP(InitGpuAVRayQuery());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_ray_query : require
 
@@ -182,7 +182,7 @@ TEST_F(NegativeGpuAVRayQuery, ComputeRayFlagsOpaque) {
     TEST_DESCRIPTION("Ray query in a compute shader, with dynamically set ray flags");
     RETURN_IF_SKIP(InitGpuAVRayQuery());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_ray_query : require
 
@@ -231,7 +231,7 @@ TEST_F(NegativeGpuAVRayQuery, ComputeRayOriginNaN) {
     TEST_DESCRIPTION("Ray query with a Ray Origin as a NaN");
     RETURN_IF_SKIP(InitGpuAVRayQuery());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_ray_query : require
 
@@ -284,7 +284,7 @@ TEST_F(NegativeGpuAVRayQuery, ComputeRayOriginNonFinite) {
     TEST_DESCRIPTION("Ray query with a Ray Origin as a non finite value");
     RETURN_IF_SKIP(InitGpuAVRayQuery());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_ray_query : require
 
@@ -337,7 +337,7 @@ TEST_F(NegativeGpuAVRayQuery, ComputeUseQueryUninit) {
     TEST_DESCRIPTION("rayQueryInitializeEXT is never called, make sure we don't hang with an uninit query object");
     RETURN_IF_SKIP(InitGpuAVRayQuery());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_ray_query : require
 
@@ -426,7 +426,7 @@ TEST_F(NegativeGpuAVRayQuery, RayGenUseQueryUninit) {
     auto buffer_ptr = static_cast<float *>(ssbo.Memory().Map());
     buffer_ptr[0] = -16.0f;
 
-    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, ssbo.handle(), 0, 4096, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, ssbo, 0, 4096, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
@@ -503,7 +503,7 @@ TEST_F(NegativeGpuAVRayQuery, RayGenUseQueryUninitSelectShaders) {
     auto buffer_ptr = static_cast<float *>(ssbo.Memory().Map());
     buffer_ptr[0] = -16.0f;
 
-    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, ssbo.handle(), 0, 4096, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, ssbo, 0, 4096, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
@@ -531,7 +531,7 @@ TEST_F(NegativeGpuAVRayQuery, FragmentUseQueryUninit) {
     RETURN_IF_SKIP(InitGpuAVRayQuery());
     InitRenderTarget();
 
-    char const *fragment_source = R"glsl(
+    const char *fragment_source = R"glsl(
         #version 460
         #extension GL_EXT_ray_query : require
 

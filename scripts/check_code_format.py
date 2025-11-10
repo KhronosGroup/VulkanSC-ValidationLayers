@@ -54,7 +54,7 @@ def CPrint(msg_type, msg_string):
 def VerifyClangFormatSource(commit, target_files):
     target_refspec = f'{commit}^...{commit}'
     retval = 0
-    good_file_pattern = re.compile('.*\\.(cpp|cc|c\+\+|cxx|c|h|hpp)$')
+    good_file_pattern = re.compile(r'.*\\.(cpp|cc|c\+\+|cxx|c|h|hpp)$')
     diff_files_list = [item for item in target_files if good_file_pattern.search(item)]
     diff_files = ' '.join([str(elem) for elem in diff_files_list])
     retval = 0
@@ -67,6 +67,26 @@ def VerifyClangFormatSource(commit, target_files):
             CPrint('CONTENT', "\n" + diff_files_data)
             retval = 1
     return retval
+#
+#
+# Check no trailing white spaces!
+def VerifyTrailingWhiteSpace(target_files):
+    whitespace_pattern = re.compile(r'[ \t]+$', flags=re.MULTILINE)
+    for file_path in target_files:
+        full_path = repo_relative(file_path)
+        if not os.path.isfile(full_path):
+            continue
+        try:
+            with open(repo_relative(full_path), 'r', encoding='utf-8', errors='ignore') as f:
+                for line_number, line in enumerate(f, 1):
+                    if whitespace_pattern.search(line):
+                        print(f"-------------- WHITE SPACE! --------------\nFound trailing white space in {file_path} at line {line_number}")
+                        return 1
+        except FileNotFoundError:
+            print(f"Warning: File not found at '{file_path}'. Skipping.")
+        except Exception as e:
+            print(f"Error reading file '{file_path}': {e}")
+    return 0
 #
 #
 # Check copyright dates for modified files
@@ -102,7 +122,7 @@ def VerifyCopyrights(commit, target_files):
             continue
         for company in ["LunarG", "Valve"]:
             # Capture the last year on the line as a separate match. It should be the highest (or only year of the range)
-            copyright_match = re.search('Copyright .*(\d{4}) ' + company, open(file_path, encoding="utf-8", errors='ignore').read(1024))
+            copyright_match = re.search(r'Copyright .*(\d{4}) ' + company, open(file_path, encoding="utf-8", errors='ignore').read(1024))
             if copyright_match:
                 copyright_year = copyright_match.group(1)
                 if int(commit_year) > int(copyright_year):
@@ -278,8 +298,8 @@ def main():
         commit = c.decode('utf-8')
         diff_range = f'{commit}^...{commit}'
 
-        commit_message = check_output(['git', 'log', '--pretty="%h %s"', diff_range])
-        CPrint('CONTENT', "\nChecking commit: " + commit_message.decode('utf-8'))
+        commit_message = check_output(['git', 'log', '--pretty="%h %s"', diff_range]).decode('utf-8')
+        CPrint('CONTENT', "\nChecking commit: " + commit_message)
 
         subprocess.run(['git', 'checkout', '-q', commit])
 
@@ -297,7 +317,12 @@ def main():
         if "dependabot" in authors:
             continue
 
+        # Skip anything tryingt do a git revert
+        if commit_message.lower().startswith("revert"):
+            continue
+
         failure |= VerifyClangFormatSource(commit, target_files)
+        failure |= VerifyTrailingWhiteSpace(target_files)
         failure |= VerifyCopyrights(commit, target_files)
         failure |= VerifyCommitMessageFormat(commit)
         failure |= VerifyTypeAssign(commit, target_files)

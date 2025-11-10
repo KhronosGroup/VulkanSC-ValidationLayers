@@ -16,6 +16,7 @@
  */
 
 #include <vulkan/vulkan_core.h>
+#include <algorithm>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "utils/hash_util.h"
@@ -67,11 +68,10 @@ TEST_F(VkLayerTest, DISABLED_UnsupportedPnextApiVersion) {
 TEST_F(VkLayerTest, VuidCheckForHashCollisions) {
     TEST_DESCRIPTION("Ensure there are no VUID hash collisions");
 
-    constexpr uint64_t num_vuids = sizeof(vuid_spec_text) / sizeof(vuid_spec_text[0]);
     std::vector<uint32_t> hashes;
-    hashes.reserve(num_vuids);
-    for (const auto &vuid_spec_text_pair : vuid_spec_text) {
-        const uint32_t hash = hash_util::VuidHash(vuid_spec_text_pair.vuid);
+    hashes.reserve(GetVuidMap().size());
+    for (const auto &vuid_spec_text_pair : GetVuidMap()) {
+        const uint32_t hash = hash_util::VuidHash(vuid_spec_text_pair.first);
         hashes.push_back(hash);
     }
     std::sort(hashes.begin(), hashes.end());
@@ -790,10 +790,8 @@ TEST_F(VkLayerTest, DISABLED_InvalidImageCreateFlagWithPhysicalDeviceCount) {
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
-    VkImageFormatProperties imageFormatProperties;
-    VkResult result =
-        vk::GetPhysicalDeviceImageFormatProperties(physical_device_group[0].physicalDevices[0], ici.format, ici.imageType,
-                                                   ici.tiling, ici.usage, ici.flags, &imageFormatProperties);
+    VkImageFormatProperties image_format_properties;
+    VkResult result = GetImageFormatProps(physical_device_group[0].physicalDevices[0], ici, image_format_properties);
     if (result == VK_ERROR_FORMAT_NOT_SUPPORTED) {
         GTEST_SKIP() << "image format is not supported";
     }
@@ -1302,7 +1300,7 @@ TEST_F(VkLayerTest, DISABLED_DisplayApplicationName) {
 
         // TODO - The second instance is not hooked up to the callback so will crash in corecheck or the driver
         m_errorMonitor->SetDesiredError("AppName: second instance");
-        vk::CreateImage(device2.handle(), nullptr, nullptr, &image);
+        vk::CreateImage(device2, nullptr, nullptr, &image);
         m_errorMonitor->VerifyFound();
     }
     ASSERT_NO_FATAL_FAILURE(vk::DestroyInstance(instance2, nullptr));
@@ -1417,6 +1415,21 @@ TEST_F(VkLayerTest, MissingExtensionPipelineCreateFlags2) {
 
     CreateComputePipelineHelper pipe(*this, &flags2);
     m_errorMonitor->SetDesiredWarning("WARNING-VkPipelineCreateFlags2CreateInfo-Extension");
+    pipe.CreateComputePipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkLayerTest, OverridePipelineCreateFlags2) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    RETURN_IF_SKIP(Init());
+
+    VkPipelineCreateFlags2CreateInfo flags2 = vku::InitStructHelper();
+    flags2.flags = 0;
+
+    CreateComputePipelineHelper pipe(*this, &flags2);
+    pipe.cp_ci_.flags = VK_PIPELINE_CREATE_2_DISABLE_OPTIMIZATION_BIT;
+    m_errorMonitor->SetDesiredWarning("WARNING-VkPipelineCreateFlags2-flags1-zero");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
 }

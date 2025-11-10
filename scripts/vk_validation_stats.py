@@ -209,7 +209,7 @@ class ValidationTests:
                     if 'DISABLED_' in testname:
                         continue
                     if any(prefix in line for prefix in vuid_prefixes):
-                        line_list = re.split('[\s{}[\]()"]+',line)
+                        line_list = re.split(r'[\s{}[\]()"]+', line)
                         for sub_str in line_list:
                             if any(prefix in sub_str for prefix in vuid_prefixes):
                                 vuid_str = sub_str.strip(',);:"*')
@@ -480,6 +480,7 @@ def main(argv):
         'layers/error_message/unimplementable_validation.h',
         'layers/state_tracker/video_session_state.cpp',
         'layers/layer_options.cpp',
+        'layers/core_checks/cc_buffer_address.h',
         f'layers/{args.api}/generated/stateless_validation_helper.cpp',
         f'layers/{args.api}/generated/object_tracker.cpp',
         f'layers/{args.api}/generated/spirv_validation_helper.cpp',

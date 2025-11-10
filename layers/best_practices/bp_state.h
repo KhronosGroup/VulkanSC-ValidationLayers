@@ -148,7 +148,8 @@ struct CommandBufferStateNV {
 
 class CommandBufferSubState : public vvl::CommandBufferSubState {
   public:
-    explicit CommandBufferSubState(vvl::CommandBuffer& cb) : vvl::CommandBufferSubState(cb) {}
+    explicit CommandBufferSubState(vvl::CommandBuffer& cb, BestPractices& validator);
+    BestPractices& validator;
 
     RenderPassState render_pass_state;
     CommandBufferStateNV nv;
@@ -165,12 +166,71 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     void Destroy() final;
     void Reset(const Location& loc) final;
 
-    void ExecuteCommands(vvl::CommandBuffer& secondary_command_buffer) final;
-    void RecordCmd(vvl::Func command) final;
+    void RecordExecuteCommand(vvl::CommandBuffer& secondary_command_buffer, uint32_t cmd_index, const Location& loc) final;
+    void RecordActionCommand(LastBound& last_bound, const Location& loc) final;
 
     void RecordPushConstants(VkPipelineLayout layout, VkShaderStageFlags stage_flags, uint32_t offset, uint32_t size,
                              const void* values) final;
     void ClearPushConstants() final;
+
+    void RecordBeginRendering(const VkRenderingInfo& rendering_info, const Location& loc) final;
+    void RecordBeginRenderPass(const VkRenderPassBeginInfo& render_pass_begin, const VkSubpassBeginInfo& subpass_begin_info,
+                               const Location& loc) final;
+    void RecordNextSubpass(const VkSubpassBeginInfo& subpass_begin_info, const VkSubpassEndInfo* subpass_end_info,
+                           const Location& loc) final;
+    void RecordEndRendering(const VkRenderingEndInfoEXT* pRenderingEndInfo) final;
+    void RecordEndRenderPass(const VkSubpassEndInfo* subpass_end_info, const Location& loc) final;
+
+    void RecordCopyImage(vvl::Image& src_image_state, vvl::Image& dst_image_state, VkImageLayout src_image_layout,
+                         VkImageLayout dst_image_layout, uint32_t region_count, const VkImageCopy* regions,
+                         const Location& loc) final;
+    void RecordCopyImage2(vvl::Image& src_image_state, vvl::Image& dst_image_state, VkImageLayout src_image_layout,
+                          VkImageLayout dst_image_layout, uint32_t region_count, const VkImageCopy2* regions,
+                          const Location& loc) final;
+    void RecordCopyBufferToImage(vvl::Buffer& src_buffer_state, vvl::Image& dst_image_state, VkImageLayout dst_image_layout,
+                                 uint32_t region_count, const VkBufferImageCopy* regions, const Location& loc) final;
+    void RecordCopyBufferToImage2(vvl::Buffer& src_buffer_state, vvl::Image& dst_image_state, VkImageLayout dst_image_layout,
+                                  uint32_t region_count, const VkBufferImageCopy2* regions, const Location& loc) final;
+    void RecordCopyImageToBuffer(vvl::Image& src_image_state, vvl::Buffer& dst_buffer_state, VkImageLayout src_image_layout,
+                                 uint32_t region_count, const VkBufferImageCopy* regions, const Location& loc) final;
+    void RecordCopyImageToBuffer2(vvl::Image& src_image_state, vvl::Buffer& dst_buffer_state, VkImageLayout src_image_layout,
+                                  uint32_t region_count, const VkBufferImageCopy2* regions, const Location& loc) final;
+    void RecordBlitImage(vvl::Image& src_image_state, vvl::Image& dst_image_state, VkImageLayout src_image_layout,
+                         VkImageLayout dst_image_layout, uint32_t region_count, const VkImageBlit* regions,
+                         const Location& loc) final;
+    void RecordBlitImage2(vvl::Image& src_image_state, vvl::Image& dst_image_state, VkImageLayout src_image_layout,
+                          VkImageLayout dst_image_layout, uint32_t region_count, const VkImageBlit2* regions,
+                          const Location& loc) final;
+    void RecordResolveImage(vvl::Image& src_image_state, vvl::Image& dst_image_state, uint32_t region_count,
+                            const VkImageResolve* regions, const Location& loc) final;
+    void RecordResolveImage2(vvl::Image& src_image_state, vvl::Image& dst_image_state, uint32_t region_count,
+                             const VkImageResolve2* regions, const Location& loc) final;
+    void RecordClearColorImage(vvl::Image& image_state, VkImageLayout image_layout, const VkClearColorValue* color_values,
+                               uint32_t range_count, const VkImageSubresourceRange* ranges, const Location& loc) final;
+    void RecordClearDepthStencilImage(vvl::Image& image_state, VkImageLayout image_layout,
+                                      const VkClearDepthStencilValue* depth_stencil_values, uint32_t range_count,
+                                      const VkImageSubresourceRange* ranges, const Location& loc) final;
+    void RecordClearAttachments(uint32_t attachment_count, const VkClearAttachment* pAttachments, uint32_t rect_count,
+                                const VkClearRect* pRects, const Location& loc) final;
+
+    void RecordSetEvent(VkEvent event, VkPipelineStageFlags2 stageMask, const VkDependencyInfo* dependency_info) final;
+    void RecordResetEvent(VkEvent event, VkPipelineStageFlags2 stageMask) final;
+    void RecordBarriers(uint32_t buffer_barrier_count, const VkBufferMemoryBarrier* buffer_barriers, uint32_t image_barrier_count,
+                        const VkImageMemoryBarrier* image_barriers, VkPipelineStageFlags src_stage_mask,
+                        VkPipelineStageFlags dst_stage_mask, const Location& loc) final;
+    void RecordBarriers2(const VkDependencyInfo& dep_info, const Location& loc) final;
+
+    void RecordSetDepthCompareOp(VkCompareOp depth_compare_op) final;
+    void RecordSetDepthTestEnable(VkBool32 depth_test_enable) final;
+    void RecordBindPipeline(VkPipelineBindPoint bind_point, vvl::Pipeline& pipeline) final;
+
+    void Submit(vvl::Queue& queue_state, uint32_t perf_submit_pass, const Location& loc) final;
+
+    // Move to private when possible
+    void RecordAttachmentAccess(uint32_t attachment, VkImageAspectFlags aspects);
+    void RecordAttachmentClearAttachments(uint32_t fb_attachment, uint32_t color_attachment, VkImageAspectFlags aspects,
+                                          uint32_t rectCount, const VkClearRect* pRects);
+    void RecordSetDepthTestStateNV(VkCompareOp new_depth_compare_op, bool new_depth_test_enable);
 
     struct SignalingInfo {
         // True, if the event's first state change within a command buffer is a signal (SetEvent)
@@ -186,8 +246,25 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     };
     vvl::unordered_map<VkEvent, SignalingInfo> event_signaling_state;
 
+    using QueueCallback = std::function<bool(const class vvl::Queue& queue_state, const vvl::CommandBuffer& cb_state)>;
+    std::vector<QueueCallback> queue_submit_functions;
+    // Used by some layers to defer actions until vkCmdEndRenderPass time.
+    // Layers using this are responsible for inserting the callbacks into queue_submit_functions.
+    std::vector<QueueCallback> queue_submit_functions_after_render_pass;
+
+    void RecordBindZcullScopeNV(VkImage depth_attachment, const VkImageSubresourceRange& subresource_range);
+    void RecordUnbindZcullScopeNV();
+    void RecordResetScopeZcullDirectionNV();
+    void RecordResetZcullDirectionNV(vvl::Image& depth_image, const VkImageSubresourceRange& subresource_range);
+    void RecordSetZcullDirectionNV(vvl::Image& depth_image, const VkImageSubresourceRange& subresource_range, ZcullDirection mode);
+    void RecordSetScopeZcullDirectionNV(ZcullDirection mode);
+    void RecordZcullDrawNV();
+    void RecordCmdDrawTypeNVIDIA();
+
   private:
     void ResetCBState();
+    void RecordBeginRenderingCommon(const VkRenderPassBeginInfo* pRenderPassBegin, const VkRenderingInfo* pRenderingInfo);
+    void RecordEndRenderingCommon(const vvl::RenderPass& rp_state);
 };
 
 static inline CommandBufferSubState& SubState(vvl::CommandBuffer& cb) {

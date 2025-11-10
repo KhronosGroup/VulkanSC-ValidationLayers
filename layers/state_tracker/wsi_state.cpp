@@ -68,11 +68,31 @@ static vku::safe_VkImageCreateInfo GetImageCreateInfo(const VkSwapchainCreateInf
 
 namespace vvl {
 
+void SwapchainImage::ResetAcquireState() {
+    acquired = false;
+    acquire_semaphore.reset();
+    acquire_fence.reset();
+    acquire_semaphore_status = AcquireSyncStatus::NotSpecified;
+    acquire_fence_status = AcquireSyncStatus::NotSpecified;
+}
+
 void SwapchainImage::ResetPresentWaitSemaphores() {
+    const bool swapchain_has_completed_presentation = !present_wait_semaphores.empty();
     for (auto &semaphore : present_wait_semaphores) {
         semaphore->ClearSwapchainWaitInfo();
     }
     present_wait_semaphores.clear();
+
+    // If the current swapchain has completed at least one presentation then the previous
+    // presentations from the old swapchain are also finished. Mark present wait semaphores
+    // from the old swapchain as not in-use.
+    // NOTE: that's the algorithm we use to track old semaphores without swapchain maintenance1 extension.
+    if (swapchain_has_completed_presentation && image_state->bind_swapchain) {
+        for (auto &old_present_wait_semaphore : image_state->bind_swapchain->old_swapchain_present_wait_semaphores) {
+            old_present_wait_semaphore->ClearSwapchainWaitInfo();
+        }
+        image_state->bind_swapchain->old_swapchain_present_wait_semaphores.clear();
+    }
 }
 
 Swapchain::Swapchain(vvl::DeviceState &dev_data_, const VkSwapchainCreateInfoKHR *pCreateInfo, VkSwapchainKHR handle)
@@ -87,23 +107,22 @@ Swapchain::Swapchain(vvl::DeviceState &dev_data_, const VkSwapchainCreateInfoKHR
       dev_data(dev_data_) {
     // Initialize with visible values for debugging purposes.
     // This helps to show used slots during the first few frames.
-    acquire_history.fill(vvl::kU32Max);
+    acquire_history.fill(vvl::kNoIndex32);
 }
 
 void Swapchain::PresentImage(uint32_t image_index, uint64_t present_id, const SubmissionReference &present_submission_ref,
                              vvl::span<std::shared_ptr<vvl::Semaphore>> present_wait_semaphores) {
-    if (image_index >= images.size()) return;
-    assert(acquired_images > 0);
-    if (!shared_presentable) {
-        acquired_images--;
-        images[image_index].acquired = false;
-        images[image_index].acquire_semaphore.reset();
-        images[image_index].acquire_fence.reset();
-    } else {
-        images[image_index].image_state->layout_locked = true;
+    if (image_index >= images.size()) {
+        return;
     }
-    images[image_index].present_submission_ref = present_submission_ref;
+    if (shared_presentable) {
+        images[image_index].image_state->layout_locked = true;
+    } else if (acquired_images > 0) {
+        acquired_images--;
+        images[image_index].ResetAcquireState();
+    }
 
+    images[image_index].present_submission_ref = present_submission_ref;
     images[image_index].present_wait_semaphores.clear();
     for (const auto &semaphore : present_wait_semaphores) {
         images[image_index].present_wait_semaphores.emplace_back(semaphore);
@@ -112,16 +131,26 @@ void Swapchain::PresentImage(uint32_t image_index, uint64_t present_id, const Su
     if (present_id > max_present_id) {
         max_present_id = present_id;
     }
+
+    // If this swapchain is retired (became oldSwapchain) then register the swapchain present
+    // wait semaphores in the *new* swapchain. It will be responsible for tracking semaphores in-use status.
+    // Old swapchain can't track semaphore in-use status anymore. That functionality is part of acquire logic
+    // and old swapchain can't acquire new images.
+    if (new_swapchain) {
+        auto &old_wait_semaphores = new_swapchain->old_swapchain_present_wait_semaphores;
+        old_wait_semaphores.insert(old_wait_semaphores.end(), present_wait_semaphores.begin(), present_wait_semaphores.end());
+    }
 }
 
 void Swapchain::ReleaseImage(uint32_t image_index) {
-    if (image_index >= images.size()) return;
-    assert(acquired_images > 0);
-    acquired_images--;
-    images[image_index].acquired = false;
-    images[image_index].acquire_semaphore.reset();
-    images[image_index].acquire_fence.reset();
-    images[image_index].ResetPresentWaitSemaphores();
+    if (image_index >= images.size()) {
+        return;
+    }
+    if (acquired_images > 0) {
+        acquired_images--;
+        images[image_index].ResetAcquireState();
+        images[image_index].ResetPresentWaitSemaphores();
+    }
 }
 
 void Swapchain::AcquireImage(uint32_t image_index, const std::shared_ptr<vvl::Semaphore> &semaphore_state,
@@ -130,9 +159,30 @@ void Swapchain::AcquireImage(uint32_t image_index, const std::shared_ptr<vvl::Se
     images[image_index].acquired = true;
     images[image_index].acquire_semaphore = semaphore_state;
     images[image_index].acquire_fence = fence_state;
-    if (fence_state && images[image_index].present_submission_ref.has_value()) {
-        fence_state->SetPresentSubmissionRef(*images[image_index].present_submission_ref);
-        images[image_index].present_submission_ref.reset();
+
+    if (semaphore_state) {
+        if (semaphore_state->Scope() == vvl::Semaphore::kInternal) {
+            images[image_index].acquire_semaphore_status = AcquireSyncStatus::Signaled;
+        } else {
+            // For external semaphores (where waits can't be tracked), assume an optimistic scenario
+            // in which the semaphore has been waited on.
+            images[image_index].acquire_semaphore_status = AcquireSyncStatus::WasWaitedOn;
+        }
+        semaphore_state->SetAcquiredImage(shared_from_this(), image_index);
+    }
+    if (fence_state) {
+        if (fence_state->Scope() == vvl::Fence::kInternal) {
+            images[image_index].acquire_fence_status = AcquireSyncStatus::Signaled;
+        } else {
+            // For external fences (where waits can't be tracked), assume an optimistic scenario
+            // in which the fence has been waited on.
+            images[image_index].acquire_fence_status = AcquireSyncStatus::WasWaitedOn;
+        }
+        fence_state->SetAcquiredImage(shared_from_this(), image_index);
+        if (images[image_index].present_submission_ref.has_value()) {
+            fence_state->SetPresentSubmissionRef(*images[image_index].present_submission_ref);
+            images[image_index].present_submission_ref.reset();
+        }
     }
     if (shared_presentable) {
         images[image_index].image_state->shared_presentable = shared_presentable;
@@ -208,7 +258,7 @@ uint32_t Swapchain::GetAcquiredImageIndexFromHistory(uint32_t acquire_history_in
     const uint32_t ring_buffer_index = global_index % acquire_history_max_length;
 
     const uint32_t acquire_image_index = acquire_history[ring_buffer_index];
-    assert(acquire_image_index != vvl::kU32Max);
+    assert(acquire_image_index != vvl::kNoIndex32);
     return acquire_image_index;
 }
 
@@ -370,11 +420,11 @@ void Surface::UpdateCapabilitiesCache(VkPhysicalDevice phys_dev, const VkSurface
 
     // Update entry
     info->surface_capabilities = surface_caps.surfaceCapabilities;
-    const auto *present_scaling_caps = vku::FindStructInPNextChain<VkSurfacePresentScalingCapabilitiesEXT>(surface_caps.pNext);
+    const auto *present_scaling_caps = vku::FindStructInPNextChain<VkSurfacePresentScalingCapabilitiesKHR>(surface_caps.pNext);
     if (present_scaling_caps) {
         info->scaling_capabilities = *present_scaling_caps;
     }
-    const auto *compat_modes = vku::FindStructInPNextChain<VkSurfacePresentModeCompatibilityEXT>(surface_caps.pNext);
+    const auto *compat_modes = vku::FindStructInPNextChain<VkSurfacePresentModeCompatibilityKHR>(surface_caps.pNext);
     if (compat_modes && compat_modes->pPresentModes) {
         info->compatible_present_modes.emplace(compat_modes->pPresentModes,
                                                compat_modes->pPresentModes + compat_modes->presentModeCount);
@@ -401,8 +451,8 @@ VkSurfaceCapabilitiesKHR Surface::GetSurfaceCapabilities(VkPhysicalDevice phys_d
         return surface_caps;
     }
 
-    // Per present mode caching is supported for a common case when pNext chain is a single VkSurfacePresentModeEXT structure.
-    const auto *surface_present_mode = vku::FindStructInPNextChain<VkSurfacePresentModeEXT>(surface_info_pnext);
+    // Per present mode caching is supported for a common case when pNext chain is a single VkSurfacePresentModeKHR structure.
+    const auto *surface_present_mode = vku::FindStructInPNextChain<VkSurfacePresentModeKHR>(surface_info_pnext);
     const bool single_pnext_element = static_cast<const VkBaseInStructure *>(surface_info_pnext)->pNext == nullptr;
     if (surface_present_mode && single_pnext_element) {
         if (auto guard = Lock(); auto cache = GetPhysDevCache(phys_dev)) {
@@ -422,12 +472,12 @@ VkSurfaceCapabilitiesKHR Surface::GetSurfaceCapabilities(VkPhysicalDevice phys_d
 
 VkSurfaceCapabilitiesKHR Surface::GetPresentModeSurfaceCapabilities(VkPhysicalDevice phys_dev,
                                                                     VkPresentModeKHR present_mode) const {
-    VkSurfacePresentModeEXT surface_present_mode = vku::InitStructHelper();
+    VkSurfacePresentModeKHR surface_present_mode = vku::InitStructHelper();
     surface_present_mode.presentMode = present_mode;
     return GetSurfaceCapabilities(phys_dev, &surface_present_mode);
 }
 
-VkSurfacePresentScalingCapabilitiesEXT Surface::GetPresentModeScalingCapabilities(VkPhysicalDevice phys_dev,
+VkSurfacePresentScalingCapabilitiesKHR Surface::GetPresentModeScalingCapabilities(VkPhysicalDevice phys_dev,
                                                                                   VkPresentModeKHR present_mode) const {
     if (auto guard = Lock(); auto cache = GetPhysDevCache(phys_dev)) {
         const PresentModeInfo *info = cache->GetPresentModeInfo(present_mode);
@@ -435,11 +485,11 @@ VkSurfacePresentScalingCapabilitiesEXT Surface::GetPresentModeScalingCapabilitie
             return info->scaling_capabilities.value();
         }
     }
-    VkSurfacePresentModeEXT surface_present_mode = vku::InitStructHelper();
+    VkSurfacePresentModeKHR surface_present_mode = vku::InitStructHelper();
     surface_present_mode.presentMode = present_mode;
     VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper(&surface_present_mode);
     surface_info.surface = VkHandle();
-    VkSurfacePresentScalingCapabilitiesEXT scaling_caps = vku::InitStructHelper();
+    VkSurfacePresentScalingCapabilitiesKHR scaling_caps = vku::InitStructHelper();
     VkSurfaceCapabilities2KHR surface_caps = vku::InitStructHelper(&scaling_caps);
     DispatchGetPhysicalDeviceSurfaceCapabilities2KHR(phys_dev, &surface_info, &surface_caps);
     return scaling_caps;
@@ -452,11 +502,11 @@ std::vector<VkPresentModeKHR> Surface::GetCompatibleModes(VkPhysicalDevice phys_
             return info->compatible_present_modes.value();
         }
     }
-    VkSurfacePresentModeEXT surface_present_mode = vku::InitStructHelper();
+    VkSurfacePresentModeKHR surface_present_mode = vku::InitStructHelper();
     surface_present_mode.presentMode = present_mode;
     VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper(&surface_present_mode);
     surface_info.surface = VkHandle();
-    VkSurfacePresentModeCompatibilityEXT present_mode_compat = vku::InitStructHelper();
+    VkSurfacePresentModeCompatibilityKHR present_mode_compat = vku::InitStructHelper();
     VkSurfaceCapabilities2KHR surface_caps = vku::InitStructHelper(&present_mode_compat);
     DispatchGetPhysicalDeviceSurfaceCapabilities2KHR(phys_dev, &surface_info, &surface_caps);
     std::vector<VkPresentModeKHR> present_modes(present_mode_compat.presentModeCount);

@@ -18,12 +18,17 @@
  */
 
 #include "last_bound_state.h"
+#include <vulkan/vulkan_core.h>
+#include <cassert>
+#include "containers/container_utils.h"
+#include "state_tracker/descriptor_mode.h"
 #include "state_tracker/pipeline_state.h"
 #include "generated/dynamic_state_helper.h"
 #include "state_tracker/descriptor_sets.h"
 #include "state_tracker/cmd_buffer_state.h"
 #include "state_tracker/shader_object_state.h"
 #include "chassis/chassis_modification_state.h"
+#include "utils/vk_api_utils.h"
 
 void LastBound::UnbindAndResetPushDescriptorSet(std::shared_ptr<vvl::DescriptorSet> &&ds) {
     if (push_descriptor_set) {
@@ -49,6 +54,7 @@ void LastBound::Reset() {
     }
     push_descriptor_set.reset();
     ds_slots.clear();
+    descriptor_mode = vvl::DescriptorModeUnknown;
 }
 
 bool LastBound::IsDepthTestEnable() const {
@@ -57,8 +63,8 @@ bool LastBound::IsDepthTestEnable() const {
             return cb_state.dynamic_state_value.depth_test_enable;
         }
     } else {
-        if (pipeline_state->DepthStencilState()) {
-            return pipeline_state->DepthStencilState()->depthTestEnable;
+        if (const auto ds_state = pipeline_state->DepthStencilState()) {
+            return ds_state->depthTestEnable;
         }
     }
     return false;
@@ -70,8 +76,8 @@ bool LastBound::IsDepthBoundTestEnable() const {
             return cb_state.dynamic_state_value.depth_bounds_test_enable;
         }
     } else {
-        if (pipeline_state->DepthStencilState()) {
-            return pipeline_state->DepthStencilState()->depthBoundsTestEnable;
+        if (const auto ds_state = pipeline_state->DepthStencilState()) {
+            return ds_state->depthBoundsTestEnable;
         }
     }
     return false;
@@ -87,8 +93,8 @@ bool LastBound::IsDepthWriteEnable() const {
             return cb_state.dynamic_state_value.depth_write_enable;
         }
     } else {
-        if (pipeline_state->DepthStencilState()) {
-            return pipeline_state->DepthStencilState()->depthWriteEnable;
+        if (const auto ds_state = pipeline_state->DepthStencilState()) {
+            return ds_state->depthWriteEnable;
         }
     }
     return false;
@@ -100,8 +106,8 @@ bool LastBound::IsDepthBiasEnable() const {
             return cb_state.dynamic_state_value.depth_bias_enable;
         }
     } else {
-        if (pipeline_state->RasterizationState()) {
-            return pipeline_state->RasterizationState()->depthBiasEnable;
+        if (const auto raster_state = pipeline_state->RasterizationState()) {
+            return raster_state->depthBiasEnable;
         }
     }
     return false;
@@ -113,8 +119,8 @@ bool LastBound::IsDepthClampEnable() const {
             return cb_state.dynamic_state_value.depth_clamp_enable;
         }
     } else {
-        if (pipeline_state->RasterizationState()) {
-            return pipeline_state->RasterizationState()->depthClampEnable;
+        if (const auto raster_state = pipeline_state->RasterizationState()) {
+            return raster_state->depthClampEnable;
         }
     }
     return false;
@@ -126,8 +132,8 @@ bool LastBound::IsStencilTestEnable() const {
             return cb_state.dynamic_state_value.stencil_test_enable;
         }
     } else {
-        if (pipeline_state->DepthStencilState()) {
-            return pipeline_state->DepthStencilState()->stencilTestEnable;
+        if (const auto ds_state = pipeline_state->DepthStencilState()) {
+            return ds_state->stencilTestEnable;
         }
     }
     return false;
@@ -135,7 +141,7 @@ bool LastBound::IsStencilTestEnable() const {
 
 VkStencilOpState LastBound::GetStencilOpStateFront() const {
     VkStencilOpState front = {};
-    if (pipeline_state) {
+    if (pipeline_state && pipeline_state->DepthStencilState()) {
         front = pipeline_state->DepthStencilState()->front;
     }
     if (IsDynamic(CB_DYNAMIC_STATE_STENCIL_WRITE_MASK)) {
@@ -151,7 +157,7 @@ VkStencilOpState LastBound::GetStencilOpStateFront() const {
 
 VkStencilOpState LastBound::GetStencilOpStateBack() const {
     VkStencilOpState back = {};
-    if (pipeline_state) {
+    if (pipeline_state && pipeline_state->DepthStencilState()) {
         back = pipeline_state->DepthStencilState()->back;
     }
     if (IsDynamic(CB_DYNAMIC_STATE_STENCIL_WRITE_MASK)) {
@@ -184,7 +190,7 @@ bool LastBound::IsRasterizationDisabled() const {
             return cb_state.dynamic_state_value.rasterizer_discard_enable;
         }
     } else {
-        return (pipeline_state->RasterizationDisabled());
+        return pipeline_state->RasterizationDisabled();
     }
     return false;
 }
@@ -195,7 +201,9 @@ bool LastBound::IsLogicOpEnabled() const {
             return cb_state.dynamic_state_value.logic_op_enable;
         }
     } else {
-        return pipeline_state->ColorBlendState() && pipeline_state->ColorBlendState()->logicOpEnable;
+        if (const auto &color_blend = pipeline_state->ColorBlendState()) {
+            return color_blend->logicOpEnable;
+        }
     }
     return false;
 }
@@ -206,8 +214,10 @@ VkColorComponentFlags LastBound::GetColorWriteMask(uint32_t i) const {
             return cb_state.dynamic_state_value.color_write_masks[i];
         }
     } else {
-        if (pipeline_state->ColorBlendState() && i < pipeline_state->ColorBlendState()->attachmentCount) {
-            return pipeline_state->ColorBlendState()->pAttachments[i].colorWriteMask;
+        if (const auto &color_blend = pipeline_state->ColorBlendState()) {
+            if (i < color_blend->attachmentCount) {
+                return color_blend->pAttachments[i].colorWriteMask;
+            }
         }
     }
     return (VkColorComponentFlags)0u;
@@ -219,9 +229,8 @@ bool LastBound::IsColorWriteEnabled(uint32_t i) const {
             return cb_state.dynamic_state_value.color_write_enabled[i];
         }
     } else {
-        if (pipeline_state->ColorBlendState()) {
-            auto color_write =
-                vku::FindStructInPNextChain<VkPipelineColorWriteCreateInfoEXT>(pipeline_state->ColorBlendState()->pNext);
+        if (const auto &color_blend = pipeline_state->ColorBlendState()) {
+            auto color_write = vku::FindStructInPNextChain<VkPipelineColorWriteCreateInfoEXT>(color_blend->pNext);
             if (color_write && i < color_write->attachmentCount) {
                 return color_write->pColorWriteEnables[i];
             }
@@ -230,12 +239,114 @@ bool LastBound::IsColorWriteEnabled(uint32_t i) const {
     return true;
 }
 
-VkPrimitiveTopology LastBound::GetPrimitiveTopology() const {
-    if (IsDynamic(CB_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY)) {
-        return cb_state.dynamic_state_value.primitive_topology;
+bool LastBound::IsColorBlendEnabled(uint32_t i) const {
+    if (IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT)) {
+        if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT)) {
+            return cb_state.dynamic_state_value.color_blend_enabled[i];
+        }
     } else {
-        return pipeline_state->topology_at_rasterizer;
+        if (const auto &color_blend = pipeline_state->ColorBlendState()) {
+            if (i < color_blend->attachmentCount) {
+                return color_blend->pAttachments[i].blendEnable;
+            }
+        }
     }
+    return true;
+}
+
+std::string LastBound::DescribeColorBlendEnabled(uint32_t i) const {
+    std::stringstream ss;
+    if (IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT)) {
+        if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT)) {
+            ss << "vkCmdSetColorBlendEnableEXT::pColorBlendEnables[" << i << "] is ";
+            ss << (cb_state.dynamic_state_value.color_blend_enabled[i] ? "VK_TRUE" : "VK_FALSE");
+        }
+    } else {
+        if (const auto &color_blend = pipeline_state->ColorBlendState()) {
+            if (i < color_blend->attachmentCount) {
+                ss << "VkPipelineColorBlendStateCreateInfo::pAttachments[" << i << "].blendEnable is ";
+                ss << (color_blend->pAttachments[i].blendEnable ? "VK_TRUE" : "VK_FALSE");
+            }
+        }
+    }
+    return ss.str();
+}
+
+bool LastBound::IsBlendConstantsEnabled(uint32_t i) const {
+    static constexpr std::array<VkBlendFactor, 4> const_factors = {
+        VK_BLEND_FACTOR_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR, VK_BLEND_FACTOR_CONSTANT_ALPHA,
+        VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA};
+    if (IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT)) {
+        if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT)) {
+            if (i >= cb_state.dynamic_state_value.color_blend_equations.size()) {
+                return false;  // this color attachment was set with vkCmdSetColorBlendAdvancedEXT instead
+            }
+            const VkColorBlendEquationEXT &eq = cb_state.dynamic_state_value.color_blend_equations[i];
+            return IsValueIn(eq.srcColorBlendFactor, const_factors) || IsValueIn(eq.dstColorBlendFactor, const_factors) ||
+                   IsValueIn(eq.srcAlphaBlendFactor, const_factors) || IsValueIn(eq.dstAlphaBlendFactor, const_factors);
+        }
+    } else {
+        if (const auto &color_blend = pipeline_state->ColorBlendState()) {
+            if (i < color_blend->attachmentCount) {
+                const VkPipelineColorBlendAttachmentState &eq = color_blend->pAttachments[i];
+                return IsValueIn(eq.srcColorBlendFactor, const_factors) || IsValueIn(eq.dstColorBlendFactor, const_factors) ||
+                       IsValueIn(eq.srcAlphaBlendFactor, const_factors) || IsValueIn(eq.dstAlphaBlendFactor, const_factors);
+            }
+        }
+    }
+    return false;
+}
+
+bool LastBound::IsDualBlending(uint32_t i) const {
+    if (IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT)) {
+        if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT)) {
+            if (i >= cb_state.dynamic_state_value.color_blend_equations.size()) {
+                return false;  // this color attachment was set with vkCmdSetColorBlendAdvancedEXT instead
+            }
+            const VkColorBlendEquationEXT &eq = cb_state.dynamic_state_value.color_blend_equations[i];
+            return IsSecondaryColorInputBlendFactor(eq.srcColorBlendFactor) ||
+                   IsSecondaryColorInputBlendFactor(eq.dstColorBlendFactor) ||
+                   IsSecondaryColorInputBlendFactor(eq.srcAlphaBlendFactor) ||
+                   IsSecondaryColorInputBlendFactor(eq.dstAlphaBlendFactor);
+        }
+    } else {
+        if (const auto &color_blend = pipeline_state->ColorBlendState()) {
+            if (i < color_blend->attachmentCount) {
+                const VkPipelineColorBlendAttachmentState &eq = color_blend->pAttachments[i];
+                return IsSecondaryColorInputBlendFactor(eq.srcColorBlendFactor) ||
+                       IsSecondaryColorInputBlendFactor(eq.dstColorBlendFactor) ||
+                       IsSecondaryColorInputBlendFactor(eq.srcAlphaBlendFactor) ||
+                       IsSecondaryColorInputBlendFactor(eq.dstAlphaBlendFactor);
+            }
+        }
+    }
+    return false;
+}
+
+std::string LastBound::DescribeBlendFactorEquation(uint32_t i) const {
+    std::stringstream ss;
+    if (IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT)) {
+        if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT)) {
+            const VkColorBlendEquationEXT &eq = cb_state.dynamic_state_value.color_blend_equations[i];
+            ss << "The following are set by vkCmdSetColorBlendEquationEXT::pColorBlendEquations[" << i << "]\n";
+            ss << "  srcColorBlendFactor = " << string_VkBlendFactor(eq.srcColorBlendFactor) << "\n";
+            ss << "  dstColorBlendFactor = " << string_VkBlendFactor(eq.dstColorBlendFactor) << "\n";
+            ss << "  srcAlphaBlendFactor = " << string_VkBlendFactor(eq.srcAlphaBlendFactor) << "\n";
+            ss << "  dstAlphaBlendFactor = " << string_VkBlendFactor(eq.dstAlphaBlendFactor) << "\n";
+        }
+    } else {
+        if (const auto &color_blend = pipeline_state->ColorBlendState()) {
+            if (i < color_blend->attachmentCount) {
+                const VkPipelineColorBlendAttachmentState &eq = color_blend->pAttachments[i];
+                ss << "The following are set by VkPipelineColorBlendStateCreateInfo::pAttachments[" << i << "]\n";
+                ss << "  srcColorBlendFactor = " << string_VkBlendFactor(eq.srcColorBlendFactor) << "\n";
+                ss << "  dstColorBlendFactor = " << string_VkBlendFactor(eq.dstColorBlendFactor) << "\n";
+                ss << "  srcAlphaBlendFactor = " << string_VkBlendFactor(eq.srcAlphaBlendFactor) << "\n";
+                ss << "  dstAlphaBlendFactor = " << string_VkBlendFactor(eq.dstAlphaBlendFactor) << "\n";
+            }
+        }
+    }
+    return ss.str();
 }
 
 VkCullModeFlags LastBound::GetCullMode() const {
@@ -466,6 +577,137 @@ uint32_t LastBound::GetViewportSwizzleCount() const {
     return 0;
 }
 
+VkPolygonMode LastBound::GetPolygonMode() const {
+    if (IsDynamic(CB_DYNAMIC_STATE_POLYGON_MODE_EXT)) {
+        if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_POLYGON_MODE_EXT)) {
+            return cb_state.dynamic_state_value.polygon_mode;
+        }
+    } else {
+        if (pipeline_state->RasterizationState()) {
+            return pipeline_state->RasterizationState()->polygonMode;
+        }
+    }
+    return VK_POLYGON_MODE_MAX_ENUM;
+}
+
+// vkspec.html#drawing-vertex-input-assembler-topology
+// When calling, we don't have to worry about Mesh shading because either VUs like 07065/07066 prevent these dynamic state being set
+// and the VkPipelineInputAssemblyStateCreateInfo is ignored
+VkPrimitiveTopology LastBound::GetVertexInputAssemblerTopology() const {
+    if (IsDynamic(CB_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY)) {
+        return cb_state.dynamic_state_value.primitive_topology;
+    } else {
+        if (auto ia_state = pipeline_state->InputAssemblyState()) {
+            return ia_state->topology;
+        }
+    }
+    return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
+}
+
+std::string LastBound::DescribeVertexInputAssemblerTopology() const {
+    if (IsDynamic(CB_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY)) {
+        return "the last call to vkCmdSetPrimitiveTopology";
+    }
+    return "VkPipelineInputAssemblyStateCreateInfo::topology";
+}
+
+// vkspec.html#drawing-clip-space-topology
+VkPrimitiveTopology LastBound::ClipSpaceTopology() const {
+    VkShaderStageFlags bound_stages = GetAllActiveBoundStages();
+    const bool geom_shader_bound = (bound_stages & VK_SHADER_STAGE_GEOMETRY_BIT) != 0;
+    const bool tesc_shader_bound = (bound_stages & VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT) != 0;
+    const bool tese_shader_bound = (bound_stages & VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) != 0;
+    const bool mesh_shader_bound = (bound_stages & VK_SHADER_STAGE_MESH_BIT_EXT) != 0;
+    if (!geom_shader_bound && !tesc_shader_bound && !tese_shader_bound && !mesh_shader_bound) {
+        return GetVertexInputAssemblerTopology();  // vertex is the last pre-rasterization stage
+    }
+
+    if (pipeline_state) {
+        if (mesh_shader_bound || geom_shader_bound) {
+            // Can only have either a mesh or geometry stage, so can search both at once
+            assert(!mesh_shader_bound || !geom_shader_bound);
+            for (const ShaderStageState &shader_stage_state : pipeline_state->stage_states) {
+                if (shader_stage_state.GetStage() == VK_SHADER_STAGE_MESH_BIT_EXT ||
+                    shader_stage_state.GetStage() == VK_SHADER_STAGE_GEOMETRY_BIT) {
+                    if (shader_stage_state.spirv_state && shader_stage_state.entrypoint) {
+                        return shader_stage_state.entrypoint->execution_mode.GetGeometryMeshOutputTopology();
+                    }
+                }
+            }
+        } else if (tesc_shader_bound || tese_shader_bound) {
+            VkPrimitiveTopology tess_output_topology = VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
+            for (const ShaderStageState &shader_stage_state : pipeline_state->stage_states) {
+                const VkShaderStageFlagBits stage = shader_stage_state.GetStage();
+                if (stage == VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT || stage == VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT) {
+                    if (shader_stage_state.spirv_state && shader_stage_state.entrypoint) {
+                        // In tessellation shaders, PointMode is separate and trumps the tessellation topology.
+                        // Can be found in both tessellation shaders
+                        if (shader_stage_state.entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
+                            return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+                        } else if (stage == VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) {
+                            tess_output_topology =
+                                shader_stage_state.entrypoint->execution_mode.GetTessellationEvalOutputTopology();
+                        }
+                    }
+                }
+            }
+
+            return tess_output_topology;
+        }
+    } else {  // shader object
+        if (mesh_shader_bound) {
+            vvl::ShaderObject *mesh_shader = GetShaderState(ShaderObjectStage::MESH);
+            if (mesh_shader && mesh_shader->entrypoint) {
+                return mesh_shader->entrypoint->execution_mode.GetGeometryMeshOutputTopology();
+            }
+        } else if (geom_shader_bound) {
+            vvl::ShaderObject *geom_shader = GetShaderState(ShaderObjectStage::GEOMETRY);
+            if (geom_shader && geom_shader->entrypoint) {
+                return geom_shader->entrypoint->execution_mode.GetGeometryMeshOutputTopology();
+            }
+        } else if (tesc_shader_bound || tese_shader_bound) {
+            VkPrimitiveTopology tess_output_topology = VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
+            vvl::ShaderObject *tesc_shader = GetShaderState(ShaderObjectStage::TESSELLATION_CONTROL);
+            if (tesc_shader && tesc_shader->entrypoint) {
+                if (tesc_shader->entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
+                    return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+                }
+            }
+
+            vvl::ShaderObject *tese_shader = GetShaderState(ShaderObjectStage::TESSELLATION_EVALUATION);
+            if (tese_shader && tese_shader->entrypoint) {
+                if (tese_shader->entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
+                    return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+                } else {
+                    tess_output_topology = tese_shader->entrypoint->execution_mode.GetTessellationEvalOutputTopology();
+                }
+            }
+
+            return tess_output_topology;
+        }
+    }
+
+    // can happen when dealing with things like VK_SHADER_CODE_TYPE_SPIRV_EXT
+    return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
+}
+
+// vkspec.html#drawing-rasterization-input-topology
+// The Topology can alter from Vertex/Mesh before going to rasterization
+// This is the "final" topology which most VUs care about
+// For additional info https://github.com/KhronosGroup/Vulkan-Guide/blob/main/chapters/primitive_topology.adoc
+VkPrimitiveTopology LastBound::GetRasterizationInputTopology() const {
+    VkPrimitiveTopology topology = ClipSpaceTopology();
+    VkPolygonMode polygon_mode = GetPolygonMode();
+
+    if (polygon_mode == VK_POLYGON_MODE_POINT && (IsLineTopology(topology) || IsTriangleTopology(topology))) {
+        topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    } else if (polygon_mode == VK_POLYGON_MODE_LINE && IsTriangleTopology(topology)) {
+        topology = TriangleToLineTopology(topology);
+    }
+
+    return topology;
+}
+
 VkShaderEXT LastBound::GetShader(ShaderObjectStage stage) const {
     if (!IsValidShaderBound(stage) || GetShaderState(stage) == nullptr) return VK_NULL_HANDLE;
     return shader_object_states[static_cast<uint32_t>(stage)]->VkHandle();
@@ -542,10 +784,22 @@ std::vector<vvl::ShaderObject *> LastBound::GetAllBoundGraphicsShaders() {
 }
 
 bool LastBound::IsAnyGraphicsShaderBound() const {
-    return IsValidShaderBound(ShaderObjectStage::VERTEX) || IsValidShaderBound(ShaderObjectStage::TESSELLATION_CONTROL) ||
-           IsValidShaderBound(ShaderObjectStage::TESSELLATION_EVALUATION) || IsValidShaderBound(ShaderObjectStage::GEOMETRY) ||
-           IsValidShaderBound(ShaderObjectStage::FRAGMENT) || IsValidShaderBound(ShaderObjectStage::TASK) ||
-           IsValidShaderBound(ShaderObjectStage::MESH);
+    if (pipeline_state) {
+        return (pipeline_state->active_shaders & kShaderStageAllGraphics) != 0;
+    } else {
+        return IsValidShaderBound(ShaderObjectStage::VERTEX) || IsValidShaderBound(ShaderObjectStage::TESSELLATION_CONTROL) ||
+               IsValidShaderBound(ShaderObjectStage::TESSELLATION_EVALUATION) || IsValidShaderBound(ShaderObjectStage::GEOMETRY) ||
+               IsValidShaderBound(ShaderObjectStage::FRAGMENT) || IsValidShaderBound(ShaderObjectStage::TASK) ||
+               IsValidShaderBound(ShaderObjectStage::MESH);
+    }
+}
+
+bool LastBound::IsFragmentBound() const {
+    if (pipeline_state) {
+        return (pipeline_state->active_shaders & VK_SHADER_STAGE_FRAGMENT_BIT) != 0;
+    } else {
+        return IsValidShaderBound(ShaderObjectStage::FRAGMENT);
+    }
 }
 
 VkShaderStageFlags LastBound::GetAllActiveBoundStages() const {
@@ -647,4 +901,35 @@ const spirv::EntryPoint *LastBound::GetFragmentEntryPoint() const {
         return shader_object->entrypoint.get();
     }
     return nullptr;
+}
+
+vvl::DescriptorMode LastBound::GetActionDescriptorMode() const {
+    if (descriptor_mode != vvl::DescriptorModeUnknown) {
+        return descriptor_mode;  // Most common case
+    }
+
+    // This is only needed  at draw/dispatch time when there is a chance there is not bound descriptor, but can still find from a
+    // pipeline/layout
+    if (pipeline_state) {
+        if (pipeline_state->create_flags & VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT) {
+            return vvl::DescriptorModeBuffer;
+        } else {
+            return vvl::DescriptorModeClassic;
+        }
+    } else {
+        // Shader Object
+        if (desc_set_pipeline_layout) {
+            for (uint32_t i = 0; i < desc_set_pipeline_layout->set_layouts.size(); i++) {
+                if (const auto set_layout_state = desc_set_pipeline_layout->set_layouts[i]) {
+                    if (set_layout_state->GetCreateFlags() & VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT) {
+                        return vvl::DescriptorModeBuffer;
+                    } else {
+                        return vvl::DescriptorModeClassic;
+                    }
+                }
+            }
+        }
+    }
+    // Not sure how to find it if in this situation, so resort to a safe choice
+    return vvl::DescriptorModeClassic;
 }

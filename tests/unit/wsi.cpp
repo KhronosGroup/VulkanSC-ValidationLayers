@@ -149,7 +149,7 @@ TEST_F(NegativeWsi, BindImageMemorySwapchain) {
     bool pass = m_device->Physical().SetMemoryType(mem_reqs.memoryRequirements.memoryTypeBits, &alloc_info, 0);
     // some devices don't give us good memory requirements for the swapchain image
     if (pass) {
-        mem.init(*m_device, alloc_info);
+        mem.Init(*m_device, alloc_info);
         ASSERT_TRUE(mem.initialized());
     }
 
@@ -174,7 +174,7 @@ TEST_F(NegativeWsi, BindImageMemorySwapchain) {
 
     bind_info.memory = mem;
     bind_swapchain_info.swapchain = m_swapchain;
-    bind_swapchain_info.imageIndex = std::numeric_limits<uint32_t>::max();
+    bind_swapchain_info.imageIndex = vvl::kU32Max;
 
     if (mem.initialized()) {
         m_errorMonitor->SetDesiredError("VUID-VkBindImageMemoryInfo-pNext-01631");
@@ -342,7 +342,7 @@ TEST_F(NegativeWsi, TransferImageToSwapchainLayoutDeviceGroup) {
     // Even though both peer_image and swapchain_images[0] use the same memory and are in an invalid layout,
     // only peer_image is referenced by the command buffer so there should only be one error reported.
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09600");
-    m_default_queue->Submit(m_command_buffer);
+    m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 
     // peer_image is a presentable image and controlled by the implementation
@@ -1560,7 +1560,7 @@ TEST_F(NegativeWsi, DisplayPresentInfoSrcRect) {
     InitRenderTarget();
 
     vkt::Semaphore image_acquired(*m_device);
-    const uint32_t current_buffer = m_swapchain.AcquireNextImage(image_acquired, kWaitTimeout);
+    uint32_t current_buffer = m_swapchain.AcquireNextImage(image_acquired, kWaitTimeout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -1571,13 +1571,25 @@ TEST_F(NegativeWsi, DisplayPresentInfoSrcRect) {
     uint32_t swapchain_height = m_surface_capabilities.minImageExtent.height;
 
     VkDisplayPresentInfoKHR display_present_info = vku::InitStructHelper();
-    display_present_info.srcRect.extent.width = swapchain_width + 1;  // Invalid
+    display_present_info.srcRect.extent.width = swapchain_width;
     display_present_info.srcRect.extent.height = swapchain_height;
     display_present_info.dstRect.extent.width = swapchain_width;
     display_present_info.dstRect.extent.height = swapchain_height;
 
-    m_errorMonitor->SetDesiredError("VUID-VkDisplayPresentInfoKHR-srcRect-01257");
+    // Invalid layout (not present)
     m_errorMonitor->SetDesiredError("VUID-VkPresentInfoKHR-pImageIndices-01430");
+    m_default_queue->Present(m_swapchain, current_buffer, image_acquired, &display_present_info);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+
+    // TODO: remove this acquire when we move layout validation from queue thread
+    // back to QueueSubmit and implement it so it respects ordering due to timeline
+    // semaphores (resolves previous dependencies directly during queue submit).
+    current_buffer = m_swapchain.AcquireNextImage(image_acquired, kWaitTimeout);
+
+    // Invalid rect
+    display_present_info.srcRect.extent.width = swapchain_width + 1;  // Invalid
+    m_errorMonitor->SetDesiredError("VUID-VkDisplayPresentInfoKHR-srcRect-01257");
     m_default_queue->Present(m_swapchain, current_buffer, image_acquired, &display_present_info);
     m_errorMonitor->VerifyFound();
 }
@@ -1667,8 +1679,8 @@ TEST_F(NegativeWsi, PresentIdWait) {
     image_indices[0] = m_swapchain.AcquireNextImage(fence, kWaitTimeout);
     image_indices[1] = swapchain2.AcquireNextImage(fence2, kWaitTimeout);
     vk::WaitForFences(device(), 2, fence_handles, true, kWaitTimeout);
-    SetImageLayoutPresentSrc(images[image_indices[0]]);
-    SetImageLayoutPresentSrc(images2[image_indices[1]]);
+    SetPresentImageLayout(images[image_indices[0]]);
+    SetPresentImageLayout(images2[image_indices[1]]);
 
     VkSwapchainKHR swap_chains[2] = {m_swapchain, swapchain2};
     uint64_t present_ids[2] = {};
@@ -1688,8 +1700,8 @@ TEST_F(NegativeWsi, PresentIdWait) {
     image_indices[0] = m_swapchain.AcquireNextImage(fence, kWaitTimeout);
     image_indices[1] = swapchain2.AcquireNextImage(fence2, kWaitTimeout);
     vk::WaitForFences(device(), 2, fence_handles, true, kWaitTimeout);
-    SetImageLayoutPresentSrc(images[image_indices[0]]);
-    SetImageLayoutPresentSrc(images2[image_indices[1]]);
+    SetPresentImageLayout(images[image_indices[0]]);
+    SetPresentImageLayout(images2[image_indices[1]]);
 
     // presentIds[0] = 3 (smaller than 4), presentIds[1] = 5 (wait for this after swapchain 2 is retired)
     present_ids[0] = 3;
@@ -1718,8 +1730,8 @@ TEST_F(NegativeWsi, PresentIdWait) {
     vk::WaitForPresentKHR(device(), swapchain2, 5, kWaitTimeout);
     m_errorMonitor->VerifyFound();
 
-    swapchain2.destroy();
-    swapchain3.destroy();
+    swapchain2.Destroy();
+    swapchain3.Destroy();
 }
 
 TEST_F(NegativeWsi, PresentIdWaitFeatures) {
@@ -1738,7 +1750,7 @@ TEST_F(NegativeWsi, PresentIdWaitFeatures) {
     const uint32_t image_index = m_swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     uint64_t present_id_index = 1;
     VkPresentIdKHR present_id = vku::InitStructHelper();
@@ -1910,8 +1922,7 @@ TEST_F(NegativeWsi, SurfaceSupportByPhysicalDevice) {
 
 TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     TEST_DESCRIPTION("Test swapchain Maintenance1 extensions.");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-
+    AddRequiredExtensions(VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
@@ -1958,7 +1969,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     VkSurfaceCapabilities2KHR surface_caps = vku::InitStructHelper();
     surface_info.surface = surface;
 
-    // Set a present_mode in VkSurfacePresentModeEXT that's NOT returned by GetPhsyicalDeviceSurfaceCapabilities2KHR
+    // Set a present_mode in VkSurfacePresentModeKHR that's NOT returned by GetPhsyicalDeviceSurfaceCapabilities2KHR
     VkPresentModeKHR mismatched_present_mode = VK_PRESENT_MODE_MAX_ENUM_KHR;
     for (auto item : defined_present_modes) {
         if (std::find(pdev_surface_present_modes.begin(), pdev_surface_present_modes.end(), item) ==
@@ -1968,12 +1979,12 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         }
     }
 
-    VkSurfacePresentModeEXT present_mode = vku::InitStructHelper();
+    VkSurfacePresentModeKHR present_mode = vku::InitStructHelper();
     present_mode.presentMode = mismatched_present_mode;
 
     surface_info.pNext = &present_mode;
-    m_errorMonitor->SetDesiredError("VUID-VkSurfacePresentModeEXT-presentMode-07780");
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSurfacePresentModeEXT-presentMode-parameter");
+    m_errorMonitor->SetDesiredError("VUID-VkSurfacePresentModeKHR-presentMode-07780");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSurfacePresentModeKHR-presentMode-parameter");  // skip stateless
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(Gpu(), &surface_info, &surface_caps);
     m_errorMonitor->VerifyFound();
 
@@ -2008,15 +2019,16 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     if (mismatched_present_mode != VK_PRESENT_MODE_MAX_ENUM_KHR) {
         // Each entry in QueuePresent->vkPresentInfoKHR->pNext->SwapchainPresentModesCreateInfo->pPresentModes must be one of the
         // VkPresentModeKHR values returned by vkGetPhysicalDeviceSurfacePresentModesKHR for the surface
-        m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModesCreateInfoEXT-None-07762");
-        m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoEXT-pPresentModes-07763");
-        m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoEXT-presentMode-07764");
+        m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModesCreateInfoKHR-None-07762");
+        // lazy way to not query properties
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoKHR-pPresentModes-07763");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoKHR-presentMode-07764");
         m_swapchain.Init(*m_device, swapchain_create_info);
         m_errorMonitor->VerifyFound();
     }
 
     // The entries in pPresentModes must be a subset of the present modes returned in
-    // VkSurfacePresentModeCompatibilityEXT::pPresentModes, given vkSwapchainCreateInfoKHR::presentMode in VkSurfacePresentModeEXT
+    // VkSurfacePresentModeCompatibilityEXT::pPresentModes, given vkSwapchainCreateInfoKHR::presentMode in VkSurfacePresentModeKHR
     mismatched_present_mode = VK_PRESENT_MODE_MAX_ENUM_KHR;
     for (auto item : defined_present_modes) {
         if (std::find(compatible_present_modes.begin(), compatible_present_modes.end(), item) == compatible_present_modes.end()) {
@@ -2025,9 +2037,10 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         }
     }
     if (mismatched_present_mode != VK_PRESENT_MODE_MAX_ENUM_KHR) {
-        m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModesCreateInfoEXT-pPresentModes-07763");
-        m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoEXT-None-07762");
-        m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoEXT-presentMode-07764");
+        m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModesCreateInfoKHR-pPresentModes-07763");
+        // lazy way to not query properties
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoKHR-None-07762");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoKHR-presentMode-07764");
         present_modes_ci.pPresentModes = &mismatched_present_mode;
         m_swapchain.Init(*m_device, swapchain_create_info);
         m_errorMonitor->VerifyFound();
@@ -2050,7 +2063,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         vk::GetPhysicalDeviceSurfaceCapabilities2KHR(Gpu(), &surface_info2, &surface_caps2);
 
         swapchain_create_info.minImageCount = surface_caps2.surfaceCapabilities.minImageCount;
-        m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModesCreateInfoEXT-presentMode-07764");
+        m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModesCreateInfoKHR-presentMode-07764");
         m_swapchain.Init(*m_device, swapchain_create_info);
         m_errorMonitor->VerifyFound();
     }
@@ -2061,27 +2074,27 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     present_scaling_info.pNext = swapchain_create_info.pNext;
     swapchain_create_info.pNext = &present_scaling_info;
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityX-07765");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityX-07765");
     // Disable validation that prevents testing zero gravity value on platforms that provide support for gravity values.
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityX-07772");
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityX-07773");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityX-07772");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityX-07773");
     present_scaling_info.scalingBehavior = VK_PRESENT_SCALING_ONE_TO_ONE_BIT_EXT;
     present_scaling_info.presentGravityX = 0;
     present_scaling_info.presentGravityY = VK_PRESENT_GRAVITY_MIN_BIT_EXT;
     m_swapchain.Init(*m_device, swapchain_create_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityX-07766");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityX-07766");
     // Disable validation that prevents testing zero gravity value on platforms that provide support for gravity values.
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityY-07774");
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityY-07775");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityY-07774");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityY-07775");
     present_scaling_info.scalingBehavior = VK_PRESENT_SCALING_ONE_TO_ONE_BIT_EXT;
     present_scaling_info.presentGravityX = VK_PRESENT_GRAVITY_MIN_BIT_EXT;
     present_scaling_info.presentGravityY = 0;
     m_swapchain.Init(*m_device, swapchain_create_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-scalingBehavior-07767");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-scalingBehavior-07767");
     present_scaling_info.scalingBehavior = VK_PRESENT_SCALING_ONE_TO_ONE_BIT_EXT | VK_PRESENT_SCALING_ASPECT_RATIO_STRETCH_BIT_EXT;
     present_scaling_info.presentGravityX = VK_PRESENT_GRAVITY_MIN_BIT_EXT;
     present_scaling_info.presentGravityY = VK_PRESENT_GRAVITY_MIN_BIT_EXT;
@@ -2089,14 +2102,14 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     m_swapchain.Init(*m_device, swapchain_create_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityX-07768");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityX-07768");
     present_scaling_info.scalingBehavior = VK_PRESENT_SCALING_ONE_TO_ONE_BIT_EXT;
     present_scaling_info.presentGravityX = VK_PRESENT_GRAVITY_MIN_BIT_EXT | VK_PRESENT_GRAVITY_MAX_BIT_EXT;
     present_scaling_info.presentGravityY = VK_PRESENT_GRAVITY_MIN_BIT_EXT;
     m_swapchain.Init(*m_device, swapchain_create_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityY-07769");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityY-07769");
     present_scaling_info.presentGravityX = VK_PRESENT_GRAVITY_MIN_BIT_EXT;
     present_scaling_info.presentGravityY = VK_PRESENT_GRAVITY_MIN_BIT_EXT | VK_PRESENT_GRAVITY_MAX_BIT_EXT;
     m_swapchain.Init(*m_device, swapchain_create_info);
@@ -2112,7 +2125,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         for (auto scaling_flag : defined_scaling_flag_bits) {
             if ((scaling_capabilities.supportedPresentScaling & scaling_flag) == 0) {
                 present_scaling_info.scalingBehavior = scaling_flag;
-                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-scalingBehavior-07770");
+                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-scalingBehavior-07770");
                 m_swapchain.Init(*m_device, swapchain_create_info);
                 m_errorMonitor->VerifyFound();
                 break;
@@ -2126,7 +2139,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         for (auto gravity_flag : defined_gravity_flag_bits) {
             if ((scaling_capabilities.supportedPresentGravityX & gravity_flag) == 0) {
                 present_scaling_info.presentGravityX = gravity_flag;
-                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityX-07772");
+                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityX-07772");
                 m_swapchain.Init(*m_device, swapchain_create_info);
                 m_errorMonitor->VerifyFound();
                 break;
@@ -2137,7 +2150,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         for (auto gravity_flag : defined_gravity_flag_bits) {
             if ((scaling_capabilities.supportedPresentGravityY & gravity_flag) == 0) {
                 present_scaling_info.presentGravityY = gravity_flag;
-                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityY-07774");
+                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityY-07774");
                 m_swapchain.Init(*m_device, swapchain_create_info);
                 m_errorMonitor->VerifyFound();
                 break;
@@ -2145,14 +2158,14 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         }
     }
 
-    // If the swapchain is created with VkSwapchainPresentModesCreateInfoEXT,
+    // If the swapchain is created with VkSwapchainPresentModesCreateInfoKHR,
     present_mode.presentMode = present_modes_ci.pPresentModes[0];
     surface_caps.pNext = &scaling_capabilities;
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(Gpu(), &surface_info, &surface_caps);
 
     // presentScaling must be a valid scaling method for the surface
-    // as returned in VkSurfacePresentScalingCapabilitiesEXT::supportedPresentScaling,
-    // given each present mode in VkSwapchainPresentModesCreateInfoEXT::pPresentModes in VkSurfacePresentModeEXT
+    // as returned in VkSurfacePresentScalingCapabilitiesKHR::supportedPresentScaling,
+    // given each present mode in VkSwapchainPresentModesCreateInfoKHR::pPresentModes in VkSurfacePresentModeKHR
     if (scaling_capabilities.supportedPresentScaling != 0) {
         const std::array defined_scaling_flag_bits = {VK_PRESENT_SCALING_ONE_TO_ONE_BIT_EXT,
                                                       VK_PRESENT_SCALING_ASPECT_RATIO_STRETCH_BIT_EXT,
@@ -2160,7 +2173,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         for (auto scaling_flag : defined_scaling_flag_bits) {
             if ((scaling_capabilities.supportedPresentScaling & scaling_flag) == 0) {
                 present_scaling_info.scalingBehavior = scaling_flag;
-                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-scalingBehavior-07771");
+                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-scalingBehavior-07771");
                 m_swapchain.Init(*m_device, swapchain_create_info);
                 m_errorMonitor->VerifyFound();
                 break;
@@ -2169,13 +2182,13 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     }
 
     // presentGravityX must be a valid x-axis present gravity for the surface
-    // as returned in VkSurfacePresentScalingCapabilitiesEXT::supportedPresentGravityX,
-    // given each present mode in VkSwapchainPresentModesCreateInfoEXT::pPresentModes in VkSurfacePresentModeEXT
+    // as returned in VkSurfacePresentScalingCapabilitiesKHR::supportedPresentGravityX,
+    // given each present mode in VkSwapchainPresentModesCreateInfoKHR::pPresentModes in VkSurfacePresentModeKHR
     if (scaling_capabilities.supportedPresentGravityX != 0) {
         for (auto gravity_flag : defined_gravity_flag_bits) {
             if ((scaling_capabilities.supportedPresentGravityX & gravity_flag) == 0) {
                 present_scaling_info.presentGravityX = gravity_flag;
-                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityX-07773");
+                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityX-07773");
                 m_swapchain.Init(*m_device, swapchain_create_info);
                 m_errorMonitor->VerifyFound();
                 break;
@@ -2184,13 +2197,13 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     }
 
     // presentGravityY must be a valid y-axis present gravity for the surface
-    // as returned in VkSurfacePresentScalingCapabilitiesEXT::supportedPresentGravityY,
-    // given each present mode in VkSwapchainPresentModesCreateInfoEXT::pPresentModes in VkSurfacePresentModeEXT
+    // as returned in VkSurfacePresentScalingCapabilitiesKHR::supportedPresentGravityY,
+    // given each present mode in VkSwapchainPresentModesCreateInfoKHR::pPresentModes in VkSurfacePresentModeKHR
     if (scaling_capabilities.supportedPresentGravityY != 0) {
         for (auto gravity_flag : defined_gravity_flag_bits) {
             if ((scaling_capabilities.supportedPresentGravityY & gravity_flag) == 0) {
                 present_scaling_info.presentGravityY = gravity_flag;
-                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-presentGravityY-07775");
+                m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-presentGravityY-07775");
                 m_swapchain.Init(*m_device, swapchain_create_info);
                 m_errorMonitor->VerifyFound();
                 break;
@@ -2215,18 +2228,17 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     release_info.swapchain = m_swapchain;
     release_info.imageIndexCount = 1;
     release_info.pImageIndices = &release_index;
-    m_errorMonitor->SetDesiredError("VUID-VkReleaseSwapchainImagesInfoEXT-pImageIndices-07785");
+    m_errorMonitor->SetDesiredError("VUID-VkReleaseSwapchainImagesInfoKHR-pImageIndices-07785");
     vk::ReleaseSwapchainImagesEXT(device(), &release_info);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
     TEST_DESCRIPTION("Test swapchain and surface Maintenance1 extensions.");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-
     AddRequiredExtensions(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::swapchainMaintenance1);
     AddSurfaceExtension();
 
@@ -2308,7 +2320,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
 
     // SwapchainMaint1 enabled + deferred_memory_alloc but image not acquired:
     m_errorMonitor->SetDesiredError("VUID-VkBindImageMemorySwapchainInfoKHR-swapchain-07756");
-    vk::BindImageMemory2(device(), 1, &bind_info);
+    vk::BindImageMemory2KHR(device(), 1, &bind_info);
     m_errorMonitor->VerifyFound();
 
     vk::GetPhysicalDeviceSurfacePresentModesKHR(Gpu(), m_surface.Handle(), &count, nullptr);
@@ -2357,10 +2369,11 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
     }
 }
 
+// TODO: investigate why if we replace layout transition code with SetPresentImageLayout helper
+// then the test fails because image is not considered in use after the last Present so we hit
+// assert later in ReleaseSwapchainImagesEXT.
 TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     TEST_DESCRIPTION("Test acquiring swapchain images with Maint1 features.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
@@ -2407,11 +2420,15 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     const auto swapchain_images = m_swapchain.GetImages();
     const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
 
-    const VkImageMemoryBarrier present_transition =
-        TransitionToPresent(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, 0);
+    VkImageMemoryBarrier present_transition = vku::InitStructHelper();
+    present_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    present_transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    present_transition.image = swapchain_images[image_index];
+    present_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &present_transition);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &present_transition);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer, vkt::Wait(acquire_semaphore, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
@@ -2425,7 +2442,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     fence_info.swapchainCount = 1 /* swapchain count */ + 1;
     fence_info.pFences = fences;
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentFenceInfoEXT-swapchainCount-07757");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentFenceInfoKHR-swapchainCount-07757");
     m_default_queue->Present(m_swapchain, image_index, submit_semaphore, &fence_info);
     m_errorMonitor->VerifyFound();
 
@@ -2451,7 +2468,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     VkSwapchainPresentModeInfoEXT present_mode_info = vku::InitStructHelper();
     present_mode_info.swapchainCount = 1;
     present_mode_info.pPresentModes = &mismatched_present_mode;
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModeInfoEXT-pPresentModes-07761");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModeInfoKHR-pPresentModes-07761");
     m_default_queue->Present(m_swapchain, image_index, submit_semaphore, &present_mode_info);
     m_errorMonitor->VerifyFound();
 
@@ -2465,8 +2482,8 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     release_info.swapchain = m_swapchain;
     release_info.imageIndexCount = 1;
     release_info.pImageIndices = &release_index;
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkReleaseSwapchainImagesInfoEXT-pImageIndices-07785");
-    m_errorMonitor->SetDesiredError("VUID-VkReleaseSwapchainImagesInfoEXT-pImageIndices-07786");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkReleaseSwapchainImagesInfoKHR-pImageIndices-07785");
+    m_errorMonitor->SetDesiredError("VUID-VkReleaseSwapchainImagesInfoKHR-pImageIndices-07786");
     vk::ReleaseSwapchainImagesEXT(device(), &release_info);
     m_errorMonitor->VerifyFound();
 
@@ -2830,6 +2847,25 @@ TEST_F(NegativeWsi, PresentImageWithWrongLayout) {
 
     m_errorMonitor->SetDesiredError("VUID-VkPresentInfoKHR-pImageIndices-01430");
     m_default_queue->Present(m_swapchain, image_index, acquire_semaphore);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeWsi, PresentImageWithWrongLayout2) {
+    TEST_DESCRIPTION("Present swapchain image without transitioning it to presentable layout.");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    const vkt::Semaphore acquire_semaphore(*m_device);
+    const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+
+    m_errorMonitor->SetDesiredError("VUID-VkPresentInfoKHR-pImageIndices-01430");
+    m_default_queue->Present(m_swapchain, image_index, acquire_semaphore);
+    m_default_queue->Wait();
+    // NOTE: in the current implementation submit time validation is run by the queue thread
+    // (so all dependencies are resolved), that's why we check vuid after Wait(). There's an idea
+    // to move this validation to actual submit/present call, then we can put Verify after Present.
     m_errorMonitor->VerifyFound();
 }
 
@@ -2842,6 +2878,7 @@ TEST_F(NegativeWsi, CreatingSwapchainWithExtent) {
     InitSwapchainInfo();
 
     m_errorMonitor->SetDesiredError("VUID-VkSwapchainCreateInfoKHR-pNext-07781");
+    // lazy way to not query properties
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-imageFormat-01778");
 
     VkSurfaceCapabilitiesKHR surface_capabilities;
@@ -2933,7 +2970,7 @@ TEST_F(NegativeWsi, QueuePresentWaitingSameSemaphore) {
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, semaphore, fence, &image_index);
 
     fence.Wait(kWaitTimeout);
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     vkt::Queue *other = m_device->QueuesWithGraphicsCapability()[1];
 
@@ -2955,7 +2992,7 @@ TEST_F(NegativeWsi, QueuePresentBinarySemaphoreNotSignaled) {
 
     const auto images = m_swapchain.GetImages();
     for (auto image : images) {
-        SetImageLayoutPresentSrc(image);
+        SetPresentImageLayout(image);
     }
 
     vkt::Semaphore semaphore(*m_device);
@@ -2984,7 +3021,7 @@ TEST_F(NegativeWsi, QueuePresentDependsOnTimelineWait) {
 
     const auto images = m_swapchain.GetImages();
     for (auto image : images) {
-        SetImageLayoutPresentSrc(image);
+        SetPresentImageLayout(image);
     }
 
     vkt::Semaphore timeline_semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
@@ -3012,7 +3049,7 @@ TEST_F(NegativeWsi, MissingWaitForImageAcquireSemaphore) {
     RETURN_IF_SKIP(InitSwapchain());
     const auto swapchain_images = m_swapchain.GetImages();
     for (auto image : swapchain_images) {
-        SetImageLayoutPresentSrc(image);
+        SetPresentImageLayout(image);
     }
 
     // Acquire image using a semaphore
@@ -3032,7 +3069,7 @@ TEST_F(NegativeWsi, MissingWaitForImageAcquireSemaphore_2) {
     RETURN_IF_SKIP(InitSwapchain());
     const auto swapchain_images = m_swapchain.GetImages();
     for (auto image : swapchain_images) {
-        SetImageLayoutPresentSrc(image);
+        SetPresentImageLayout(image);
     }
 
     // Acquire image using a semaphore
@@ -3060,7 +3097,7 @@ TEST_F(NegativeWsi, MissingWaitForImageAcquireFence) {
     RETURN_IF_SKIP(InitSwapchain());
     const auto swapchain_images = m_swapchain.GetImages();
     for (auto image : swapchain_images) {
-        SetImageLayoutPresentSrc(image);
+        SetPresentImageLayout(image);
     }
 
     // Acquire image using a fence
@@ -3085,7 +3122,7 @@ TEST_F(NegativeWsi, MissingWaitForImageAcquireFenceAndSemaphore) {
     RETURN_IF_SKIP(InitSwapchain());
     const auto swapchain_images = m_swapchain.GetImages();
     for (auto image : swapchain_images) {
-        SetImageLayoutPresentSrc(image);
+        SetPresentImageLayout(image);
     }
 
     // Acquire image using a semaphore and fence
@@ -3277,7 +3314,7 @@ TEST_F(NegativeWsi, UseDestroyedSwapchain) {
     vkt::Swapchain oldSwapchain = std::move(swapchain);
     swapchain_create_info.oldSwapchain = oldSwapchain;
     swapchain.Init(*m_device, swapchain_create_info);
-    oldSwapchain.destroy();
+    oldSwapchain.Destroy();
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassBeginInfo-framebuffer-parameter");
@@ -3376,8 +3413,8 @@ TEST_F(NegativeWsi, PresentDuplicatedSwapchain) {
     VkFence fences[2] = {fence1, fence2};
     vk::WaitForFences(device(), 2u, fences, VK_TRUE, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_indices[0]]);
-    SetImageLayoutPresentSrc(images[image_indices[1]]);
+    SetPresentImageLayout(images[image_indices[0]]);
+    SetPresentImageLayout(images[image_indices[1]]);
 
     VkPresentInfoKHR present_info = vku::InitStructHelper();
     present_info.swapchainCount = 2u;
@@ -3435,13 +3472,13 @@ TEST_F(NegativeWsi, SwapchainPresentModeInfoImplicit) {
     present_mode_info.swapchainCount = 0;
     present_mode_info.pPresentModes = &present_mode;
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModeInfoEXT-swapchainCount-arraylength");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModeInfoKHR-swapchainCount-arraylength");
     m_default_queue->Present(m_swapchain, 0, vkt::no_semaphore, &present_mode_info);
     m_errorMonitor->VerifyFound();
 
     present_mode_info.swapchainCount = 1;
     present_mode_info.pPresentModes = nullptr;
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModeInfoEXT-pPresentModes-parameter");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModeInfoKHR-pPresentModes-parameter");
     m_default_queue->Present(m_swapchain, 0, vkt::no_semaphore, &present_mode_info);
     m_errorMonitor->VerifyFound();
 }
@@ -3603,48 +3640,27 @@ TEST_F(NegativeWsi, PresentInfoSwapchainsDifferentPresentModes) {
     vkt::Semaphore image_acquired2(*m_device);
     const uint32_t image_index1 = swapchain1.AcquireNextImage(image_acquired1, kWaitTimeout);
     const uint32_t image_index2 = swapchain2.AcquireNextImage(image_acquired2, kWaitTimeout);
-
-    const VkImageMemoryBarrier present_transitions[] = {
-        TransitionToPresent(swapchain1.GetImages()[image_index1], VK_IMAGE_LAYOUT_UNDEFINED, 0),
-        TransitionToPresent(swapchain2.GetImages()[image_index2], VK_IMAGE_LAYOUT_UNDEFINED, 0),
-    };
-    m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0u,
-                           nullptr, 0u, nullptr, 2u, present_transitions);
-    m_command_buffer.End();
+    SetPresentImageLayout(swapchain1.GetImages()[image_index1]);
+    SetPresentImageLayout(swapchain2.GetImages()[image_index2]);
 
     VkSemaphore acquire_semaphores[] = {image_acquired1, image_acquired2};
-    VkPipelineStageFlags wait_masks[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
-
-    vkt::Semaphore semaphore(*m_device);
-
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.waitSemaphoreCount = 2u;
-    submit_info.pWaitSemaphores = acquire_semaphores;
-    submit_info.pWaitDstStageMask = wait_masks;
-    submit_info.commandBufferCount = 1u;
-    submit_info.pCommandBuffers = &m_command_buffer.handle();
-    submit_info.signalSemaphoreCount = 1u;
-    submit_info.pSignalSemaphores = &semaphore.handle();
-    vk::QueueSubmit(m_default_queue->handle(), 1u, &submit_info, VK_NULL_HANDLE);
-
     VkSwapchainKHR swapchains[] = {swapchain1, swapchain2};
     uint32_t image_indices[] = {image_index1, image_index2};
 
     VkPresentInfoKHR present = vku::InitStructHelper();
-    present.waitSemaphoreCount = 1u;
-    present.pWaitSemaphores = &semaphore.handle();
+    present.waitSemaphoreCount = 2u;
+    present.pWaitSemaphores = acquire_semaphores;
     present.pSwapchains = swapchains;
     present.pImageIndices = image_indices;
     present.swapchainCount = 2;
     m_errorMonitor->SetDesiredError("VUID-VkPresentInfoKHR-pSwapchains-09199");
     vk::QueuePresentKHR(m_default_queue->handle(), &present);
     m_errorMonitor->VerifyFound();
-    vk::DeviceWaitIdle(device());
+    m_device->Wait();
 }
 
 TEST_F(NegativeWsi, ReleaseSwapchainImagesWithoutFeature) {
-    TEST_DESCRIPTION("Submit VkPresentInfo where one swapchain has VkSwapchainPresentModesCreateInfoEXT and the other does not");
+    TEST_DESCRIPTION("Submit VkPresentInfo where one swapchain has VkSwapchainPresentModesCreateInfoKHR and the other does not");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
@@ -3661,7 +3677,7 @@ TEST_F(NegativeWsi, ReleaseSwapchainImagesWithoutFeature) {
     release_info.imageIndexCount = 1u;
     release_info.pImageIndices = &image_index;
 
-    m_errorMonitor->SetDesiredError("VUID-vkReleaseSwapchainImagesEXT-swapchainMaintenance1-10159");
+    m_errorMonitor->SetDesiredError("VUID-vkReleaseSwapchainImagesKHR-swapchainMaintenance1-10159");
     vk::ReleaseSwapchainImagesEXT(device(), &release_info);
     m_errorMonitor->VerifyFound();
 }
@@ -3703,7 +3719,7 @@ TEST_F(NegativeWsi, SwapchainCreateMissingMaintenanc1Feature) {
     VkSwapchainPresentScalingCreateInfoEXT present_scaling_ci = vku::InitStructHelper();
     present_scaling_ci.scalingBehavior = VK_PRESENT_SCALING_ASPECT_RATIO_STRETCH_BIT_EXT;
     swapchain_ci.pNext = &present_scaling_ci;
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoEXT-swapchainMaintenance1-10154");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentScalingCreateInfoKHR-swapchainMaintenance1-10154");
     m_swapchain.Init(*m_device, swapchain_ci);
     m_errorMonitor->VerifyFound();
 
@@ -3792,19 +3808,19 @@ TEST_F(NegativeWsi, MissingPresentModesCreateInfoFifoLatestReadyFeature) {
     VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper(&present_mode);
     surface_info.surface = m_surface.Handle();
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(Gpu(), &surface_info, &surface_caps);
-    std::vector<VkPresentModeKHR> presentModes(present_mode_compatibility.presentModeCount);
-    present_mode_compatibility.pPresentModes = presentModes.data();
+    std::vector<VkPresentModeKHR> present_modes(present_mode_compatibility.presentModeCount);
+    present_mode_compatibility.pPresentModes = present_modes.data();
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(Gpu(), &surface_info, &surface_caps);
 
-    VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_LATEST_READY_EXT;
+    VkPresentModeKHR fifo_mode = VK_PRESENT_MODE_FIFO_LATEST_READY_EXT;
 
-    if (std::find(presentModes.begin(), presentModes.end(), presentMode) == presentModes.end()) {
+    if (std::find(present_modes.begin(), present_modes.end(), fifo_mode) == present_modes.end()) {
         GTEST_SKIP() << "VK_PRESENT_MODE_FIFO_LATEST_READY_EXT is not compatible";
     }
 
     VkSwapchainPresentModesCreateInfoEXT present_modes_ci = vku::InitStructHelper();
     present_modes_ci.presentModeCount = 1;
-    present_modes_ci.pPresentModes = &presentMode;
+    present_modes_ci.pPresentModes = &fifo_mode;
 
     VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper(&present_modes_ci);
     swapchain_ci.surface = m_surface.Handle();
@@ -3822,7 +3838,7 @@ TEST_F(NegativeWsi, MissingPresentModesCreateInfoFifoLatestReadyFeature) {
     swapchain_ci.oldSwapchain = 0;
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentModeFifoLatestReady-10161");
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModesCreateInfoEXT-presentModeFifoLatestReady-10160");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModesCreateInfoKHR-presentModeFifoLatestReady-10160");
     vkt::Swapchain swapchain(*m_device, swapchain_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -3889,7 +3905,7 @@ TEST_F(NegativeWsi, InitSwapchainPresentScalingInvalidExtent) {
                                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0u, &image_format_properties);
 
     if (present_scaling_capabilities.maxScaledImageExtent.width > image_format_properties.maxExtent.width) {
-        GTEST_SKIP() << "VkSurfacePresentScalingCapabilitiesEXT::maxScaledImageExtent.width is higher than "
+        GTEST_SKIP() << "VkSurfacePresentScalingCapabilitiesKHR::maxScaledImageExtent.width is higher than "
                         "VkImageFormatProperties::maxExtent.width";
     }
 
@@ -4144,26 +4160,18 @@ TEST_F(NegativeWsi, PresentSignaledFence) {
     RETURN_IF_SKIP(Init());
     RETURN_IF_SKIP(InitSwapchain());
 
-    const vkt::Semaphore acquire_semaphore(*m_device);
-    const vkt::Semaphore submit_semaphore(*m_device);
-
     const auto swapchain_images = m_swapchain.GetImages();
+    const vkt::Semaphore acquire_semaphore(*m_device);
     const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
-    const auto present_transition = TransitionToPresent(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, 0);
-
-    m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &present_transition);
-    m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer, vkt::Wait(acquire_semaphore), vkt::Signal(submit_semaphore));
+    SetPresentImageLayout(swapchain_images[image_index]);
 
     vkt::Fence present_fence(*m_device, VK_FENCE_CREATE_SIGNALED_BIT);
     VkSwapchainPresentFenceInfoEXT present_fence_info = vku::InitStructHelper();
     present_fence_info.swapchainCount = 1;
     present_fence_info.pFences = &present_fence.handle();
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentFenceInfoEXT-pFences-07758");
-    m_default_queue->Present(m_swapchain, image_index, submit_semaphore, &present_fence_info);
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentFenceInfoKHR-pFences-07758");
+    m_default_queue->Present(m_swapchain, image_index, acquire_semaphore, &present_fence_info);
     m_errorMonitor->VerifyFound();
     m_default_queue->Wait();
 }
@@ -4177,35 +4185,25 @@ TEST_F(NegativeWsi, PresentFenceInUse) {
     RETURN_IF_SKIP(Init());
     RETURN_IF_SKIP(InitSwapchain());
 
-    const vkt::Semaphore acquire_semaphore(*m_device);
-    const vkt::Semaphore submit_semaphore(*m_device);
-
     const auto swapchain_images = m_swapchain.GetImages();
+    const vkt::Semaphore acquire_semaphore(*m_device);
     const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
-    const auto present_transition = TransitionToPresent(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, 0);
-
-    m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &present_transition);
-    m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer, vkt::Wait(acquire_semaphore), vkt::Signal(submit_semaphore));
+    SetPresentImageLayout(swapchain_images[image_index]);
 
     vkt::Fence present_fence(*m_device);
     VkSwapchainPresentFenceInfoEXT present_fence_info = vku::InitStructHelper();
     present_fence_info.swapchainCount = 1;
     present_fence_info.pFences = &present_fence.handle();
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    vk::QueueSubmit(m_default_queue->handle(), 1u, &submit_info, present_fence);
+    m_default_queue->Submit(vkt::no_cmd, present_fence);
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentFenceInfoEXT-pFences-07759");
-    m_default_queue->Present(m_swapchain, image_index, submit_semaphore, &present_fence_info);
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentFenceInfoKHR-pFences-07759");
+    m_default_queue->Present(m_swapchain, image_index, acquire_semaphore, &present_fence_info);
     m_errorMonitor->VerifyFound();
     m_default_queue->Wait();
 }
 
 TEST_F(NegativeWsi, PresentMismatchedSwapchainCount) {
-    TEST_DESCRIPTION("Use a sigled fence in VkSwapchainPresentFenceInfoEXT");
     AddSurfaceExtension();
     AddRequiredExtensions(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
@@ -4239,17 +4237,9 @@ TEST_F(NegativeWsi, PresentMismatchedSwapchainCount) {
     vkt::Swapchain swapchain(*m_device, swapchain_ci);
 
     const vkt::Semaphore acquire_semaphore(*m_device);
-    const vkt::Semaphore submit_semaphore(*m_device);
-
     const auto swapchain_images = swapchain.GetImages();
     const uint32_t image_index = swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
-    const auto present_transition = TransitionToPresent(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, 0);
-
-    m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &present_transition);
-    m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer, vkt::Wait(acquire_semaphore), vkt::Signal(submit_semaphore));
+    SetPresentImageLayout(swapchain_images[image_index]);
 
     VkPresentModeKHR present_modes[2] = {present_mode, present_mode};
 
@@ -4257,8 +4247,8 @@ TEST_F(NegativeWsi, PresentMismatchedSwapchainCount) {
     present_mode_info.swapchainCount = 2u;
     present_mode_info.pPresentModes = present_modes;
 
-    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModeInfoEXT-swapchainCount-07760");
-    m_default_queue->Present(swapchain, image_index, submit_semaphore, &present_mode_info);
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModeInfoKHR-swapchainCount-07760");
+    m_default_queue->Present(swapchain, image_index, acquire_semaphore, &present_mode_info);
     m_errorMonitor->VerifyFound();
     m_default_queue->Wait();
 }
@@ -4290,17 +4280,10 @@ TEST_F(NegativeWsi, InvalidRectLayer) {
     vkt::Swapchain swapchain(*m_device, swapchain_ci);
 
     const vkt::Semaphore acquire_semaphore(*m_device);
-    const vkt::Semaphore submit_semaphore(*m_device);
 
     const auto swapchain_images = swapchain.GetImages();
     const uint32_t image_index = swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
-    const auto present_transition = TransitionToPresent(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, 0);
-
-    m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &present_transition);
-    m_command_buffer.End();
-    m_default_queue->Submit(m_command_buffer, vkt::Wait(acquire_semaphore), vkt::Signal(submit_semaphore));
+    SetPresentImageLayout(swapchain_images[image_index]);
 
     VkRectLayerKHR rectangle;
     rectangle.offset.x = 0;
@@ -4317,20 +4300,20 @@ TEST_F(NegativeWsi, InvalidRectLayer) {
     present_regions.pRegions = &present_region;
 
     m_errorMonitor->SetDesiredError("VUID-VkRectLayerKHR-layer-01262");
-    m_default_queue->Present(swapchain, image_index, submit_semaphore, &present_regions);
+    m_default_queue->Present(swapchain, image_index, acquire_semaphore, &present_regions);
     m_errorMonitor->VerifyFound();
     m_default_queue->Wait();
 
     rectangle.layer = 0u;
     rectangle.offset.x = 1;
     m_errorMonitor->SetDesiredError("VUID-VkRectLayerKHR-offset-04864");
-    m_default_queue->Present(swapchain, image_index, submit_semaphore, &present_regions);
+    m_default_queue->Present(swapchain, image_index, acquire_semaphore, &present_regions);
     m_errorMonitor->VerifyFound();
     m_default_queue->Wait();
 }
 
 TEST_F(NegativeWsi, PresentWithUnsupportedQueue) {
-    TEST_DESCRIPTION("Present with a queue family that does nto support presenting");
+    TEST_DESCRIPTION("Present with a queue family that does not support presenting");
     AddSurfaceExtension();
     AddRequiredExtensions(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
@@ -4352,20 +4335,9 @@ TEST_F(NegativeWsi, PresentWithUnsupportedQueue) {
     }
 
     const vkt::Semaphore acquire_semaphore(*m_device);
-    const vkt::Semaphore submit_semaphore(*m_device);
-
     const auto swapchain_images = m_swapchain.GetImages();
     const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
-    const auto present_transition = TransitionToPresent(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, 0);
-
-    vkt::CommandPool command_pool(*m_device, transfer_qfi);
-    vkt::CommandBuffer command_buffer(*m_device, command_pool);
-
-    command_buffer.Begin();
-    vk::CmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &present_transition);
-    command_buffer.End();
-    m_device->TransferOnlyQueue()->Submit(command_buffer, vkt::Wait(acquire_semaphore), vkt::Signal(submit_semaphore));
+    SetPresentImageLayout(swapchain_images[image_index]);
 
     vkt::Fence present_fence(*m_device);
     VkSwapchainPresentFenceInfoEXT present_fence_info = vku::InitStructHelper();
@@ -4373,7 +4345,7 @@ TEST_F(NegativeWsi, PresentWithUnsupportedQueue) {
     present_fence_info.pFences = &present_fence.handle();
 
     m_errorMonitor->SetDesiredError("VUID-vkQueuePresentKHR-pSwapchains-01292");
-    m_device->TransferOnlyQueue()->Present(m_swapchain, image_index, submit_semaphore, &present_fence_info);
+    m_device->TransferOnlyQueue()->Present(m_swapchain, image_index, acquire_semaphore, &present_fence_info);
     m_errorMonitor->VerifyFound();
     m_device->TransferOnlyQueue()->Wait();
 }
@@ -4445,12 +4417,12 @@ TEST_F(NegativeWsi, SwapchainUseAfterDestroy) {
         vkt::Swapchain swapchain2;
         if (i == 0) {
             vk::DeviceWaitIdle(*m_device);
-            swapchain1.destroy();
+            swapchain1.Destroy();
             swapchain2.Init(*m_device, swapchain_ci);
         } else {
             swapchain_ci.oldSwapchain = swapchain_1_handle;
             swapchain2.Init(*m_device, swapchain_ci);
-            swapchain1.destroy();
+            swapchain1.Destroy();
         }
 
         VkPresentInfoKHR present = vku::InitStructHelper();
@@ -4469,7 +4441,7 @@ TEST_F(NegativeWsi, SwapchainUseAfterDestroy) {
 
         std::vector<VkImage> images2 = swapchain2.GetImages();
         VkSwapchainKHR swapchain_2_handle = swapchain2.handle();
-        swapchain2.destroy();
+        swapchain2.Destroy();
 
         vkt::Fence fence2(*m_device);
         uint32_t image_index = 0;
@@ -4486,7 +4458,7 @@ TEST_F(NegativeWsi, SignalPresentSemaphore) {
     RETURN_IF_SKIP(InitSwapchain());
     const auto swapchain_images = m_swapchain.GetImages();
     for (auto image : swapchain_images) {
-        SetImageLayoutPresentSrc(image);
+        SetPresentImageLayout(image);
     }
 
     vkt::Semaphore acquire_semaphore(*m_device);
@@ -4517,7 +4489,7 @@ TEST_F(NegativeWsi, SignalPresentSemaphoreAfterQueueWait) {
     RETURN_IF_SKIP(InitSwapchain());
     const auto swapchain_images = m_swapchain.GetImages();
     for (auto image : swapchain_images) {
-        SetImageLayoutPresentSrc(image);
+        SetPresentImageLayout(image);
     }
 
     vkt::Semaphore acquire_semaphore(*m_device);
@@ -4568,7 +4540,7 @@ TEST_F(NegativeWsi, PresentId2Features) {
     const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     uint64_t present_id_index = 1;
     VkPresentId2KHR present_id = vku::InitStructHelper();
@@ -4614,7 +4586,7 @@ TEST_F(NegativeWsi, PresentWait2Features) {
     const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     uint64_t present_id_index = 1;
     VkPresentId2KHR present_id = vku::InitStructHelper();
@@ -4673,7 +4645,7 @@ TEST_F(NegativeWsi, PresentId2SurfaceNotSupported) {
     const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     uint64_t present_id_index = 1;
     VkPresentId2KHR present_id = vku::InitStructHelper();
@@ -4728,7 +4700,7 @@ TEST_F(NegativeWsi, PresentWait2SurfaceNotSupported) {
     const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     VkPresentWait2InfoKHR present_wait_2_info = vku::InitStructHelper();
     present_wait_2_info.presentId = 1u;
@@ -4782,7 +4754,7 @@ TEST_F(NegativeWsi, PresentId2SwapchainCountMismatch) {
     const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     uint64_t present_id_indices[] = {1, 2};
     VkPresentId2KHR present_id = vku::InitStructHelper();
@@ -4839,7 +4811,7 @@ TEST_F(NegativeWsi, PresentId2SwapchainMissingFlags) {
     const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     uint64_t present_id_index = 1u;
     VkPresentId2KHR present_id = vku::InitStructHelper();
@@ -4897,7 +4869,7 @@ TEST_F(NegativeWsi, PresentWait2SwapchainMissingFlags) {
     const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     uint64_t present_id_index = 1u;
     VkPresentId2KHR present_id = vku::InitStructHelper();
@@ -4948,7 +4920,7 @@ TEST_F(NegativeWsi, PresentId2InvalidEntry) {
     uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     uint64_t present_id_index = 1u;
     VkPresentId2KHR present_id = vku::InitStructHelper();
@@ -4960,7 +4932,7 @@ TEST_F(NegativeWsi, PresentId2InvalidEntry) {
     image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
     m_errorMonitor->SetDesiredError("VUID-VkPresentId2KHR-presentIds-10819");
     m_default_queue->Present(swapchain, image_index, vkt::no_semaphore, &present_id);
@@ -5013,9 +4985,9 @@ TEST_F(NegativeWsi, PresentIdWait2) {
     const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    SetImageLayoutPresentSrc(images[image_index]);
+    SetPresentImageLayout(images[image_index]);
 
-    uint64_t present_id_value = 2u;
+    uint64_t present_id_value = 1u;
     VkPresentId2KHR present_id = vku::InitStructHelper();
     present_id.swapchainCount = 1u;
     present_id.pPresentIds = &present_id_value;
@@ -5023,7 +4995,7 @@ TEST_F(NegativeWsi, PresentIdWait2) {
     m_default_queue->Present(swapchain, image_index, vkt::no_semaphore, &present_id);
 
     VkPresentWait2InfoKHR present_wait_2_info = vku::InitStructHelper();
-    present_wait_2_info.presentId = 1u;
+    present_wait_2_info.presentId = 2u;
     present_wait_2_info.timeout = kWaitTimeout;
     m_errorMonitor->SetDesiredError("VUID-vkWaitForPresent2KHR-presentId-10817");
     vk::WaitForPresent2KHR(device(), swapchain, &present_wait_2_info);

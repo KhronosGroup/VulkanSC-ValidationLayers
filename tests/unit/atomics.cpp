@@ -14,7 +14,6 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
-#include "../framework/shader_object_helper.h"
 
 class NegativeAtomic : public VkLayerTest {};
 
@@ -29,7 +28,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
 
     // Test StoreOp
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, rgba8) uniform image2D si0;
             void main() {
@@ -49,7 +48,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
 
     // Test AtomicOp
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, r32f) uniform image2D si0;
             void main() {
@@ -80,7 +79,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
 
     // Test StoreOp
     {
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, rgba8) uniform image2D si0;
             void main() {
@@ -100,7 +99,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
 
     // Test AtomicOp
     {
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, r32f) uniform image2D si0;
             void main() {
@@ -127,7 +126,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureBuffer) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer ssbo { int y; };
         void main() {
@@ -155,7 +154,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisableShaderObject) {
 
     RETURN_IF_SKIP(Init());
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         layout(set=0, binding=0, rgba8) uniform image2D si0;
         void main() {
@@ -199,7 +198,7 @@ TEST_F(NegativeAtomic, Int64) {
     // StorageBuffer storage class using AtomicStore
     // atomicStore is slightly different than other atomics, so good edge case
     std::string cs_store = cs_base + R"glsl(
-           atomicStore(y, 1ul, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(y, 1ul, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -302,17 +301,17 @@ TEST_F(NegativeAtomic, ImageInt64) {
     )glsl";
 
     std::string cs_image_load = cs_image_base + R"glsl(
-           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_image_store = cs_image_base + R"glsl(
-           imageAtomicStore(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           imageAtomicStore(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
     std::string cs_image_exchange = cs_image_base + R"glsl(
-           imageAtomicExchange(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           imageAtomicExchange(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -374,7 +373,7 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime64) {
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0, r64ui) uniform u64image2D z;
         void main() {
-            uint64_t y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+            uint64_t y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
@@ -414,7 +413,7 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime32) {
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0, r32ui) uniform uimage2D z;
         void main() {
-            uint y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+            uint y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
@@ -460,7 +459,7 @@ TEST_F(NegativeAtomic, ImageInt64DrawtimeSparse) {
         layout(set = 0, binding = 0) buffer ssbo { uint64_t y; };
         layout(set = 0, binding = 1, r64ui) uniform u64image2D z;
         void main() {
-           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
@@ -477,6 +476,10 @@ TEST_F(NegativeAtomic, ImageInt64DrawtimeSparse) {
 
     auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R64_UINT, VK_IMAGE_USAGE_STORAGE_BIT);
     image_ci.flags = VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT | VK_IMAGE_CREATE_SPARSE_BINDING_BIT;
+    if (IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT)) {
+        GTEST_SKIP() << "Cannot make VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT not supported.";
+    }
+
     vkt::Image image(*m_device, image_ci, vkt::no_mem);
     vkt::ImageView image_view = image.CreateView();
     pipe.descriptor_set_.WriteDescriptorImageInfo(1, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -515,7 +518,7 @@ TEST_F(NegativeAtomic, ImageInt64Mesh32) {
 
         void main() {
             SetMeshOutputsEXT(3,1);
-            uint y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+            uint y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
@@ -576,13 +579,13 @@ TEST_F(NegativeAtomic, Float) {
     )glsl";
 
     std::string cs_buffer_float_32_load = cs_32_base + R"glsl(
-           y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_buffer_float_32_store = cs_32_base + R"glsl(
            float32_t a = 1;
-           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -598,12 +601,12 @@ TEST_F(NegativeAtomic, Float) {
     )glsl";
 
     std::string cs_shared_float_32_load = cs_32_base + R"glsl(
-           y = 1 + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = 1 + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_shared_float_32_store = cs_32_base + R"glsl(
-           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -629,13 +632,13 @@ TEST_F(NegativeAtomic, Float) {
     )glsl";
 
     std::string cs_buffer_float_64_load = cs_64_base + R"glsl(
-           y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_buffer_float_64_store = cs_64_base + R"glsl(
            float64_t a = 1;
-           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -651,12 +654,12 @@ TEST_F(NegativeAtomic, Float) {
     )glsl";
 
     std::string cs_shared_float_64_load = cs_64_base + R"glsl(
-           y = 1 + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = 1 + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_shared_float_64_store = cs_64_base + R"glsl(
-           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -676,17 +679,17 @@ TEST_F(NegativeAtomic, Float) {
     )glsl";
 
     std::string cs_image_load = cs_image_base + R"glsl(
-           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_image_store = cs_image_base + R"glsl(
-           imageAtomicStore(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           imageAtomicStore(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
     std::string cs_image_exchange = cs_image_base + R"glsl(
-           imageAtomicExchange(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           imageAtomicExchange(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -957,13 +960,13 @@ TEST_F(NegativeAtomic, Float2With16bit) {
     )glsl";
 
     std::string cs_buffer_float_16_load = cs_16_base + R"glsl(
-           y = float16_t(1.0) + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = float16_t(1.0) + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_buffer_float_16_store = cs_16_base + R"glsl(
            float16_t a = float16_t(1.0);
-           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -989,12 +992,12 @@ TEST_F(NegativeAtomic, Float2With16bit) {
     )glsl";
 
     std::string cs_shared_float_16_load = cs_16_base + R"glsl(
-           y = float16_t(1.0) + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = float16_t(1.0) + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_shared_float_16_store = cs_16_base + R"glsl(
-           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -1014,13 +1017,13 @@ TEST_F(NegativeAtomic, Float2With16bit) {
         }
     )glsl";
 
-    // clang-format on
+     // clang-format on
 
-    // shaderBufferFloat16Atomics
-    {
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-        VkShaderObj const cs(this, cs_buffer_float_16_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-        m_errorMonitor->VerifyFound();
+     // shaderBufferFloat16Atomics
+     {
+         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+         VkShaderObj const cs(this, cs_buffer_float_16_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+         m_errorMonitor->VerifyFound();
     }
     {
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
@@ -1244,7 +1247,7 @@ TEST_F(NegativeAtomic, FloatOpSource) {
 
 layout(set = 0, binding = 0) buffer ssbo { float32_t y; };
 void main() {
-    y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+    y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
 }"
                OpSourceExtension "GL_EXT_shader_atomic_float"
                OpSourceExtension "GL_EXT_shader_explicit_arithmetic_types_float32"
@@ -1276,13 +1279,13 @@ void main() {
        %uint = OpTypeInt 32 0
      %uint_1 = OpConstant %uint 1
      %uint_0 = OpConstant %uint 0
-    %uint_64 = OpConstant %uint 64
+    %uint_66 = OpConstant %uint 66
                OpLine %1 7 11
        %main = OpFunction %void None %4
           %6 = OpLabel
                OpLine %1 8 0
          %15 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
-         %22 = OpAtomicLoad %float %15 %int_1 %uint_64
+         %22 = OpAtomicLoad %float %15 %int_1 %uint_66
          %23 = OpFAdd %float %float_1 %22
          %24 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
                OpStore %24 %23
@@ -1292,7 +1295,7 @@ void main() {
     )";
 
     // VUID-RuntimeSpirv-None-06284
-    m_errorMonitor->SetDesiredError("atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);");
+    m_errorMonitor->SetDesiredError("atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);");
     VkShaderObj const cs(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
@@ -1313,7 +1316,7 @@ TEST_F(NegativeAtomic, InvalidStorageOperation) {
                                                        // cause DesiredFailure. VK_FORMAT_R32_UINT is right format.
     auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, image_format, usage);
 
-    if (ImageFormatIsSupported(instance(), Gpu(), image_ci, VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT)) {
+    if (IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT)) {
         GTEST_SKIP() << "Cannot make VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT not supported.";
     }
 
@@ -1334,7 +1337,7 @@ TEST_F(NegativeAtomic, InvalidStorageOperation) {
     vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
     vkt::BufferView buffer_view(*m_device, buffer, buffer_view_format);
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(set = 0, binding = 3, r32f) uniform image2D si0;
         layout(set = 0, binding = 2, r32f) uniform image2D si1[2];
@@ -1471,7 +1474,7 @@ TEST_F(NegativeAtomic, VertexPipelineStoresAndAtomics) {
     //     float a;
     //     float b;
     // } data;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Vertex %main "main" %o
@@ -1528,7 +1531,7 @@ TEST_F(NegativeAtomic, BufferViewInt64Drawtime32) {
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0, r32ui) uniform uimageBuffer z;
         void main() {
-            uint y = imageAtomicLoad(z, 1, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+            uint y = imageAtomicLoad(z, 1, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
@@ -1574,7 +1577,7 @@ TEST_F(NegativeAtomic, BufferViewInt64Drawtime64) {
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0, r64ui) uniform u64imageBuffer z;
         void main() {
-            uint64_t y = imageAtomicLoad(z, 1, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+            uint64_t y = imageAtomicLoad(z, 1, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 

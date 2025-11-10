@@ -84,11 +84,10 @@ TEST_F(NegativeDeviceQueue, FamilyIndexUsage) {
         buffer_ci.queueFamilyIndexCount = 2;
         qfi[0] = 1;
         qfi[1] = 2;
-        vkt::Buffer ib;
-        ib.init(*m_device, buffer_ci);
+        vkt::Buffer ib(*m_device, buffer_ci);
 
         m_command_buffer.Begin();
-        vk::CmdFillBuffer(m_command_buffer, ib.handle(), 0, 16, 5);
+        vk::CmdFillBuffer(m_command_buffer, ib, 0, 16, 5);
         m_command_buffer.End();
         m_default_queue->SubmitAndWait(m_command_buffer);
         m_errorMonitor->VerifyFound();
@@ -361,22 +360,25 @@ TEST_F(NegativeDeviceQueue, QueuesSameQueueFamily) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features = vku::InitStructHelper();
+    auto features2 = GetPhysicalDeviceFeatures2(protected_memory_features);
     if (!protected_memory_features.protectedMemory) {
         GTEST_SKIP() << "protectedMemory not supported";
     }
-    RETURN_IF_SKIP(InitState(nullptr, &protected_memory_features));
 
     uint32_t qf_count;
     vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &qf_count, nullptr);
     std::vector<VkQueueFamilyProperties> qf_props(qf_count);
     vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &qf_count, qf_props.data());
 
-    uint32_t index = 0;
+    uint32_t index = UINT32_MAX;
     for (uint32_t i = 0; i < qf_count; ++i) {
-        if (qf_props[i].queueFlags & VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT) {
+        if (qf_props[i].queueFlags & VK_QUEUE_PROTECTED_BIT) {
             index = i;
             break;
         }
+    }
+    if (UINT32_MAX == index) {
+        GTEST_SKIP() << "no queue supports protected memory";
     }
 
     std::vector<float> priorities(qf_props[index].queueCount, 1.0f);
@@ -391,7 +393,7 @@ TEST_F(NegativeDeviceQueue, QueuesSameQueueFamily) {
     device_queue_ci[1].queueCount = 1u;
     device_queue_ci[1].pQueuePriorities = priorities.data();
 
-    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper(&features2);
     device_ci.queueCreateInfoCount = 2u;
     device_ci.pQueueCreateInfos = device_queue_ci;
 
@@ -484,6 +486,28 @@ TEST_F(NegativeDeviceQueue, DeviceCreateInvalidParameters) {
         vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(NegativeDeviceQueue, NoQueues) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance9);
+    RETURN_IF_SKIP(InitFramework());
+
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
+    device_ci.pNext = requested_features_.GetEnabledFeatures2();
+    device_ci.enabledExtensionCount = static_cast<uint32_t>(m_device_extension_names.size());
+    device_ci.ppEnabledExtensionNames = m_device_extension_names.data();
+
+    vkt::Device device(gpu_, device_ci);
+
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
+    buffer_create_info.size = 4096;
+    buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    VkBuffer buffer;
+    m_errorMonitor->SetDesiredError("VUID-vkCreateBuffer-device-queuecount");
+    vk::CreateBuffer(device, &buffer_create_info, nullptr, &buffer);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeDeviceQueue, DeviceCreateEnabledLayerNamesPointer) {

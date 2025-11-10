@@ -72,25 +72,70 @@ struct LayoutUseCheckAndMessage {
     }
 };
 
-bool CoreChecks::VerifyImageLayoutRange(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
-                                        VkImageAspectFlags aspect_mask, VkImageLayout explicit_layout,
-                                        const CommandBufferImageLayoutMap &cb_layout_map, RangeGenerator &&range_gen,
-                                        const Location &loc, const char *mismatch_layout_vuid, bool *error) const {
+bool CoreChecks::ValidateDescriptorImageLayout(const LogObjectList &objlist, const vvl::Image &image_state,
+                                               VkImageAspectFlags aspect_mask, VkImageLayout explicit_layout,
+                                               const CommandBufferImageLayoutMap &cb_layout_map, RangeGenerator &&range_gen,
+                                               const vvl::DrawDispatchVuid &vuids,
+                                               std::function<std::string()> describe_descriptor_callback) const {
     bool skip = false;
     LayoutUseCheckAndMessage layout_check(explicit_layout, aspect_mask);
     skip |= ForEachMatchingLayoutMapRange(
         cb_layout_map, std::move(range_gen),
-        [this, &cb_state, &image_state, &layout_check, mismatch_layout_vuid, loc, error](const LayoutRange &range,
-                                                                                         const ImageLayoutState &state) {
+        [this, &objlist, &image_state, &layout_check, &describe_descriptor_callback, vuids](const LayoutRange &range,
+                                                                                            const ImageLayoutState &state) {
             bool local_skip = false;
             if (!layout_check.Check(state)) {
-                if (error) {
-                    *error = true;
-                }
+                const subresource_adapter::Subresource subresource = image_state.subresource_encoder.Decode(range.begin);
+                local_skip |= LogError(vuids.image_layout_00344, objlist, vuids.loc(),
+                                       "Cannot use %s (layer %" PRIu32 ", mip %" PRIu32
+                                       ") with specific layout %s (specified by %s) that doesn't match the "
+                                       "%s layout %s.",
+                                       FormatHandle(image_state).c_str(), subresource.arrayLayer, subresource.mipLevel,
+                                       string_VkImageLayout(layout_check.expected_layout), describe_descriptor_callback().c_str(),
+                                       layout_check.message, string_VkImageLayout(layout_check.layout));
+            }
+            return local_skip;
+        });
+    return skip;
+}
+
+bool CoreChecks::ValidateSubresourceImageLayout(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
+                                                const VkImageSubresourceLayers &subresource_layers, int32_t depth_offset,
+                                                uint32_t depth_extent, VkImageLayout explicit_layout, const Location &loc,
+                                                const char *vuid) const {
+    bool skip = false;
+    if (disabled[image_layout_validation]) {
+        return skip;
+    }
+    const auto image_layout_map = cb_state.GetImageLayoutMap(image_state.VkHandle());
+    if (!image_layout_map) {
+        return skip;
+    }
+
+    VkImageSubresourceRange normalized_subresource_range =
+        image_state.NormalizeSubresourceRange(RangeFromLayers(subresource_layers));
+
+    if (CanTransitionDepthSlices(extensions, image_state.create_info)) {
+        normalized_subresource_range.baseArrayLayer = (uint32_t)depth_offset;
+        normalized_subresource_range.layerCount = depth_extent;
+    }
+
+    if (!image_state.subresource_encoder.InRange(normalized_subresource_range)) {
+        return skip;
+    }
+
+    RangeGenerator range_gen(image_state.subresource_encoder, normalized_subresource_range);
+
+    LayoutUseCheckAndMessage layout_check(explicit_layout, normalized_subresource_range.aspectMask);
+    skip |= ForEachMatchingLayoutMapRange(
+        *image_layout_map, std::move(range_gen),
+        [this, &cb_state, &image_state, &layout_check, vuid, loc](const LayoutRange &range, const ImageLayoutState &state) {
+            bool local_skip = false;
+            if (!layout_check.Check(state)) {
                 const subresource_adapter::Subresource subresource = image_state.subresource_encoder.Decode(range.begin);
                 const LogObjectList objlist(cb_state.Handle(), image_state.Handle());
-                local_skip |= LogError(mismatch_layout_vuid, objlist, loc,
-                                       "Cannot use %s (layer=%" PRIu32 " mip=%" PRIu32
+                local_skip |= LogError(vuid, objlist, loc,
+                                       "Cannot use %s (layer %" PRIu32 ", mip %" PRIu32
                                        ") with specific layout %s that doesn't match the "
                                        "%s layout %s.",
                                        FormatHandle(image_state).c_str(), subresource.arrayLayer, subresource.mipLevel,
@@ -102,54 +147,10 @@ bool CoreChecks::VerifyImageLayoutRange(const vvl::CommandBuffer &cb_state, cons
     return skip;
 }
 
-bool CoreChecks::VerifyImageLayoutSubresource(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
-                                              const VkImageSubresourceLayers &subresource_layers, int32_t depth_offset,
-                                              uint32_t depth_extent, VkImageLayout explicit_layout, const Location &loc,
-                                              const char *vuid) const {
-    if (disabled[image_layout_validation]) {
-        return false;
-    }
-    const auto image_layout_map = cb_state.GetImageLayoutMap(image_state.VkHandle());
-    if (!image_layout_map) {
-        return false;
-    }
-
-    VkImageSubresourceRange normalized_subresource_range =
-        image_state.NormalizeSubresourceRange(RangeFromLayers(subresource_layers));
-
-    if (IsExtEnabled(extensions.vk_khr_maintenance9) && image_state.create_info.imageType == VK_IMAGE_TYPE_3D &&
-        (image_state.create_info.flags & VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT) != 0) {
-        normalized_subresource_range.baseArrayLayer = (uint32_t)depth_offset;
-        normalized_subresource_range.layerCount = depth_extent;
-    }
-
-    RangeGenerator range_gen = image_state.subresource_encoder.InRange(normalized_subresource_range)
-                                   ? RangeGenerator(image_state.subresource_encoder, normalized_subresource_range)
-                                   : RangeGenerator{};
-
-    return VerifyImageLayoutRange(cb_state, image_state, normalized_subresource_range.aspectMask, explicit_layout,
-                                  *image_layout_map, std::move(range_gen), loc, vuid, nullptr);
-}
-
-bool CoreChecks::VerifyImageLayout(const vvl::CommandBuffer &cb_state, const vvl::ImageView &image_view_state,
-                                   VkImageLayout explicit_layout, const Location &loc, const char *mismatch_layout_vuid,
-                                   bool *error) const {
-    if (disabled[image_layout_validation]) {
-        return false;
-    }
-    const auto image_layout_map = cb_state.GetImageLayoutMap(image_view_state.image_state->VkHandle());
-    if (!image_layout_map) {
-        return false;
-    }
-
-    return VerifyImageLayoutRange(cb_state, *image_view_state.image_state, image_view_state.create_info.subresourceRange.aspectMask,
-                                  explicit_layout, *image_layout_map, RangeGenerator(image_view_state.range_generator), loc,
-                                  mismatch_layout_vuid, error);
-}
-
-bool CoreChecks::VerifyVideoImageLayout(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
-                                        const VkImageSubresourceRange &normalized_subresource_range, VkImageLayout explicit_layout,
-                                        const Location &loc, const char *mismatch_layout_vuid, bool *error) const {
+bool CoreChecks::ValidateVideoImageLayout(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
+                                          const VkImageSubresourceRange &normalized_subresource_range,
+                                          VkImageLayout explicit_layout, const Location &loc,
+                                          const char *mismatch_layout_vuid) const {
     if (disabled[image_layout_validation]) {
         return false;
     }
@@ -167,13 +168,10 @@ bool CoreChecks::VerifyVideoImageLayout(const vvl::CommandBuffer &cb_state, cons
     LayoutUseCheckAndMessage layout_check_general(VK_IMAGE_LAYOUT_GENERAL, normalized_subresource_range.aspectMask);
     skip |= ForEachMatchingLayoutMapRange(
         *image_layout_map, std::move(range_gen),
-        [this, &cb_state, &image_state, &layout_check, &layout_check_general, mismatch_layout_vuid, loc, error](
+        [this, &cb_state, &image_state, &layout_check, &layout_check_general, mismatch_layout_vuid, loc](
             const LayoutRange &range, const ImageLayoutState &state) {
             bool local_skip = false;
             if (!layout_check.Check(state) && (!enabled_features.unifiedImageLayoutsVideo || !layout_check_general.Check(state))) {
-                if (error) {
-                    *error = true;
-                }
                 const subresource_adapter::Subresource subresource = image_state.subresource_encoder.Decode(range.begin);
                 std::string expected_layout = string_VkImageLayout(layout_check.expected_layout);
                 if (enabled_features.unifiedImageLayoutsVideo) {
@@ -524,10 +522,11 @@ bool CoreChecks::ValidateRenderPassStencilLayoutAgainstFramebufferImageUsage(VkI
     return skip;
 }
 
-bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer &cb_state, const VkRenderPassBeginInfo &begin_info,
-                                                       const vvl::RenderPass &render_pass_state,
-                                                       const vvl::Framebuffer &framebuffer_state,
-                                                       const Location &rp_begin_loc) const {
+bool CoreChecks::ValidateFramebufferAndRenderPassLayouts(const vvl::CommandBuffer &cb_state,
+                                                         const VkRenderPassBeginInfo &begin_info,
+                                                         const vvl::RenderPass &render_pass_state,
+                                                         const vvl::Framebuffer &framebuffer_state,
+                                                         const Location &rp_begin_loc) const {
     bool skip = false;
     const auto *render_pass_info = render_pass_state.create_info.ptr();
     const VkRenderPass render_pass = render_pass_state.VkHandle();
@@ -809,9 +808,9 @@ void CoreChecks::TransitionBeginRenderPassLayouts(vvl::CommandBuffer &cb_state, 
             const auto stencil_initial_layout = attachment_description_stencil_layout->stencilInitialLayout;
             VkImageSubresourceRange sub_range = view_state->normalized_subresource_range;
             sub_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-            cb_state.TrackImageFirstLayout(*image_state, sub_range, initial_layout);
+            cb_state.TrackImageFirstLayout(*image_state, sub_range, 0, 0, initial_layout);
             sub_range.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-            cb_state.TrackImageFirstLayout(*image_state, sub_range, stencil_initial_layout);
+            cb_state.TrackImageFirstLayout(*image_state, sub_range, 0, 0, stencil_initial_layout);
         } else {
             // If layoutStencil is kInvalidLayout (meaning no separate depth/stencil layout), image view format has both depth
             // and stencil aspects, and subresource has only one of aspect out of depth or stencil, then the missing aspect will
@@ -822,16 +821,16 @@ void CoreChecks::TransitionBeginRenderPassLayouts(vvl::CommandBuffer &cb_state, 
                     subresource_range.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
                 }
             }
-            cb_state.TrackImageFirstLayout(*image_state, subresource_range, initial_layout);
+            cb_state.TrackImageFirstLayout(*image_state, subresource_range, 0, 0, initial_layout);
         }
     }
     // Now transition for first subpass (index 0)
     TransitionSubpassLayouts(cb_state, render_pass_state, 0);
 }
 
-bool CoreChecks::VerifyClearImageLayout(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
-                                        const VkImageSubresourceRange &range, VkImageLayout dest_image_layout,
-                                        const Location &loc) const {
+bool CoreChecks::ValidateClearImageLayout(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
+                                          const VkImageSubresourceRange &range, VkImageLayout dest_image_layout,
+                                          const Location &loc) const {
     bool skip = false;
     if (loc.function == Func::vkCmdClearDepthStencilImage) {
         if ((dest_image_layout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) && (dest_image_layout != VK_IMAGE_LAYOUT_GENERAL)) {
@@ -881,9 +880,9 @@ bool CoreChecks::VerifyClearImageLayout(const vvl::CommandBuffer &cb_state, cons
     return skip;
 }
 
-bool CoreChecks::VerifyImageBarrierLayouts(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
-                                           const Location &image_loc, const ImageBarrier &image_barrier,
-                                           ImageLayoutRegistry &local_layout_registry) const {
+bool CoreChecks::ValidateImageBarrierLayouts(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
+                                             const Location &image_loc, const ImageBarrier &image_barrier,
+                                             ImageLayoutRegistry &local_layout_registry) const {
     bool skip = false;
 
     std::shared_ptr<CommandBufferImageLayoutMap> local_layout_map;
@@ -1006,28 +1005,6 @@ bool CoreChecks::VerifyDynamicRenderingImageBarrierLayouts(const vvl::CommandBuf
     return skip;
 }
 
-bool CoreChecks::FindLayouts(const vvl::Image &image_state, std::vector<VkImageLayout> &layouts) const {
-    if (!image_state.layout_map) {
-        return false;
-    }
-    const auto &layout_map = *image_state.layout_map;
-
-    auto guard = image_state.LayoutMapReadLock();
-    // TODO: FindLayouts function should mutate into a ValidatePresentableLayout with the loop wrapping the LogError
-    //       from the caller. You can then use decode to add the subresource of the range::begin to the error message.
-
-    // TODO: what is this test and what is it supposed to do?! -- the logic doesn't match the comment below?!
-
-    // TODO: Make this robust for >1 aspect mask. Now it will just say ignore potential errors in this case.
-    if (layout_map.size() >= (image_state.create_info.arrayLayers * image_state.create_info.mipLevels + 1)) {
-        return false;
-    }
-    for (const auto &entry : layout_map) {
-        layouts.emplace_back(entry.second);
-    }
-    return true;
-}
-
 void CoreChecks::EnqueueValidateDynamicRenderingImageBarrierLayouts(const Location barrier_loc, vvl::CommandBuffer &cb_state,
                                                                     const ImageBarrier &image_barrier) {
     if (!cb_state.active_render_pass || !cb_state.active_render_pass->UsesDynamicRendering()) {
@@ -1091,17 +1068,22 @@ void CoreChecks::EnqueueValidateDynamicRenderingImageBarrierLayouts(const Locati
     }
 }
 
-void CoreChecks::RecordTransitionImageLayout(vvl::CommandBuffer &cb_state, const ImageBarrier &mem_barrier) {
+void CoreChecks::RecordTransitionImageLayout(vvl::CommandBuffer &cb_state, const ImageBarrier &mem_barrier,
+                                             const vvl::Image &image_state) {
     if (enabled_features.synchronization2) {
         if (mem_barrier.oldLayout == mem_barrier.newLayout) {
             return;
         }
     }
-    auto image_state = Get<vvl::Image>(mem_barrier.image);
-    ASSERT_AND_RETURN(image_state);
 
-    const VkImageSubresourceRange normalized_subresource_range =
-        image_state->NormalizeSubresourceRange(mem_barrier.subresourceRange);
+    VkImageSubresourceRange normalized_subresource_range = image_state.NormalizeSubresourceRange(mem_barrier.subresourceRange);
+
+    // VK_REMAINING_ARRAY_LAYERS for sliced 3d image in the context of layout transition means image's depth extent.
+    if (mem_barrier.subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS &&
+        CanTransitionDepthSlices(extensions, image_state.create_info)) {
+        normalized_subresource_range.layerCount =
+            image_state.create_info.extent.depth - normalized_subresource_range.baseArrayLayer;
+    }
 
     VkImageLayout old_layout = mem_barrier.oldLayout;
     if (IsQueueFamilyExternal(mem_barrier.srcQueueFamilyIndex)) {
@@ -1119,9 +1101,9 @@ void CoreChecks::RecordTransitionImageLayout(vvl::CommandBuffer &cb_state, const
     //
     // However, we still need to record initial layout for the "initial layout" validation
     if (cb_state.IsReleaseOp(mem_barrier)) {
-        cb_state.TrackImageFirstLayout(*image_state, normalized_subresource_range, old_layout);
+        cb_state.TrackImageFirstLayout(image_state, normalized_subresource_range, 0, 0, old_layout);
     } else {
-        cb_state.SetImageLayout(*image_state, normalized_subresource_range, mem_barrier.newLayout, old_layout);
+        cb_state.SetImageLayout(image_state, normalized_subresource_range, mem_barrier.newLayout, old_layout);
     }
 }
 

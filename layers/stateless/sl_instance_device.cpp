@@ -91,7 +91,7 @@ bool Instance::ValidateExtensionReqs(const ExtensionState &extensions, const cha
     // Check against the required list in the info
     std::vector<const char *> missing;
     for (const auto &req : info.requirements) {
-        if (!(extensions.*(req.enabled))) {
+        if (!IsExtEnabled(extensions.*(req.enabled))) {
             missing.push_back(req.name);
         }
     }
@@ -108,7 +108,7 @@ bool Instance::ValidateExtensionReqs(const ExtensionState &extensions, const cha
 ExtEnabled ExtensionStateByName(const DeviceExtensions &extensions, vvl::Extension extension) {
     auto info = extensions.GetInfo(extension);
     // unknown extensions can't be enabled in extension struct
-    ExtEnabled state = info.state ? extensions.*(info.state) : kNotEnabled;
+    ExtEnabled state = info.state ? extensions.*(info.state) : kNotSupported;
     return state;
 }
 
@@ -351,6 +351,8 @@ void Device::FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const Loca
             scissor_exclusive_extension_version = prop.specVersion;
         }
     }
+
+    has_zero_queues = pCreateInfo->queueCreateInfoCount == 0;
 }
 
 bool Instance::manual_PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCreateInfo,
@@ -647,6 +649,12 @@ bool Instance::manual_PreCallValidateCreateDevice(VkPhysicalDevice physicalDevic
                 break;
             }
             current = reinterpret_cast<const VkBaseOutStructure *>(current->pNext);
+        }
+        if (vulkan_14_features->pushDescriptor == VK_FALSE &&
+            enabled_extensions.find(vvl::Extension::_VK_KHR_push_descriptor) != enabled_extensions.end()) {
+            skip |= LogError("VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-10858", physicalDevice, error_obj.location,
+                             "%s is enabled but VkPhysicalDeviceVulkan14Features::pushDescriptor is not VK_TRUE.",
+                             VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
         }
     }
 

@@ -14,6 +14,7 @@
  *
  */
 
+#include <vulkan/vulkan_core.h>
 #include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
@@ -199,9 +200,11 @@ TEST_F(NegativeDynamicRendering, CmdClearAttachmentTests) {
     RETURN_IF_SKIP(InitBasicDynamicRendering());
     InitRenderTarget();
 
+    const auto render_target_ci = vkt::Image::ImageCreateInfo2D(m_renderTargets[0]->Width(), m_renderTargets[0]->Height(),
+                                                                m_renderTargets[0]->CreateInfo().mipLevels, 4,
+                                                                m_renderTargets[0]->Format(), m_renderTargets[0]->Usage());
     VkImageFormatProperties image_format_properties{};
-    vk::GetPhysicalDeviceImageFormatProperties(m_device->Physical(), m_renderTargets[0]->Format(), VK_IMAGE_TYPE_2D,
-                                               VK_IMAGE_TILING_OPTIMAL, m_renderTargets[0]->Usage(), 0, &image_format_properties);
+    GetImageFormatProps(Gpu(), render_target_ci, image_format_properties);
     if (image_format_properties.maxArrayLayers < 4) {
         GTEST_SKIP() << "Test needs to create image 2D array of 4 image view, but VkImageFormatProperties::maxArrayLayers is < 4. "
                         "Skipping test.";
@@ -211,9 +214,6 @@ TEST_F(NegativeDynamicRendering, CmdClearAttachmentTests) {
     // to make sure that considered layer count is the one coming from frame buffer
     // (test would not fail if layer count used to do validation was 4)
     assert(!m_renderTargets.empty());
-    const auto render_target_ci = vkt::Image::ImageCreateInfo2D(m_renderTargets[0]->Width(), m_renderTargets[0]->Height(),
-                                                                m_renderTargets[0]->CreateInfo().mipLevels, 4,
-                                                                m_renderTargets[0]->Format(), m_renderTargets[0]->Usage());
     vkt::Image render_target(*m_device, render_target_ci, vkt::set_layout);
     vkt::ImageView render_target_view =
         render_target.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, render_target_ci.arrayLayers);
@@ -573,7 +573,7 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
         m_command_buffer.End();
 
         {
-            m_command_buffer.destroy();
+            m_command_buffer.Destroy();
             m_command_buffer.Init(*m_device, m_command_pool);
 
             std::unique_ptr<vkt::CommandBuffer> secondary_cmd_buffer(
@@ -654,7 +654,7 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
 
     clear_cmd_test(true);
 
-    m_command_buffer.destroy();
+    m_command_buffer.Destroy();
     m_command_buffer.Init(*m_device, m_command_pool);
     clear_cmd_test(false);
 }
@@ -1620,11 +1620,6 @@ TEST_F(NegativeDynamicRendering, PipelineMissingFlags) {
         image_ci.usage |= VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT;
     }
 
-    VkImageFormatProperties imageFormatProperties;
-    if (vk::GetPhysicalDeviceImageFormatProperties(Gpu(), image_ci.format, image_ci.imageType, image_ci.tiling, image_ci.usage,
-                                                   image_ci.flags, &imageFormatProperties) == VK_ERROR_FORMAT_NOT_SUPPORTED) {
-        GTEST_SKIP() << "Format not supported";
-    }
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView depth_image_view = image.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
@@ -1839,11 +1834,6 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRate) {
     auto image_ci = vkt::Image::ImageCreateInfo2D(
         32, 32, 1, 2, VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR);
-    VkImageFormatProperties imageFormatProperties;
-    if (vk::GetPhysicalDeviceImageFormatProperties(Gpu(), image_ci.format, image_ci.imageType, image_ci.tiling, image_ci.usage,
-                                                   image_ci.flags, &imageFormatProperties) == VK_ERROR_FORMAT_NOT_SUPPORTED) {
-        GTEST_SKIP() << "Format not supported";
-    }
 
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 2);
@@ -1877,6 +1867,33 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRate) {
     begin_rendering_info.pColorAttachments = &color_attachment;
     begin_rendering_info.viewMask = 0;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-06125");
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicRendering, ColorAttachmentLayerCount) {
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+    InitRenderTarget();
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 2, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 2);
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.layerCount = 3;
+    begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment;
+
+    m_command_buffer.Begin();
+
+    m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-viewMask-10859");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
@@ -2075,14 +2092,14 @@ TEST_F(NegativeDynamicRendering, TestFragmentDensityMapRenderArea) {
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06112");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
+    begin_rendering_info.renderArea.offset.x = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06112");
     m_command_buffer.BeginRendering(begin_rendering_info);
@@ -2097,14 +2114,14 @@ TEST_F(NegativeDynamicRendering, TestFragmentDensityMapRenderArea) {
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07816");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06114");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
+    begin_rendering_info.renderArea.offset.y = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07816");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06114");
     m_command_buffer.BeginRendering(begin_rendering_info);
@@ -2544,14 +2561,14 @@ TEST_F(NegativeDynamicRendering, AreaGreaterThanAttachmentExtent) {
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07815");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
+    begin_rendering_info.renderArea.offset.x = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07815");
     m_command_buffer.BeginRendering(begin_rendering_info);
@@ -2566,14 +2583,14 @@ TEST_F(NegativeDynamicRendering, AreaGreaterThanAttachmentExtent) {
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07816");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
+    begin_rendering_info.renderArea.offset.y = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07816");
     m_command_buffer.BeginRendering(begin_rendering_info);
@@ -2627,14 +2644,14 @@ TEST_F(NegativeDynamicRendering, DeviceGroupAreaGreaterThanAttachmentExtent) {
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
+    begin_rendering_info.renderArea.offset.x = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
     m_command_buffer.BeginRendering(begin_rendering_info);
@@ -2649,14 +2666,14 @@ TEST_F(NegativeDynamicRendering, DeviceGroupAreaGreaterThanAttachmentExtent) {
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07816");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
+    begin_rendering_info.renderArea.offset.y = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07816");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
     m_command_buffer.BeginRendering(begin_rendering_info);
@@ -3119,7 +3136,7 @@ TEST_F(NegativeDynamicRendering, RenderingFragmentDensityMapAttachment) {
     auto image_ci = vkt::Image::ImageCreateInfo2D(
         32, 32, 1, 2, VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT | VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR);
-    if (!ImageFormatIsSupported(instance(), Gpu(), image_ci, VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
+    if (!IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         GTEST_SKIP() << "format doesn't support FRAGMENT_SHADING_RATE_ATTACHMENT_BIT";
     }
 
@@ -3302,13 +3319,13 @@ TEST_F(NegativeDynamicRendering, RenderArea) {
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07815");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
+    begin_rendering_info.renderArea.offset.x = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07815");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
@@ -3321,13 +3338,13 @@ TEST_F(NegativeDynamicRendering, RenderArea) {
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07816");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
+    begin_rendering_info.renderArea.offset.y = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07816");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
@@ -4408,14 +4425,14 @@ TEST_F(NegativeDynamicRendering, FragmentShadingRateAttachmentSizeWithDeviceGrou
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06119");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
-    begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
+    begin_rendering_info.renderArea.offset.x = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.width = vvl::kU32Max;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06119");
     m_command_buffer.BeginRendering(begin_rendering_info);
@@ -4441,13 +4458,13 @@ TEST_F(NegativeDynamicRendering, FragmentShadingRateAttachmentSizeWithDeviceGrou
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06120");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
-    begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
+    begin_rendering_info.renderArea.offset.y = vvl::kI32Max;
+    begin_rendering_info.renderArea.extent.height = vvl::kU32Max;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06120");
     m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
@@ -4470,34 +4487,18 @@ TEST_F(NegativeDynamicRendering, SuspendingRenderPassInstance) {
     vkt::CommandBuffer cmd_buffer2(*m_device, command_pool);
     vkt::CommandBuffer cmd_buffer3(*m_device, command_pool);
 
-    VkRenderingInfo suspend_rendering_info = vku::InitStructHelper();
-    suspend_rendering_info.flags = VK_RENDERING_SUSPENDING_BIT;
-    suspend_rendering_info.layerCount = 1;
-    suspend_rendering_info.renderArea = {{0, 0}, {1, 1}};
-
-    VkRenderingInfo resume_rendering_info = vku::InitStructHelper();
-    resume_rendering_info.flags = VK_RENDERING_RESUMING_BIT;
-    resume_rendering_info.layerCount = 1;
-    resume_rendering_info.renderArea = {{0, 0}, {1, 1}};
-
-    VkRenderingInfo rendering_info = vku::InitStructHelper();
-    rendering_info.layerCount = 1;
-    rendering_info.renderArea = {{0, 0}, {1, 1}};
-
-    VkCommandBufferBeginInfo cmd_begin = vku::InitStructHelper();
-
-    cmd_buffer1.Begin(&cmd_begin);
-    cmd_buffer1.BeginRendering(suspend_rendering_info);
+    cmd_buffer1.Begin();
+    cmd_buffer1.BeginRendering(GetSimpleSuspendInfo());
     cmd_buffer1.EndRendering();
     cmd_buffer1.End();
 
-    cmd_buffer2.Begin(&cmd_begin);
-    cmd_buffer2.BeginRendering(resume_rendering_info);
+    cmd_buffer2.Begin();
+    cmd_buffer2.BeginRendering(GetSimpleResumeInfo());
     cmd_buffer2.EndRendering();
     cmd_buffer2.End();
 
-    cmd_buffer3.Begin(&cmd_begin);
-    cmd_buffer3.BeginRendering(rendering_info);
+    cmd_buffer3.Begin();
+    cmd_buffer3.BeginRendering(GetSimpleRenderingInfo());
     cmd_buffer3.EndRendering();
     cmd_buffer3.End();
 
@@ -4537,7 +4538,34 @@ TEST_F(NegativeDynamicRendering, SuspendingRenderPassInstance) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDynamicRendering, SuspendingRenderPassInstanceQueueSubmit2) {
+TEST_F(NegativeDynamicRendering, SuspendingRenderPassInstance2) {
+    TEST_DESCRIPTION("Test suspending render pass instance.");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::CommandBuffer command_buffers[2] = {{*m_device, m_command_pool}, {*m_device, m_command_pool}};
+
+    command_buffers[0].Begin();
+    command_buffers[0].BeginRendering(GetSimpleSuspendInfo());
+    command_buffers[0].EndRendering();
+    command_buffers[0].End();
+
+    command_buffers[1].Begin();
+    // We can't begin new render pass instance and only later resume the suspended one.
+    // This will be detected during submit time validation.
+    command_buffers[1].BeginRendering(GetSimpleRenderingInfo());
+    command_buffers[1].EndRendering();
+
+    command_buffers[1].BeginRendering(GetSimpleResumeInfo());
+    command_buffers[1].EndRendering();
+    command_buffers[1].End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06016");
+    m_default_queue->Submit({command_buffers[0], command_buffers[1]});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendingRenderPassInstance3) {
     TEST_DESCRIPTION("Test suspending render pass instance with QueueSubmit2.");
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::synchronization2);
@@ -4548,34 +4576,18 @@ TEST_F(NegativeDynamicRendering, SuspendingRenderPassInstanceQueueSubmit2) {
     vkt::CommandBuffer cmd_buffer2(*m_device, command_pool);
     vkt::CommandBuffer cmd_buffer3(*m_device, command_pool);
 
-    VkRenderingInfo suspend_rendering_info = vku::InitStructHelper();
-    suspend_rendering_info.flags = VK_RENDERING_SUSPENDING_BIT;
-    suspend_rendering_info.layerCount = 1;
-    suspend_rendering_info.renderArea = {{0, 0}, {1, 1}};
-
-    VkRenderingInfo resume_rendering_info = vku::InitStructHelper();
-    resume_rendering_info.flags = VK_RENDERING_RESUMING_BIT;
-    resume_rendering_info.layerCount = 1;
-    resume_rendering_info.renderArea = {{0, 0}, {1, 1}};
-
-    VkRenderingInfo rendering_info = vku::InitStructHelper();
-    rendering_info.layerCount = 1;
-    rendering_info.renderArea = {{0, 0}, {1, 1}};
-
-    VkCommandBufferBeginInfo cmd_begin = vku::InitStructHelper();
-
-    cmd_buffer1.Begin(&cmd_begin);
-    cmd_buffer1.BeginRendering(suspend_rendering_info);
+    cmd_buffer1.Begin();
+    cmd_buffer1.BeginRendering(GetSimpleSuspendInfo());
     cmd_buffer1.EndRendering();
     cmd_buffer1.End();
 
-    cmd_buffer2.Begin(&cmd_begin);
-    cmd_buffer2.BeginRendering(resume_rendering_info);
+    cmd_buffer2.Begin();
+    cmd_buffer2.BeginRendering(GetSimpleResumeInfo());
     cmd_buffer2.EndRendering();
     cmd_buffer2.End();
 
-    cmd_buffer3.Begin(&cmd_begin);
-    cmd_buffer3.BeginRendering(rendering_info);
+    cmd_buffer3.Begin();
+    cmd_buffer3.BeginRendering(GetSimpleRenderingInfo());
     cmd_buffer3.EndRendering();
     cmd_buffer3.End();
 
@@ -4619,6 +4631,332 @@ TEST_F(NegativeDynamicRendering, SuspendingRenderPassInstanceQueueSubmit2) {
     m_default_queue->Wait();
 
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommand) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(GetSimpleSuspendInfo());
+    m_command_buffer.EndRendering();
+    // TODO: temporary use submit time vuid: https://gitlab.khronos.org/vulkan/vulkan/-/issues/4468
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    vk::CmdFillBuffer(m_command_buffer, buffer, 0, 4, 0x42);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSecondary) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    secondary.Begin();
+    secondary.BeginRendering(GetSimpleSuspendInfo());
+    secondary.EndRendering();
+    // TODO: temporary use submit time vuid: https://gitlab.khronos.org/vulkan/vulkan/-/issues/4468
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    vk::CmdFillBuffer(secondary, buffer, 0, 4, 0x42);
+    m_errorMonitor->VerifyFound();
+    secondary.End();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSecondary2) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    secondary.Begin();
+    vk::CmdFillBuffer(secondary, buffer, 0, 4, 0x42);
+    secondary.End();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(GetSimpleSuspendInfo());
+    m_command_buffer.EndRendering();
+    // TODO: temporary use submit time vuid: https://gitlab.khronos.org/vulkan/vulkan/-/issues/4468
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    m_command_buffer.ExecuteCommands(secondary);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSecondary3) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer secondaries[2] = {{*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY},
+                                         {*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY}};
+    VkCommandBuffer secondary_handles[2] = {secondaries[0], secondaries[1]};
+
+    secondaries[0].Begin();
+    secondaries[0].End();
+
+    secondaries[1].Begin();
+    vk::CmdFillBuffer(secondaries[1], buffer, 0, 4, 0x42);
+    secondaries[1].End();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(GetSimpleSuspendInfo());
+    m_command_buffer.EndRendering();
+    // TODO: temporary use submit time vuid: https://gitlab.khronos.org/vulkan/vulkan/-/issues/4468
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    vk::CmdExecuteCommands(m_command_buffer, 2, secondary_handles);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSecondary4) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer secondaries[2] = {{*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY},
+                                         {*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY}};
+    VkCommandBuffer secondary_handles[2] = {secondaries[0], secondaries[1]};
+
+    secondaries[0].Begin();
+    secondaries[0].BeginRendering(GetSimpleSuspendInfo());
+    secondaries[0].EndRendering();
+    secondaries[0].End();
+
+    secondaries[1].Begin();
+    vk::CmdFillBuffer(secondaries[1], buffer, 0, 4, 0x42);
+    secondaries[1].End();
+
+    m_command_buffer.Begin();
+    // TODO: temporary use submit time vuid: https://gitlab.khronos.org/vulkan/vulkan/-/issues/4468
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    vk::CmdExecuteCommands(m_command_buffer, 2, secondary_handles);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSubmit) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer command_buffers[2] = {{*m_device, m_command_pool}, {*m_device, m_command_pool}};
+
+    command_buffers[0].Begin();
+    command_buffers[0].BeginRendering(GetSimpleSuspendInfo());
+    command_buffers[0].EndRendering();
+    command_buffers[0].End();
+
+    command_buffers[1].Begin();
+    vk::CmdFillBuffer(command_buffers[1], buffer, 0, 4, 0x42);
+    command_buffers[1].BeginRendering(GetSimpleResumeInfo());
+    command_buffers[1].EndRendering();
+    command_buffers[1].End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    m_default_queue->Submit({command_buffers[0], command_buffers[1]});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSubmit2) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer command_buffers[2] = {{*m_device, m_command_pool}, {*m_device, m_command_pool}};
+
+    command_buffers[0].Begin();
+    command_buffers[0].BeginRendering(GetSimpleSuspendInfo());
+    command_buffers[0].EndRendering();
+    command_buffers[0].End();
+
+    command_buffers[1].Begin();
+    vk::CmdFillBuffer(command_buffers[1], buffer, 0, 4, 0x42);
+    command_buffers[1].BeginRendering(GetSimpleResumeInfo());
+    command_buffers[1].EndRendering();
+    command_buffers[1].End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo2-commandBuffer-06011");
+    m_default_queue->Submit2({command_buffers[0], command_buffers[1]});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSubmit3) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer command_buffers[3] = {{*m_device, m_command_pool}, {*m_device, m_command_pool}, {*m_device, m_command_pool}};
+
+    command_buffers[0].Begin();
+    command_buffers[0].BeginRendering(GetSimpleSuspendInfo());
+    command_buffers[0].EndRendering();
+    command_buffers[0].End();
+
+    command_buffers[1].Begin();
+    vk::CmdFillBuffer(command_buffers[1], buffer, 0, 4, 0x42);
+    command_buffers[1].End();
+
+    command_buffers[2].Begin();
+    command_buffers[2].BeginRendering(GetSimpleResumeInfo());
+    command_buffers[2].EndRendering();
+    command_buffers[2].End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    m_default_queue->Submit({command_buffers[0], command_buffers[1], command_buffers[2]});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSubmit4) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer command_buffers[3] = {{*m_device, m_command_pool}, {*m_device, m_command_pool}, {*m_device, m_command_pool}};
+
+    command_buffers[0].Begin();
+    command_buffers[0].BeginRendering(GetSimpleSuspendInfo());
+    command_buffers[0].EndRendering();
+    command_buffers[0].End();
+
+    command_buffers[1].Begin();
+    vk::CmdFillBuffer(command_buffers[1], buffer, 0, 4, 0x42);
+    command_buffers[1].End();
+
+    command_buffers[2].Begin();
+    command_buffers[2].BeginRendering(GetSimpleResumeInfo());
+    command_buffers[2].EndRendering();
+    command_buffers[2].End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo2-commandBuffer-06011");
+    m_default_queue->Submit2({command_buffers[0], command_buffers[1], command_buffers[2]});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenSyncCommandSubmit) {
+    TEST_DESCRIPTION("Run synchronization command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer command_buffers[2] = {{*m_device, m_command_pool}, {*m_device, m_command_pool}};
+
+    VkMemoryBarrier barrier = vku::InitStructHelper();
+
+    command_buffers[0].Begin();
+    command_buffers[0].BeginRendering(GetSimpleSuspendInfo());
+    command_buffers[0].EndRendering();
+    command_buffers[0].End();
+
+    command_buffers[1].Begin();
+    vk::CmdPipelineBarrier(command_buffers[1], VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
+                           &barrier, 0, nullptr, 0, nullptr);
+    command_buffers[1].BeginRendering(GetSimpleResumeInfo());
+    command_buffers[1].EndRendering();
+    command_buffers[1].End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    m_default_queue->Submit({command_buffers[0], command_buffers[1]});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenSyncCommandSubmit2) {
+    TEST_DESCRIPTION("Run synchronization command when render pass instance is suspended");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer command_buffers[2] = {{*m_device, m_command_pool}, {*m_device, m_command_pool}};
+
+    VkMemoryBarrier2 barrier = vku::InitStructHelper();
+
+    command_buffers[0].Begin();
+    command_buffers[0].BeginRendering(GetSimpleSuspendInfo());
+    command_buffers[0].EndRendering();
+    command_buffers[0].End();
+
+    command_buffers[1].Begin();
+    command_buffers[1].Barrier(barrier);
+    command_buffers[1].BeginRendering(GetSimpleResumeInfo());
+    command_buffers[1].EndRendering();
+    command_buffers[1].End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo2-commandBuffer-06011");
+    m_default_queue->Submit2({command_buffers[0], command_buffers[1]});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSecondarySubmit) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer command_buffers[2] = {{*m_device, m_command_pool}, {*m_device, m_command_pool}};
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    secondary.Begin();
+    vk::CmdFillBuffer(secondary, buffer, 0, 4, 0x42);
+    secondary.End();
+
+    command_buffers[0].Begin();
+    command_buffers[0].BeginRendering(GetSimpleSuspendInfo());
+    command_buffers[0].EndRendering();
+    command_buffers[0].End();
+
+    command_buffers[1].Begin();
+    command_buffers[1].ExecuteCommands(secondary);
+    command_buffers[1].BeginRendering(GetSimpleResumeInfo());
+    command_buffers[1].EndRendering();
+    command_buffers[1].End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    m_default_queue->Submit({command_buffers[0], command_buffers[1]});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeDynamicRendering, SuspendThenActionCommandSecondarySubmit2) {
+    TEST_DESCRIPTION("Run action command when render pass instance is suspended");
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::CommandBuffer command_buffers[2] = {{*m_device, m_command_pool}, {*m_device, m_command_pool}};
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    secondary.Begin();
+    vk::CmdFillBuffer(secondary, buffer, 0, 4, 0x42);
+    secondary.BeginRendering(GetSimpleResumeInfo());
+    secondary.EndRendering();
+    secondary.End();
+
+    command_buffers[0].Begin();
+    command_buffers[0].BeginRendering(GetSimpleSuspendInfo());
+    command_buffers[0].EndRendering();
+    command_buffers[0].End();
+
+    command_buffers[1].Begin();
+    command_buffers[1].ExecuteCommands(secondary);
+    command_buffers[1].End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-06015");
+    m_default_queue->Submit({command_buffers[0], command_buffers[1]});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
 }
 
 TEST_F(NegativeDynamicRendering, NullDepthStencilExecuteCommands) {
@@ -4934,11 +5272,11 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingColorAttachmentCo
         VK_NULL_HANDLE,
     };
 
-    VkCommandBufferBeginInfo cmdbuff__bi = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-                                            nullptr,  // pNext
-                                            VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
-    cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.Begin(&cmdbuff__bi);
+    VkCommandBufferBeginInfo cmdbuff_bi = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                                           nullptr,  // pNext
+                                           VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
+    cmdbuff_bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    secondary.Begin(&cmdbuff_bi);
     secondary.End();
 
     m_command_buffer.Begin();
@@ -5579,7 +5917,7 @@ TEST_F(NegativeDynamicRendering, EndRenderpassWithBeginRenderingRenderpassInstan
     m_command_buffer.EndRenderPass();
     m_errorMonitor->VerifyFound();
 
-    VkSubpassEndInfo subpassEndInfo = {VK_STRUCTURE_TYPE_SUBPASS_END_INFO_KHR, nullptr};
+    VkSubpassEndInfo subpassEndInfo = vku::InitStructHelper();
 
     vkt::CommandBuffer primary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
@@ -5728,7 +6066,7 @@ TEST_F(NegativeDynamicRendering, CreateGraphicsPipeline) {
     TEST_DESCRIPTION("Test for a creating a pipeline with VK_KHR_dynamic_rendering enabled");
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
         layout(location=0) out vec4 color;
@@ -5738,8 +6076,8 @@ TEST_F(NegativeDynamicRendering, CreateGraphicsPipeline) {
     )glsl";
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkDescriptorSetLayoutBinding dslb = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
-    const vkt::DescriptorSetLayout dsl(*m_device, {dslb});
+    const vkt::DescriptorSetLayout dsl(*m_device,
+                                       {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
     const vkt::PipelineLayout pl(*m_device, {&dsl});
 
     VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -5750,7 +6088,7 @@ TEST_F(NegativeDynamicRendering, CreateGraphicsPipeline) {
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06061");
     CreatePipelineHelper pipe(*this, &rendering_info);
     pipe.shader_stages_[1] = fs.GetStageCreateInfo();
-    pipe.gp_ci_.layout = pl.handle();
+    pipe.gp_ci_.layout = pl;
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -5759,7 +6097,7 @@ TEST_F(NegativeDynamicRendering, CreateGraphicsPipelineNoInfo) {
     TEST_DESCRIPTION("Test for a creating a pipeline with VK_KHR_dynamic_rendering enabled but no rendering info struct.");
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
         layout(location=0) out vec4 color;
@@ -5769,14 +6107,14 @@ TEST_F(NegativeDynamicRendering, CreateGraphicsPipelineNoInfo) {
     )glsl";
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkDescriptorSetLayoutBinding dslb = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
-    const vkt::DescriptorSetLayout dsl(*m_device, {dslb});
+    const vkt::DescriptorSetLayout dsl(*m_device,
+                                       {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
     const vkt::PipelineLayout pl(*m_device, {&dsl});
 
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06061");
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_[1] = fs.GetStageCreateInfo();
-    pipe.gp_ci_.layout = pl.handle();
+    pipe.gp_ci_.layout = pl;
     pipe.cb_ci_.attachmentCount = 0;
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
@@ -5788,17 +6126,22 @@ TEST_F(NegativeDynamicRendering, DynamicColorBlendAttchment) {
     AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorWriteMask);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    VkFormat color_formats = VK_FORMAT_UNDEFINED;
+    VkFormat color_formats = VK_FORMAT_R8G8B8A8_UNORM;
     VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
     pipeline_rendering_info.colorAttachmentCount = 1;
     pipeline_rendering_info.pColorAttachmentFormats = &color_formats;
 
     CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT);
+    pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
     pipe.CreateGraphicsPipeline();
+
+    vkt::Image color_image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView color_image_view = color_image.CreateView();
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.imageView = color_image_view;
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.colorAttachmentCount = 1;
@@ -6139,7 +6482,7 @@ TEST_F(NegativeDynamicRendering, ResolveAttachmentUsage) {
     attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     attachment.imageView = image_view;
     attachment.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    attachment.resolveImageView = resolve_image_view.handle();
+    attachment.resolveImageView = resolve_image_view;
     attachment.resolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
@@ -6352,10 +6695,10 @@ TEST_F(NegativeDynamicRendering, RenderPassStripeInfoQueueSubmit2) {
 
     for (uint32_t i = 0; i < stripe_count + 1; ++i) {
         VkSemaphoreCreateInfo create_info = i == 4 ? semaphore_timeline_create_info : semaphore_create_info;
-        semaphore[i].init(*m_device, create_info);
+        semaphore[i].Init(*m_device, create_info);
 
         semaphore_submit_infos[i] = vku::InitStructHelper();
-        semaphore_submit_infos[i].semaphore = semaphore[i].handle();
+        semaphore_submit_infos[i].semaphore = semaphore[i];
     }
 
     VkRenderPassStripeSubmitInfoARM rp_stripe_submit_info = vku::InitStructHelper();
@@ -6497,6 +6840,7 @@ TEST_F(NegativeDynamicRendering, InheritanceRenderingInfoViewMask) {
     inheritance_rendering_info.colorAttachmentCount = 1u;
     inheritance_rendering_info.pColorAttachmentFormats = &color_format;
     inheritance_rendering_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    inheritance_rendering_info.viewMask = 0;
     VkCommandBufferInheritanceInfo inheritance_info = vku::InitStructHelper(&inheritance_rendering_info);
 
     VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
@@ -6586,15 +6930,7 @@ TEST_F(NegativeDynamicRendering, AttachmentFeedbackLoopInfoInvalidUsage) {
     AddRequiredFeature(vkt::Feature::unifiedImageLayouts);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
-    image_ci.extent = {32u, 32u, 1u};
-    image_ci.mipLevels = 1u;
-    image_ci.arrayLayers = 1u;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView();
 

@@ -14,10 +14,12 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/render_pass_helper.h"
+#include "utils/convert_utils.h"
 
 class PositiveRenderPass : public VkLayerTest {};
 
@@ -59,7 +61,7 @@ TEST_F(PositiveRenderPass, InitialLayoutUndefined) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(rp, fb, 32, 32);
     m_command_buffer.EndRenderPass();
-    m_errorMonitor->SetAllowedFailureMsg("SYNC-HAZARD-WRITE-AFTER-WRITE");
+    m_errorMonitor->SetAllowedFailureMsg("SYNC-HAZARD-WRITE-AFTER-WRITE");  // if running with sync val
     m_command_buffer.BeginRenderPass(rp, fb, 32, 32);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -401,19 +403,34 @@ TEST_F(PositiveRenderPass, ValidStages) {
     dependency.dstSubpass = 1;
     dependency.srcStageMask = kGraphicsStages;
     dependency.dstStageMask = kGraphicsStages;
-    PositiveTestRenderPassCreate(m_errorMonitor, *m_device, rpci, rp2_supported);
+    {
+        vkt::RenderPass rp(*m_device, rpci);
+        if (rp2_supported) {
+            vkt::RenderPass rp2(*m_device, *ConvertVkRenderPassCreateInfoToV2KHR(rpci).ptr());
+        }
+    }
 
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
     dependency.srcStageMask = kGraphicsStages | VK_PIPELINE_STAGE_HOST_BIT;
     dependency.dstStageMask = kGraphicsStages;
-    PositiveTestRenderPassCreate(m_errorMonitor, *m_device, rpci, rp2_supported);
+    {
+        vkt::RenderPass rp(*m_device, rpci);
+        if (rp2_supported) {
+            vkt::RenderPass rp2(*m_device, *ConvertVkRenderPassCreateInfoToV2KHR(rpci).ptr());
+        }
+    }
 
     dependency.srcSubpass = 0;
     dependency.dstSubpass = VK_SUBPASS_EXTERNAL;
     dependency.srcStageMask = kGraphicsStages;
     dependency.dstStageMask = VK_PIPELINE_STAGE_HOST_BIT;
-    PositiveTestRenderPassCreate(m_errorMonitor, *m_device, rpci, rp2_supported);
+    {
+        vkt::RenderPass rp(*m_device, rpci);
+        if (rp2_supported) {
+            vkt::RenderPass rp2(*m_device, *ConvertVkRenderPassCreateInfoToV2KHR(rpci).ptr());
+        }
+    }
 }
 
 TEST_F(PositiveRenderPass, SingleMipTransition) {
@@ -449,8 +466,7 @@ TEST_F(PositiveRenderPass, SingleMipTransition) {
 
     VkImageView baseViews[] = {color_view, depth_view};
 
-    VkImageViewCreateInfo vinfo = {};
-    vinfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    VkImageViewCreateInfo vinfo = vku::InitStructHelper();
     vinfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     vinfo.components.r = VK_COMPONENT_SWIZZLE_R;
     vinfo.components.g = VK_COMPONENT_SWIZZLE_G;
@@ -476,7 +492,7 @@ TEST_F(PositiveRenderPass, SingleMipTransition) {
 
     // Create shader modules
 
-    char const fsSource[] = R"glsl(
+    const char fsSource[] = R"glsl(
         #version 450
         layout(location=0) out vec4 x;
         layout(set=0, binding=2) uniform sampler2D depth;
@@ -499,8 +515,7 @@ TEST_F(PositiveRenderPass, SingleMipTransition) {
                                             VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
     descriptor_set.UpdateDescriptorSets();
 
-    VkPipelineDepthStencilStateCreateInfo ds_ci = {};
-    ds_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    VkPipelineDepthStencilStateCreateInfo ds_ci = vku::InitStructHelper();
     ds_ci.depthTestEnable = VK_TRUE;
     ds_ci.depthCompareOp = VK_COMPARE_OP_LESS;
 
@@ -680,7 +695,7 @@ TEST_F(PositiveRenderPass, FramebufferWithAttachmentsTo3DImageMultipleSubpasses)
     VkImageView views[depth_count] = {VK_NULL_HANDLE};
     for (unsigned i = 0; i < depth_count; ++i) {
         view_info.subresourceRange.baseArrayLayer = i;
-        image_views[i].init(*m_device, view_info);
+        image_views[i].Init(*m_device, view_info);
         views[i] = image_views[i];
     }
 
@@ -740,14 +755,6 @@ TEST_F(PositiveRenderPass, ImageLayoutTransitionOf3dImageWith2dViews) {
     AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_subset_features = vku::InitStructHelper();
-        GetPhysicalDeviceFeatures2(portability_subset_features);
-        if (!portability_subset_features.imageView2DOn3DImage) {
-            GTEST_SKIP() << "imageView2DOn3DImage not supported, skipping test";
-        }
-    }
-
     constexpr unsigned image_depth = 2u;
 
     // 3D image
@@ -779,7 +786,7 @@ TEST_F(PositiveRenderPass, ImageLayoutTransitionOf3dImageWith2dViews) {
     VkImageView views[image_depth] = {VK_NULL_HANDLE};
     for (unsigned i = 0; i < image_depth; ++i) {
         view_info.subresourceRange.baseArrayLayer = i;
-        image_views[i].init(*m_device, view_info);
+        image_views[i].Init(*m_device, view_info);
         views[i] = image_views[i];
     }
 
@@ -1011,11 +1018,9 @@ TEST_F(PositiveRenderPass, SeparateDepthStencilSubresourceLayout) {
 
 TEST_F(PositiveRenderPass, InputResolve) {
     TEST_DESCRIPTION("Create render pass where input attachment == resolve attachment");
-
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
-    const bool rp2Supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
 
     RenderPassSingleSubpass rp(*this);
     // input attachments
@@ -1032,8 +1037,7 @@ TEST_F(PositiveRenderPass, InputResolve) {
     rp.AddInputAttachment(0);
     rp.AddColorAttachment(1);
     rp.AddResolveAttachment(2);
-
-    PositiveTestRenderPassCreate(m_errorMonitor, *m_device, rp.GetCreateInfo(), rp2Supported);
+    rp.CreateRenderPass();
 }
 
 TEST_F(PositiveRenderPass, TestDepthStencilRenderPassTransition) {
@@ -1133,7 +1137,7 @@ TEST_F(PositiveRenderPass, BeginRenderPassWithRenderPassStriped) {
     VkSemaphoreSubmitInfo semaphore_submit_infos[stripe_count];
 
     for (uint32_t i = 0; i < stripe_count; ++i) {
-        semaphores[i].init(*m_device, semaphore_create_info);
+        semaphores[i].Init(*m_device, semaphore_create_info);
         semaphore_submit_infos[i] = vku::InitStructHelper();
         semaphore_submit_infos[i].semaphore = semaphores[i];
     }
@@ -1273,4 +1277,141 @@ TEST_F(PositiveRenderPass, RenderPassSampleLocationsBeginInfo) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
+}
+
+TEST_F(PositiveRenderPass, MultisampledRenderToSingleSampled) {
+    TEST_DESCRIPTION("Test VK_EXT_multisampled_render_to_single_sampled");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::imagelessFramebuffer);
+    AddRequiredFeature(vkt::Feature::multisampledRenderToSingleSampled);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkAttachmentReference2 attachment_ref = vku::InitStructHelper();
+    attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment_ref.attachment = 0;
+
+    VkMultisampledRenderToSingleSampledInfoEXT ms_render_to_ss = vku::InitStructHelper();
+    ms_render_to_ss.multisampledRenderToSingleSampledEnable = VK_TRUE;
+    ms_render_to_ss.rasterizationSamples = VK_SAMPLE_COUNT_2_BIT;
+
+    VkSubpassDescription2 subpass = vku::InitStructHelper(&ms_render_to_ss);
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &attachment_ref;
+    subpass.pDepthStencilAttachment = nullptr;
+
+    VkAttachmentDescription2 attach_desc = vku::InitStructHelper();
+    attach_desc.format = VK_FORMAT_B8G8R8A8_UNORM;
+    attach_desc.samples = VK_SAMPLE_COUNT_2_BIT;
+    attach_desc.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attach_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkRenderPassCreateInfo2 rpci = vku::InitStructHelper();
+    rpci.subpassCount = 1;
+    rpci.pSubpasses = &subpass;
+    rpci.attachmentCount = 1;
+    rpci.pAttachments = &attach_desc;
+    vkt::RenderPass test_rp(*m_device, rpci);
+
+    VkPipelineMultisampleStateCreateInfo ms_state = vku::InitStructHelper();
+    ms_state.rasterizationSamples = VK_SAMPLE_COUNT_4_BIT;
+    ms_state.sampleShadingEnable = VK_FALSE;
+    ms_state.minSampleShading = 0.0f;
+    ms_state.pSampleMask = nullptr;
+    ms_state.alphaToCoverageEnable = VK_FALSE;
+    ms_state.alphaToOneEnable = VK_FALSE;
+
+    CreatePipelineHelper pipe_helper(*this);
+    pipe_helper.gp_ci_.renderPass = test_rp;
+    pipe_helper.ms_ci_ = ms_state;
+    pipe_helper.ms_ci_.rasterizationSamples = VK_SAMPLE_COUNT_2_BIT;
+    pipe_helper.CreateGraphicsPipeline();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper(&ms_render_to_ss);
+    begin_rendering_info.layerCount = 1;
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment;
+    begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
+
+    {
+        ms_render_to_ss.rasterizationSamples = VK_SAMPLE_COUNT_4_BIT;
+
+        m_command_buffer.Begin();
+        m_command_buffer.BeginRendering(begin_rendering_info);
+        // ms_render_to_ss.rasterizationSamples != ms_state.rasterizationSamples
+        // Valid because never hit draw time
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_helper);
+        m_command_buffer.EndRendering();
+        m_command_buffer.End();
+
+        ms_render_to_ss.rasterizationSamples = VK_SAMPLE_COUNT_2_BIT;
+    }
+
+    VkImageFormatProperties2 image_format_prop = vku::InitStructHelper();
+    VkPhysicalDeviceImageFormatInfo2 image_format_info = vku::InitStructHelper();
+    image_format_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_format_info.type = VK_IMAGE_TYPE_2D;
+    image_format_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_format_info.format = VK_FORMAT_B8G8R8A8_UNORM;
+    VkResult result = vk::GetPhysicalDeviceImageFormatProperties2(m_device->Physical(), &image_format_info, &image_format_prop);
+    if ((result != VK_SUCCESS) || !(image_format_prop.imageFormatProperties.sampleCounts & VK_SAMPLE_COUNT_2_BIT)) {
+        GTEST_SKIP() << "Cannot create an image with format VK_FORMAT_B8G8R8A8_UNORM and sample count VK_SAMPLE_COUNT_2_BIT. "
+                        "Skipping remainder of the test";
+    }
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.flags = 0;
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
+    image_create_info.extent = {64, 64, 1};
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 1;
+    image_create_info.samples = VK_SAMPLE_COUNT_2_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    vkt::Image two_count_image(*m_device, image_create_info, vkt::set_layout);
+    vkt::ImageView two_count_image_view(*m_device, two_count_image.BasicViewCreatInfo());
+
+    image_create_info.flags = VK_IMAGE_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    vkt::Image good_one_count_image(*m_device, image_create_info, vkt::set_layout);
+    auto one_count_image_view_ci = good_one_count_image.BasicViewCreatInfo();
+    vkt::ImageView one_count_image_view(*m_device, one_count_image_view_ci);
+
+    // Image view with VK_SAMPLE_COUNT_1_BIT should not get error 07285 in pipeline created with attachment with
+    // VK_SAMPLE_COUNT_2_BIT
+    CreatePipelineHelper dr_pipe_helper(*this);
+    dr_pipe_helper.gp_ci_.renderPass = VK_NULL_HANDLE;
+    dr_pipe_helper.ms_ci_ = ms_state;
+    dr_pipe_helper.cb_ci_.attachmentCount = 0;
+    dr_pipe_helper.CreateGraphicsPipeline();
+
+    color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    color_attachment.imageView = one_count_image_view;
+    color_attachment.resolveImageView = VK_NULL_HANDLE;
+    color_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
+    begin_rendering_info.pNext = nullptr;
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, dr_pipe_helper);
+    vk::CmdDraw(m_command_buffer, 1, 1, 0, 0);
+    m_command_buffer.EndRendering();
+
+    // Same as previous test but using render pass and should not get error 08644
+    color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+    CreatePipelineHelper test_pipe(*this);
+    test_pipe.ms_ci_ = ms_state;
+    test_pipe.CreateGraphicsPipeline();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, test_pipe);
+    vk::CmdDraw(m_command_buffer, 1, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
 }

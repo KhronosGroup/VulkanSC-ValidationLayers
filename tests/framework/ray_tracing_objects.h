@@ -189,7 +189,7 @@ class BuildGeometryInfoKHR {
 
     // Those functions call Build() on internal resources (geometries, src and dst acceleration structures, scratch buffer),
     // then will build/update an acceleration structure.
-    void BuildCmdBuffer(VkCommandBuffer cmd_buffer, bool use_ppGeometries = true);
+    void BuildCmdBuffer(VkCommandBuffer cmd_buffer);
     void BuildCmdBufferIndirect(VkCommandBuffer cmd_buffer);
     void BuildHost();
 
@@ -293,6 +293,27 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostTopLevel(const vkt::Device& de
 
 // Create and build a top level acceleration structure
 BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device& device, vkt::Queue& queue, vkt::CommandBuffer& cmd_buffer);
+
+// Build Top Level Acceleration Structure:
+// 2 instances of the cube, at different positions
+// They are supposed to invoke 2 different closest hist shaders,
+// through different instanceShaderBindingTableRecordOffset
+// clang-format off
+/*
+    cube instance 2, translation (x = 0, y = 0, z = 50), instanceShaderBindingTableRecordOffset = 1
+    +----+
+    |  2 |
+    +----+
+
+       Z
+       ^
+       |            +----+
+       +---> X      |  1 | cube instance 1, translation (x = 50, y = 0, z = 0), instanceShaderBindingTableRecordOffset = 0
+                    +----+
+ */
+// clang-format on
+vkt::as::BuildGeometryInfoKHR GetCubesTLAS(vkt::Device& device, vkt::CommandBuffer& cb, vkt::Queue& queue,
+                                           std::shared_ptr<vkt::as::BuildGeometryInfoKHR>& out_cube_blas);
 }  // namespace blueprint
 }  // namespace as
 
@@ -313,20 +334,27 @@ class Pipeline {
     // Build settings
     // --------------
     void AddCreateInfoFlags(VkPipelineCreateFlags flags);
-    void InitLibraryInfo();
+    void AddCreateInfoFlags2(VkPipelineCreateFlags2 flags);
+    void InitLibraryInfo(uint32_t max_pipeline_payload_size, bool is_exe_pipeline);
 
     void AddBinding(VkDescriptorType descriptor_type, uint32_t binding, uint32_t descriptor_count = 1);
     void CreateDescriptorSet();
+    void AddDescriptorIndexingBinding(VkDescriptorType descriptor_type, uint32_t binding, VkDescriptorBindingFlags flags = 0,
+                                      uint32_t descriptor_count = 1);
+    void CreateDescriptorIndexingSet();
     // *If CreateDescriptorSet() is never called*, this method will hook supplied descriptor set layouts
     void SetPipelineSetLayouts(uint32_t set_layout_count, const VkDescriptorSetLayout* set_layouts);
 
     void SetPushConstantRangeSize(uint32_t byte_size);
-    void SetGlslRayGenShader(const char* glsl);
+    void SetGlslRayGenShader(const char* glsl, void* pNext = nullptr);
     void AddSpirvRayGenShader(const char* spirv, const char* entry_point);
+    void AddSlangRayGenShader(const char* slang, const char* entry_point);
     void AddGlslMissShader(const char* glsl);
     void AddSpirvMissShader(const char* spirv, const char* entry_point);
+    void AddSlangMissShader(const char* slang, const char* entry_point);
     void AddGlslClosestHitShader(const char* glsl);
     void AddSpirvClosestHitShader(const char* spirv, const char* entry_point);
+    void AddSlangClosestHitShader(const char* slang, const char* entry_point);
     void AddLibrary(const Pipeline& library);
     void AddDynamicState(VkDynamicState dynamic_state);
 
@@ -347,6 +375,10 @@ class Pipeline {
         assert(desc_set_);
         return *desc_set_;
     }
+    OneOffDescriptorIndexingSet& GetDescriptorIndexingSet() {
+        assert(desc_indexing_set_);
+        return *desc_indexing_set_;
+    }
     TraceRaysSbt GetTraceRaysSbt(uint32_t ray_gen_shader_i = 0);
     const vkt::Buffer& GetTraceRaysSbtBuffer();
     vkt::Buffer GetTraceRaysSbtIndirectBuffer(uint32_t ray_gen_shader_i, uint32_t width, uint32_t height, uint32_t depth);
@@ -356,12 +388,20 @@ class Pipeline {
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> GetRayTracingShaderGroupCreateInfos();
 
   private:
+    uint32_t GetRayGenShadersCount() const;
+    uint32_t GetMissShadersCount() const;
+    uint32_t GetClosestHitShadersCount() const;
+
+  private:
     VkLayerTest& test_;
     vkt::Device* device_;
+    VkPipelineCreateFlags2CreateInfo create_flags_2_ = {};
     VkRayTracingPipelineCreateInfoKHR vk_info_{};
     uint32_t push_constant_range_size_ = 0;
     std::vector<VkDescriptorSetLayoutBinding> bindings_{};
     std::unique_ptr<OneOffDescriptorSet> desc_set_{};
+    std::vector<OneOffDescriptorIndexingSet::Binding> desc_indexing_bindings_{};
+    std::unique_ptr<OneOffDescriptorIndexingSet> desc_indexing_set_{};
     VkPipelineLayoutCreateInfo pipeline_layout_ci_;
     vkt::PipelineLayout pipeline_layout_{};
     std::vector<VkDynamicState> dynamic_states{};
@@ -374,7 +414,8 @@ class Pipeline {
     vkt::Buffer sbt_buffer_{};
     VkRayTracingPipelineInterfaceCreateInfoKHR rt_pipeline_interface_info_{};
     VkPipelineLibraryCreateInfoKHR pipeline_lib_info_{};
-    std::vector<VkPipeline> libraries_{};
+    std::vector<const Pipeline*> libraries_{};
+    std::vector<VkPipeline> library_handles_{};
 };
 }  // namespace rt
 

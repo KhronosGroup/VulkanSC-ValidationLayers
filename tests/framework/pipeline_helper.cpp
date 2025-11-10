@@ -71,6 +71,10 @@ CreatePipelineHelper::CreatePipelineHelper(VkLayerTest &test, void *pNext) : lay
         rs_state_ci_.pNext = &line_state_ci_;
     }
 
+    // Init VkPipelineColorBlendAttachmentState
+    cb_attachments_.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
     // InitBlendStateInfo
     cb_ci_ = vku::InitStructHelper();
     cb_ci_.logicOpEnable = VK_FALSE;
@@ -461,7 +465,7 @@ SimpleGPL::SimpleGPL(VkLayerTest &test, VkPipelineLayout layout, const char *ver
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = layout;
-    pipe_.init(*device, exe_pipe_ci);
+    pipe_.Init(*device, exe_pipe_ci);
 }
 
 }  // namespace vkt

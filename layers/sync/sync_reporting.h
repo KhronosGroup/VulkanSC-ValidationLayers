@@ -19,11 +19,13 @@
 
 #include "generated/error_location_helper.h"
 #include "generated/sync_validation_types.h"
-#include "generated/vk_object_types.h"
+
+class Logger;
+
+namespace syncval {
 
 class CommandExecutionContext;
 class HazardResult;
-class Logger;
 class SyncValidator;
 
 // Collection of named values that describe key information associated with an error message.
@@ -107,3 +109,5 @@ inline constexpr const char *kPropertySwapchainIndex = "swapchain_index";
 inline constexpr const char *kPropertySeqNo = "seq_no";
 inline constexpr const char *kPropertyResetNo = "reset_no";
 inline constexpr const char *kPropertyBatchTag = "batch_tag";
+
+}  // namespace syncval

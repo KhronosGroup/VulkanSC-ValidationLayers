@@ -51,13 +51,13 @@ bool Instance::CheckPromotedApiAgainstVulkanVersion(VkPhysicalDevice pdev, const
     return skip;
 }
 
-bool Instance::OutputExtensionError(const Location &loc, const vvl::Extensions &exentsions) const {
+bool Instance::OutputExtensionError(const Location &loc, const vvl::Extensions &extensions) const {
     return LogError("UNASSIGNED-GeneralParameterError-ExtensionNotEnabled", instance, loc,
-                    "function required extension %s which has not been enabled.\n", String(exentsions).c_str());
+                    "function required extension %s which has not been enabled.\n", String(extensions).c_str());
 }
-bool Device::OutputExtensionError(const Location &loc, const vvl::Extensions &exentsions) const {
+bool Device::OutputExtensionError(const Location &loc, const vvl::Extensions &extensions) const {
     return LogError("UNASSIGNED-GeneralParameterError-ExtensionNotEnabled", device, loc,
-                    "function required extension %s which has not been enabled.\n", String(exentsions).c_str());
+                    "function required extension %s which has not been enabled.\n", String(extensions).c_str());
 }
 
 static const uint8_t kUtF8OneByteCode = 0xC0;
@@ -246,10 +246,10 @@ bool Context::ValidateStructPnext(const Location &loc, const void *next, size_t 
 
         const Location pNext_loc = loc.dot(Field::pNext);
         if ((allowed_type_count == 0) && (GetCustomStypeInfo().empty())) {
-            std::string message = "must be NULL.\n%s\n";
+            std::string message = "must be NULL.\n";
             message += disclaimer;
-            skip |= log.LogError(pnext_vuid, error_obj.handle, pNext_loc, message.c_str(),
-                                 PrintPNextChain(Struct::Empty, next).c_str(), header_version, pNext_loc.Fields().c_str());
+            skip |=
+                log.LogError(pnext_vuid, error_obj.handle, pNext_loc, message.c_str(), header_version, pNext_loc.Fields().c_str());
         } else {
             const VkStructureType *start = allowed_types;
             const VkStructureType *end = allowed_types + allowed_type_count;
@@ -354,6 +354,14 @@ bool Context::ValidateReservedFlags(const Location &loc, VkFlags value, const ch
     return skip;
 }
 
+bool Context::ValidateReservedFlags(const Location &loc, VkFlags64 value, const char *vuid) const {
+    bool skip = false;
+    if (value != 0) {
+        skip |= log.LogError(vuid, error_obj.handle, loc, "is %" PRIu64 ", but must be 0.", value);
+    }
+    return skip;
+}
+
 // helper to implement validation of both 32 bit and 64 bit flags.
 template <typename FlagTypedef>
 bool Context::ValidateFlagsImplementation(const Location &loc, vvl::FlagBitmask flag_bitmask, FlagTypedef all_flags,
@@ -383,7 +391,7 @@ bool Context::ValidateFlagsImplementation(const Location &loc, vvl::FlagBitmask 
 }
 
 bool Context::ValidateFlags(const Location &loc, vvl::FlagBitmask flag_bitmask, VkFlags all_flags, VkFlags value,
-                            const FlagType flag_type, const char *vuid, const char *flags_zero_vuid) const {
+                            const FlagType flag_type, const char *vuid, const char *flags_zero_vuid, bool instance_function) const {
     bool skip = false;
     skip |= ValidateFlagsImplementation<VkFlags>(loc, flag_bitmask, all_flags, value, flag_type, vuid, flags_zero_vuid);
 
@@ -398,7 +406,7 @@ bool Context::ValidateFlags(const Location &loc, vvl::FlagBitmask flag_bitmask, 
     }
 
     if (!skip && value != 0) {
-        vvl::Extensions required = IsValidFlagValue(flag_bitmask, value);
+        vvl::Extensions required = IsValidFlagValue(flag_bitmask, value, instance_function);
         if (!required.empty()) {
             skip |=
                 log.LogError(vuid, error_obj.handle, loc, "has %s values (%s) that requires the extensions %s.",
@@ -409,7 +417,7 @@ bool Context::ValidateFlags(const Location &loc, vvl::FlagBitmask flag_bitmask, 
 }
 
 bool Context::ValidateFlags(const Location &loc, vvl::FlagBitmask flag_bitmask, VkFlags64 all_flags, VkFlags64 value,
-                            const FlagType flag_type, const char *vuid, const char *flags_zero_vuid) const {
+                            const FlagType flag_type, const char *vuid, const char *flags_zero_vuid, bool instance_function) const {
     bool skip = false;
     skip |= ValidateFlagsImplementation<VkFlags64>(loc, flag_bitmask, all_flags, value, flag_type, vuid, flags_zero_vuid);
 
@@ -424,7 +432,7 @@ bool Context::ValidateFlags(const Location &loc, vvl::FlagBitmask flag_bitmask, 
     }
 
     if (!skip && value != 0) {
-        vvl::Extensions required = IsValidFlag64Value(flag_bitmask, value);
+        vvl::Extensions required = IsValidFlag64Value(flag_bitmask, value, instance_function);
         if (!required.empty()) {
             skip |= log.LogError(vuid, error_obj.handle, loc, "has %s values (%s) that requires the extensions %s.",
                                  String(flag_bitmask), DescribeFlagBitmaskValue64(flag_bitmask, value).c_str(),

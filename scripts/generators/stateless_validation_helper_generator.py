@@ -5,6 +5,7 @@
 # Copyright (c) 2015-2025 LunarG, Inc.
 # Copyright (c) 2015-2025 Google Inc.
 # Copyright (c) 2023-2025 RasterGrid Kft.
+# Copyright (C) 2025 Arm Limited.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -79,6 +80,7 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCreateBufferView',
             'vkCreateSemaphore',
             'vkCreateEvent',
+            'vkCreateTensorARM',
             'vkFreeDescriptorSets',
             'vkUpdateDescriptorSets',
             'vkBeginCommandBuffer',
@@ -99,6 +101,7 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCmdPushDescriptorSet',
             'vkCmdPushDescriptorSet2',
             'vkGetDescriptorEXT',
+            'vkCmdSetDescriptorBufferOffsetsEXT',
             'vkCmdSetDescriptorBufferOffsets2EXT',
             'vkCmdBindDescriptorBufferEmbeddedSamplers2EXT',
             'vkCmdPushDescriptorSetWithTemplate2',
@@ -223,8 +226,12 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkGetMicromapBuildSizesEXT',
             'vkWriteMicromapsPropertiesEXT',
             'vkReleaseSwapchainImagesEXT',
+            'vkReleaseSwapchainImagesKHR',
             'vkConvertCooperativeVectorMatrixNV',
             'vkCmdConvertCooperativeVectorMatrixNV',
+            'vkCmdBuildPartitionedAccelerationStructuresNV',
+            'vkCmdBuildClusterAccelerationStructureIndirectNV',
+            'vkGetClusterAccelerationStructureBuildSizesNV',
         ]
 
         # Commands to ignore
@@ -287,6 +294,9 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'VkAccelerationStructureGeometryInstancesDataKHR',
             'VkAccelerationStructureGeometryAabbsDataKHR',
             'VkIndirectExecutionSetPipelineInfoEXT', # VkIndirectExecutionSetShaderInfoEXT is done manually
+            'VkClusterAccelerationStructureTriangleClusterInputNV',
+            'VkClusterAccelerationStructureClustersBottomLevelInputNV',
+            'VkClusterAccelerationStructureMoveObjectsInputNV',
         ]
 
         # These functions entrypoints we as VVL expose
@@ -307,10 +317,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
 
         # Map of structs type names to generated validation code for that struct type
         self.validatedStructs = dict()
-        # Map of flags typenames
-        self.flags = set()
-        # Map of flag bits typename to list of values
-        self.flagBits = dict()
 
         self.stype_version_dict = dict()
 
@@ -583,6 +589,14 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                     # check function name so KHR version doesn't trigger flase positive
                     functionBody.append(f'if (loc.function == vvl::Func::{command.name} && CheckPromotedApiAgainstVulkanVersion({command.params[0].name}, loc, {command.version.nameApi})) return true;\n')
 
+                if not command.allowNoQueues and command.params[0].type == 'VkDevice':
+                    if 'vkCreate' in command.name or 'vkAllocate' in command.name:
+                        functionBody.append(f'''
+                            if (has_zero_queues) {{
+                                skip |= LogError("VUID-{command.name}-device-queuecount", device, error_obj.location, "device was created with queueCreateInfoCount of zero.");
+                            }}
+                            ''')
+
                 for line in lines:
                     if isinstance(line, list):
                         for sub in line:
@@ -629,21 +643,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
         ''')
         self.write("".join(out))
 
-    def genType(self, typeinfo, name, alias):
-        BaseGenerator.genType(self, typeinfo, name, alias)
-        if (typeinfo.elem.get('category') == 'bitmask' and not alias):
-            self.flags.add(name)
-
-    def genGroup(self, groupinfo, groupName, alias):
-        BaseGenerator.genGroup(self, groupinfo, groupName, alias)
-        if 'FlagBits' in groupName and groupName != 'VkStructureType':
-            bits = []
-            for elem in groupinfo.elem.findall('enum'):
-                if elem.get('supported') != 'disabled' and elem.get('alias') is None:
-                    bits.append(elem.get('name'))
-            if bits:
-                self.flagBits[groupName] = bits
-
     def isHandleOptional(self, member: Member, lengthMember: Member) -> bool :
         # Simple, if it's optional, return true
         if member.optional or member.optionalPointer:
@@ -655,6 +654,13 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
         if lengthMember and lengthMember.optional:
             return True
         return
+
+    def isFlagReserved(self, flag) -> bool:
+        bitmask = self.vk.flags[flag].bitmaskName
+        # Check if doesn't have an associated bitmask type, or if the associated bitmask type is empty
+        if bitmask is None or len(self.vk.bitmasks[bitmask].flags) == 0:
+            return True
+        return False
 
     # Get VUID identifier from implicit VUID tag
     def GetVuid(self, name, suffix):
@@ -865,7 +871,10 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                                 # Handle edge case where XML expresses a non-optional non-pointer value length with noautovalidity
                                 # ex: <param noautovalidity="true"len="commandBufferCount">
                                 countRequiredVuid = self.GetVuid(callerName, f"{lengthMember.name}-arraylength")
-                                if countRequiredVuid in duplicateCountVuid:
+                                if ' ' in member.length:
+                                    # For things like altlen="(rasterizationSamples + 31) / 32" we want to skip these
+                                    countRequiredVuid = None
+                                elif countRequiredVuid in duplicateCountVuid:
                                     countRequiredVuid = None
                                 else:
                                     duplicateCountVuid.append(countRequiredVuid)
@@ -924,11 +933,11 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                         countRequiredVuid = self.GetVuid(callerName, f"{member.length}-arraylength")
                         # This is an array with an integer count value
                         usedLines.append(f'skip |= {context}ValidateHandleArray({errorLoc}.dot(Field::{member.length}), {errorLoc}.dot(Field::{member.name}), {valuePrefix}{member.length}, {valuePrefix}{member.name}, {counValueRequired}, {arrayRequired}, {countRequiredVuid});\n')
-                    elif member.type in self.flags and member.const:
+                    elif member.type in self.vk.flags and member.const:
                         # Generate check string for an array of VkFlags values
-                        flagBitsName = member.type.replace('Flags', 'FlagBits')
-                        if flagBitsName not in self.vk.bitmasks:
+                        if self.isFlagReserved(member.type):
                             raise Exception('Unsupported parameter validation case: array of reserved VkFlags')
+                        flagBitsName = self.vk.flags[member.type].bitmaskName
                         allFlags = 'All' + flagBitsName
                         countRequiredVuid = self.GetVuid(callerName, f"{member.length}-arraylength")
                         arrayRequiredVuid = self.GetVuid(callerName, f"{member.name}-parameter")
@@ -1031,29 +1040,38 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                     elif member.type in self.vk.handles:
                         if not member.optional:
                             usedLines.append(f'skip |= {context}ValidateRequiredHandle({errorLoc}.dot(Field::{member.name}), {valuePrefix}{member.name});\n')
-                    elif member.type in self.flags and member.type.replace('Flags', 'FlagBits') not in self.flagBits:
+                    elif member.type in self.vk.flags and self.isFlagReserved(member.type):
                         vuid = self.GetVuid(callerName, f"{member.name}-zerobitmask")
                         usedLines.append(f'skip |= {context}ValidateReservedFlags({errorLoc}.dot(Field::{member.name}), {valuePrefix}{member.name}, {vuid});\n')
-                    elif member.type in self.flags or member.type in self.flagBits:
-                        if member.type in self.flags:
-                            flagBitsName = member.type.replace('Flags', 'FlagBits')
+                    elif member.type in self.vk.flags or member.type in self.vk.bitmasks:
+                        if member.type in self.vk.flags:
+                            flagBitsName = self.vk.flags[member.type].bitmaskName
                             flagsType = 'kOptionalFlags' if member.optional else 'kRequiredFlags'
                             invalidVuid = self.GetVuid(callerName, f"{member.name}-parameter")
                             zeroVuid = self.GetVuid(callerName, f"{member.name}-requiredbitmask")
-                        elif member.type in self.flagBits:
+                        elif member.type in self.vk.bitmasks:
                             flagBitsName = member.type
                             flagsType = 'kOptionalSingleBit' if member.optional else 'kRequiredSingleBit'
                             invalidVuid = self.GetVuid(callerName, f"{member.name}-parameter")
                             zeroVuid = invalidVuid
-                        # Bad workaround, but this whole file will be refactored soon
-                        if flagBitsName == 'VkBuildAccelerationStructureFlagBitsNV':
-                            flagBitsName = 'VkBuildAccelerationStructureFlagBitsKHR'
                         allFlagsName = 'All' + flagBitsName
-                        zeroVuidArg = '' if member.optional else ', ' + zeroVuid
+                        zeroVuidArg = ', nullptr' if member.optional else ', ' + zeroVuid
                         condition = [item for item in self.structMemberValidationConditions if (item['struct'] == structTypeName and item['field'] == flagBitsName)]
-                        usedLines.append(f'skip |= {context}ValidateFlags({errorLoc}.dot(Field::{member.name}), vvl::FlagBitmask::{flagBitsName}, {allFlagsName}, {valuePrefix}{member.name}, {flagsType}, {invalidVuid}{zeroVuidArg});\n')
+                        isInstanceFunction = 'false'
+                        if (struct):
+                            extensions = self.vk.structs[struct.name].extensions
+                            for extension in extensions:
+                                if self.vk.extensions[extension].instance:
+                                    isInstanceFunction = 'true'
+                        else:
+                            if self.vk.commands[funcName].instance:
+                                isInstanceFunction = 'true'
+                        usedLines.append(f'skip |= {context}ValidateFlags({errorLoc}.dot(Field::{member.name}), vvl::FlagBitmask::{flagBitsName}, {allFlagsName}, {valuePrefix}{member.name}, {flagsType}, {invalidVuid}{zeroVuidArg}, {isInstanceFunction});\n')
                     elif member.type == 'VkBool32':
                         usedLines.append(f'skip |= {context}ValidateBool32({errorLoc}.dot(Field::{member.name}), {valuePrefix}{member.name});\n')
+                    elif member.type == 'VkDeviceAddress' and not member.optional:
+                        vuid = self.GetVuid(callerName, f"{member.name}-parameter")
+                        usedLines.append(f'skip |= {context}ValidateNotZero({valuePrefix}{member.name} == 0, {vuid}, {errorLoc}.dot(Field::{member.name}));\n')
                     elif member.type in self.vk.enums and member.type != 'VkStructureType':
                         vuid = self.GetVuid(callerName, f"{member.name}-parameter")
                         usedLines.append(f'skip |= {context}ValidateRangedEnum({errorLoc}.dot(Field::{member.name}), vvl::Enum::{member.type}, {valuePrefix}{member.name}, {vuid});\n')

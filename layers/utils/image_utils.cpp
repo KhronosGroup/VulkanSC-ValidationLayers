@@ -18,6 +18,7 @@
 #include "image_utils.h"
 #include "containers/range.h"
 #include "utils/math_utils.h"
+#include "generated/vk_extension_helper.h"
 
 #include <algorithm>
 #include <sstream>
@@ -26,6 +27,30 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
+
+uint32_t GetEffectiveLevelCount(const VkImageSubresourceRange &subresource_range, uint32_t total_level_count) {
+    uint32_t level_count = subresource_range.levelCount;
+    if (level_count == VK_REMAINING_MIP_LEVELS) {
+        if (total_level_count > subresource_range.baseMipLevel) {
+            level_count = total_level_count - subresource_range.baseMipLevel;
+        } else {  // invalid mip range which should be caught by validation
+            level_count = 0;
+        }
+    }
+    return level_count;
+}
+
+uint32_t GetEffectiveLayerCount(const VkImageSubresourceRange &subresource_range, uint32_t total_layer_count) {
+    uint32_t layer_count = subresource_range.layerCount;
+    if (layer_count == VK_REMAINING_ARRAY_LAYERS) {
+        if (total_layer_count > subresource_range.baseArrayLayer) {
+            layer_count = total_layer_count - subresource_range.baseArrayLayer;
+        } else {  // invalid array layer range which should be caught by validation
+            layer_count = 0;
+        }
+    }
+    return layer_count;
+}
 
 // Returns the effective extent of an image subresource, adjusted for mip level and array depth.
 VkExtent3D GetEffectiveExtent(const VkImageCreateInfo &ci, const VkImageAspectFlags aspect_mask, const uint32_t mip_level) {
@@ -48,17 +73,18 @@ VkExtent3D GetEffectiveExtent(const VkImageCreateInfo &ci, const VkImageAspectFl
     {
         const uint32_t corner = (ci.flags & VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV) ? 1 : 0;
         const uint32_t min_size = 1 + corner;
+        const uint32_t round_up_nudge = corner ? static_cast<uint32_t>((1 << mip_level) - 1) : 0u;
 
         if (extent.width != 0) {
-            extent.width >>= mip_level;
+            extent.width = (extent.width + round_up_nudge) >> mip_level;
             extent.width = std::max({min_size, extent.width});
         }
         if (extent.height != 0) {
-            extent.height >>= mip_level;
+            extent.height = (extent.height + round_up_nudge) >> mip_level;
             extent.height = std::max({min_size, extent.height});
         }
         if (extent.depth != 0) {
-            extent.depth >>= mip_level;
+            extent.depth = (extent.depth + round_up_nudge) >> mip_level;
             extent.depth = std::max({min_size, extent.depth});
         }
     }
@@ -190,6 +216,20 @@ bool IsAnyPlaneAspect(VkImageAspectFlags aspect_mask) {
     return (aspect_mask & valid_planes) != 0;
 }
 
+// TODO: this function does not check if the image is disjoint, is it an issue?
+VkImageAspectFlags NormalizeAspectMask(VkImageAspectFlags aspect_mask, VkFormat format) {
+    // For multiplanar formats and disjoint image the IMAGE_ASPECT_COLOR is equivalent
+    // to adding the aspect of the individual planes.
+    if (vkuFormatIsMultiplane(format) && (aspect_mask & VK_IMAGE_ASPECT_COLOR_BIT) != 0) {
+        aspect_mask &= ~VK_IMAGE_ASPECT_COLOR_BIT;
+        aspect_mask |= (VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT);
+        if (vkuFormatPlaneCount(format) > 2) {
+            aspect_mask |= VK_IMAGE_ASPECT_PLANE_2_BIT;
+        }
+    }
+    return aspect_mask;
+}
+
 bool IsImageLayoutReadOnly(VkImageLayout layout) {
     constexpr std::array read_only_layouts = {
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
@@ -237,4 +277,19 @@ bool IsImageLayoutStencilReadOnly(VkImageLayout layout) {
     };
     return std::any_of(read_only_layouts.begin(), read_only_layouts.end(),
                        [layout](const VkImageLayout read_only_layout) { return layout == read_only_layout; });
+}
+
+bool IsDepthSliceView(const VkImageCreateInfo &image_create_info, VkImageViewType view_type) {
+    constexpr VkImageCreateFlags depth_slice_view_flags =
+        VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT | VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
+
+    const bool image_supports_depth_slice_view =
+        image_create_info.imageType == VK_IMAGE_TYPE_3D && (image_create_info.flags & depth_slice_view_flags) != 0;
+
+    return image_supports_depth_slice_view && (view_type == VK_IMAGE_VIEW_TYPE_2D || view_type == VK_IMAGE_VIEW_TYPE_2D_ARRAY);
+}
+
+bool CanTransitionDepthSlices(const DeviceExtensions &extensions, const VkImageCreateInfo &create_info) {
+    return IsExtEnabled(extensions.vk_khr_maintenance9) && create_info.imageType == VK_IMAGE_TYPE_3D &&
+           (create_info.flags & VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT) != 0;
 }

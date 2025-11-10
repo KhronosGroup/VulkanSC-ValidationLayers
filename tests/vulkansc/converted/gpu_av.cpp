@@ -85,7 +85,7 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShaders) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     descriptor_set.WriteDescriptorBufferInfo(0, write_buffer, 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
-    static const char vertshader[] = R"glsl(
+    const char vertshader[] = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;
         void main() {
@@ -141,7 +141,7 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersRegex) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     descriptor_set.WriteDescriptorBufferInfo(0, write_buffer, 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
-    static const char vertshader[] = R"glsl(
+    const char vertshader[] = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;
         void main() {
@@ -210,7 +210,7 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersRegexDestroyedShaders) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     descriptor_set.WriteDescriptorBufferInfo(0, write_buffer, 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
-    static const char vertshader[] = R"glsl(
+    const char vertshader[] = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;
         void main() {
@@ -240,8 +240,8 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersRegexDestroyedShaders) {
     m_errorMonitor->SetDesiredInfo("fragment_bar");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
-    vs.destroy();
-    fs.destroy();
+    vs.Destroy();
+    fs.Destroy();
 
     m_command_buffer.Begin();
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
@@ -279,7 +279,7 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersShaderObject) {
                                             });
     vkt::PipelineLayout pipeline_layout(*m_device, {&vert_descriptor_set.layout_});
 
-    static const char vert_src[] = R"glsl(
+    const char vert_src[] = R"glsl(
         #version 460
         layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;
         void main() {
@@ -376,7 +376,7 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
     }
     vkt::PipelineLayout pipe_layout(*m_device, layouts);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -451,7 +451,7 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineReserved) {
     }
     vkt::PipelineLayout pipe_layout(*m_device, layouts);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -517,6 +517,8 @@ TEST_F(NegativeGpuAV, DISABLED_ForceUniformAndStorageBuffer8BitAccess) {
     m_errorMonitor->SetAllowedFailureMsg(
         "Adding a VkPhysicalDeviceBufferDeviceAddressFeatures to pNext with bufferDeviceAddress set to VK_TRUE");
     m_errorMonitor->SetAllowedFailureMsg(
+        "Adding a VkPhysicalDeviceScalarBlockLayoutFeatures to pNext with scalarBlockLayout set to VK_TRUE");
+    m_errorMonitor->SetAllowedFailureMsg(
         "Buffer device address validation option was enabled, but required buffer device address extension and/or features are not "
         "enabled");
     m_errorMonitor->SetAllowedFailureMsg("Ray Query validation option was enabled");
@@ -553,7 +555,7 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineLayout) {
     m_errorMonitor->SetAllowedFailureMsg("This Pipeline Layout has too many descriptor sets");
     vkt::PipelineLayout bad_pipe_layout(*m_device, empty_layouts);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer foo {
             int x;
@@ -566,12 +568,12 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineLayout) {
 
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    pipe.cp_ci_.layout = bad_pipe_layout.handle();
+    pipe.cp_ci_.layout = bad_pipe_layout;
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, bad_pipe_layout.handle(), 0, 1,
-                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, bad_pipe_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
@@ -669,7 +671,7 @@ TEST_F(NegativeGpuAV, DISABLED_LeakedResource) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout (set = 0, binding = 0) uniform sampler2D samplerColor[2];
         void main() {

@@ -21,9 +21,9 @@
 
 #include "state_tracker/state_object.h"
 #include "state_tracker/submission_reference.h"
-#include "state_tracker/image_layout_map.h"
 #include "containers/span.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
+#include <optional>
 
 namespace vvl {
 class DeviceState;
@@ -32,6 +32,7 @@ class Semaphore;
 class Surface;
 class Swapchain;
 class SwapchainSubState;
+class Image;
 }  // namespace vvl
 
 struct GpuQueue {
@@ -53,6 +54,13 @@ struct hash<GpuQueue> {
 }  // namespace std
 
 namespace vvl {
+class Swapchain;
+
+// Tracks the status of the fence or semaphore specified by acquire operation.
+// The reason we can't simply check the fence or semaphore's own status is that the sync
+// primitive can be reused, and it might report "not ready" due to other usage even if we
+// have already waited on it after acquire.
+enum class AcquireSyncStatus { NotSpecified, Signaled, WasWaitedOn };
 
 struct SwapchainImage {
     vvl::Image *image_state = nullptr;
@@ -61,6 +69,9 @@ struct SwapchainImage {
     bool acquired = false;
     std::shared_ptr<vvl::Semaphore> acquire_semaphore;
     std::shared_ptr<vvl::Fence> acquire_fence;
+    AcquireSyncStatus acquire_semaphore_status = AcquireSyncStatus::NotSpecified;
+    AcquireSyncStatus acquire_fence_status = AcquireSyncStatus::NotSpecified;
+    void ResetAcquireState();
 
     // Queue location (seq) for present operation that presented this image.
     // When this image is reacquired, the acquire fence can synchronize with this location.
@@ -96,6 +107,17 @@ class Swapchain : public StateObject, public SubStateManager<SwapchainSubState> 
     static constexpr uint32_t acquire_history_max_length = 16;
     std::array<uint32_t, acquire_history_max_length> acquire_history;  // ring buffer contains the last acquired images
     uint32_t acquire_count = 0;                                        // total number of image acquire requests
+
+    // Old swapchain state:
+    // The new swapchain is a swapchain for which *this* swapchain is the oldSwapchain.
+    // We still can present (pre-acquired) images from the old swapchain.
+    // The new swapchain is responsible for tracking in-use status of present wait semaphores from
+    // the last few presentations (if any) of the old swapchain.
+    std::shared_ptr<Swapchain> new_swapchain;
+
+    // New swapchain state:
+    // Present wait semaphores from the the old swapchain presentations.
+    std::vector<std::shared_ptr<vvl::Semaphore>> old_swapchain_present_wait_semaphores;
 
     Swapchain(DeviceState &dev_data, const VkSwapchainCreateInfoKHR *pCreateInfo, VkSwapchainKHR handle);
 
@@ -179,7 +201,7 @@ class Surface : public StateObject {
     bool IsLastCapabilityQueryUsedPresentMode(VkPhysicalDevice phys_dev) const;
     VkSurfaceCapabilitiesKHR GetSurfaceCapabilities(VkPhysicalDevice phys_dev, const void *surface_info_pnext) const;
     VkSurfaceCapabilitiesKHR GetPresentModeSurfaceCapabilities(VkPhysicalDevice phys_dev, VkPresentModeKHR present_mode) const;
-    VkSurfacePresentScalingCapabilitiesEXT GetPresentModeScalingCapabilities(VkPhysicalDevice phys_dev,
+    VkSurfacePresentScalingCapabilitiesKHR GetPresentModeScalingCapabilities(VkPhysicalDevice phys_dev,
                                                                              VkPresentModeKHR present_mode) const;
     std::vector<VkPresentModeKHR> GetCompatibleModes(VkPhysicalDevice phys_dev, VkPresentModeKHR present_mode) const;
 
@@ -190,7 +212,7 @@ class Surface : public StateObject {
     struct PresentModeInfo {
         VkPresentModeKHR present_mode;
         VkSurfaceCapabilitiesKHR surface_capabilities;
-        std::optional<VkSurfacePresentScalingCapabilitiesEXT> scaling_capabilities;
+        std::optional<VkSurfacePresentScalingCapabilitiesKHR> scaling_capabilities;
         std::optional<std::vector<VkPresentModeKHR>> compatible_present_modes;
     };
     // Cached information per physical device. Optional indicates if element is in the cache.

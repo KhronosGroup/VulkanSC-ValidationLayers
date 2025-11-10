@@ -3,6 +3,7 @@
  * Copyright (c) 2015-2025 Valve Corporation
  * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (C) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,25 +91,27 @@ uint32_t size32(const Container &c) {
 }
 
 // Format search helper
-VkFormat FindSupportedDepthOnlyFormat(VkPhysicalDevice phy);
-VkFormat FindSupportedStencilOnlyFormat(VkPhysicalDevice phy);
-VkFormat FindSupportedDepthStencilFormat(VkPhysicalDevice phy);
+VkFormat FindSupportedDepthOnlyFormat(VkPhysicalDevice gpu);
+VkFormat FindSupportedStencilOnlyFormat(VkPhysicalDevice gpu);
+VkFormat FindSupportedDepthStencilFormat(VkPhysicalDevice gpu);
 
 // Returns true if *any* requested features are available.
 // Assumption is that the framework can successfully create an image as
 // long as at least one of the feature bits is present (excepting VTX_BUF).
-bool FormatIsSupported(VkPhysicalDevice phy, VkFormat format, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
+bool FormatIsSupported(VkPhysicalDevice gpu, VkFormat format, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
                        VkFormatFeatureFlags features = ~VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT);
 
 // Returns true if format and *all* requested features are available.
-bool FormatFeaturesAreSupported(VkPhysicalDevice phy, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features);
+bool FormatFeaturesAreSupported(VkPhysicalDevice gpu, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features);
+
+// Small wrapprer around vkGetPhysicalDeviceImageFormatProperties
+VkResult GetImageFormatProps(VkPhysicalDevice gpu, const VkImageCreateInfo &ci, VkImageFormatProperties &out_limits);
 
 // Returns true if format and *all* requested features are available.
-bool ImageFormatIsSupported(const VkInstance inst, const VkPhysicalDevice phy, const VkImageCreateInfo info,
-                            const VkFormatFeatureFlags features);
+bool IsImageFormatSupported(VkPhysicalDevice gpu, const VkImageCreateInfo &ci, const VkFormatFeatureFlags features);
 
 // Returns true if format and *all* requested features are available.
-bool BufferFormatAndFeaturesSupported(VkPhysicalDevice phy, VkFormat format, VkFormatFeatureFlags features);
+bool BufferFormatAndFeaturesSupported(VkPhysicalDevice gpu, VkFormat format, VkFormatFeatureFlags features);
 
 // Simple sane SamplerCreateInfo boilerplate
 VkSamplerCreateInfo SafeSaneSamplerCreateInfo(void *p_next = nullptr);
@@ -188,6 +191,10 @@ class VkLayerTest : public VkLayerTestBase {
     void CreateImageTest(const VkImageCreateInfo &create_info, const char *vuid);
     void CreateBufferViewTest(const VkBufferViewCreateInfo &create_info, const char *vuid);
     void CreateImageViewTest(const VkImageViewCreateInfo &create_info, const char *vuid);
+    void CreateRenderPassTest(const VkRenderPassCreateInfo &create_info, bool rp2_supported, const char *rp1_vuid,
+                              const char *rp2_vuid);
+    void CreateRenderPassBeginTest(const VkCommandBuffer command_buffer, const VkRenderPassBeginInfo *begin_info,
+                                   bool rp2_supported, const char *rp1_vuid, const char *rp2_vuid);
 
   protected:
     void SetTargetApiVersion(APIVersion target_api_version);
@@ -241,8 +248,8 @@ class GpuAVDescriptorIndexingTest : public GpuAVTest {
 
 class GpuAVDescriptorClassGeneralBuffer : public GpuAVTest {
   public:
-    void ComputeStorageBufferTest(const char *shader, bool is_glsl, VkDeviceSize buffer_size, const char *expected_error = nullptr,
-                                  uint32_t error_count = 1);
+    void ComputeStorageBufferTest(const char *shader, int source_type, VkDeviceSize buffer_size,
+                                  const char *expected_error = nullptr, uint32_t error_count = 1);
 };
 
 class GpuAVRayQueryTest : public GpuAVTest {
@@ -261,9 +268,16 @@ class AndroidExternalResolveTest : public VkLayerTest {
     bool nullColorAttachmentWithExternalFormatResolve;
 };
 
+class DeprecationTest : public VkLayerTest {
+  public:
+    void CreateRenderPass();
+};
+
 class DescriptorBufferTest : public VkLayerTest {
   public:
     void InitBasicDescriptorBuffer(void *instance_pnext = nullptr);
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
 };
 
 class DescriptorIndexingTest : public VkLayerTest {
@@ -275,6 +289,10 @@ class DynamicRenderingTest : public VkLayerTest {
   public:
     void InitBasicDynamicRendering();
     void InitBasicDynamicRenderingLocalRead();
+
+    VkRenderingInfo GetSimpleRenderingInfo();
+    VkRenderingInfo GetSimpleSuspendInfo();
+    VkRenderingInfo GetSimpleResumeInfo();
 };
 
 class DynamicStateTest : public VkLayerTest {
@@ -330,6 +348,11 @@ class ImageDrmTest : public VkLayerTest {
     std::vector<uint64_t> GetFormatModifier(VkFormat format, VkFormatFeatureFlags2 features, uint32_t plane_count = 1);
 };
 
+class MeshTest : public virtual VkLayerTest {
+  public:
+    void InitBasicMeshAndTask();
+};
+
 class QueryTest : public VkLayerTest {
   public:
     bool HasZeroTimestampValidBits();
@@ -365,12 +388,42 @@ class SyncObjectTest : public VkLayerTest {
 #endif
 };
 
-class WsiTest : public VkLayerTest {
+class TensorTest : public VkLayerTest {
   public:
-    // most tests need images in VK_IMAGE_LAYOUT_PRESENT_SRC_KHR layout
-    void SetImageLayoutPresentSrc(VkImage image);
-    VkImageMemoryBarrier TransitionToPresent(VkImage swapchain_image, VkImageLayout old_layout, VkAccessFlags src_access_mask);
+    void InitBasicTensor();
+    static VkTensorDescriptionARM DefaultDesc();
+    static VkTensorCreateInfoARM DefaultCreateInfo(VkTensorDescriptionARM *desc = nullptr);
 
+    const char *tensor_shader_source = R"glsl(
+      #version 450
+      #extension GL_ARM_tensors : require
+      #extension GL_EXT_shader_explicit_arithmetic_types : require
+      layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+      layout(set=0, binding=0) uniform tensorARM<int32_t, 1> tens;
+      layout(set=0, binding=1, std430) buffer asd {
+        int32_t out_data[];
+      };
+      void main()
+      {
+        const uint size_x = tensorSizeARM(tens, 0);
+        const uint x = gl_GlobalInvocationID.x % size_x;
+        const uint out_index = gl_GlobalInvocationID.x;
+
+        tensorReadARM(tens, uint[](x), out_data[out_index]);
+      }
+    )glsl";
+};
+
+class DataGraphTest : public VkLayerTest {
+  public:
+    void InitBasicDataGraph();
+    static void CheckSessionMemory(const vkt::DataGraphPipelineSession& session);
+    static std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> InitSessionBindInfo(const vkt::DataGraphPipelineSession& session, const std::vector<vkt::DeviceMemory>& device_mem);
+
+    static const std::string IncorrectSpirvMessage;
+};
+
+class WsiTest : public VkLayerTest {
   protected:
     // Find physical device group that contains physical device selected by the test framework
     std::optional<VkPhysicalDeviceGroupProperties> FindPhysicalDeviceGroup();
@@ -406,20 +459,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback(VkDebugUtilsMessageSeverityFla
                                                   VkDebugUtilsMessageTypeFlagsEXT messageTypes,
                                                   const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData);
 
-void TestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo &create_info,
-                          bool rp2_supported, const char *rp1_vuid, const char *rp2_vuid);
-void PositiveTestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo &create_info,
-                                  bool rp2_supported);
-void PositiveTestRenderPass2KHRCreate(const vkt::Device &device, const VkRenderPassCreateInfo2KHR &create_info);
-void TestRenderPass2KHRCreate(ErrorMonitor &error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo2KHR &create_info,
-                              const std::vector<const char *> &vuids);
-void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, const VkCommandBuffer command_buffer,
-                         const VkRenderPassBeginInfo *begin_info, bool rp2Supported, const char *rp1_vuid, const char *rp2_vuid);
-
-VkResult GPDIFPHelper(VkPhysicalDevice dev, const VkImageCreateInfo *ci, VkImageFormatProperties *limits = nullptr);
-
 VkFormat FindFormatWithoutFeatures(VkPhysicalDevice gpu, VkImageTiling tiling,
-                                   VkFormatFeatureFlags undesired_features = vvl::kU32Max);
+                                   VkFormatFeatureFlags undesired_features = vvl::kNoIndex32);
 
 VkFormat FindFormatWithoutFeatures2(VkPhysicalDevice gpu, VkImageTiling tiling, VkFormatFeatureFlags2 undesired_features);
 

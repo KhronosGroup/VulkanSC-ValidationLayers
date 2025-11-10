@@ -34,11 +34,15 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/command_positive.cpp
     converted/copy_buffer_image.cpp
     converted/copy_buffer_image_positive.cpp
+    converted/data_graph.cpp
+    converted/data_graph_positive.cpp
     converted/debug_extensions.cpp
     converted/debug_extensions_positive.cpp
     converted/debug_printf.cpp
     converted/debug_printf_ray_tracing.cpp
     converted/debug_printf_shader_debug_info.cpp
+    converted/deprecation.cpp
+    converted/deprecation_positive.cpp
     converted/descriptor_buffer.cpp
     converted/descriptor_buffer_positive.cpp
     converted/descriptor_indexing.cpp
@@ -95,6 +99,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_spirv.cpp
     converted/gpu_av_spirv_positive.cpp
     converted/gpu_av_vertex_attribute_fetch.cpp
+    converted/gpu_av_vertex_attribute_fetch_positive.cpp
     converted/graphics_library.cpp
     converted/graphics_library_positive.cpp
     converted/host_image_copy.cpp
@@ -181,6 +186,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/shader_storage_image_positive.cpp
     converted/shader_storage_texel.cpp
     converted/shader_storage_texel_positive.cpp
+    converted/shader_untyped.cpp
+    converted/shader_untyped_positive.cpp
     converted/sparse_buffer.cpp
     converted/sparse_buffer_positive.cpp
     converted/sparse_image.cpp
@@ -201,6 +208,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/sync_val_video_positive.cpp
     converted/sync_val_wsi.cpp
     converted/sync_val_wsi_positive.cpp
+    converted/tensor.cpp
+    converted/tensor_positive.cpp
     converted/threading.cpp
     converted/threading_positive.cpp
     converted/tooling.cpp
@@ -226,6 +235,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/video_encode_h264_positive.cpp
     converted/video_encode_h265.cpp
     converted/video_encode_h265_positive.cpp
+    converted/video_encode_intra_refresh.cpp
+    converted/video_encode_intra_refresh_positive.cpp
     converted/video_encode_positive.cpp
     converted/video_encode_quantization_map.cpp
     converted/video_encode_quantization_map_positive.cpp

@@ -2,6 +2,7 @@
  * Copyright (c) 2015-2025 Valve Corporation
  * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (C) 2015-2025 Google Inc.
+ * Copyright (C) 2025 Arm Limited.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -20,20 +21,23 @@
 #pragma once
 #include "state_tracker/state_object.h"
 #include "state_tracker/image_layout_map.h"
-#include "state_tracker/pipeline_sub_state.h"
+#include "state_tracker/pipeline_library_state.h"
 #include "state_tracker/video_session_state.h"
 #include "state_tracker/last_bound_state.h"
+#include "state_tracker/bind_point.h"
 #include "state_tracker/query_state.h"
 #include "state_tracker/vertex_index_buffer_state.h"
-#include "state_tracker/event_map.h"
 #include "utils/sync_utils.h"
 #include "generated/dynamic_state_helper.h"
+
+struct Location;
 
 namespace vvl {
 class Bindable;
 class Buffer;
 class CommandBufferSubState;
 class DeviceState;
+class Pipeline;
 class Framebuffer;
 class Queue;
 class RenderPass;
@@ -48,6 +52,18 @@ enum class CbState {
     InvalidComplete,    // had a complete recording, but was since invalidated
     InvalidIncomplete,  // fouled before recording was completed
 };
+
+static inline bool IsRecorded(CbState state) { return state == CbState::Recorded || state == CbState::InvalidComplete; }
+
+static inline bool IsRecording(CbState state) { return state == CbState::Recording || state == CbState::InvalidIncomplete; }
+
+// Submit time validation helper. Since CmdBeginRendering is itself an action command,
+// if the first detected action or sync command is CmdBeginRendering, it means there are
+// no other action commands before it.
+static inline bool HasActionOrSyncCommandBeforeBeginRendering(vvl::Func first_action_or_sync_command) {
+    return first_action_or_sync_command != vvl::Func::Empty &&
+           !IsValueIn(first_action_or_sync_command, {vvl::Func::vkCmdBeginRendering, vvl::Func::vkCmdBeginRenderingKHR});
+}
 
 enum class AttachmentSource {
     Empty = 0,
@@ -75,30 +91,44 @@ struct AttachmentInfo {
 
     vvl::ImageView *image_view;
     Type type;
+    VkImageLayout layout;
+    // Only for VkRenderPass with VK_KHR_separate_depth_stencil_layouts
+    VkImageLayout separate_stencil_layout;
+    // When dealing with color attachments, need to know the index for things such as
+    // VkPipelineColorBlendStateCreateInfo::pAttachments or vkCmdSetColorBlendEnableEXT
+    //
+    // This index is tied to a Attachment::Type and will line up to the index in either:
+    //   VkRenderingInfo::pColorAttachments
+    //   VkSubpassDescription::pColorAttachments
+    //   VkSubpassDescription::pInputAttachments
+    //   VkSubpassDescription::pResolveAttachments
+    uint32_t type_index;
 
-    AttachmentInfo() : image_view(nullptr), type(Type::Empty) {}
+    AttachmentInfo()
+        : image_view(nullptr),
+          type(Type::Empty),
+          layout(VK_IMAGE_LAYOUT_UNDEFINED),
+          separate_stencil_layout(VK_IMAGE_LAYOUT_UNDEFINED),
+          type_index(0) {}
 
     bool IsResolve() const { return type == Type::ColorResolve || type == Type::DepthResolve || type == Type::StencilResolve; }
     bool IsInput() const { return type == Type::Input; }
     bool IsColor() const { return type == Type::Color; }
-    bool IsDepthOrStencil() const {
-        return type == Type::DepthStencil || type == Type::Depth || type == Type::DepthResolve || type == Type::Stencil ||
-               type == Type::StencilResolve;
-    }
+    bool IsDepth() const;
+    bool IsStencil() const;
+    bool IsDepthOrStencil() const { return type == Type::DepthStencil || type == Type::Depth || type == Type::Stencil; }
     bool IsFragmentDensityMap() const { return type == Type::FragmentDensityMap; }
     bool IsFragmentShadingRate() const { return type == Type::FragmentShadingRate; }
 
-    std::string Describe(AttachmentSource source, uint32_t index) const;
+    std::string Describe(const vvl::CommandBuffer &cb_state, uint32_t rp_index) const;
 };
 
 struct SubpassInfo {
     bool used;
     VkImageUsageFlagBits usage;
-    VkImageLayout layout;
     VkImageAspectFlags aspectMask;
 
-    SubpassInfo()
-        : used(false), usage(VkImageUsageFlagBits(0)), layout(VK_IMAGE_LAYOUT_UNDEFINED), aspectMask(VkImageAspectFlags(0)) {}
+    SubpassInfo() : used(false), usage(VkImageUsageFlagBits(0)), aspectMask(VkImageAspectFlags(0)) {}
 };
 
 namespace vvl {
@@ -171,10 +201,8 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     // since command buffers can only be destroyed by their command pool, this does not need to be a shared_ptr
     const vvl::CommandPool *command_pool;
     DeviceState &dev_data;
-    bool unprotected;  // can't be used for protected memory
-    bool has_render_pass_instance;
-    bool suspends_render_pass_instance;
-    bool resumes_render_pass_instance;
+
+    const bool unprotected;  // can't be used for protected memory
 
     CbState state;           // Track cmd buffer update state
     uint64_t command_count;  // Number of commands recorded. Currently only used with VK_KHR_performance_query
@@ -199,7 +227,10 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     std::string DescribeInvalidatedState(CBDynamicState dynamic_state) const;
 
     // Return true if the corresponding vkCmdSet* call has occured in the command buffer.
-    // Used to know if the DynamicStateValue will be valid or not to read.
+    // Used for calls like vkCmdSetColorBlendEnableEXT where we have both a VU for
+    //   - it was called it at all
+    //   - it was called for every attachment
+    // And this is used to not give double error
     bool IsDynamicStateSet(CBDynamicState state) const { return dynamic_state_status.cb[state]; }
 
     // These are values that are being set with vkCmdSet* tied to a command buffer
@@ -382,38 +413,11 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     const LastBound &GetLastBoundGraphics() const { return lastBound[vvl::BindPointGraphics]; }
     const LastBound &GetLastBoundCompute() const { return lastBound[vvl::BindPointCompute]; }
     const LastBound &GetLastBoundRayTracing() const { return lastBound[vvl::BindPointRayTracing]; }
+    const LastBound &GetLastBoundDataGraph() const { return lastBound[vvl::BindPointDataGraph]; }
 
     // Use the casting boilerplate from StateObject to implement the derived shared_from_this
     std::shared_ptr<const CommandBuffer> shared_from_this() const { return SharedFromThisImpl(this); }
     std::shared_ptr<CommandBuffer> shared_from_this() { return SharedFromThisImpl(this); }
-
-    struct Viewport {
-        uint32_t mask;
-        uint32_t count_mask;
-
-        // Bits set when binding graphics pipeline defining corresponding static state, or executing any secondary command buffer.
-        // Bits unset by calling a corresponding vkCmdSet[State] cmd.
-        uint32_t trashed_mask;
-        bool trashed_count;
-
-        bool used_dynamic_count;  // true if any draw recorded used VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT
-
-        // If VK_NV_inherited_viewport_scissor is enabled and VkCommandBufferInheritanceViewportScissorInfoNV::viewportScissor2D is
-        // true, then is the nonempty list of viewports passed in pViewportDepths. Otherwise, this is empty.
-        std::vector<VkViewport> inherited_depths;
-    } viewport;
-
-    struct Scissor {
-        uint32_t mask;
-        uint32_t count_mask;
-
-        uint32_t trashed_mask;
-        bool trashed_count;
-
-        bool used_dynamic_count;  // true if any draw recorded used VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT
-    } scissor;
-
-    uint32_t used_viewport_scissor_count;
 
     // Track if any dynamic state is set that is static in the currently bound pipeline
     bool dirty_static_state;
@@ -422,6 +426,21 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     uint32_t initial_device_mask;
     // Device mask from vkCmdBeginRenderPass/vkCmdBeginRendering
     uint32_t render_pass_device_mask;
+
+    // Set to true when the first render pass instance is encountered during recording.
+    // When recording is finished, it indicates if command buffer has render pass instances.
+    bool has_render_pass_instance;
+
+    // True if the *first* render pass instance specifies VK_RENDERING_RESUMING_BIT
+    bool resumes_render_pass_instance;
+
+    // The suspension state at the end of the command buffer, based on previous render pass instances.
+    // Regular render pass instances (without RESUMING/SUSPENDING) do not change the suspend state.
+    enum class SuspendState { Empty, Suspended, Resumed };
+    SuspendState last_suspend_state;
+
+    // Used by submit time validation to check for invalild commands when render pass instance is suspended.
+    vvl::Func first_action_or_sync_command;
 
     // This is null if we are outside a renderPass/rendering
     //
@@ -437,12 +456,14 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     // There is no concept of "attachment index" with dynamic rendering, we use this for both dynamic/non-dynamic rendering though.
     // The attachments are packed the following: | color | color resolve | depth | depth resolve | stencil | stencil resolve |
     std::vector<AttachmentInfo> active_attachments;
+    // Used for checking all color attachments, values will be [0, colorAttachmentCount - 1] from either VkRenderingInfo or the
+    // current subpass. The "active" part means the imageView was not VK_NULL_HANDLE/VK_ATTACHMENT_UNUSED
     vvl::unordered_set<uint32_t> active_color_attachments_index;
     bool has_render_pass_striped;
     uint32_t striped_count;
     VkRect2D render_area;
     // only when not using dynamic rendering
-    const VkRenderPassSampleLocationsBeginInfoEXT *sample_locations_begin_info;
+    vku::safe_VkRenderPassSampleLocationsBeginInfoEXT sample_locations_begin_info;
     std::vector<SubpassInfo> active_subpasses;
 
     VkSubpassContents active_subpass_contents;
@@ -458,6 +479,8 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     vvl::unordered_set<std::shared_ptr<StateObject>> object_bindings;
     vvl::unordered_map<VulkanTypedHandle, LogObjectList> broken_bindings;
 
+    std::vector<TensorBarrier> tensor_barriers;
+
     // VK_KHR_dynamic_rendering_local_read works like dynamic state, but lives for the rendering lifetime only
     struct RenderingAttachment {
         // VkRenderingAttachmentLocationInfo
@@ -468,6 +491,8 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
         std::vector<uint32_t> color_indexes;
         const uint32_t *depth_index = nullptr;
         const uint32_t *stencil_index = nullptr;
+        uint32_t depth_index_storage;
+        uint32_t stencil_index_storage;
         void Reset() {
             color_locations.clear();
             color_indexes.clear();
@@ -492,23 +517,7 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     VkCommandBuffer primary_command_buffer;
     // If primary, the secondary command buffers we will call.
     vvl::unordered_set<CommandBuffer *> linked_command_buffers;
-    // Validation functions run at primary CB queue submit time
-    using QueueCallback = std::function<bool(const class vvl::Queue &queue_state, const CommandBuffer &cb_state)>;
-    std::vector<QueueCallback> queue_submit_functions;
-    // Used by some layers to defer actions until vkCmdEndRenderPass time.
-    // Layers using this are responsible for inserting the callbacks into queue_submit_functions.
-    std::vector<QueueCallback> queue_submit_functions_after_render_pass;
-    // Validation functions run when secondary CB is executed in primary
-    std::vector<std::function<bool(const CommandBuffer &secondary, const CommandBuffer *primary, const vvl::Framebuffer *)>>
-        cmd_execute_commands_functions;
 
-    using EventCallback = std::function<bool(CommandBuffer &cb_state, bool do_validate, EventMap &local_event_signal_info,
-                                             VkQueue waiting_queue, const Location &loc)>;
-    std::vector<EventCallback> event_updates;
-
-    std::vector<std::function<bool(CommandBuffer &cb_state, bool do_validate, VkQueryPool &firstPerfQueryPool,
-                                   uint32_t perfQueryPass, QueryMap *localQueryToStateMap)>>
-        query_updates;
     bool performance_lock_acquired = false;
     bool performance_lock_released = false;
 
@@ -529,7 +538,22 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     bool conditional_rendering_inside_render_pass{false};
     uint32_t conditional_rendering_subpass{0};
 
-    std::vector<VkDescriptorBufferBindingInfoEXT> descriptor_buffer_binding_info;
+    // VK_EXT_descriptor_buffer
+    struct DescriptorBuffer {
+        struct BindingInfo {
+            VkDeviceAddress address;
+            VkBufferUsageFlags2 usage;
+        };
+
+        // This information is always tracked
+        std::vector<BindingInfo> binding_info;
+        bool ever_bound{false};
+
+        void Reset() {
+            binding_info.clear();
+            ever_bound = false;
+        }
+    } descriptor_buffer;
 
     mutable std::shared_mutex lock;
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock); }
@@ -582,94 +606,145 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     void Begin(const VkCommandBufferBeginInfo *pBeginInfo);
     void End(VkResult result);
 
-    void BeginQuery(const QueryObject &query_obj);
-    void EndQuery(const QueryObject &query_obj);
-    void EndQueries(VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount);
-    void ResetQueryPool(VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount);
+    void RecordCommand(const Location &loc);
+
+    void RecordBeginQuery(const QueryObject &query_obj, const Location &loc);
+    void RecordEndQuery(const QueryObject &query_obj, const Location &loc);
+    void RecordEndQueries(VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount);
+    void RecordWriteTimestamp(VkQueryPool queryPool, uint32_t slot, const Location &loc);
+    void RecordResetQueryPool(VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount, const Location &loc);
+    void RecordCopyQueryPoolResults(VkQueryPool queryPool, VkBuffer dstBuffer, uint32_t firstQuery, uint32_t queryCount,
+                                    VkDeviceSize dstOffset, VkDeviceSize stride, VkQueryResultFlags flags, const Location &loc);
+    void RecordWriteAccelerationStructuresProperties(VkQueryPool queryPool, uint32_t firstQuery,
+                                                     uint32_t accelerationStructureCount, const Location &loc);
     bool UpdatesQuery(const QueryObject &query_obj) const;
 
-    void BeginRenderPass(Func command, const VkRenderPassBeginInfo *pRenderPassBegin, VkSubpassContents contents);
-    void NextSubpass(Func command, VkSubpassContents contents);
+    void RecordBeginRendering(const VkRenderingInfo &rendering_info, const Location &loc);
+    void RecordBeginRenderPass(const VkRenderPassBeginInfo &render_pass_begin, const VkSubpassBeginInfo &subpass_begin_info,
+                               const Location &loc);
+    void RecordNextSubpass(const VkSubpassBeginInfo &subpass_begin_info, const VkSubpassEndInfo *subpass_end_info,
+                           const Location &loc);
     void UpdateSubpassAttachments();
-    void EndRenderPass(Func command);
+    void RecordEndRendering(const VkRenderingEndInfoEXT *pRenderingEndInfo, const Location &loc);
+    void RecordEndRenderPass(const VkSubpassEndInfo *subpass_end_info, const Location &loc);
 
-    void BeginRendering(Func command, const VkRenderingInfo *pRenderingInfo);
-    void EndRendering(Func command);
+    void RecordBeginVideoCoding(const VkVideoBeginCodingInfoKHR &begin_info, const Location &loc);
+    void RecordEndVideoCoding(const Location &loc);
+    void RecordControlVideoCoding(const VkVideoCodingControlInfoKHR &control_info, const Location &loc);
+    void RecordDecodeVideo(const VkVideoDecodeInfoKHR &decode_info, const Location &loc);
+    void RecordEncodeVideo(const VkVideoEncodeInfoKHR &encode_info, const Location &loc);
 
-    void BeginVideoCoding(const VkVideoBeginCodingInfoKHR *pBeginInfo);
-    void EndVideoCoding(const VkVideoEndCodingInfoKHR *pEndCodingInfo);
-    void ControlVideoCoding(const VkVideoCodingControlInfoKHR *pControlInfo);
-    void DecodeVideo(const VkVideoDecodeInfoKHR *pDecodeInfo);
-    void EncodeVideo(const VkVideoEncodeInfoKHR *pEncodeInfo);
-
-    void ExecuteCommands(vvl::span<const VkCommandBuffer> secondary_command_buffers);
+    void RecordExecuteCommands(vvl::span<const VkCommandBuffer> secondary_command_buffers, const Location &loc);
 
     void UpdateLastBoundDescriptorSets(VkPipelineBindPoint pipeline_bind_point,
-                                       std::shared_ptr<const vvl::PipelineLayout> pipeline_layout, vvl::Func bound_command,
-                                       uint32_t first_set, uint32_t set_count, const VkDescriptorSet *pDescriptorSets,
+                                       std::shared_ptr<const vvl::PipelineLayout> pipeline_layout, uint32_t first_set,
+                                       uint32_t set_count, const VkDescriptorSet *pDescriptorSets,
                                        std::shared_ptr<vvl::DescriptorSet> &push_descriptor_set, uint32_t dynamic_offset_count,
-                                       const uint32_t *p_dynamic_offsets);
+                                       const uint32_t *p_dynamic_offsets, const Location &loc);
 
     void UpdateLastBoundDescriptorBuffers(VkPipelineBindPoint pipeline_bind_point,
                                           std::shared_ptr<const vvl::PipelineLayout> pipeline_layout, uint32_t first_set,
                                           uint32_t set_count, const uint32_t *buffer_indicies, const VkDeviceSize *buffer_offsets);
 
     void PushDescriptorSetState(VkPipelineBindPoint pipelineBindPoint, std::shared_ptr<const vvl::PipelineLayout> pipeline_layout,
-                                vvl::Func bound_command, uint32_t set, uint32_t descriptorWriteCount,
-                                const VkWriteDescriptorSet *pDescriptorWrites);
+                                uint32_t set, uint32_t descriptorWriteCount, const VkWriteDescriptorSet *pDescriptorWrites,
+                                const Location &loc);
 
-    void UpdateDrawCmd(Func command);
-    void UpdateDispatchCmd(Func command);
-    void UpdateTraceRayCmd(Func command);
-    void UpdatePipelineState(Func command, const VkPipelineBindPoint bind_point);
+    void RecordDraw(const Location &loc);
+    void RecordDispatch(const Location &loc);
+    void RecordTraceRay(const Location &loc);
 
-    void RecordCmd(Func command);
-    void RecordStateCmd(Func command, CBDynamicState dynamic_state);
+    void RecordStateCmd(CBDynamicState dynamic_state);
     void RecordDynamicState(CBDynamicState dynamic_state);
-    void RecordTransferCmd(Func command, std::shared_ptr<Bindable> &&buf1, std::shared_ptr<Bindable> &&buf2 = nullptr);
-    void RecordSetEvent(Func command, VkEvent event, VkPipelineStageFlags2KHR stageMask, const VkDependencyInfo *dependency_info);
-    void RecordResetEvent(Func command, VkEvent event, VkPipelineStageFlags2KHR stageMask);
-    void RecordWaitEvents(Func command, uint32_t eventCount, const VkEvent *pEvents, VkPipelineStageFlags2KHR src_stage_mask,
-                          const VkDependencyInfo *dependency_info);
-    void RecordWriteTimestamp(Func command, VkPipelineStageFlags2KHR pipelineStage, VkQueryPool queryPool, uint32_t slot);
+    void RecordSetViewport(uint32_t first_viewport, uint32_t viewport_count, const VkViewport *viewports);
+    void RecordSetViewportWithCount(uint32_t viewport_count, const VkViewport *viewports);
+    void RecordSetScissor(uint32_t first_scissor, uint32_t scissor_count);
+    void RecordSetScissorWithCount(uint32_t scissor_count);
+    void RecordSetDepthCompareOp(VkCompareOp depth_compare_op);
+    void RecordSetDepthTestEnable(VkBool32 depth_test_enable);
+    void RecordBindPipeline(VkPipelineBindPoint bind_point, vvl::Pipeline &pipeline);
+
+    void RecordCopyBuffer(vvl::Buffer &src_buffer_state, vvl::Buffer &dst_buffer_state, uint32_t region_count,
+                          const VkBufferCopy *regions, const Location &loc);
+    void RecordCopyBuffer2(vvl::Buffer &src_buffer_state, vvl::Buffer &dst_buffer_state, uint32_t region_count,
+                           const VkBufferCopy2 *regions, const Location &loc);
+    void RecordCopyImage(vvl::Image &src_image_state, vvl::Image &dst_image_state, VkImageLayout src_image_layout,
+                         VkImageLayout dst_image_layout, uint32_t region_count, const VkImageCopy *regions, const Location &loc);
+    void RecordCopyImage2(vvl::Image &src_image_state, vvl::Image &dst_image_state, VkImageLayout src_image_layout,
+                          VkImageLayout dst_image_layout, uint32_t region_count, const VkImageCopy2 *regions, const Location &loc);
+    void RecordCopyBufferToImage(vvl::Buffer &src_buffer_state, vvl::Image &dst_image_state, VkImageLayout dst_image_layout,
+                                 uint32_t region_count, const VkBufferImageCopy *regions, const Location &loc);
+    void RecordCopyBufferToImage2(vvl::Buffer &src_buffer_state, vvl::Image &dst_image_state, VkImageLayout dst_image_layout,
+                                  uint32_t region_count, const VkBufferImageCopy2 *regions, const Location &loc);
+    void RecordCopyImageToBuffer(vvl::Image &src_image_state, vvl::Buffer &dst_buffer_state, VkImageLayout src_image_layout,
+                                 uint32_t region_count, const VkBufferImageCopy *regions, const Location &loc);
+    void RecordCopyImageToBuffer2(vvl::Image &src_image_state, vvl::Buffer &dst_buffer_state, VkImageLayout src_image_layout,
+                                  uint32_t region_count, const VkBufferImageCopy2 *regions, const Location &loc);
+    void RecordBlitImage(vvl::Image &src_image_state, vvl::Image &dst_image_state, VkImageLayout src_image_layout,
+                         VkImageLayout dst_image_layout, uint32_t region_count, const VkImageBlit *regions, const Location &loc);
+    void RecordBlitImage2(vvl::Image &src_image_state, vvl::Image &dst_image_state, VkImageLayout src_image_layout,
+                          VkImageLayout dst_image_layout, uint32_t region_count, const VkImageBlit2 *regions, const Location &loc);
+    void RecordResolveImage(vvl::Image &src_image_state, vvl::Image &dst_image_state, uint32_t region_count,
+                            const VkImageResolve *regions, const Location &loc);
+    void RecordResolveImage2(vvl::Image &src_image_state, vvl::Image &dst_image_state, uint32_t region_count,
+                             const VkImageResolve2 *regions, const Location &loc);
+    void RecordClearColorImage(vvl::Image &image_state, VkImageLayout image_layout, const VkClearColorValue *color_values,
+                               uint32_t range_count, const VkImageSubresourceRange *ranges, const Location &loc);
+    void RecordClearDepthStencilImage(vvl::Image &image_state, VkImageLayout image_layout,
+                                      const VkClearDepthStencilValue *depth_stencil_values, uint32_t range_count,
+                                      const VkImageSubresourceRange *ranges, const Location &loc);
+    void RecordClearAttachments(uint32_t attachment_count, const VkClearAttachment *pAttachments, uint32_t rect_count,
+                                const VkClearRect *pRects, const Location &loc);
+    void RecordFillBuffer(vvl::Buffer &buffer_state, VkDeviceSize offset, VkDeviceSize size, const Location &loc);
+    void RecordUpdateBuffer(vvl::Buffer &buffer_state, VkDeviceSize offset, VkDeviceSize size, const Location &loc);
+
+    void RecordSetEvent(VkEvent event, VkPipelineStageFlags2KHR stageMask, const VkDependencyInfo *dependency_info,
+                        const Location &loc);
+    void RecordResetEvent(VkEvent event, VkPipelineStageFlags2KHR stageMask, const Location &loc);
+    void RecordWaitEvents(uint32_t eventCount, const VkEvent *pEvents, VkPipelineStageFlags2KHR src_stage_mask,
+                          const VkDependencyInfo *dependency_info, const Location &loc);
     void RecordPushConstants(const vvl::PipelineLayout &pipeline_layout_state, VkShaderStageFlags stage_flags, uint32_t offset,
                              uint32_t size, const void *values);
 
-    void RecordBarriers(uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers, uint32_t bufferMemoryBarrierCount,
-                        const VkBufferMemoryBarrier *pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
-                        const VkImageMemoryBarrier *pImageMemoryBarriers);
-    void RecordBarriers(const VkDependencyInfo &dep_info);
+    void RecordBeginConditionalRendering(const Location &loc);
+    void RecordEndConditionalRendering(const Location &loc);
+
+    void RecordSetRenderingAttachmentLocations(const VkRenderingAttachmentLocationInfo *pLocationInfo, const Location &loc);
+    void RecordSetRenderingInputAttachmentIndices(const VkRenderingInputAttachmentIndexInfo *pLocationInfo, const Location &loc);
+
+    void RecordBarrierObjects(uint32_t buffer_barrier_count, const VkBufferMemoryBarrier *buffer_barriers,
+                              uint32_t image_barrier_count, const VkImageMemoryBarrier *image_barriers,
+                              VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask, const Location &loc);
+    void RecordBarrierObjects(const VkDependencyInfo &dep_info, const Location &loc);
 
     void SetImageViewLayout(const vvl::ImageView &view_state, VkImageLayout layout, VkImageLayout layoutStencil);
     void TrackImageViewFirstLayout(const vvl::ImageView &view_state, VkImageLayout layout);
 
     void SetImageLayout(const vvl::Image &image_state, const VkImageSubresourceRange &normalized_subresource_range,
                         VkImageLayout layout, VkImageLayout expected_layout = kInvalidLayout);
-    // This tracks the first known layout of the subresource in the command buffer.
-    void TrackImageFirstLayout(const vvl::Image &image_state, const VkImageSubresourceRange &subresource_range,
-                               VkImageLayout layout);
 
-    void Submit(Queue &queue_state, uint32_t perf_submit_pass, const Location &loc);
-    void Retire(uint32_t perf_submit_pass, const std::function<bool(const QueryObject &)> &is_query_updated_after);
+    // This tracks the first known layout of the subresource in the command buffer.
+    // NOTE: depth_offset/depth_extent parameters are used to support per-slice image layout
+    // transitions in 3d image. Set depth_extent to zero if API does not specify region with depth information.
+    void TrackImageFirstLayout(const vvl::Image &image_state, const VkImageSubresourceRange &subresource_range,
+                               int32_t depth_offset, uint32_t depth_extent, VkImageLayout layout);
+
+    void SubmitTimeValidate(Queue &queue_state, uint32_t perf_submit_pass, const Location &loc);
 
     // Helpers to offset into |active_attachments|
     // [all color, all color resolve, depth, depth resolve, stencil, stencil resolve, FragmentDensityMap]
     uint32_t GetDynamicRenderingColorAttachmentCount() const;
+    // Used to keep naming convention consistent
     uint32_t GetDynamicRenderingColorAttachmentIndex(uint32_t index) const { return index; }
     uint32_t GetDynamicRenderingColorResolveAttachmentIndex(uint32_t index) const {
         return index + GetDynamicRenderingColorAttachmentCount();
     }
     // used for non-color types
     uint32_t GetDynamicRenderingAttachmentIndex(AttachmentInfo::Type type) const;
-    // For dynamic rendering, get count from vkCmdBeginRendering
-    // For non-dynamic rendering, get count from current subpass
-    uint32_t GetColorAttachmentCount() const;
 
-    bool HasValidDynamicDepthAttachment() const;
-    bool HasValidDynamicStencilAttachment() const;
     bool HasExternalFormatResolveAttachment() const;
 
-    inline void BindPipeline(vvl::BindPoint bind_point, vvl::Pipeline *pipe_state) {
+    inline void BindLastBoundPipeline(vvl::BindPoint bind_point, vvl::Pipeline *pipe_state) {
         lastBound[bind_point].pipeline_state = pipe_state;
     }
     void BindShader(VkShaderStageFlagBits shader_stage, vvl::ShaderObject *shader_object_state);
@@ -708,7 +783,7 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
   protected:
     void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
     void UpdateAttachmentsView(const VkRenderPassBeginInfo *pRenderPassBegin);
-    void EnqueueUpdateVideoInlineQueries(const VkVideoInlineQueryInfoKHR &query_info);
+    void RecordVideoInlineQueries(const VkVideoInlineQueryInfoKHR &query_info);
     void UnbindResources();
 };
 
@@ -720,18 +795,108 @@ class CommandBufferSubState {
     virtual ~CommandBufferSubState() {}
 
     virtual void Begin(const VkCommandBufferBeginInfo &begin_info) {}
+    virtual void End() {}
     virtual void Reset(const Location &loc) {}
     virtual void Destroy() {}
 
-    virtual void ExecuteCommands(vvl::CommandBuffer &secondary_command_buffer) {}
+    virtual void RecordExecuteCommand(vvl::CommandBuffer &secondary_command_buffer, uint32_t cmd_index, const Location &loc) {}
 
-    virtual void RecordCmd(Func command) {}
-    virtual void RecordWaitEvents(Func command, uint32_t eventCount, const VkEvent *pEvents,
-                                  VkPipelineStageFlags2KHR src_stage_mask, const VkDependencyInfo *dependency_info) {}
+    virtual void RecordActionCommand(LastBound &last_bound, const Location &loc) {}
+    virtual void RecordBindPipeline(VkPipelineBindPoint bind_point, vvl::Pipeline &pipeline) {}
+    virtual void UpdateLastBoundDescriptorSets(VkPipelineBindPoint bind_point, const Location &loc) {}
+
+    virtual void RecordSetViewport(uint32_t first_viewport, uint32_t viewport_count) {}
+    virtual void RecordSetViewportWithCount(uint32_t viewport_count) {}
+    virtual void RecordSetScissor(uint32_t first_scissor, uint32_t scissor_count) {}
+    virtual void RecordSetScissorWithCount(uint32_t scissor_count) {}
+    virtual void RecordSetDepthCompareOp(VkCompareOp depth_compare_op) {}
+    virtual void RecordSetDepthTestEnable(VkBool32 depth_test_enable) {}
+
+    virtual void RecordCopyBuffer(vvl::Buffer &src_buffer_state, vvl::Buffer &dst_buffer_state, uint32_t region_count,
+                                  const VkBufferCopy *regions, const Location &loc) {}
+    virtual void RecordCopyBuffer2(vvl::Buffer &src_buffer_state, vvl::Buffer &dst_buffer_state, uint32_t region_count,
+                                   const VkBufferCopy2 *regions, const Location &loc) {}
+    virtual void RecordCopyImage(vvl::Image &src_image_state, vvl::Image &dst_image_state, VkImageLayout src_image_layout,
+                                 VkImageLayout dst_image_layout, uint32_t region_count, const VkImageCopy *regions,
+                                 const Location &loc) {}
+    virtual void RecordCopyImage2(vvl::Image &src_image_state, vvl::Image &dst_image_state, VkImageLayout src_image_layout,
+                                  VkImageLayout dst_image_layout, uint32_t region_count, const VkImageCopy2 *regions,
+                                  const Location &loc) {}
+    virtual void RecordCopyBufferToImage(vvl::Buffer &src_buffer_state, vvl::Image &dst_image_state, VkImageLayout dst_image_layout,
+                                         uint32_t region_count, const VkBufferImageCopy *regions, const Location &loc) {}
+    virtual void RecordCopyBufferToImage2(vvl::Buffer &src_buffer_state, vvl::Image &dst_image_state,
+                                          VkImageLayout dst_image_layout, uint32_t region_count, const VkBufferImageCopy2 *regions,
+                                          const Location &loc) {}
+    virtual void RecordCopyImageToBuffer(vvl::Image &src_image_state, vvl::Buffer &dst_buffer_state, VkImageLayout src_image_layout,
+                                         uint32_t region_count, const VkBufferImageCopy *regions, const Location &loc) {}
+    virtual void RecordCopyImageToBuffer2(vvl::Image &src_image_state, vvl::Buffer &dst_buffer_state,
+                                          VkImageLayout src_image_layout, uint32_t region_count, const VkBufferImageCopy2 *regions,
+                                          const Location &loc) {}
+    virtual void RecordBlitImage(vvl::Image &src_image_state, vvl::Image &dst_image_state, VkImageLayout src_image_layout,
+                                 VkImageLayout dst_image_layout, uint32_t region_count, const VkImageBlit *regions,
+                                 const Location &loc) {}
+    virtual void RecordBlitImage2(vvl::Image &src_image_state, vvl::Image &dst_image_state, VkImageLayout src_image_layout,
+                                  VkImageLayout dst_image_layout, uint32_t region_count, const VkImageBlit2 *regions,
+                                  const Location &loc) {}
+    virtual void RecordResolveImage(vvl::Image &src_image_state, vvl::Image &dst_image_state, uint32_t region_count,
+                                    const VkImageResolve *regions, const Location &loc) {}
+    virtual void RecordResolveImage2(vvl::Image &src_image_state, vvl::Image &dst_image_state, uint32_t region_count,
+                                     const VkImageResolve2 *regions, const Location &loc) {}
+    virtual void RecordClearColorImage(vvl::Image &image_state, VkImageLayout image_layout, const VkClearColorValue *color_values,
+                                       uint32_t range_count, const VkImageSubresourceRange *ranges, const Location &loc) {}
+    virtual void RecordClearDepthStencilImage(vvl::Image &image_state, VkImageLayout image_layout,
+                                              const VkClearDepthStencilValue *depth_stencil_values, uint32_t range_count,
+                                              const VkImageSubresourceRange *ranges, const Location &loc) {}
+    virtual void RecordClearAttachments(uint32_t attachment_count, const VkClearAttachment *pAttachments, uint32_t rect_count,
+                                        const VkClearRect *pRects, const Location &loc) {}
+    virtual void RecordFillBuffer(vvl::Buffer &buffer_state, VkDeviceSize offset, VkDeviceSize size, const Location &loc) {}
+    virtual void RecordUpdateBuffer(vvl::Buffer &buffer_state, VkDeviceSize offset, VkDeviceSize size, const Location &loc) {}
+
+    virtual void RecordSetEvent(VkEvent event, VkPipelineStageFlags2 stage_mask, const VkDependencyInfo *dependency_info) {}
+    virtual void RecordResetEvent(VkEvent event, VkPipelineStageFlags2 stage_mask) {}
+    virtual void RecordWaitEvents(uint32_t eventCount, const VkEvent *pEvents, VkPipelineStageFlags2 src_stage_mask,
+                                  const VkDependencyInfo *dependency_info, const Location &loc) {}
+    virtual void RecordBarriers(uint32_t buffer_barrier_count, const VkBufferMemoryBarrier *buffer_barriers,
+                                uint32_t image_barrier_count, const VkImageMemoryBarrier *image_barriers,
+                                VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask, const Location &loc) {}
+    virtual void RecordBarriers2(const VkDependencyInfo &dep_info, const Location &loc) {}
+
     virtual void RecordPushConstants(VkPipelineLayout layout, VkShaderStageFlags stage_flags, uint32_t offset, uint32_t size,
                                      const void *values) {}
+
+    virtual void RecordBeginRendering(const VkRenderingInfo &rendering_info, const Location &loc) {}
+    virtual void RecordBeginRenderPass(const VkRenderPassBeginInfo &render_pass_begin, const VkSubpassBeginInfo &subpass_begin_info,
+                                       const Location &loc) {}
+    virtual void RecordNextSubpass(const VkSubpassBeginInfo &subpass_begin_info, const VkSubpassEndInfo *subpass_end_info,
+                                   const Location &loc) {}
+    // Note - these are called prior to the renderPass object being destroyed
+    virtual void RecordEndRendering(const VkRenderingEndInfoEXT *pRenderingEndInfo) {}
+    virtual void RecordEndRenderPass(const VkSubpassEndInfo *subpass_end_info, const Location &loc) {}
+
+    virtual void RecordBeginQuery(const QueryObject &query_obj, const Location &loc) {}
+    virtual void RecordEndQuery(const QueryObject &query_obj, const Location &loc) {}
+    virtual void RecordEndQueries(VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount) {}
+    virtual void RecordWriteTimestamp(const QueryObject &query_obj, const Location &loc) {}
+    virtual void RecordResetQueryPool(VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount, bool is_perf_query,
+                                      const Location &loc) {}
+    virtual void RecordCopyQueryPoolResults(vvl::QueryPool &pool_state, vvl::Buffer &dst_buffer_state, uint32_t first_query,
+                                            uint32_t query_count, VkDeviceSize dst_offset, VkDeviceSize stride,
+                                            VkQueryResultFlags flags, const Location &loc) {}
+    virtual void RecordWriteAccelerationStructuresProperties(VkQueryPool queryPool, uint32_t firstQuery,
+                                                             uint32_t accelerationStructureCount, const Location &loc) {}
+    virtual void RecordVideoInlineQueries(const VkVideoInlineQueryInfoKHR &query_info) {}
+
+    virtual void RecordBeginVideoCoding(vvl::VideoSession &vs_state, const VkVideoBeginCodingInfoKHR &begin_info,
+                                        const Location &loc) {}
+    virtual void RecordControlVideoCoding(vvl::VideoSession &vs_state, const VkVideoCodingControlInfoKHR &control_info,
+                                          const Location &loc) {}
+    virtual void RecordDecodeVideo(vvl::VideoSession &vs_state, const VkVideoDecodeInfoKHR &decode_info, const Location &loc) {}
+    virtual void RecordEncodeVideo(vvl::VideoSession &vs_state, const VkVideoEncodeInfoKHR &encode_info, const Location &loc) {}
+
     virtual void ClearPushConstants() {}
     virtual void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) {}
+
+    virtual void Submit(Queue &queue_state, uint32_t perf_submit_pass, const Location &loc) {}
 
     VulkanTypedHandle Handle() const;
     VkCommandBuffer VkHandle() const;

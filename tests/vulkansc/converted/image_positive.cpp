@@ -38,13 +38,15 @@ VkImageCreateInfo ImageTest::DefaultImageInfo() {
 
 class PositiveImage : public ImageTest {};
 
-TEST_F(PositiveImage, OwnershipTranfersImage) {
+TEST_F(PositiveImage, OwnershipTranfers) {
     TEST_DESCRIPTION("Valid image ownership transfers that shouldn't create errors");
     RETURN_IF_SKIP(Init());
 
     vkt::Queue *no_gfx_queue = m_device->QueueWithoutCapabilities(VK_QUEUE_GRAPHICS_BIT);
     if (!no_gfx_queue) {
-        GTEST_SKIP() << "Required queue not present (non-graphics non-compute capable required)";
+        GTEST_SKIP() << "Required queue not present (non-graphics capable required)";
+    } else if ((m_device->Physical().queue_properties_[no_gfx_queue->family_index].queueFlags & VK_QUEUE_TRANSFER_BIT) == 0) {
+        GTEST_SKIP() << "Non graphic queue doesn't have transfer bit";
     }
 
     vkt::CommandPool no_gfx_pool(*m_device, no_gfx_queue->family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -60,8 +62,8 @@ TEST_F(PositiveImage, OwnershipTranfersImage) {
 
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
 
-    ValidOwnershipTransfer(m_errorMonitor, m_default_queue, m_command_buffer, no_gfx_queue, no_gfx_cb,
-                           VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, nullptr, &image_barrier);
+    ValidOwnershipTransfer(m_default_queue, m_command_buffer, no_gfx_queue, no_gfx_cb, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                           VK_PIPELINE_STAGE_TRANSFER_BIT, nullptr, &image_barrier);
 
     // Change layouts while changing ownership
     image_barrier.srcQueueFamilyIndex = no_gfx_queue->family_index;
@@ -74,8 +76,8 @@ TEST_F(PositiveImage, OwnershipTranfersImage) {
         image_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
 
-    ValidOwnershipTransfer(m_errorMonitor, no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, nullptr, &image_barrier);
+    ValidOwnershipTransfer(no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                           VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, nullptr, &image_barrier);
 }
 
 TEST_F(PositiveImage, AliasedMemoryTracking) {
@@ -105,7 +107,6 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
     const auto buffer_memory_requirements = buffer->MemoryRequirements();
     const auto image_memory_requirements = image.MemoryRequirements();
 
-    vkt::DeviceMemory mem;
     VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.allocationSize = (std::max)(buffer_memory_requirements.size, image_memory_requirements.size);
     bool has_memtype =
@@ -114,7 +115,7 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
     if (!has_memtype) {
         GTEST_SKIP() << "Failed to find a host visible memory type for both a buffer and an image";
     }
-    mem.init(*m_device, alloc_info);
+    vkt::DeviceMemory mem(*m_device, alloc_info);
 
     auto pData = mem.Map();
     std::memset(pData, 0xCADECADE, static_cast<size_t>(buff_size));
@@ -270,9 +271,7 @@ TEST_F(PositiveImage, ExtendedUsageWithDifferentFormatViews) {
         VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
     VkImageFormatProperties image_properties;
-    VkResult err = vk::GetPhysicalDeviceImageFormatProperties(Gpu(), image_ci.format, image_ci.imageType, image_ci.tiling,
-                                                              image_ci.usage, image_ci.flags, &image_properties);
-    // Test not supported by driver
+    VkResult err = GetImageFormatProps(Gpu(), image_ci, image_properties);
     if (err != VK_SUCCESS) {
         GTEST_SKIP() << "Image format not valid for format, type, tiling, usage and flags combination.";
     }
@@ -897,14 +896,6 @@ TEST_F(PositiveImage, Image3DWith2DArrayCompatIssue) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
 
-    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_subset_features = vku::InitStructHelper();
-        GetPhysicalDeviceFeatures2(portability_subset_features);
-        if (!portability_subset_features.imageView2DOn3DImage) {
-            GTEST_SKIP() << "imageView2DOn3DImage not supported, skipping test";
-        }
-    }
-
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
     image_ci.imageType = VK_IMAGE_TYPE_3D;
@@ -935,4 +926,88 @@ TEST_F(PositiveImage, Image3DWith2DArrayCompatIssue) {
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
                            nullptr, 1, &image_memory_barrier);
     m_command_buffer.End();
+}
+
+TEST_F(PositiveImage, ImageView2dOf3dBaseLayer) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10416");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.flags = VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
+    image_ci.imageType = VK_IMAGE_TYPE_3D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent = {32u, 32u, 2u};
+    image_ci.mipLevels = 1u;
+    image_ci.arrayLayers = 1u;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vkt::Image image(*m_device, image_ci);
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0u, 1u, 1u, 1u);
+}
+
+TEST_F(PositiveImage, FramebufferRemainingArrayLayers) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
+    image_ci.imageType = VK_IMAGE_TYPE_3D;
+    image_ci.format = VK_FORMAT_B8G8R8A8_UNORM;
+    image_ci.extent = {32u, 32u, 5u};
+    image_ci.mipLevels = 1u;
+    image_ci.arrayLayers = 1u;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vkt::Image image(*m_device, image_ci);
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0u, 1u, 2u, VK_REMAINING_ARRAY_LAYERS);
+
+    VkFramebufferCreateInfo fb_ci = vku::InitStructHelper();
+    fb_ci.renderPass = m_renderPass;
+    fb_ci.attachmentCount = 1u;
+    fb_ci.pAttachments = &image_view.handle();
+    fb_ci.width = 32u;
+    fb_ci.height = 32u;
+    fb_ci.layers = 1u;
+    vkt::Framebuffer framebuffer(*m_device, fb_ci);
+}
+
+TEST_F(PositiveImage, BlockTexelViewLayerCount) {
+    TEST_DESCRIPTION("Create view with VK_REMAINING_ARRAY_LAYERS layerCount from CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE image");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT | VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT |
+                              VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+    image_create_info.imageType = VK_IMAGE_TYPE_3D;
+    image_create_info.format = VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+    image_create_info.extent = {32, 32, 2};
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 1;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    VkFormatProperties image_fmt;
+    vk::GetPhysicalDeviceFormatProperties(m_device->Physical(), image_create_info.format, &image_fmt);
+    if (!vkt::Image::IsCompatible(*m_device, image_create_info.usage, image_fmt.optimalTilingFeatures)) {
+        GTEST_SKIP() << "Image usage and format not compatible on device";
+    }
+    vkt::Image image(*m_device, image_create_info);
+
+    VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
+    image_view_ci.image = image;
+    image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    image_view_ci.format = VK_FORMAT_R16G16B16A16_UNORM;
+    image_view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1, VK_REMAINING_ARRAY_LAYERS};
+
+    // Test that VK_REMAINING_ARRAY_LAYERS evaluates to 1
+    vkt::ImageView view(*m_device, image_view_ci);
 }

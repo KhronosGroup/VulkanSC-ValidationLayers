@@ -149,7 +149,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
         }
 
         // Request too many bindings.
-        if (tf_properties.maxTransformFeedbackBuffers < std::numeric_limits<uint32_t>::max()) {
+        if (tf_properties.maxTransformFeedbackBuffers < vvl::kU32Max) {
             auto const bindingCount = tf_properties.maxTransformFeedbackBuffers + 1;
             std::vector<VkBuffer> buffers(bindingCount, buffer_obj);
 
@@ -165,7 +165,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
             VkDeviceSize const offsets[1]{};
             VkDeviceSize const sizes[1]{tf_properties.maxTransformFeedbackBufferSize + 1};
 
-            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pSize-02361");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pOffsets-02363");
             vk::CmdBindTransformFeedbackBuffersEXT(m_command_buffer, 0, 1, &buffer_obj.handle(), offsets, sizes);
             m_errorMonitor->VerifyFound();
         }
@@ -198,7 +198,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
             VkDeviceSize const offsets[1]{};
             VkDeviceSize const sizes[1]{buffer_size + 1};
 
-            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pSizes-02362");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pOffsets-02363");
             vk::CmdBindTransformFeedbackBuffersEXT(m_command_buffer, 0, 1, &buffer_obj.handle(), offsets, sizes);
             m_errorMonitor->VerifyFound();
         }
@@ -283,7 +283,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
         }
 
         // Request too many buffers.
-        if (tf_properties.maxTransformFeedbackBuffers < std::numeric_limits<uint32_t>::max()) {
+        if (tf_properties.maxTransformFeedbackBuffers < vvl::kU32Max) {
             auto const counterBufferCount = tf_properties.maxTransformFeedbackBuffers + 1;
 
             m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-firstCounterBuffer-02369");
@@ -373,7 +373,7 @@ TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
             }
 
             // Request too many buffers.
-            if (tf_properties.maxTransformFeedbackBuffers < std::numeric_limits<uint32_t>::max()) {
+            if (tf_properties.maxTransformFeedbackBuffers < vvl::kU32Max) {
                 auto const counterBufferCount = tf_properties.maxTransformFeedbackBuffers + 1;
 
                 m_errorMonitor->SetDesiredError("VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02377");
@@ -1112,7 +1112,7 @@ TEST_F(NegativeTransformFeedback, InvalidCounterBuffers) {
 
     vkt::Buffer buffer(*m_device, 4, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT);
     VkBuffer buffer_handle = buffer;
-    buffer.destroy();
+    buffer.Destroy();
 
     CreatePipelineHelper pipe(*this);
     auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);

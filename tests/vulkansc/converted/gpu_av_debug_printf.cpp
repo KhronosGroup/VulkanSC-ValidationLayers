@@ -80,7 +80,7 @@ void NegativeGpuAVDebugPrintf::InitWithLayerSettings(bool enable_printf, bool en
 }
 
 void NegativeGpuAVDebugPrintf::BasicComputeTest() {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer foo_0 {
@@ -191,7 +191,7 @@ TEST_F(NegativeGpuAVDebugPrintf, Graphics) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer foo_0 {
@@ -240,7 +240,7 @@ TEST_F(NegativeGpuAVDebugPrintf, GPL) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer foo_0 {
@@ -286,7 +286,7 @@ TEST_F(NegativeGpuAVDebugPrintf, ShaderObject) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer foo_0 {
@@ -333,7 +333,7 @@ TEST_F(NegativeGpuAVDebugPrintf, DynamicRendering) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer foo_0 {

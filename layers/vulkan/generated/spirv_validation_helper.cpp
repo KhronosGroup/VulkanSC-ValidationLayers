@@ -282,8 +282,13 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityStorageTensorArrayNonUniformIndexingARM, {0, &DeviceFeatures::shaderStorageTensorArrayNonUniformIndexing, nullptr, ""}},
         {spv::CapabilityFloat8EXT, {0, &DeviceFeatures::shaderFloat8, nullptr, ""}},
         {spv::CapabilityFloat8CooperativeMatrixEXT, {0, &DeviceFeatures::shaderFloat8CooperativeMatrix, nullptr, ""}},
+        {spv::CapabilityGraphARM, {0, &DeviceFeatures::dataGraph, nullptr, ""}},
+        {spv::CapabilityUntypedPointersKHR, {0, &DeviceFeatures::shaderUntypedPointers, nullptr, ""}},
+        {spv::CapabilityFMAKHR, {0, &DeviceFeatures::shaderFmaFloat16, nullptr, ""}},
+        {spv::CapabilityFMAKHR, {0, &DeviceFeatures::shaderFmaFloat32, nullptr, ""}},
+        {spv::CapabilityFMAKHR, {0, &DeviceFeatures::shaderFmaFloat64, nullptr, ""}},
         // Not found in current SPIR-V Headers
-        // {spv::CapabilityGraphARM, {0, &DeviceFeatures::dataGraph, nullptr, ""}},
+        // {spv::CapabilityShader64BitIndexingEXT, {0, &DeviceFeatures::shader64BitIndexing, nullptr, ""}},
     };
     // clang-format on
     return spirv_capabilities;
@@ -385,7 +390,6 @@ const std::unordered_multimap<std::string_view, RequiredSpirvInfo>& GetSpirvExte
         {"SPV_EXT_opacity_micromap", {0, nullptr, &DeviceExtensions::vk_ext_opacity_micromap, ""}},
         {"SPV_KHR_cooperative_matrix", {0, nullptr, &DeviceExtensions::vk_khr_cooperative_matrix, ""}},
         {"SPV_ARM_core_builtins", {0, nullptr, &DeviceExtensions::vk_arm_shader_core_builtins, ""}},
-        {"SPV_AMDX_shader_enqueue", {0, nullptr, &DeviceExtensions::vk_amdx_shader_enqueue, ""}},
         {"SPV_HUAWEI_cluster_culling_shader", {0, nullptr, &DeviceExtensions::vk_huawei_cluster_culling_shader, ""}},
         {"SPV_HUAWEI_subpass_shading", {0, nullptr, &DeviceExtensions::vk_huawei_subpass_shading, ""}},
         {"SPV_NV_ray_tracing_motion_blur", {0, nullptr, &DeviceExtensions::vk_nv_ray_tracing_motion_blur, ""}},
@@ -396,6 +400,7 @@ const std::unordered_multimap<std::string_view, RequiredSpirvInfo>& GetSpirvExte
         {"SPV_KHR_expect_assume", {0, nullptr, &DeviceExtensions::vk_khr_shader_expect_assume, ""}},
         {"SPV_KHR_float_controls2", {VK_API_VERSION_1_4, nullptr, nullptr, ""}},
         {"SPV_KHR_float_controls2", {0, nullptr, &DeviceExtensions::vk_khr_shader_float_controls2, ""}},
+        {"SPV_KHR_fma", {0, nullptr, &DeviceExtensions::vk_khr_shader_fma, ""}},
         {"SPV_KHR_quad_control", {0, nullptr, &DeviceExtensions::vk_khr_shader_quad_control, ""}},
         {"SPV_KHR_bfloat16", {0, nullptr, &DeviceExtensions::vk_khr_shader_bfloat16, ""}},
         {"SPV_NV_raw_access_chains", {0, nullptr, &DeviceExtensions::vk_nv_raw_access_chains, ""}},
@@ -411,6 +416,8 @@ const std::unordered_multimap<std::string_view, RequiredSpirvInfo>& GetSpirvExte
         {"SPV_ARM_tensors", {0, nullptr, &DeviceExtensions::vk_arm_tensors, ""}},
         {"SPV_EXT_float8", {0, nullptr, &DeviceExtensions::vk_ext_shader_float8, ""}},
         {"SPV_ARM_graph", {0, nullptr, &DeviceExtensions::vk_arm_data_graph, ""}},
+        {"SPV_KHR_untyped_pointers", {0, nullptr, &DeviceExtensions::vk_khr_shader_untyped_pointers, ""}},
+        {"SPV_EXT_shader_64bit_indexing", {0, nullptr, &DeviceExtensions::vk_ext_shader_64bit_indexing, ""}},
     };
     // clang-format on
     return spirv_extensions;
@@ -548,6 +555,8 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "StorageTensorArrayDynamicIndexingARM";
         case spv::CapabilityStorageTensorArrayNonUniformIndexingARM:
             return "StorageTensorArrayNonUniformIndexingARM";
+        case spv::CapabilityGraphARM:
+            return "GraphARM";
         case spv::CapabilityCooperativeMatrixLayoutsARM:
             return "CooperativeMatrixLayoutsARM";
         case spv::CapabilityFloat8EXT:
@@ -608,10 +617,8 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "RayQueryProvisionalKHR";
         case spv::CapabilityRayQueryKHR:
             return "RayQueryKHR";
-#ifdef VK_ENABLE_BETA_EXTENSIONS
         case spv::CapabilityUntypedPointersKHR:
             return "UntypedPointersKHR";
-#endif
         case spv::CapabilityRayTraversalPrimitiveCullingKHR:
             return "RayTraversalPrimitiveCullingKHR";
         case spv::CapabilityRayTracingKHR:
@@ -624,6 +631,8 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "TextureBlockMatchQCOM";
         case spv::CapabilityTileShadingQCOM:
             return "TileShadingQCOM";
+        case spv::CapabilityCooperativeMatrixConversionQCOM:
+            return "CooperativeMatrixConversionQCOM";
         case spv::CapabilityTextureBlockMatch2QCOM:
             return "TextureBlockMatch2QCOM";
         case spv::CapabilityFloat16ImageAMD:
@@ -806,6 +815,8 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "GroupNonUniformRotateKHR";
         case spv::CapabilityFloatControls2:
             return "FloatControls2";
+        case spv::CapabilityFMAKHR:
+            return "FMAKHR";
         case spv::CapabilityAtomicFloat32AddEXT:
             return "AtomicFloat32AddEXT";
         case spv::CapabilityAtomicFloat64AddEXT:
@@ -830,6 +841,16 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "SubgroupMatrixMultiplyAccumulateINTEL";
         case spv::CapabilityTernaryBitwiseFunctionINTEL:
             return "TernaryBitwiseFunctionINTEL";
+        case spv::CapabilityUntypedVariableLengthArrayINTEL:
+            return "UntypedVariableLengthArrayINTEL";
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+        case spv::CapabilitySpecConditionalINTEL:
+            return "SpecConditionalINTEL";
+#endif
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+        case spv::CapabilityFunctionVariantsINTEL:
+            return "FunctionVariantsINTEL";
+#endif
         case spv::CapabilityGroupUniformArithmeticKHR:
             return "GroupUniformArithmeticKHR";
         case spv::CapabilityTensorFloat32RoundingINTEL:
@@ -1203,6 +1224,9 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityStorageTensorArrayNonUniformIndexingARM, "VkPhysicalDeviceTensorFeaturesARM::shaderStorageTensorArrayNonUniformIndexing"},
     {spv::CapabilityFloat8EXT, "VkPhysicalDeviceShaderFloat8FeaturesEXT::shaderFloat8"},
     {spv::CapabilityFloat8CooperativeMatrixEXT, "VkPhysicalDeviceShaderFloat8FeaturesEXT::shaderFloat8CooperativeMatrix"},
+    {spv::CapabilityGraphARM, "VkPhysicalDeviceDataGraphFeaturesARM::dataGraph"},
+    {spv::CapabilityUntypedPointersKHR, "VkPhysicalDeviceShaderUntypedPointersFeaturesKHR::shaderUntypedPointers"},
+    {spv::CapabilityFMAKHR, "VkPhysicalDeviceShaderFmaFeaturesKHR::shaderFmaFloat16 OR VkPhysicalDeviceShaderFmaFeaturesKHR::shaderFmaFloat32 OR VkPhysicalDeviceShaderFmaFeaturesKHR::shaderFmaFloat64"},
     };
 
     // VUs before catch unknown capabilities
@@ -1287,7 +1311,6 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
     {"SPV_EXT_opacity_micromap", {{vvl::Extension::_VK_EXT_opacity_micromap}}},
     {"SPV_KHR_cooperative_matrix", {{vvl::Extension::_VK_KHR_cooperative_matrix}}},
     {"SPV_ARM_core_builtins", {{vvl::Extension::_VK_ARM_shader_core_builtins}}},
-    {"SPV_AMDX_shader_enqueue", {{vvl::Extension::_VK_AMDX_shader_enqueue}}},
     {"SPV_HUAWEI_cluster_culling_shader", {{vvl::Extension::_VK_HUAWEI_cluster_culling_shader}}},
     {"SPV_HUAWEI_subpass_shading", {{vvl::Extension::_VK_HUAWEI_subpass_shading}}},
     {"SPV_NV_ray_tracing_motion_blur", {{vvl::Extension::_VK_NV_ray_tracing_motion_blur}}},
@@ -1295,6 +1318,7 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
     {"SPV_KHR_subgroup_rotate", {{vvl::Version::_VK_VERSION_1_4}, {vvl::Extension::_VK_KHR_shader_subgroup_rotate}}},
     {"SPV_KHR_expect_assume", {{vvl::Version::_VK_VERSION_1_4}, {vvl::Extension::_VK_KHR_shader_expect_assume}}},
     {"SPV_KHR_float_controls2", {{vvl::Version::_VK_VERSION_1_4}, {vvl::Extension::_VK_KHR_shader_float_controls2}}},
+    {"SPV_KHR_fma", {{vvl::Extension::_VK_KHR_shader_fma}}},
     {"SPV_KHR_quad_control", {{vvl::Extension::_VK_KHR_shader_quad_control}}},
     {"SPV_KHR_bfloat16", {{vvl::Extension::_VK_KHR_shader_bfloat16}}},
     {"SPV_NV_raw_access_chains", {{vvl::Extension::_VK_NV_raw_access_chains}}},
@@ -1310,6 +1334,8 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
     {"SPV_ARM_tensors", {{vvl::Extension::_VK_ARM_tensors}}},
     {"SPV_EXT_float8", {{vvl::Extension::_VK_EXT_shader_float8}}},
     {"SPV_ARM_graph", {{vvl::Extension::_VK_ARM_data_graph}}},
+    {"SPV_KHR_untyped_pointers", {{vvl::Extension::_VK_KHR_shader_untyped_pointers}}},
+    {"SPV_EXT_shader_64bit_indexing", {{vvl::Extension::_VK_EXT_shader_64bit_indexing}}},
     };
 
     // VUs before catch unknown extensions

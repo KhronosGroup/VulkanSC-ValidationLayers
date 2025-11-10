@@ -95,7 +95,7 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
     vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci);
 
     // Create a dummy pipeline, since VL inspects which bindings are actually used at draw time
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 color;
         layout(set=0, binding=0) uniform foo0 { float x0; } bar0;
@@ -352,20 +352,8 @@ TEST_F(NegativeDescriptorIndexing, SetLayoutBindings) {
     AddRequiredFeature(vkt::Feature::descriptorBindingUniformBufferUpdateAfterBind);
     RETURN_IF_SKIP(Init());
 
-    VkDescriptorSetLayoutBinding update_binding = {};
-    update_binding.binding = 0;
-    update_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    update_binding.descriptorCount = 1;
-    update_binding.stageFlags = VK_SHADER_STAGE_ALL;
-    update_binding.pImmutableSamplers = nullptr;
-
-    VkDescriptorSetLayoutBinding dynamic_binding = {};
-    dynamic_binding.binding = 1;
-    dynamic_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-    dynamic_binding.descriptorCount = 1;
-    dynamic_binding.stageFlags = VK_SHADER_STAGE_ALL;
-    dynamic_binding.pImmutableSamplers = nullptr;
-
+    VkDescriptorSetLayoutBinding update_binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    VkDescriptorSetLayoutBinding dynamic_binding = {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_ALL, nullptr};
     VkDescriptorSetLayoutBinding bindings[2] = {update_binding, dynamic_binding};
 
     VkDescriptorBindingFlags flags[2] = {VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, 0};
@@ -380,7 +368,119 @@ TEST_F(NegativeDescriptorIndexing, SetLayoutBindings) {
     create_info.pBindings = bindings;
 
     m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutCreateInfo-descriptorType-03001");
-    VkDescriptorSetLayout setLayout;
-    vk::CreateDescriptorSetLayout(*m_device, &create_info, nullptr, &setLayout);
+    VkDescriptorSetLayout set_layout;
+    vk::CreateDescriptorSetLayout(*m_device, &create_info, nullptr, &set_layout);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDescriptorIndexing, VariableDescriptorCount) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10370");
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingVariableDescriptorCount);
+    RETURN_IF_SKIP(Init());
+
+    OneOffDescriptorIndexingSet descriptor_set(
+        m_device, {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr,
+                    VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT}});
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::ImageView image_view = image.CreateView();
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler);
+    m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-dstBinding-00316");
+    descriptor_set.UpdateDescriptorSets();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDescriptorIndexing, DescriptorSetVariableDescriptorCountAllocateInfo) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10370");
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingVariableDescriptorCount);
+    RETURN_IF_SKIP(Init());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+
+    VkDescriptorBindingFlags binding_flags = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+    VkDescriptorSetLayoutBindingFlagsCreateInfo flags_create_info = vku::InitStructHelper();
+    flags_create_info.bindingCount = 1;
+    flags_create_info.pBindingFlags = &binding_flags;
+
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+    VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper(&flags_create_info);
+    ds_layout_ci.bindingCount = 1;
+    ds_layout_ci.pBindings = &binding;
+    ds_layout_ci.flags = 0;
+    vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
+
+    VkDescriptorPoolSize pool_size = {binding.descriptorType, 3};
+    VkDescriptorPoolCreateInfo dspci = vku::InitStructHelper();
+    dspci.poolSizeCount = 1;
+    dspci.pPoolSizes = &pool_size;
+    dspci.maxSets = 2;
+    vkt::DescriptorPool pool(*m_device, dspci);
+
+    // forget VkDescriptorSetVariableDescriptorCountAllocateInfo
+    VkDescriptorSetAllocateInfo ds_alloc_info = vku::InitStructHelper();
+    ds_alloc_info.descriptorPool = pool;
+    ds_alloc_info.descriptorSetCount = 1;
+    ds_alloc_info.pSetLayouts = &ds_layout.handle();
+
+    VkDescriptorSet ds = VK_NULL_HANDLE;
+    m_errorMonitor->SetDesiredWarning("WARNING-CoreValidation-AllocateDescriptorSets-VariableDescriptorCount");
+    vk::AllocateDescriptorSets(*m_device, &ds_alloc_info, &ds);
+    m_errorMonitor->VerifyFound();
+
+    VkDescriptorSetVariableDescriptorCountAllocateInfo count_alloc_info = vku::InitStructHelper();
+    count_alloc_info.descriptorSetCount = 1;
+    uint32_t variable_count = 0;  // explicit, no warning
+    count_alloc_info.pDescriptorCounts = &variable_count;
+    ds_alloc_info.pNext = &count_alloc_info;
+    vk::AllocateDescriptorSets(*m_device, &ds_alloc_info, &ds);
+}
+
+TEST_F(NegativeDescriptorIndexing, VariableDescriptorCountBuffer) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10490");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::descriptorBindingVariableDescriptorCount);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    VkDescriptorBindingFlags binding_flags = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+    VkDescriptorSetLayoutBindingFlagsCreateInfo dsl_binding_flags = vku::InitStructHelper();
+    dsl_binding_flags.bindingCount = 1u;
+    dsl_binding_flags.pBindingFlags = &binding_flags;
+
+    uint32_t variable_count = 2u;
+    VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count_info = vku::InitStructHelper();
+    variable_count_info.descriptorSetCount = 1u;
+    variable_count_info.pDescriptorCounts = &variable_count;
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                       },
+                                       0u, &dsl_binding_flags, 0u, &variable_count_info);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0u, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0u);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0u, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1u);
+    descriptor_set.UpdateDescriptorSets();
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    const char *cs_source = R"glsl(
+        #version 450 core
+        layout(set = 0, binding = 0) buffer SSBO { int x; } bufs[4];
+        void main() {
+          bufs[0].x = 0;
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
+    m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-layout-07991");
+    pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
 }

@@ -18,15 +18,17 @@
 
 #pragma once
 
-#include <cctype>
-#include <cstring>
 #include <string>
 
 #include <vulkan/vulkan_core.h>
 
+struct DeviceExtensions;
+
+uint32_t GetEffectiveLevelCount(const VkImageSubresourceRange &subresource_range, uint32_t total_level_count);
+uint32_t GetEffectiveLayerCount(const VkImageSubresourceRange &subresource_range, uint32_t total_layer_count);
 VkExtent3D GetEffectiveExtent(const VkImageCreateInfo &ci, const VkImageAspectFlags aspect_mask, const uint32_t mip_level);
 
-// When dealing with a compressed format, we could have a miplevel that is less then a single texel block
+// When dealing with a compressed format, we could have a miplevel that is less than a single texel block
 // In that case, we still view (from the API) that you need a full extent for 1 texel block
 // if block extent width is 4,
 //     then {1, 2, 3, 4} texel is 1 texel block
@@ -68,12 +70,19 @@ bool IsValidPlaneAspect(VkFormat format, VkImageAspectFlags aspect_mask);
 bool IsOnlyOneValidPlaneAspect(VkFormat format, VkImageAspectFlags aspect_mask);
 bool IsMultiplePlaneAspect(VkImageAspectFlags aspect_mask);
 bool IsAnyPlaneAspect(VkImageAspectFlags aspect_mask);
+VkImageAspectFlags NormalizeAspectMask(VkImageAspectFlags aspect_mask, VkFormat format);
 
 bool IsImageLayoutReadOnly(VkImageLayout layout);
 bool IsImageLayoutDepthOnly(VkImageLayout layout);
 bool IsImageLayoutDepthReadOnly(VkImageLayout layout);
 bool IsImageLayoutStencilOnly(VkImageLayout layout);
 bool IsImageLayoutStencilReadOnly(VkImageLayout layout);
+
+// Return true if an image view of this type references separate depth slices of a 3d image
+bool IsDepthSliceView(const VkImageCreateInfo &image_create_info, VkImageViewType view_type);
+
+// Return true if layout transitions of separate slices of a 3d image are supported for the image with the given create info
+bool CanTransitionDepthSlices(const DeviceExtensions &extensions, const VkImageCreateInfo &create_info);
 
 static inline bool IsIdentitySwizzle(VkComponentMapping components) {
     // clang-format off

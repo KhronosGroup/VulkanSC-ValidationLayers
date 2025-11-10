@@ -22,7 +22,7 @@
 #include "state_tracker/device_state.h"
 
 void BestPractices::Created(vvl::CommandBuffer& cb_state) {
-    cb_state.SetSubState(container_type, std::make_unique<bp_state::CommandBufferSubState>(cb_state));
+    cb_state.SetSubState(container_type, std::make_unique<bp_state::CommandBufferSubState>(cb_state, *this));
 }
 
 bool BestPractices::PreCallValidateAllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo,
@@ -113,35 +113,6 @@ bool BestPractices::PreCallValidateGetQueryPoolResults(VkDevice device, VkQueryP
     return skip;
 }
 
-void BestPractices::PostCallRecordCmdSetDepthCompareOp(VkCommandBuffer commandBuffer, VkCompareOp depthCompareOp,
-                                                       const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& sub_state = bp_state::SubState(*cb_state);
-
-    if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        RecordSetDepthTestState(sub_state, depthCompareOp, sub_state.nv.depth_test_enable);
-    }
-}
-
-void BestPractices::PostCallRecordCmdSetDepthCompareOpEXT(VkCommandBuffer commandBuffer, VkCompareOp depthCompareOp,
-                                                          const RecordObject& record_obj) {
-    PostCallRecordCmdSetDepthCompareOp(commandBuffer, depthCompareOp, record_obj);
-}
-
-void BestPractices::PostCallRecordCmdSetDepthTestEnable(VkCommandBuffer commandBuffer, VkBool32 depthTestEnable,
-                                                        const RecordObject& record_obj) {
-    if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-        auto& sub_state = bp_state::SubState(*cb_state);
-        RecordSetDepthTestState(sub_state, sub_state.nv.depth_compare_op, depthTestEnable != VK_FALSE);
-    }
-}
-
-void BestPractices::PostCallRecordCmdSetDepthTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthTestEnable,
-                                                           const RecordObject& record_obj) {
-    PostCallRecordCmdSetDepthTestEnable(commandBuffer, depthTestEnable, record_obj);
-}
-
 namespace {
 struct EventValidator {
     const Logger& log;
@@ -225,46 +196,4 @@ bool BestPractices::PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuf
         }
     }
     return skip;
-}
-
-void BestPractices::PostCallRecordCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount,
-                                                     const VkCommandBuffer* pCommandBuffers, const RecordObject& record_obj) {
-    auto primary = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    if (!primary) {
-        return;
-    }
-    auto& primary_sub_state = bp_state::SubState(*primary);
-
-    for (uint32_t i = 0; i < commandBufferCount; i++) {
-        auto secondary = GetWrite<vvl::CommandBuffer>(pCommandBuffers[i]);
-        if (!secondary) {
-            continue;
-        }
-        auto& secondary_sub_state = bp_state::SubState(*secondary);
-
-        for (auto& early_clear : secondary_sub_state.render_pass_state.earlyClearAttachments) {
-            if (ClearAttachmentsIsFullClear(primary_sub_state, uint32_t(early_clear.rects.size()), early_clear.rects.data())) {
-                RecordAttachmentClearAttachments(primary_sub_state, early_clear.framebufferAttachment, early_clear.colorAttachment,
-                                                 early_clear.aspects, uint32_t(early_clear.rects.size()), early_clear.rects.data());
-            } else {
-                RecordAttachmentAccess(primary_sub_state, early_clear.framebufferAttachment, early_clear.aspects);
-            }
-        }
-
-        for (auto& touch : secondary_sub_state.render_pass_state.touchesAttachments) {
-            RecordAttachmentAccess(primary_sub_state, touch.framebufferAttachment, touch.aspects);
-        }
-
-        primary_sub_state.render_pass_state.numDrawCallsDepthEqualCompare +=
-            secondary_sub_state.render_pass_state.numDrawCallsDepthEqualCompare;
-        primary_sub_state.render_pass_state.numDrawCallsDepthOnly += secondary_sub_state.render_pass_state.numDrawCallsDepthOnly;
-
-        for (const auto& [event, secondary_info] : secondary_sub_state.event_signaling_state) {
-            if (auto* primary_info = vvl::Find(primary_sub_state.event_signaling_state, event)) {
-                primary_info->signaled = secondary_info.signaled;
-            } else {
-                primary_sub_state.event_signaling_state.emplace(event, secondary_info);
-            }
-        }
-    }
 }

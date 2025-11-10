@@ -40,17 +40,17 @@ TEST_F(PositiveAtomic, ImageInt64) {
     )glsl";
 
     std::string cs_image_load = cs_image_base + R"glsl(
-           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_image_store = cs_image_base + R"glsl(
-           imageAtomicStore(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           imageAtomicStore(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
     std::string cs_image_exchange = cs_image_base + R"glsl(
-           imageAtomicExchange(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           imageAtomicExchange(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -102,7 +102,7 @@ TEST_F(PositiveAtomic, ImageInt64DrawtimeSparse) {
         layout(set = 0, binding = 0) buffer ssbo { uint64_t y; };
         layout(set = 0, binding = 1, r64ui) uniform u64image2D z;
         void main() {
-           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
@@ -160,13 +160,13 @@ TEST_F(PositiveAtomic, Float) {
     )glsl";
 
     std::string cs_buffer_float_32_load = cs_32_base + R"glsl(
-           y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_buffer_float_32_store = cs_32_base + R"glsl(
            float32_t a = 1;
-           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -182,12 +182,12 @@ TEST_F(PositiveAtomic, Float) {
     )glsl";
 
     std::string cs_shared_float_32_load = cs_32_base + R"glsl(
-           y = 1 + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = 1 + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_shared_float_32_store = cs_32_base + R"glsl(
-           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -213,13 +213,13 @@ TEST_F(PositiveAtomic, Float) {
     )glsl";
 
     std::string cs_buffer_float_64_load = cs_64_base + R"glsl(
-           y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_buffer_float_64_store = cs_64_base + R"glsl(
            float64_t a = 1;
-           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -235,12 +235,12 @@ TEST_F(PositiveAtomic, Float) {
     )glsl";
 
     std::string cs_shared_float_64_load = cs_64_base + R"glsl(
-           y = 1 + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = 1 + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_shared_float_64_store = cs_64_base + R"glsl(
-           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -260,17 +260,17 @@ TEST_F(PositiveAtomic, Float) {
     )glsl";
 
     std::string cs_image_load = cs_image_base + R"glsl(
-           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           y = imageAtomicLoad(z, ivec2(1, 1), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_image_store = cs_image_base + R"glsl(
-           imageAtomicStore(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           imageAtomicStore(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
     std::string cs_image_exchange = cs_image_base + R"glsl(
-           imageAtomicExchange(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+           imageAtomicExchange(z, ivec2(1, 1), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -411,13 +411,13 @@ TEST_F(PositiveAtomic, Float2) {
     )glsl";
 
     std::string cs_buffer_float_16_load = cs_16_base + R"glsl(
-           y = float16_t(1.0) + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = float16_t(1.0) + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_buffer_float_16_store = cs_16_base + R"glsl(
            float16_t a = float16_t(1.0);
-           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(y, a, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -443,12 +443,12 @@ TEST_F(PositiveAtomic, Float2) {
     )glsl";
 
     std::string cs_shared_float_16_load = cs_16_base + R"glsl(
-           y = float16_t(1.0) + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           y = float16_t(1.0) + atomicLoad(x, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
         }
     )glsl";
 
     std::string cs_shared_float_16_store = cs_16_base + R"glsl(
-           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(x, y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -753,7 +753,7 @@ TEST_F(PositiveAtomic, Int64) {
     // StorageBuffer storage class using AtomicStore
     // atomicStore is slightly different than other atomics, so good edge case
     std::string cs_store = cs_base + R"glsl(
-           atomicStore(y, 1ul, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+           atomicStore(y, 1ul, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -949,7 +949,7 @@ TEST_F(PositiveAtomic, VertexPipelineStoresAndAtomics) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(set=0, binding=0, std430) readonly buffer SSBO {
             float a;

@@ -56,7 +56,7 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersImage) {
     image_barrier.image = image;
     image_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    ValidOwnershipTransfer(m_errorMonitor, m_default_queue, m_command_buffer, no_gfx_queue, no_gfx_cb, nullptr, &image_barrier);
+    ValidOwnershipTransfer(m_default_queue, m_command_buffer, no_gfx_queue, no_gfx_cb, nullptr, &image_barrier);
 
     // Change layouts while changing ownership
     image_barrier.srcQueueFamilyIndex = no_gfx_queue->family_index;
@@ -71,7 +71,7 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersImage) {
         image_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
 
-    ValidOwnershipTransfer(m_errorMonitor, no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer, nullptr, &image_barrier);
+    ValidOwnershipTransfer(no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer, nullptr, &image_barrier);
 }
 
 TEST_F(PositiveSyncObject, Sync2OwnershipTranfersBuffer) {
@@ -96,11 +96,11 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersBuffer) {
     // Let gfx own it.
     buffer_barrier.srcQueueFamilyIndex = m_device->graphics_queue_node_index_;
     buffer_barrier.dstQueueFamilyIndex = m_device->graphics_queue_node_index_;
-    ValidOwnershipTransferOp(m_errorMonitor, m_default_queue, m_command_buffer, &buffer_barrier, nullptr);
+    ValidOwnershipTransferOp(m_default_queue, m_command_buffer, &buffer_barrier, nullptr);
 
     // Transfer it to non-gfx
     buffer_barrier.dstQueueFamilyIndex = no_gfx_queue->family_index;
-    ValidOwnershipTransfer(m_errorMonitor, m_default_queue, m_command_buffer, no_gfx_queue, no_gfx_cb, &buffer_barrier, nullptr);
+    ValidOwnershipTransfer(m_default_queue, m_command_buffer, no_gfx_queue, no_gfx_cb, &buffer_barrier, nullptr);
 
     // Transfer it to gfx
     buffer_barrier.srcQueueFamilyIndex = no_gfx_queue->family_index;
@@ -108,7 +108,7 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersBuffer) {
     buffer_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
     buffer_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
 
-    ValidOwnershipTransfer(m_errorMonitor, no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer, &buffer_barrier, nullptr);
+    ValidOwnershipTransfer(no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer, &buffer_barrier, nullptr);
 }
 
 TEST_F(PositiveSyncObject, BarrierQueueFamily2) {
@@ -810,7 +810,7 @@ TEST_F(PositiveSyncObject, ExternalSemaphore) {
     import_semaphore.ImportHandle(ext_handle, handle_type);
 
     // Signal the exported semaphore and wait on the imported semaphore
-    VkPipelineStageFlags flags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    const VkPipelineStageFlags flags = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     std::vector<VkSubmitInfo> si(4, vku::InitStruct<VkSubmitInfo>());
     si[0].signalSemaphoreCount = 1;
     si[0].pSignalSemaphores = &export_semaphore.handle();
@@ -1269,12 +1269,12 @@ TEST_F(PositiveSyncObject, QueueSubmitTimelineSemaphore2Queue) {
 
     semaphore.SignalKHR(kQ0Begin);  // initiate forward progress on q0
     semaphore.WaitKHR(kQ0End, kWaitTimeout);
-    buffer_a.destroy();  // buffer_a is only used by the q0 commands
+    buffer_a.Destroy();  // buffer_a is only used by the q0 commands
 
     semaphore.SignalKHR(kQ1Begin);  // initiate forward progress on q1
     semaphore.WaitKHR(kQ1End, kWaitTimeout);
-    buffer_b.destroy();  // buffer_b is used by both q0 and q1
-    buffer_c.destroy();  // buffer_c is used by q1
+    buffer_b.Destroy();  // buffer_b is used by both q0 and q1
+    buffer_c.Destroy();  // buffer_c is used by q1
 
     m_device->Wait();
 }
@@ -1478,7 +1478,7 @@ struct SemBufferRaceData {
 
             VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
             auto buffer = std::make_unique<vkt::Buffer>();
-            buffer->init(dev, 20, VK_BUFFER_USAGE_TRANSFER_DST_BIT, reqs);
+            buffer->Init(dev, 20, VK_BUFFER_USAGE_TRANSFER_DST_BIT, reqs);
 
             // main thread sets up buffer
             // main thread signals 1
@@ -2646,8 +2646,8 @@ TEST_F(PositiveSyncObject, Transition3dImageSlice) {
     image_memory_barrier.subresourceRange.layerCount = 1u;
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
-                           nullptr, 0u, nullptr, 1u, &image_memory_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
+                           nullptr, 1u, &image_memory_barrier);
     m_command_buffer.End();
 }
 
@@ -2677,7 +2677,7 @@ TEST_F(PositiveSyncObject, Transition3dImageSlices) {
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.image = image.handle();
+    image_memory_barrier.image = image;
     image_memory_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     image_memory_barrier.subresourceRange.baseMipLevel = 0u;
     image_memory_barrier.subresourceRange.levelCount = 1u;
@@ -2685,26 +2685,26 @@ TEST_F(PositiveSyncObject, Transition3dImageSlices) {
     image_memory_barrier.subresourceRange.layerCount = 4u;
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
-                           nullptr, 0u, nullptr, 1u, &image_memory_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
+                           nullptr, 1u, &image_memory_barrier);
 
     image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     image_memory_barrier.subresourceRange.baseArrayLayer = 1u;
     image_memory_barrier.subresourceRange.layerCount = 1u;
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
-                           nullptr, 0u, nullptr, 1u, &image_memory_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
+                           nullptr, 1u, &image_memory_barrier);
 
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     image_memory_barrier.subresourceRange.baseArrayLayer = 2u;
     image_memory_barrier.subresourceRange.layerCount = 1u;
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
-                           nullptr, 0u, nullptr, 1u, &image_memory_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
+                           nullptr, 1u, &image_memory_barrier);
 
     image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
-                           nullptr, 0u, nullptr, 1u, &image_memory_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
+                           nullptr, 1u, &image_memory_barrier);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
@@ -2714,14 +2714,6 @@ TEST_F(PositiveSyncObject, Transition3dImageSlices) {
 TEST_F(PositiveSyncObject, Transition3dImageWithMipLevels) {
     AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
-
-    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_subset_features = vku::InitStructHelper();
-        GetPhysicalDeviceFeatures2(portability_subset_features);
-        if (!portability_subset_features.imageView2DOn3DImage) {
-            GTEST_SKIP() << "imageView2DOn3DImage not supported, skipping test";
-        }
-    }
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
@@ -2742,7 +2734,7 @@ TEST_F(PositiveSyncObject, Transition3dImageWithMipLevels) {
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.image = image.handle();
+    image_memory_barrier.image = image;
     image_memory_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     image_memory_barrier.subresourceRange.baseMipLevel = 0u;
     image_memory_barrier.subresourceRange.levelCount = 2u;
@@ -2750,8 +2742,47 @@ TEST_F(PositiveSyncObject, Transition3dImageWithMipLevels) {
     image_memory_barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
-                           nullptr, 0u, nullptr, 1u, &image_memory_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
+                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveSyncObject, Transition3dImageWithMipLevelsRemainingArrayLayers) {
+    TEST_DESCRIPTION("https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/7483");
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance9);
+    RETURN_IF_SKIP(Init());
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
+    image_create_info.imageType = VK_IMAGE_TYPE_3D;
+    image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
+    image_create_info.extent = {32u, 32u, 4u};
+    image_create_info.mipLevels = 2u;
+    image_create_info.arrayLayers = 1u;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    vkt::Image image(*m_device, image_create_info);
+
+    VkImageMemoryBarrier image_memory_barrier = vku::InitStructHelper();
+    image_memory_barrier.srcAccessMask = VK_ACCESS_NONE;
+    image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.image = image;
+    image_memory_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image_memory_barrier.subresourceRange.baseMipLevel = 0u;
+    image_memory_barrier.subresourceRange.levelCount = 2u;
+    image_memory_barrier.subresourceRange.baseArrayLayer = 0u;
+    image_memory_barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+    m_command_buffer.Begin();
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
+                           nullptr, 1u, &image_memory_barrier);
     m_command_buffer.End();
 }
 
@@ -2772,7 +2803,7 @@ TEST_F(PositiveSyncObject, SetEvent2Flags) {
     dependency_info.pMemoryBarriers = &memory_barrier;
 
     vkt::Event event(*m_device);
-    vk::CmdSetEvent2(m_command_buffer.handle(), event.handle(), &dependency_info);
+    vk::CmdSetEvent2(m_command_buffer, event, &dependency_info);
 }
 
 TEST_F(PositiveSyncObject, TimelineSemaphoreAndExportedCopyCooperation) {
@@ -2941,4 +2972,57 @@ TEST_F(PositiveSyncObject, AsymmetricWaitEvent2) {
 
     m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncObject, Maintenance9ImageBarriers) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10302");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance9);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Buffer buffer(*m_device, 32 * 32 * 4 * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
+    image_ci.imageType = VK_IMAGE_TYPE_3D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent = {32, 32, 4};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vkt::Image image(*m_device, image_ci);
+
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    layout_transition.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    layout_transition.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    layout_transition.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    layout_transition.image = image;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1};  // set layers later
+
+    m_command_buffer.Begin();
+    // Transition slice 1
+    layout_transition.subresourceRange.baseArrayLayer = 1;
+    layout_transition.subresourceRange.layerCount = 1;
+    m_command_buffer.Barrier(layout_transition);
+
+    // Copy from slice 1
+    VkBufferImageCopy copy_region{};
+    copy_region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy_region.imageOffset = {0, 0, 1};
+    copy_region.imageExtent = {32, 32, 1};
+    vk::CmdCopyImageToBuffer(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, buffer, 1, &copy_region);
+
+    // Transition slice 0
+    layout_transition.subresourceRange.baseArrayLayer = 0;
+    layout_transition.subresourceRange.layerCount = 1;
+    m_command_buffer.Barrier(layout_transition);
+    m_command_buffer.End();
 }

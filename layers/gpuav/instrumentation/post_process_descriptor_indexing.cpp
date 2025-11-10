@@ -17,6 +17,7 @@
 
 #include "drawdispatch/descriptor_validator.h"
 #include "gpuav/core/gpuav.h"
+#include "gpuav/core/gpuav_constants.h"
 #include "gpuav/resources/gpuav_shader_resources.h"
 #include "gpuav/resources/gpuav_state_trackers.h"
 #include "state_tracker/pipeline_state.h"
@@ -80,15 +81,15 @@ void RegisterPostProcessingValidation(Validator& gpuav, CommandBufferSubState& c
         DescriptorSetBindings& desc_set_bindings = cb.shared_resources_cache.Get<DescriptorSetBindings>();
 
         for (const DescriptorSetBindings::BindingCommand& desc_binding_cmd : desc_set_bindings.descriptor_set_binding_commands) {
-            vko::BufferRange desc_set_buffer_lut_buffer_range = cb.gpu_resources_manager.GetHostVisibleBufferRange(
+            vko::BufferRange desc_set_buffer_lut_buffer_range = cb.gpu_resources_manager.GetHostCoherentBufferRange(
                 32 * sizeof(VkDeviceAddress));  // No driver offers more than 32 descriptor set bindings
 
             // For each unique bound descriptor set in this command buffer,
             // create an appropriate post processing buffer,
-            // and update the "per CB submission desciptor set to post process buffers" LUT
+            // and update the "per CB submission descriptor set to post process buffers" LUT
 
             // For each CB submission, and for each descriptor binding command,
-            // a "desciptor set to post process buffers LUT" is allocated and updated in a VkBuffer.
+            // a "descriptor set to post process buffers LUT" is allocated and updated in a VkBuffer.
             // When executing, this CB submission will access its own private
             // post processing buffers, preventing concurrent use by another CB
             for (size_t ds_i = 0; ds_i < desc_binding_cmd.bound_descriptor_sets.size(); ds_i++) {
@@ -101,7 +102,7 @@ void RegisterPostProcessingValidation(Validator& gpuav, CommandBufferSubState& c
                 if (auto found = bound_desc_sets_to_pp_buffer_map->find(desc_binding_cmd.bound_descriptor_sets[ds_i]);
                     found == bound_desc_sets_to_pp_buffer_map->end()) {
                     // DescriptorSetSubState::GetPostProcessBufferSize() used to do a "auto guard = Lock()"
-                    // But the lock was only guarding againg GPU-AV sub state, not the base state, so
+                    // But the lock was only guarding against GPU-AV sub state, not the base state, so
                     // base.GetNonInlineDescriptorCount() access were not fully protected
                     const VkDeviceSize pp_buffer_size =
                         desc_set_state.base.GetNonInlineDescriptorCount() * sizeof(glsl::PostProcessDescriptorIndexSlot);
@@ -167,18 +168,16 @@ void RegisterPostProcessingValidation(Validator& gpuav, CommandBufferSubState& c
     // Validate descriptor set accesses done by command buffer submission
     cb.on_cb_completion_functions.emplace_back([bound_desc_sets_to_pp_buffer_map](
                                                    Validator& gpuav, CommandBufferSubState& cb,
-                                                   const CommandBufferSubState::LabelLogging& label_logging, const Location& loc) {
+                                                   const CommandBufferSubState::LabelLogging& label_logging,
+                                                   const Location& submission_loc) {
         VVL_ZoneScoped;
-        // TODO - Currently we don't know the actual call that triggered this, but without just giving "vkCmdDraw" we
-        // will get VUID_Undefined We now have the DescriptorValidator::action_index, just need to hook it up!
-        Location draw_loc(vvl::Func::vkCmdDraw);
 
         // We loop each vkCmdBindDescriptorSet, find each VkDescriptorSet that was used in the command buffer, and check
         // its post process buffer for which descriptor was accessed Only check a VkDescriptorSet once, might be bound
         // multiple times in a single command buffer
         for (auto& [desc_set, staging_buffer] : *bound_desc_sets_to_pp_buffer_map) {
             // We build once here, but will update the set_index and shader_handle when found
-            vvl::DescriptorValidator context(gpuav, cb.base, *desc_set, 0, VK_NULL_HANDLE, nullptr, draw_loc);
+            vvl::DescriptorValidator context(gpuav, cb.base, *desc_set, 0, VK_NULL_HANDLE, nullptr, Location(vvl::Func::Empty));
 
             // We create a map with the |unique_shader_id| as the key so we can only do the state object lookup once per
             // pipeline/shaderModule/shaderObject
@@ -194,10 +193,10 @@ void RegisterPostProcessingValidation(Validator& gpuav, CommandBufferSubState& c
                         const glsl::PostProcessDescriptorIndexSlot slot = slot_ptr[binding_layout.start + descriptor_i];
                         if (slot.meta_data & glsl::kPostProcessMetaMaskAccessed) {
                             const uint32_t shader_id = slot.meta_data & glsl::kShaderIdMask;
-                            const uint32_t action_index =
-                                (slot.meta_data & glsl::kPostProcessMetaMaskActionIndex) >> glsl::kPostProcessMetaShiftActionIndex;
-                            descriptor_access_map[shader_id].emplace_back(
-                                DescriptorAccess{binding, descriptor_i, slot.variable_id, action_index});
+                            const uint32_t error_logger_i = (slot.meta_data & glsl::kPostProcessMetaMaskErrorLoggerIndex) >>
+                                                            glsl::kPostProcessMetaShiftErrorLoggerIndex;
+                            descriptor_access_map[shader_id].emplace_back(DescriptorAccess{
+                                binding, descriptor_i, slot.variable_id, slot.instruction_position_offset, error_logger_i});
                         }
                     }
                 }
@@ -217,17 +216,25 @@ void RegisterPostProcessingValidation(Validator& gpuav, CommandBufferSubState& c
                 if (it->second.pipeline != VK_NULL_HANDLE) {
                     // We use pipeline over vkShaderModule as likely they will have been destroyed by now
                     pipeline_state = gpuav.Get<vvl::Pipeline>(it->second.pipeline).get();
-                    context.SetShaderHandleForGpuAv(&pipeline_state->Handle());
                 } else if (it->second.shader_object != VK_NULL_HANDLE) {
                     shader_object_state = gpuav.Get<vvl::ShaderObject>(it->second.shader_object).get();
                     ASSERT_AND_CONTINUE(shader_object_state->entrypoint);
-                    context.SetShaderHandleForGpuAv(&shader_object_state->Handle());
                 } else {
                     assert(false);
                     continue;
                 }
 
+                context.SetOriginalSpirv(&it->second.original_spirv);
+
                 for (const DescriptorAccess& descriptor_access : descriptor_accesses) {
+                    if (descriptor_access.error_logger_i == cst::invalid_index_command) {
+                        gpuav.LogError("GPUAV-Overflow-Unknown", LogObjectList(), Location(vvl::Func::Empty),
+                                       "Cannot perform runtime descriptor access validation, access was done in a command past the "
+                                       "internal limit of %" PRIu32 " draw/dispatch/traceRays in a command buffer.",
+                                       cst::indices_count);
+                        continue;
+                    }
+
                     auto descriptor_binding = desc_set->GetBinding(descriptor_access.binding);
                     ASSERT_AND_CONTINUE(descriptor_binding);
 
@@ -258,17 +265,19 @@ void RegisterPostProcessingValidation(Validator& gpuav, CommandBufferSubState& c
                         continue;
                     }
 
+                    context.SetInstructionPositionOffset(descriptor_access.instruction_position_offset);
+
                     // This will represent the Set that was accessed in the shader, which might not match the
                     // vkCmdBindDescriptorSet index if sets are aliased
                     context.SetSetIndexForGpuAv(resource_variable->decorations.set);
 
-                    std::string debug_region_name;
-                    if (auto found_label_cmd_i = label_logging.action_cmd_i_to_label_cmd_i_map.find(descriptor_access.action_index);
-                        found_label_cmd_i != label_logging.action_cmd_i_to_label_cmd_i_map.end()) {
-                        debug_region_name = cb.GetDebugLabelRegion(found_label_cmd_i->second, label_logging.initial_label_stack);
-                    }
+                    const CommandBufferSubState::CommandErrorLogger& cmd_error_logger =
+                        cb.GetErrorLogger(descriptor_access.error_logger_i);
+                    context.SetObjlistForGpuAv(&cmd_error_logger.objlist);
+                    std::string debug_region_name =
+                        cb.GetDebugLabelRegion(cmd_error_logger.label_cmd_i, label_logging.initial_label_stack);
 
-                    Location access_loc(loc, debug_region_name);
+                    Location access_loc(cmd_error_logger.loc.Get(), debug_region_name);
                     context.SetLocationForGpuAv(access_loc);
                     context.ValidateBindingDynamic(*resource_variable, *descriptor_binding, descriptor_access.index);
                 }

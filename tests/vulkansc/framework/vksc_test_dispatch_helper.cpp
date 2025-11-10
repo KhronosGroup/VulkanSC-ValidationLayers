@@ -790,7 +790,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL TestDispatchHelper::DebugCallback(VkDebugUtilsMes
     if (tls_dispatch_policy_ != nullptr) {
         // Check VUIDs that, if triggered, should cause the test case to be skipped
         for (const auto& skip_on_vuid : tls_dispatch_policy_->skip_on_vuids_) {
-            if (strstr(callback_data->pMessage, skip_on_vuid.first)) {
+            if (strstr(callback_data->pMessageIdName, skip_on_vuid.first)) {
                 // Prevent the VUID from causing a test failure
                 self->test_case_->Monitor().SetAllowedFailureMsg(skip_on_vuid.first);
                 // Set the skip message to the first one received
@@ -802,7 +802,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL TestDispatchHelper::DebugCallback(VkDebugUtilsMes
         }
         // Check VUIDs that should be ignored
         for (const auto& ignore_vuid : tls_dispatch_policy_->ignore_vuids_) {
-            if (strstr(callback_data->pMessage, ignore_vuid)) {
+            if (strstr(callback_data->pMessageIdName, ignore_vuid)) {
                 // Prevent the VUID from causing a test failure
                 self->test_case_->Monitor().SetAllowedFailureMsg(ignore_vuid);
                 return VK_FALSE;

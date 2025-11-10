@@ -52,7 +52,7 @@ TEST_F(PositiveCommand, DrawIndirectCountWithoutFeature) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vk::CmdDrawIndirectCountKHR(m_command_buffer, indirect_buffer, 0, count_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
     vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
-    vk::CmdDrawIndexedIndirectCountKHR(m_command_buffer, indexed_indirect_buffer.handle(), 0, count_buffer, 0, 1,
+    vk::CmdDrawIndexedIndirectCountKHR(m_command_buffer, indexed_indirect_buffer, 0, count_buffer, 0, 1,
                                        sizeof(VkDrawIndexedIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -88,7 +88,7 @@ TEST_F(PositiveCommand, DrawIndirectCountWithoutFeature12) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vk::CmdDrawIndirectCount(m_command_buffer, indirect_buffer, 0, count_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
     vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
-    vk::CmdDrawIndexedIndirectCount(m_command_buffer, indexed_indirect_buffer.handle(), 0, count_buffer, 0, 1,
+    vk::CmdDrawIndexedIndirectCount(m_command_buffer, indexed_indirect_buffer, 0, count_buffer, 0, 1,
                                     sizeof(VkDrawIndexedIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -121,7 +121,7 @@ TEST_F(PositiveCommand, DrawIndirectCountWithFeature) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vk::CmdDrawIndirectCount(m_command_buffer, indirect_buffer, 0, count_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
     vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
-    vk::CmdDrawIndexedIndirectCount(m_command_buffer, indexed_indirect_buffer.handle(), 0, count_buffer, 0, 1,
+    vk::CmdDrawIndexedIndirectCount(m_command_buffer, indexed_indirect_buffer, 0, count_buffer, 0, 1,
                                     sizeof(VkDrawIndexedIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -292,7 +292,7 @@ TEST_F(PositiveCommand, ThreadedCommandBuffersWithLabels) {
     constexpr int worker_count = 8;
     ThreadTimeoutHelper timeout_helper(worker_count);
 
-    auto worker_thread = [&](int worker_index) {
+    auto worker_thread = [&]() {
         auto timeout_guard = timeout_helper.ThreadGuard();
         // Command pool per worker thread
         vkt::CommandPool pool(*m_device, m_device->graphics_queue_node_index_, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
@@ -321,7 +321,7 @@ TEST_F(PositiveCommand, ThreadedCommandBuffersWithLabels) {
         }
     };
     std::vector<std::thread> workers;
-    for (int i = 0; i < worker_count; i++) workers.emplace_back(worker_thread, i);
+    for (int i = 0; i < worker_count; i++) workers.emplace_back(worker_thread);
     constexpr int wait_time = 60;
     if (!timeout_helper.WaitForThreads(wait_time))
         ADD_FAILURE() << "The waiting time for the worker threads exceeded the maximum limit: " << wait_time << " seconds.";

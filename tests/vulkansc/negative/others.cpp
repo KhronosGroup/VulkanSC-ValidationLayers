@@ -341,7 +341,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         auto create_info = vku::InitStruct<VkQueryPoolCreateInfo>();
         create_info.queryType = VK_QUERY_TYPE_OCCLUSION;
         create_info.queryCount = 16;
-        query_pool_obj.init(*m_device, create_info);
+        query_pool_obj.Init(*m_device, create_info);
 
         create_info.queryCount++;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-05046");
@@ -358,7 +358,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         create_info.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS;
         create_info.queryCount = 8;
         create_info.pipelineStatistics = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT;
-        query_pool_obj.init(*m_device, create_info);
+        query_pool_obj.Init(*m_device, create_info);
 
         create_info.queryCount++;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-05047");
@@ -374,7 +374,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         auto create_info = vku::InitStruct<VkQueryPoolCreateInfo>();
         create_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
         create_info.queryCount = 20;
-        query_pool_obj.init(*m_device, create_info);
+        query_pool_obj.Init(*m_device, create_info);
 
         create_info.queryCount++;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-05048");
@@ -395,7 +395,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         auto create_info = vku::InitStruct<VkQueryPoolCreateInfo>(&perf_info);
         create_info.queryType = VK_QUERY_TYPE_PERFORMANCE_QUERY_KHR;
         create_info.queryCount = 3;
-        query_pool_obj.init(*m_device, create_info);
+        query_pool_obj.Init(*m_device, create_info);
 
         create_info.queryCount++;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-05049");

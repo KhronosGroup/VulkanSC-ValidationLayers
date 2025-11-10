@@ -53,27 +53,26 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
     skip |= ReportLeakedObjects(kVulkanObjectTypeSemaphore, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeFence, error_code, loc);
     // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedObjects(kVulkanObjectTypeDeviceMemory,
-    // error_code, loc);
-    skip |= ReportLeakedObjects(kVulkanObjectTypeEvent, error_code, loc);
-    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedObjects(kVulkanObjectTypeQueryPool,
-    // error_code, loc);
-    skip |= ReportLeakedObjects(kVulkanObjectTypeBufferView, error_code, loc);
+    // error_code, loc); No destroy API or implicitly freed/destroyed -- do not report: skip |=
+    // ReportLeakedObjects(kVulkanObjectTypeQueryPool, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeImageView, error_code, loc);
+    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedObjects(kVulkanObjectTypeCommandPool,
+    // error_code, loc);
+    skip |= ReportLeakedObjects(kVulkanObjectTypeRenderPass, error_code, loc);
+    skip |= ReportLeakedObjects(kVulkanObjectTypeFramebuffer, error_code, loc);
+    skip |= ReportLeakedObjects(kVulkanObjectTypeEvent, error_code, loc);
+    skip |= ReportLeakedObjects(kVulkanObjectTypeBufferView, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeShaderModule, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypePipelineCache, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypePipelineLayout, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypePipeline, error_code, loc);
-    skip |= ReportLeakedObjects(kVulkanObjectTypeRenderPass, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeDescriptorSetLayout, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeSampler, error_code, loc);
     // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedObjects(kVulkanObjectTypeDescriptorSet,
     // error_code, loc); No destroy API or implicitly freed/destroyed -- do not report: skip |=
     // ReportLeakedObjects(kVulkanObjectTypeDescriptorPool, error_code, loc);
-    skip |= ReportLeakedObjects(kVulkanObjectTypeFramebuffer, error_code, loc);
-    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedObjects(kVulkanObjectTypeCommandPool,
-    // error_code, loc);
-    skip |= ReportLeakedObjects(kVulkanObjectTypeSamplerYcbcrConversion, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypeDescriptorUpdateTemplate, error_code, loc);
+    skip |= ReportLeakedObjects(kVulkanObjectTypeSamplerYcbcrConversion, error_code, loc);
     skip |= ReportLeakedObjects(kVulkanObjectTypePrivateDataSlot, error_code, loc);
     // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedObjects(kVulkanObjectTypeSwapchainKHR,
     // error_code, loc);
@@ -121,23 +120,23 @@ void Device::DestroyLeakedObjects() {
     DestroyUndestroyedObjects(kVulkanObjectTypeSemaphore, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeFence, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeDeviceMemory, loc);
-    DestroyUndestroyedObjects(kVulkanObjectTypeEvent, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeQueryPool, loc);
-    DestroyUndestroyedObjects(kVulkanObjectTypeBufferView, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeImageView, loc);
+    DestroyUndestroyedObjects(kVulkanObjectTypeCommandPool, loc);
+    DestroyUndestroyedObjects(kVulkanObjectTypeRenderPass, loc);
+    DestroyUndestroyedObjects(kVulkanObjectTypeFramebuffer, loc);
+    DestroyUndestroyedObjects(kVulkanObjectTypeEvent, loc);
+    DestroyUndestroyedObjects(kVulkanObjectTypeBufferView, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeShaderModule, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypePipelineCache, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypePipelineLayout, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypePipeline, loc);
-    DestroyUndestroyedObjects(kVulkanObjectTypeRenderPass, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeDescriptorSetLayout, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeSampler, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeDescriptorSet, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeDescriptorPool, loc);
-    DestroyUndestroyedObjects(kVulkanObjectTypeFramebuffer, loc);
-    DestroyUndestroyedObjects(kVulkanObjectTypeCommandPool, loc);
-    DestroyUndestroyedObjects(kVulkanObjectTypeSamplerYcbcrConversion, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeDescriptorUpdateTemplate, loc);
+    DestroyUndestroyedObjects(kVulkanObjectTypeSamplerYcbcrConversion, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypePrivateDataSlot, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeSwapchainKHR, loc);
     DestroyUndestroyedObjects(kVulkanObjectTypeVideoSessionKHR, loc);
@@ -692,58 +691,6 @@ void Device::PreCallRecordDestroySemaphore(VkDevice device, VkSemaphore semaphor
     RecordDestroyObject(semaphore, kVulkanObjectTypeSemaphore, record_obj.location);
 }
 
-// vkCreateEvent:
-// Checked by chassis: device: "VUID-vkCreateEvent-device-parameter"
-
-void Device::PostCallRecordCreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo,
-                                       const VkAllocationCallbacks* pAllocator, VkEvent* pEvent, const RecordObject& record_obj) {
-    if (record_obj.result < VK_SUCCESS) return;
-    tracker.CreateObject(*pEvent, kVulkanObjectTypeEvent, pAllocator, record_obj.location, device);
-}
-
-bool Device::PreCallValidateDestroyEvent(VkDevice device, VkEvent event, const VkAllocationCallbacks* pAllocator,
-                                         const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkDestroyEvent-device-parameter"
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, true, "VUID-vkDestroyEvent-event-parameter",
-                           "VUID-vkDestroyEvent-event-parent", error_obj.location.dot(Field::event));
-    skip |= ValidateDestroyObject(event, kVulkanObjectTypeEvent, pAllocator, kVUIDUndefined, kVUIDUndefined, error_obj.location);
-
-    return skip;
-}
-
-void Device::PreCallRecordDestroyEvent(VkDevice device, VkEvent event, const VkAllocationCallbacks* pAllocator,
-                                       const RecordObject& record_obj) {
-    RecordDestroyObject(event, kVulkanObjectTypeEvent, record_obj.location);
-}
-
-bool Device::PreCallValidateGetEventStatus(VkDevice device, VkEvent event, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkGetEventStatus-device-parameter"
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkGetEventStatus-event-parameter",
-                           "VUID-vkGetEventStatus-event-parent", error_obj.location.dot(Field::event));
-
-    return skip;
-}
-
-bool Device::PreCallValidateSetEvent(VkDevice device, VkEvent event, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkSetEvent-device-parameter"
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkSetEvent-event-parameter", "VUID-vkSetEvent-event-parent",
-                           error_obj.location.dot(Field::event));
-
-    return skip;
-}
-
-bool Device::PreCallValidateResetEvent(VkDevice device, VkEvent event, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkResetEvent-device-parameter"
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkResetEvent-event-parameter",
-                           "VUID-vkResetEvent-event-parent", error_obj.location.dot(Field::event));
-
-    return skip;
-}
-
 // vkCreateQueryPool:
 // Checked by chassis: device: "VUID-vkCreateQueryPool-device-parameter"
 
@@ -819,44 +766,6 @@ bool Device::PreCallValidateDestroyBuffer(VkDevice device, VkBuffer buffer, cons
 void Device::PreCallRecordDestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks* pAllocator,
                                         const RecordObject& record_obj) {
     RecordDestroyObject(buffer, kVulkanObjectTypeBuffer, record_obj.location);
-}
-
-bool Device::PreCallValidateCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
-                                             const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
-                                             const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkCreateBufferView-device-parameter"
-    if (pCreateInfo) {
-        [[maybe_unused]] const Location pCreateInfo_loc = error_obj.location.dot(Field::pCreateInfo);
-        skip |= ValidateObject(pCreateInfo->buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferViewCreateInfo-buffer-parameter",
-                               "UNASSIGNED-VkBufferViewCreateInfo-buffer-parent", pCreateInfo_loc.dot(Field::buffer));
-    }
-
-    return skip;
-}
-
-void Device::PostCallRecordCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
-                                            const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
-                                            const RecordObject& record_obj) {
-    if (record_obj.result < VK_SUCCESS) return;
-    tracker.CreateObject(*pView, kVulkanObjectTypeBufferView, pAllocator, record_obj.location, device);
-}
-
-bool Device::PreCallValidateDestroyBufferView(VkDevice device, VkBufferView bufferView, const VkAllocationCallbacks* pAllocator,
-                                              const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkDestroyBufferView-device-parameter"
-    skip |= ValidateObject(bufferView, kVulkanObjectTypeBufferView, true, "VUID-vkDestroyBufferView-bufferView-parameter",
-                           "VUID-vkDestroyBufferView-bufferView-parent", error_obj.location.dot(Field::bufferView));
-    skip |= ValidateDestroyObject(bufferView, kVulkanObjectTypeBufferView, pAllocator, kVUIDUndefined, kVUIDUndefined,
-                                  error_obj.location);
-
-    return skip;
-}
-
-void Device::PreCallRecordDestroyBufferView(VkDevice device, VkBufferView bufferView, const VkAllocationCallbacks* pAllocator,
-                                            const RecordObject& record_obj) {
-    RecordDestroyObject(bufferView, kVulkanObjectTypeBufferView, record_obj.location);
 }
 
 bool Device::PreCallValidateCreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo,
@@ -959,6 +868,304 @@ void Device::PreCallRecordDestroyImageView(VkDevice device, VkImageView imageVie
     RecordDestroyObject(imageView, kVulkanObjectTypeImageView, record_obj.location);
 }
 
+// vkCreateCommandPool:
+// Checked by chassis: device: "VUID-vkCreateCommandPool-device-parameter"
+
+void Device::PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
+                                             const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
+                                             const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pCommandPool, kVulkanObjectTypeCommandPool, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags,
+                                             const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkResetCommandPool-device-parameter"
+    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, "VUID-vkResetCommandPool-commandPool-parameter",
+                           "VUID-vkResetCommandPool-commandPool-parent", error_obj.location.dot(Field::commandPool));
+
+    return skip;
+}
+
+// vkEndCommandBuffer:
+// Checked by chassis: commandBuffer: "VUID-vkEndCommandBuffer-commandBuffer-parameter"
+
+// vkResetCommandBuffer:
+// Checked by chassis: commandBuffer: "VUID-vkResetCommandBuffer-commandBuffer-parameter"
+
+bool Device::PreCallValidateCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer,
+                                          uint32_t regionCount, const VkBufferCopy* pRegions, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyBuffer-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyBuffer-commonparent"
+    skip |= ValidateObject(srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBuffer-srcBuffer-parameter",
+                           "VUID-vkCmdCopyBuffer-commonparent", error_obj.location.dot(Field::srcBuffer));
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBuffer-dstBuffer-parameter",
+                           "VUID-vkCmdCopyBuffer-commonparent", error_obj.location.dot(Field::dstBuffer));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
+                                         VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
+                                         const VkImageCopy* pRegions, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyImage-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyImage-commonparent"
+    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImage-srcImage-parameter",
+                           "VUID-vkCmdCopyImage-commonparent", error_obj.location.dot(Field::srcImage));
+    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImage-dstImage-parameter",
+                           "VUID-vkCmdCopyImage-commonparent", error_obj.location.dot(Field::dstImage));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
+                                                 VkImageLayout dstImageLayout, uint32_t regionCount,
+                                                 const VkBufferImageCopy* pRegions, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyBufferToImage-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyBufferToImage-commonparent"
+    skip |= ValidateObject(srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBufferToImage-srcBuffer-parameter",
+                           "VUID-vkCmdCopyBufferToImage-commonparent", error_obj.location.dot(Field::srcBuffer));
+    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyBufferToImage-dstImage-parameter",
+                           "VUID-vkCmdCopyBufferToImage-commonparent", error_obj.location.dot(Field::dstImage));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
+                                                 VkBuffer dstBuffer, uint32_t regionCount, const VkBufferImageCopy* pRegions,
+                                                 const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyImageToBuffer-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyImageToBuffer-commonparent"
+    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImageToBuffer-srcImage-parameter",
+                           "VUID-vkCmdCopyImageToBuffer-commonparent", error_obj.location.dot(Field::srcImage));
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyImageToBuffer-dstBuffer-parameter",
+                           "VUID-vkCmdCopyImageToBuffer-commonparent", error_obj.location.dot(Field::dstBuffer));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdUpdateBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                            VkDeviceSize dataSize, const void* pData, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdUpdateBuffer-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdUpdateBuffer-commonparent"
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdUpdateBuffer-dstBuffer-parameter",
+                           "VUID-vkCmdUpdateBuffer-commonparent", error_obj.location.dot(Field::dstBuffer));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                          VkDeviceSize size, uint32_t data, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdFillBuffer-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdFillBuffer-commonparent"
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdFillBuffer-dstBuffer-parameter",
+                           "VUID-vkCmdFillBuffer-commonparent", error_obj.location.dot(Field::dstBuffer));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask,
+                                               VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags,
+                                               uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
+                                               uint32_t bufferMemoryBarrierCount,
+                                               const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
+                                               const VkImageMemoryBarrier* pImageMemoryBarriers,
+                                               const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdPipelineBarrier-commandBuffer-parameter"
+    if (pBufferMemoryBarriers) {
+        for (uint32_t index0 = 0; index0 < bufferMemoryBarrierCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pBufferMemoryBarriers, index0);
+            skip |= ValidateObject(pBufferMemoryBarriers[index0].buffer, kVulkanObjectTypeBuffer, false,
+                                   "VUID-VkBufferMemoryBarrier-buffer-parameter",
+                                   "UNASSIGNED-vkCmdPipelineBarrier-commandBuffer-commonparent", index0_loc.dot(Field::buffer));
+        }
+    }
+    if (pImageMemoryBarriers) {
+        for (uint32_t index0 = 0; index0 < imageMemoryBarrierCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pImageMemoryBarriers, index0);
+            skip |= ValidateObject(pImageMemoryBarriers[index0].image, kVulkanObjectTypeImage, false,
+                                   "VUID-VkImageMemoryBarrier-image-parameter",
+                                   "UNASSIGNED-vkCmdPipelineBarrier-commandBuffer-commonparent", index0_loc.dot(Field::image));
+        }
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdBeginQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query,
+                                          VkQueryControlFlags flags, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdBeginQuery-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdBeginQuery-commonparent"
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdBeginQuery-queryPool-parameter",
+                           "VUID-vkCmdBeginQuery-commonparent", error_obj.location.dot(Field::queryPool));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdEndQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query,
+                                        const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdEndQuery-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdEndQuery-commonparent"
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdEndQuery-queryPool-parameter",
+                           "VUID-vkCmdEndQuery-commonparent", error_obj.location.dot(Field::queryPool));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdResetQueryPool(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
+                                              uint32_t queryCount, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdResetQueryPool-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdResetQueryPool-commonparent"
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdResetQueryPool-queryPool-parameter",
+                           "VUID-vkCmdResetQueryPool-commonparent", error_obj.location.dot(Field::queryPool));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdWriteTimestamp(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage,
+                                              VkQueryPool queryPool, uint32_t query, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdWriteTimestamp-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdWriteTimestamp-commonparent"
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdWriteTimestamp-queryPool-parameter",
+                           "VUID-vkCmdWriteTimestamp-commonparent", error_obj.location.dot(Field::queryPool));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
+                                                    uint32_t queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                                    VkDeviceSize stride, VkQueryResultFlags flags,
+                                                    const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyQueryPoolResults-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyQueryPoolResults-commonparent"
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdCopyQueryPoolResults-queryPool-parameter",
+                           "VUID-vkCmdCopyQueryPoolResults-commonparent", error_obj.location.dot(Field::queryPool));
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyQueryPoolResults-dstBuffer-parameter",
+                           "VUID-vkCmdCopyQueryPoolResults-commonparent", error_obj.location.dot(Field::dstBuffer));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount,
+                                               const VkCommandBuffer* pCommandBuffers, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdExecuteCommands-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdExecuteCommands-commonparent"
+
+    if ((commandBufferCount > 0) && (pCommandBuffers)) {
+        for (uint32_t index0 = 0; index0 < commandBufferCount; ++index0) {
+            skip |= ValidateObject(pCommandBuffers[index0], kVulkanObjectTypeCommandBuffer, false,
+                                   "VUID-vkCmdExecuteCommands-pCommandBuffers-parameter", "VUID-vkCmdExecuteCommands-commonparent",
+                                   error_obj.location.dot(Field::pCommandBuffers, index0));
+        }
+    }
+
+    return skip;
+}
+
+// vkCreateEvent:
+// Checked by chassis: device: "VUID-vkCreateEvent-device-parameter"
+
+void Device::PostCallRecordCreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo,
+                                       const VkAllocationCallbacks* pAllocator, VkEvent* pEvent, const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pEvent, kVulkanObjectTypeEvent, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateDestroyEvent(VkDevice device, VkEvent event, const VkAllocationCallbacks* pAllocator,
+                                         const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkDestroyEvent-device-parameter"
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, true, "VUID-vkDestroyEvent-event-parameter",
+                           "VUID-vkDestroyEvent-event-parent", error_obj.location.dot(Field::event));
+    skip |= ValidateDestroyObject(event, kVulkanObjectTypeEvent, pAllocator, kVUIDUndefined, kVUIDUndefined, error_obj.location);
+
+    return skip;
+}
+
+void Device::PreCallRecordDestroyEvent(VkDevice device, VkEvent event, const VkAllocationCallbacks* pAllocator,
+                                       const RecordObject& record_obj) {
+    RecordDestroyObject(event, kVulkanObjectTypeEvent, record_obj.location);
+}
+
+bool Device::PreCallValidateGetEventStatus(VkDevice device, VkEvent event, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkGetEventStatus-device-parameter"
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkGetEventStatus-event-parameter",
+                           "VUID-vkGetEventStatus-event-parent", error_obj.location.dot(Field::event));
+
+    return skip;
+}
+
+bool Device::PreCallValidateSetEvent(VkDevice device, VkEvent event, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkSetEvent-device-parameter"
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkSetEvent-event-parameter", "VUID-vkSetEvent-event-parent",
+                           error_obj.location.dot(Field::event));
+
+    return skip;
+}
+
+bool Device::PreCallValidateResetEvent(VkDevice device, VkEvent event, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkResetEvent-device-parameter"
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkResetEvent-event-parameter",
+                           "VUID-vkResetEvent-event-parent", error_obj.location.dot(Field::event));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
+                                             const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
+                                             const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkCreateBufferView-device-parameter"
+    if (pCreateInfo) {
+        [[maybe_unused]] const Location pCreateInfo_loc = error_obj.location.dot(Field::pCreateInfo);
+        skip |= ValidateObject(pCreateInfo->buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferViewCreateInfo-buffer-parameter",
+                               "UNASSIGNED-VkBufferViewCreateInfo-buffer-parent", pCreateInfo_loc.dot(Field::buffer));
+    }
+
+    return skip;
+}
+
+void Device::PostCallRecordCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
+                                            const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
+                                            const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pView, kVulkanObjectTypeBufferView, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateDestroyBufferView(VkDevice device, VkBufferView bufferView, const VkAllocationCallbacks* pAllocator,
+                                              const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkDestroyBufferView-device-parameter"
+    skip |= ValidateObject(bufferView, kVulkanObjectTypeBufferView, true, "VUID-vkDestroyBufferView-bufferView-parameter",
+                           "VUID-vkDestroyBufferView-bufferView-parent", error_obj.location.dot(Field::bufferView));
+    skip |= ValidateDestroyObject(bufferView, kVulkanObjectTypeBufferView, pAllocator, kVUIDUndefined, kVUIDUndefined,
+                                  error_obj.location);
+
+    return skip;
+}
+
+void Device::PreCallRecordDestroyBufferView(VkDevice device, VkBufferView bufferView, const VkAllocationCallbacks* pAllocator,
+                                            const RecordObject& record_obj) {
+    RecordDestroyObject(bufferView, kVulkanObjectTypeBufferView, record_obj.location);
+}
+
 bool Device::PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
                                                const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule,
                                                const ErrorObject& error_obj) const {
@@ -1038,77 +1245,6 @@ bool Device::PreCallValidateMergePipelineCaches(VkDevice device, VkPipelineCache
             skip |= ValidateObject(pSrcCaches[index0], kVulkanObjectTypePipelineCache, false, kVUIDUndefined,
                                    "UNASSIGNED-vkMergePipelineCaches-pSrcCaches-parent",
                                    error_obj.location.dot(Field::pSrcCaches, index0));
-        }
-    }
-
-    return skip;
-}
-
-bool Device::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
-                                                    const VkGraphicsPipelineCreateInfo* pCreateInfos,
-                                                    const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                    const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkCreateGraphicsPipelines-device-parameter"
-    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false,
-                           "VUID-vkCreateGraphicsPipelines-pipelineCache-parameter",
-                           "VUID-vkCreateGraphicsPipelines-pipelineCache-parent", error_obj.location.dot(Field::pipelineCache));
-    if (pCreateInfos) {
-        for (uint32_t index0 = 0; index0 < createInfoCount; ++index0) {
-            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pCreateInfos, index0);
-            if (pCreateInfos[index0].pStages) {
-                for (uint32_t index1 = 0; index1 < pCreateInfos[index0].stageCount; ++index1) {
-                    [[maybe_unused]] const Location index1_loc = index0_loc.dot(Field::pStages, index1);
-                    skip |=
-                        ValidateObject(pCreateInfos[index0].pStages[index1].module, kVulkanObjectTypeShaderModule, true,
-                                       "VUID-VkPipelineShaderStageCreateInfo-module-parameter",
-                                       "UNASSIGNED-VkPipelineShaderStageCreateInfo-module-parent", index1_loc.dot(Field::module));
-                    if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkShaderModuleValidationCacheCreateInfoEXT>(
-                            pCreateInfos[index0].pStages[index1].pNext)) {
-                        [[maybe_unused]] const Location pNext_loc =
-                            index1_loc.pNext(Struct::VkShaderModuleValidationCacheCreateInfoEXT);
-                    }
-                }
-            }
-            if ((pCreateInfos[index0].flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pCreateInfos[index0].basePipelineIndex == -1))
-                skip |= ValidateObject(pCreateInfos[index0].basePipelineHandle, kVulkanObjectTypePipeline, false,
-                                       "VUID-VkGraphicsPipelineCreateInfo-flags-07984",
-                                       "VUID-VkGraphicsPipelineCreateInfo-commonparent", error_obj.location);
-            if ([[maybe_unused]] auto pNext =
-                    vku::FindStructInPNextChain<VkGraphicsPipelineShaderGroupsCreateInfoNV>(pCreateInfos[index0].pNext)) {
-                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkGraphicsPipelineShaderGroupsCreateInfoNV);
-
-                if ((pNext->pipelineCount > 0) && (pNext->pPipelines)) {
-                    for (uint32_t index2 = 0; index2 < pNext->pipelineCount; ++index2) {
-                        skip |= ValidateObject(pNext->pPipelines[index2], kVulkanObjectTypePipeline, false, kVUIDUndefined,
-                                               "UNASSIGNED-VkGraphicsPipelineShaderGroupsCreateInfoNV-pPipelines-parent",
-                                               pNext_loc.dot(Field::pPipelines, index2));
-                    }
-                }
-            }
-            if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkPipelineBinaryInfoKHR>(pCreateInfos[index0].pNext)) {
-                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkPipelineBinaryInfoKHR);
-
-                if ((pNext->binaryCount > 0) && (pNext->pPipelineBinaries)) {
-                    for (uint32_t index2 = 0; index2 < pNext->binaryCount; ++index2) {
-                        skip |= ValidateObject(pNext->pPipelineBinaries[index2], kVulkanObjectTypePipelineBinaryKHR, false,
-                                               kVUIDUndefined, "UNASSIGNED-VkPipelineBinaryInfoKHR-pPipelineBinaries-parent",
-                                               pNext_loc.dot(Field::pPipelineBinaries, index2));
-                    }
-                }
-            }
-            if ([[maybe_unused]] auto pNext =
-                    vku::FindStructInPNextChain<VkPipelineLibraryCreateInfoKHR>(pCreateInfos[index0].pNext)) {
-                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkPipelineLibraryCreateInfoKHR);
-
-                if ((pNext->libraryCount > 0) && (pNext->pLibraries)) {
-                    for (uint32_t index2 = 0; index2 < pNext->libraryCount; ++index2) {
-                        skip |= ValidateObject(pNext->pLibraries[index2], kVulkanObjectTypePipeline, false, kVUIDUndefined,
-                                               "UNASSIGNED-VkPipelineLibraryCreateInfoKHR-pLibraries-parent",
-                                               pNext_loc.dot(Field::pLibraries, index2));
-                    }
-                }
-            }
         }
     }
 
@@ -1314,93 +1450,6 @@ void Device::PostCallRecordCreateDescriptorPool(VkDevice device, const VkDescrip
     tracker.CreateObject(*pDescriptorPool, kVulkanObjectTypeDescriptorPool, pAllocator, record_obj.location, device);
 }
 
-void Device::PostCallRecordCreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo,
-                                             const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer,
-                                             const RecordObject& record_obj) {
-    if (record_obj.result < VK_SUCCESS) return;
-    tracker.CreateObject(*pFramebuffer, kVulkanObjectTypeFramebuffer, pAllocator, record_obj.location, device);
-}
-
-bool Device::PreCallValidateDestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer, const VkAllocationCallbacks* pAllocator,
-                                               const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkDestroyFramebuffer-device-parameter"
-    skip |= ValidateObject(framebuffer, kVulkanObjectTypeFramebuffer, true, "VUID-vkDestroyFramebuffer-framebuffer-parameter",
-                           "VUID-vkDestroyFramebuffer-framebuffer-parent", error_obj.location.dot(Field::framebuffer));
-    skip |= ValidateDestroyObject(framebuffer, kVulkanObjectTypeFramebuffer, pAllocator, kVUIDUndefined, kVUIDUndefined,
-                                  error_obj.location);
-
-    return skip;
-}
-
-void Device::PreCallRecordDestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer, const VkAllocationCallbacks* pAllocator,
-                                             const RecordObject& record_obj) {
-    RecordDestroyObject(framebuffer, kVulkanObjectTypeFramebuffer, record_obj.location);
-}
-
-// vkCreateRenderPass:
-// Checked by chassis: device: "VUID-vkCreateRenderPass-device-parameter"
-
-void Device::PostCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
-                                            const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
-                                            const RecordObject& record_obj) {
-    if (record_obj.result < VK_SUCCESS) return;
-    tracker.CreateObject(*pRenderPass, kVulkanObjectTypeRenderPass, pAllocator, record_obj.location, device);
-}
-
-bool Device::PreCallValidateDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator,
-                                              const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkDestroyRenderPass-device-parameter"
-    skip |= ValidateObject(renderPass, kVulkanObjectTypeRenderPass, true, "VUID-vkDestroyRenderPass-renderPass-parameter",
-                           "VUID-vkDestroyRenderPass-renderPass-parent", error_obj.location.dot(Field::renderPass));
-    skip |= ValidateDestroyObject(renderPass, kVulkanObjectTypeRenderPass, pAllocator, kVUIDUndefined, kVUIDUndefined,
-                                  error_obj.location);
-
-    return skip;
-}
-
-void Device::PreCallRecordDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator,
-                                            const RecordObject& record_obj) {
-    RecordDestroyObject(renderPass, kVulkanObjectTypeRenderPass, record_obj.location);
-}
-
-bool Device::PreCallValidateGetRenderAreaGranularity(VkDevice device, VkRenderPass renderPass, VkExtent2D* pGranularity,
-                                                     const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkGetRenderAreaGranularity-device-parameter"
-    skip |= ValidateObject(renderPass, kVulkanObjectTypeRenderPass, false, "VUID-vkGetRenderAreaGranularity-renderPass-parameter",
-                           "VUID-vkGetRenderAreaGranularity-renderPass-parent", error_obj.location.dot(Field::renderPass));
-
-    return skip;
-}
-
-// vkCreateCommandPool:
-// Checked by chassis: device: "VUID-vkCreateCommandPool-device-parameter"
-
-void Device::PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
-                                             const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
-                                             const RecordObject& record_obj) {
-    if (record_obj.result < VK_SUCCESS) return;
-    tracker.CreateObject(*pCommandPool, kVulkanObjectTypeCommandPool, pAllocator, record_obj.location, device);
-}
-
-bool Device::PreCallValidateResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags,
-                                             const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: "VUID-vkResetCommandPool-device-parameter"
-    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, "VUID-vkResetCommandPool-commandPool-parameter",
-                           "VUID-vkResetCommandPool-commandPool-parent", error_obj.location.dot(Field::commandPool));
-
-    return skip;
-}
-
-// vkEndCommandBuffer:
-// Checked by chassis: commandBuffer: "VUID-vkEndCommandBuffer-commandBuffer-parameter"
-
-// vkResetCommandBuffer:
-// Checked by chassis: commandBuffer: "VUID-vkResetCommandBuffer-commandBuffer-parameter"
-
 bool Device::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
                                             VkPipeline pipeline, const ErrorObject& error_obj) const {
     bool skip = false;
@@ -1411,33 +1460,6 @@ bool Device::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer, VkPip
 
     return skip;
 }
-
-// vkCmdSetViewport:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetViewport-commandBuffer-parameter"
-
-// vkCmdSetScissor:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetScissor-commandBuffer-parameter"
-
-// vkCmdSetLineWidth:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetLineWidth-commandBuffer-parameter"
-
-// vkCmdSetDepthBias:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetDepthBias-commandBuffer-parameter"
-
-// vkCmdSetBlendConstants:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetBlendConstants-commandBuffer-parameter"
-
-// vkCmdSetDepthBounds:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetDepthBounds-commandBuffer-parameter"
-
-// vkCmdSetStencilCompareMask:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetStencilCompareMask-commandBuffer-parameter"
-
-// vkCmdSetStencilWriteMask:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetStencilWriteMask-commandBuffer-parameter"
-
-// vkCmdSetStencilReference:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetStencilReference-commandBuffer-parameter"
 
 bool Device::PreCallValidateCmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
                                                   VkPipelineLayout layout, uint32_t firstSet, uint32_t descriptorSetCount,
@@ -1461,59 +1483,14 @@ bool Device::PreCallValidateCmdBindDescriptorSets(VkCommandBuffer commandBuffer,
     return skip;
 }
 
-bool Device::PreCallValidateCmdBindIndexBuffer(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
-                                               VkIndexType indexType, const ErrorObject& error_obj) const {
+bool Device::PreCallValidateCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
+                                               const VkClearColorValue* pColor, uint32_t rangeCount,
+                                               const VkImageSubresourceRange* pRanges, const ErrorObject& error_obj) const {
     bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdBindIndexBuffer-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdBindIndexBuffer-commonparent"
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindIndexBuffer-buffer-parameter",
-                           "VUID-vkCmdBindIndexBuffer-commonparent", error_obj.location.dot(Field::buffer));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount,
-                                                 const VkBuffer* pBuffers, const VkDeviceSize* pOffsets,
-                                                 const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdBindVertexBuffers-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdBindVertexBuffers-commonparent"
-
-    if ((bindingCount > 0) && (pBuffers)) {
-        for (uint32_t index0 = 0; index0 < bindingCount; ++index0) {
-            skip |=
-                ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindVertexBuffers-pBuffers-parameter",
-                               "VUID-vkCmdBindVertexBuffers-commonparent", error_obj.location.dot(Field::pBuffers, index0));
-        }
-    }
-
-    return skip;
-}
-
-// vkCmdDraw:
-// Checked by chassis: commandBuffer: "VUID-vkCmdDraw-commandBuffer-parameter"
-
-// vkCmdDrawIndexed:
-// Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexed-commandBuffer-parameter"
-
-bool Device::PreCallValidateCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount,
-                                            uint32_t stride, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndirect-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndirect-commonparent"
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirect-buffer-parameter",
-                           "VUID-vkCmdDrawIndirect-commonparent", error_obj.location.dot(Field::buffer));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
-                                                   uint32_t drawCount, uint32_t stride, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexedIndirect-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexedIndirect-commonparent"
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirect-buffer-parameter",
-                           "VUID-vkCmdDrawIndexedIndirect-commonparent", error_obj.location.dot(Field::buffer));
+    // Checked by chassis: commandBuffer: "VUID-vkCmdClearColorImage-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdClearColorImage-commonparent"
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkCmdClearColorImage-image-parameter",
+                           "VUID-vkCmdClearColorImage-commonparent", error_obj.location.dot(Field::image));
 
     return skip;
 }
@@ -1528,138 +1505,6 @@ bool Device::PreCallValidateCmdDispatchIndirect(VkCommandBuffer commandBuffer, V
     // Checked by chassis: commandBuffer: "VUID-vkCmdDispatchIndirect-commonparent"
     skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDispatchIndirect-buffer-parameter",
                            "VUID-vkCmdDispatchIndirect-commonparent", error_obj.location.dot(Field::buffer));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer,
-                                          uint32_t regionCount, const VkBufferCopy* pRegions, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyBuffer-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyBuffer-commonparent"
-    skip |= ValidateObject(srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBuffer-srcBuffer-parameter",
-                           "VUID-vkCmdCopyBuffer-commonparent", error_obj.location.dot(Field::srcBuffer));
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBuffer-dstBuffer-parameter",
-                           "VUID-vkCmdCopyBuffer-commonparent", error_obj.location.dot(Field::dstBuffer));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                         VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                         const VkImageCopy* pRegions, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyImage-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyImage-commonparent"
-    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImage-srcImage-parameter",
-                           "VUID-vkCmdCopyImage-commonparent", error_obj.location.dot(Field::srcImage));
-    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImage-dstImage-parameter",
-                           "VUID-vkCmdCopyImage-commonparent", error_obj.location.dot(Field::dstImage));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                         VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                         const VkImageBlit* pRegions, VkFilter filter, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdBlitImage-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdBlitImage-commonparent"
-    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdBlitImage-srcImage-parameter",
-                           "VUID-vkCmdBlitImage-commonparent", error_obj.location.dot(Field::srcImage));
-    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdBlitImage-dstImage-parameter",
-                           "VUID-vkCmdBlitImage-commonparent", error_obj.location.dot(Field::dstImage));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
-                                                 VkImageLayout dstImageLayout, uint32_t regionCount,
-                                                 const VkBufferImageCopy* pRegions, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyBufferToImage-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyBufferToImage-commonparent"
-    skip |= ValidateObject(srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBufferToImage-srcBuffer-parameter",
-                           "VUID-vkCmdCopyBufferToImage-commonparent", error_obj.location.dot(Field::srcBuffer));
-    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyBufferToImage-dstImage-parameter",
-                           "VUID-vkCmdCopyBufferToImage-commonparent", error_obj.location.dot(Field::dstImage));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                                 VkBuffer dstBuffer, uint32_t regionCount, const VkBufferImageCopy* pRegions,
-                                                 const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyImageToBuffer-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyImageToBuffer-commonparent"
-    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImageToBuffer-srcImage-parameter",
-                           "VUID-vkCmdCopyImageToBuffer-commonparent", error_obj.location.dot(Field::srcImage));
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyImageToBuffer-dstBuffer-parameter",
-                           "VUID-vkCmdCopyImageToBuffer-commonparent", error_obj.location.dot(Field::dstBuffer));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdUpdateBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
-                                            VkDeviceSize dataSize, const void* pData, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdUpdateBuffer-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdUpdateBuffer-commonparent"
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdUpdateBuffer-dstBuffer-parameter",
-                           "VUID-vkCmdUpdateBuffer-commonparent", error_obj.location.dot(Field::dstBuffer));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
-                                          VkDeviceSize size, uint32_t data, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdFillBuffer-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdFillBuffer-commonparent"
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdFillBuffer-dstBuffer-parameter",
-                           "VUID-vkCmdFillBuffer-commonparent", error_obj.location.dot(Field::dstBuffer));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                               const VkClearColorValue* pColor, uint32_t rangeCount,
-                                               const VkImageSubresourceRange* pRanges, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdClearColorImage-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdClearColorImage-commonparent"
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkCmdClearColorImage-image-parameter",
-                           "VUID-vkCmdClearColorImage-commonparent", error_obj.location.dot(Field::image));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                                      const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount,
-                                                      const VkImageSubresourceRange* pRanges, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdClearDepthStencilImage-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdClearDepthStencilImage-commonparent"
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkCmdClearDepthStencilImage-image-parameter",
-                           "VUID-vkCmdClearDepthStencilImage-commonparent", error_obj.location.dot(Field::image));
-
-    return skip;
-}
-
-// vkCmdClearAttachments:
-// Checked by chassis: commandBuffer: "VUID-vkCmdClearAttachments-commandBuffer-parameter"
-
-bool Device::PreCallValidateCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                            VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                            const VkImageResolve* pRegions, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdResolveImage-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdResolveImage-commonparent"
-    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdResolveImage-srcImage-parameter",
-                           "VUID-vkCmdResolveImage-commonparent", error_obj.location.dot(Field::srcImage));
-    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdResolveImage-dstImage-parameter",
-                           "VUID-vkCmdResolveImage-commonparent", error_obj.location.dot(Field::dstImage));
 
     return skip;
 }
@@ -1722,94 +1567,6 @@ bool Device::PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_
     return skip;
 }
 
-bool Device::PreCallValidateCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask,
-                                               VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags,
-                                               uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
-                                               uint32_t bufferMemoryBarrierCount,
-                                               const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
-                                               const VkImageMemoryBarrier* pImageMemoryBarriers,
-                                               const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdPipelineBarrier-commandBuffer-parameter"
-    if (pBufferMemoryBarriers) {
-        for (uint32_t index0 = 0; index0 < bufferMemoryBarrierCount; ++index0) {
-            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pBufferMemoryBarriers, index0);
-            skip |= ValidateObject(pBufferMemoryBarriers[index0].buffer, kVulkanObjectTypeBuffer, false,
-                                   "VUID-VkBufferMemoryBarrier-buffer-parameter",
-                                   "UNASSIGNED-vkCmdPipelineBarrier-commandBuffer-commonparent", index0_loc.dot(Field::buffer));
-        }
-    }
-    if (pImageMemoryBarriers) {
-        for (uint32_t index0 = 0; index0 < imageMemoryBarrierCount; ++index0) {
-            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pImageMemoryBarriers, index0);
-            skip |= ValidateObject(pImageMemoryBarriers[index0].image, kVulkanObjectTypeImage, false,
-                                   "VUID-VkImageMemoryBarrier-image-parameter",
-                                   "UNASSIGNED-vkCmdPipelineBarrier-commandBuffer-commonparent", index0_loc.dot(Field::image));
-        }
-    }
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdBeginQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query,
-                                          VkQueryControlFlags flags, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdBeginQuery-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdBeginQuery-commonparent"
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdBeginQuery-queryPool-parameter",
-                           "VUID-vkCmdBeginQuery-commonparent", error_obj.location.dot(Field::queryPool));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdEndQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query,
-                                        const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdEndQuery-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdEndQuery-commonparent"
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdEndQuery-queryPool-parameter",
-                           "VUID-vkCmdEndQuery-commonparent", error_obj.location.dot(Field::queryPool));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdResetQueryPool(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
-                                              uint32_t queryCount, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdResetQueryPool-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdResetQueryPool-commonparent"
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdResetQueryPool-queryPool-parameter",
-                           "VUID-vkCmdResetQueryPool-commonparent", error_obj.location.dot(Field::queryPool));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdWriteTimestamp(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage,
-                                              VkQueryPool queryPool, uint32_t query, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdWriteTimestamp-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdWriteTimestamp-commonparent"
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdWriteTimestamp-queryPool-parameter",
-                           "VUID-vkCmdWriteTimestamp-commonparent", error_obj.location.dot(Field::queryPool));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
-                                                    uint32_t queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset,
-                                                    VkDeviceSize stride, VkQueryResultFlags flags,
-                                                    const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyQueryPoolResults-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdCopyQueryPoolResults-commonparent"
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdCopyQueryPoolResults-queryPool-parameter",
-                           "VUID-vkCmdCopyQueryPoolResults-commonparent", error_obj.location.dot(Field::queryPool));
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyQueryPoolResults-dstBuffer-parameter",
-                           "VUID-vkCmdCopyQueryPoolResults-commonparent", error_obj.location.dot(Field::dstBuffer));
-
-    return skip;
-}
-
 bool Device::PreCallValidateCmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags,
                                              uint32_t offset, uint32_t size, const void* pValues,
                                              const ErrorObject& error_obj) const {
@@ -1818,6 +1575,265 @@ bool Device::PreCallValidateCmdPushConstants(VkCommandBuffer commandBuffer, VkPi
     // Checked by chassis: commandBuffer: "VUID-vkCmdPushConstants-commonparent"
     skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, "VUID-vkCmdPushConstants-layout-parameter",
                            "VUID-vkCmdPushConstants-commonparent", error_obj.location.dot(Field::layout));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                    const VkGraphicsPipelineCreateInfo* pCreateInfos,
+                                                    const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                    const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkCreateGraphicsPipelines-device-parameter"
+    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false,
+                           "VUID-vkCreateGraphicsPipelines-pipelineCache-parameter",
+                           "VUID-vkCreateGraphicsPipelines-pipelineCache-parent", error_obj.location.dot(Field::pipelineCache));
+    if (pCreateInfos) {
+        for (uint32_t index0 = 0; index0 < createInfoCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pCreateInfos, index0);
+            if (pCreateInfos[index0].pStages) {
+                for (uint32_t index1 = 0; index1 < pCreateInfos[index0].stageCount; ++index1) {
+                    [[maybe_unused]] const Location index1_loc = index0_loc.dot(Field::pStages, index1);
+                    skip |=
+                        ValidateObject(pCreateInfos[index0].pStages[index1].module, kVulkanObjectTypeShaderModule, true,
+                                       "VUID-VkPipelineShaderStageCreateInfo-module-parameter",
+                                       "UNASSIGNED-VkPipelineShaderStageCreateInfo-module-parent", index1_loc.dot(Field::module));
+                    if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkShaderModuleValidationCacheCreateInfoEXT>(
+                            pCreateInfos[index0].pStages[index1].pNext)) {
+                        [[maybe_unused]] const Location pNext_loc =
+                            index1_loc.pNext(Struct::VkShaderModuleValidationCacheCreateInfoEXT);
+                    }
+                }
+            }
+            if ((pCreateInfos[index0].flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pCreateInfos[index0].basePipelineIndex == -1))
+                skip |= ValidateObject(pCreateInfos[index0].basePipelineHandle, kVulkanObjectTypePipeline, false,
+                                       "VUID-VkGraphicsPipelineCreateInfo-flags-07984",
+                                       "VUID-VkGraphicsPipelineCreateInfo-commonparent", error_obj.location);
+            if ([[maybe_unused]] auto pNext =
+                    vku::FindStructInPNextChain<VkGraphicsPipelineShaderGroupsCreateInfoNV>(pCreateInfos[index0].pNext)) {
+                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkGraphicsPipelineShaderGroupsCreateInfoNV);
+
+                if ((pNext->pipelineCount > 0) && (pNext->pPipelines)) {
+                    for (uint32_t index2 = 0; index2 < pNext->pipelineCount; ++index2) {
+                        skip |= ValidateObject(pNext->pPipelines[index2], kVulkanObjectTypePipeline, false, kVUIDUndefined,
+                                               "UNASSIGNED-VkGraphicsPipelineShaderGroupsCreateInfoNV-pPipelines-parent",
+                                               pNext_loc.dot(Field::pPipelines, index2));
+                    }
+                }
+            }
+            if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkPipelineBinaryInfoKHR>(pCreateInfos[index0].pNext)) {
+                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkPipelineBinaryInfoKHR);
+
+                if ((pNext->binaryCount > 0) && (pNext->pPipelineBinaries)) {
+                    for (uint32_t index2 = 0; index2 < pNext->binaryCount; ++index2) {
+                        skip |= ValidateObject(pNext->pPipelineBinaries[index2], kVulkanObjectTypePipelineBinaryKHR, false,
+                                               kVUIDUndefined, "UNASSIGNED-VkPipelineBinaryInfoKHR-pPipelineBinaries-parent",
+                                               pNext_loc.dot(Field::pPipelineBinaries, index2));
+                    }
+                }
+            }
+            if ([[maybe_unused]] auto pNext =
+                    vku::FindStructInPNextChain<VkPipelineLibraryCreateInfoKHR>(pCreateInfos[index0].pNext)) {
+                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkPipelineLibraryCreateInfoKHR);
+
+                if ((pNext->libraryCount > 0) && (pNext->pLibraries)) {
+                    for (uint32_t index2 = 0; index2 < pNext->libraryCount; ++index2) {
+                        skip |= ValidateObject(pNext->pLibraries[index2], kVulkanObjectTypePipeline, false, kVUIDUndefined,
+                                               "UNASSIGNED-VkPipelineLibraryCreateInfoKHR-pLibraries-parent",
+                                               pNext_loc.dot(Field::pLibraries, index2));
+                    }
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+void Device::PostCallRecordCreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo,
+                                             const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer,
+                                             const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pFramebuffer, kVulkanObjectTypeFramebuffer, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateDestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer, const VkAllocationCallbacks* pAllocator,
+                                               const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkDestroyFramebuffer-device-parameter"
+    skip |= ValidateObject(framebuffer, kVulkanObjectTypeFramebuffer, true, "VUID-vkDestroyFramebuffer-framebuffer-parameter",
+                           "VUID-vkDestroyFramebuffer-framebuffer-parent", error_obj.location.dot(Field::framebuffer));
+    skip |= ValidateDestroyObject(framebuffer, kVulkanObjectTypeFramebuffer, pAllocator, kVUIDUndefined, kVUIDUndefined,
+                                  error_obj.location);
+
+    return skip;
+}
+
+void Device::PreCallRecordDestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer, const VkAllocationCallbacks* pAllocator,
+                                             const RecordObject& record_obj) {
+    RecordDestroyObject(framebuffer, kVulkanObjectTypeFramebuffer, record_obj.location);
+}
+
+// vkCreateRenderPass:
+// Checked by chassis: device: "VUID-vkCreateRenderPass-device-parameter"
+
+void Device::PostCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
+                                            const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
+                                            const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pRenderPass, kVulkanObjectTypeRenderPass, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator,
+                                              const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkDestroyRenderPass-device-parameter"
+    skip |= ValidateObject(renderPass, kVulkanObjectTypeRenderPass, true, "VUID-vkDestroyRenderPass-renderPass-parameter",
+                           "VUID-vkDestroyRenderPass-renderPass-parent", error_obj.location.dot(Field::renderPass));
+    skip |= ValidateDestroyObject(renderPass, kVulkanObjectTypeRenderPass, pAllocator, kVUIDUndefined, kVUIDUndefined,
+                                  error_obj.location);
+
+    return skip;
+}
+
+void Device::PreCallRecordDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator,
+                                            const RecordObject& record_obj) {
+    RecordDestroyObject(renderPass, kVulkanObjectTypeRenderPass, record_obj.location);
+}
+
+bool Device::PreCallValidateGetRenderAreaGranularity(VkDevice device, VkRenderPass renderPass, VkExtent2D* pGranularity,
+                                                     const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkGetRenderAreaGranularity-device-parameter"
+    skip |= ValidateObject(renderPass, kVulkanObjectTypeRenderPass, false, "VUID-vkGetRenderAreaGranularity-renderPass-parameter",
+                           "VUID-vkGetRenderAreaGranularity-renderPass-parent", error_obj.location.dot(Field::renderPass));
+
+    return skip;
+}
+
+// vkCmdSetViewport:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetViewport-commandBuffer-parameter"
+
+// vkCmdSetScissor:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetScissor-commandBuffer-parameter"
+
+// vkCmdSetLineWidth:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetLineWidth-commandBuffer-parameter"
+
+// vkCmdSetDepthBias:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetDepthBias-commandBuffer-parameter"
+
+// vkCmdSetBlendConstants:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetBlendConstants-commandBuffer-parameter"
+
+// vkCmdSetDepthBounds:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetDepthBounds-commandBuffer-parameter"
+
+// vkCmdSetStencilCompareMask:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetStencilCompareMask-commandBuffer-parameter"
+
+// vkCmdSetStencilWriteMask:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetStencilWriteMask-commandBuffer-parameter"
+
+// vkCmdSetStencilReference:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetStencilReference-commandBuffer-parameter"
+
+bool Device::PreCallValidateCmdBindIndexBuffer(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                               VkIndexType indexType, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdBindIndexBuffer-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdBindIndexBuffer-commonparent"
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindIndexBuffer-buffer-parameter",
+                           "VUID-vkCmdBindIndexBuffer-commonparent", error_obj.location.dot(Field::buffer));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount,
+                                                 const VkBuffer* pBuffers, const VkDeviceSize* pOffsets,
+                                                 const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdBindVertexBuffers-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdBindVertexBuffers-commonparent"
+
+    if ((bindingCount > 0) && (pBuffers)) {
+        for (uint32_t index0 = 0; index0 < bindingCount; ++index0) {
+            skip |=
+                ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindVertexBuffers-pBuffers-parameter",
+                               "VUID-vkCmdBindVertexBuffers-commonparent", error_obj.location.dot(Field::pBuffers, index0));
+        }
+    }
+
+    return skip;
+}
+
+// vkCmdDraw:
+// Checked by chassis: commandBuffer: "VUID-vkCmdDraw-commandBuffer-parameter"
+
+// vkCmdDrawIndexed:
+// Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexed-commandBuffer-parameter"
+
+bool Device::PreCallValidateCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount,
+                                            uint32_t stride, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndirect-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndirect-commonparent"
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirect-buffer-parameter",
+                           "VUID-vkCmdDrawIndirect-commonparent", error_obj.location.dot(Field::buffer));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                   uint32_t drawCount, uint32_t stride, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexedIndirect-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexedIndirect-commonparent"
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirect-buffer-parameter",
+                           "VUID-vkCmdDrawIndexedIndirect-commonparent", error_obj.location.dot(Field::buffer));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
+                                         VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
+                                         const VkImageBlit* pRegions, VkFilter filter, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdBlitImage-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdBlitImage-commonparent"
+    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdBlitImage-srcImage-parameter",
+                           "VUID-vkCmdBlitImage-commonparent", error_obj.location.dot(Field::srcImage));
+    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdBlitImage-dstImage-parameter",
+                           "VUID-vkCmdBlitImage-commonparent", error_obj.location.dot(Field::dstImage));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
+                                                      const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount,
+                                                      const VkImageSubresourceRange* pRanges, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdClearDepthStencilImage-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdClearDepthStencilImage-commonparent"
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkCmdClearDepthStencilImage-image-parameter",
+                           "VUID-vkCmdClearDepthStencilImage-commonparent", error_obj.location.dot(Field::image));
+
+    return skip;
+}
+
+// vkCmdClearAttachments:
+// Checked by chassis: commandBuffer: "VUID-vkCmdClearAttachments-commandBuffer-parameter"
+
+bool Device::PreCallValidateCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
+                                            VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
+                                            const VkImageResolve* pRegions, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdResolveImage-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdResolveImage-commonparent"
+    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdResolveImage-srcImage-parameter",
+                           "VUID-vkCmdResolveImage-commonparent", error_obj.location.dot(Field::srcImage));
+    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdResolveImage-dstImage-parameter",
+                           "VUID-vkCmdResolveImage-commonparent", error_obj.location.dot(Field::dstImage));
 
     return skip;
 }
@@ -1856,23 +1872,6 @@ bool Device::PreCallValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, co
 
 // vkCmdEndRenderPass:
 // Checked by chassis: commandBuffer: "VUID-vkCmdEndRenderPass-commandBuffer-parameter"
-
-bool Device::PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount,
-                                               const VkCommandBuffer* pCommandBuffers, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdExecuteCommands-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdExecuteCommands-commonparent"
-
-    if ((commandBufferCount > 0) && (pCommandBuffers)) {
-        for (uint32_t index0 = 0; index0 < commandBufferCount; ++index0) {
-            skip |= ValidateObject(pCommandBuffers[index0], kVulkanObjectTypeCommandBuffer, false,
-                                   "VUID-vkCmdExecuteCommands-pCommandBuffers-parameter", "VUID-vkCmdExecuteCommands-commonparent",
-                                   error_obj.location.dot(Field::pCommandBuffers, index0));
-        }
-    }
-
-    return skip;
-}
 
 bool Device::PreCallValidateBindBufferMemory2(VkDevice device, uint32_t bindInfoCount, const VkBindBufferMemoryInfo* pBindInfos,
                                               const ErrorObject& error_obj) const {
@@ -1922,9 +1921,6 @@ bool Device::PreCallValidateBindImageMemory2(VkDevice device, uint32_t bindInfoC
 
 // vkCmdSetDeviceMask:
 // Checked by chassis: commandBuffer: "VUID-vkCmdSetDeviceMask-commandBuffer-parameter"
-
-// vkCmdDispatchBase:
-// Checked by chassis: commandBuffer: "VUID-vkCmdDispatchBase-commandBuffer-parameter"
 
 // vkEnumeratePhysicalDeviceGroups:
 // Checked by chassis: instance: "VUID-vkEnumeratePhysicalDeviceGroups-instance-parameter"
@@ -2010,6 +2006,37 @@ bool Device::PreCallValidateGetImageSparseMemoryRequirements2(VkDevice device, c
 // vkGetDeviceQueue2:
 // Checked by chassis: device: "VUID-vkGetDeviceQueue2-device-parameter"
 
+// vkGetPhysicalDeviceExternalBufferProperties:
+// Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceExternalBufferProperties-physicalDevice-parameter"
+
+// vkGetPhysicalDeviceExternalFenceProperties:
+// Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceExternalFenceProperties-physicalDevice-parameter"
+
+// vkGetPhysicalDeviceExternalSemaphoreProperties:
+// Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceExternalSemaphoreProperties-physicalDevice-parameter"
+
+// vkCmdDispatchBase:
+// Checked by chassis: commandBuffer: "VUID-vkCmdDispatchBase-commandBuffer-parameter"
+
+bool Device::PreCallValidateDestroyDescriptorUpdateTemplate(VkDevice device, VkDescriptorUpdateTemplate descriptorUpdateTemplate,
+                                                            const VkAllocationCallbacks* pAllocator,
+                                                            const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    skip |= ValidateDestroyObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, pAllocator, kVUIDUndefined,
+                                  kVUIDUndefined, error_obj.location);
+
+    return skip;
+}
+
+void Device::PreCallRecordDestroyDescriptorUpdateTemplate(VkDevice device, VkDescriptorUpdateTemplate descriptorUpdateTemplate,
+                                                          const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
+    RecordDestroyObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, record_obj.location);
+}
+
+// vkUpdateDescriptorSetWithTemplate:
+// Checked by chassis: device: kVUIDUndefined
+
 // vkCreateSamplerYcbcrConversion:
 // Checked by chassis: device: "VUID-vkCreateSamplerYcbcrConversion-device-parameter"
 
@@ -2040,107 +2067,6 @@ void Device::PreCallRecordDestroySamplerYcbcrConversion(VkDevice device, VkSampl
                                                         const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
     RecordDestroyObject(ycbcrConversion, kVulkanObjectTypeSamplerYcbcrConversion, record_obj.location);
 }
-
-bool Device::PreCallValidateDestroyDescriptorUpdateTemplate(VkDevice device, VkDescriptorUpdateTemplate descriptorUpdateTemplate,
-                                                            const VkAllocationCallbacks* pAllocator,
-                                                            const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: kVUIDUndefined
-    skip |= ValidateDestroyObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, pAllocator, kVUIDUndefined,
-                                  kVUIDUndefined, error_obj.location);
-
-    return skip;
-}
-
-void Device::PreCallRecordDestroyDescriptorUpdateTemplate(VkDevice device, VkDescriptorUpdateTemplate descriptorUpdateTemplate,
-                                                          const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
-    RecordDestroyObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, record_obj.location);
-}
-
-// vkUpdateDescriptorSetWithTemplate:
-// Checked by chassis: device: kVUIDUndefined
-
-// vkGetPhysicalDeviceExternalBufferProperties:
-// Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceExternalBufferProperties-physicalDevice-parameter"
-
-// vkGetPhysicalDeviceExternalFenceProperties:
-// Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceExternalFenceProperties-physicalDevice-parameter"
-
-// vkGetPhysicalDeviceExternalSemaphoreProperties:
-// Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceExternalSemaphoreProperties-physicalDevice-parameter"
-
-bool Device::PreCallValidateCmdDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
-                                                 VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
-                                                 uint32_t stride, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndirectCount-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndirectCount-commonparent"
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-buffer-parameter",
-                           "VUID-vkCmdDrawIndirectCount-commonparent", error_obj.location.dot(Field::buffer));
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-countBuffer-parameter",
-                           "VUID-vkCmdDrawIndirectCount-commonparent", error_obj.location.dot(Field::countBuffer));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdDrawIndexedIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
-                                                        VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
-                                                        uint32_t stride, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexedIndirectCount-commonparent"
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-buffer-parameter",
-                           "VUID-vkCmdDrawIndexedIndirectCount-commonparent", error_obj.location.dot(Field::buffer));
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-parameter",
-                           "VUID-vkCmdDrawIndexedIndirectCount-commonparent", error_obj.location.dot(Field::countBuffer));
-
-    return skip;
-}
-
-// vkCreateRenderPass2:
-// Checked by chassis: device: "VUID-vkCreateRenderPass2-device-parameter"
-
-void Device::PostCallRecordCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
-                                             const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
-                                             const RecordObject& record_obj) {
-    if (record_obj.result < VK_SUCCESS) return;
-    tracker.CreateObject(*pRenderPass, kVulkanObjectTypeRenderPass, pAllocator, record_obj.location, device);
-}
-
-bool Device::PreCallValidateCmdBeginRenderPass2(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
-                                                const VkSubpassBeginInfo* pSubpassBeginInfo, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdBeginRenderPass2-commandBuffer-parameter"
-    if (pRenderPassBegin) {
-        [[maybe_unused]] const Location pRenderPassBegin_loc = error_obj.location.dot(Field::pRenderPassBegin);
-        skip |= ValidateObject(pRenderPassBegin->renderPass, kVulkanObjectTypeRenderPass, false,
-                               "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-VkRenderPassBeginInfo-commonparent",
-                               pRenderPassBegin_loc.dot(Field::renderPass));
-        skip |= ValidateObject(pRenderPassBegin->framebuffer, kVulkanObjectTypeFramebuffer, false,
-                               "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-VkRenderPassBeginInfo-commonparent",
-                               pRenderPassBegin_loc.dot(Field::framebuffer));
-        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkRenderPassAttachmentBeginInfo>(pRenderPassBegin->pNext)) {
-            [[maybe_unused]] const Location pNext_loc = pRenderPassBegin_loc.pNext(Struct::VkRenderPassAttachmentBeginInfo);
-
-            if ((pNext->attachmentCount > 0) && (pNext->pAttachments)) {
-                for (uint32_t index2 = 0; index2 < pNext->attachmentCount; ++index2) {
-                    skip |=
-                        ValidateObject(pNext->pAttachments[index2], kVulkanObjectTypeImageView, false,
-                                       "VUID-VkRenderPassAttachmentBeginInfo-pAttachments-parameter",
-                                       "VUID-VkRenderPassBeginInfo-framebuffer-02780", pNext_loc.dot(Field::pAttachments, index2));
-                }
-            }
-        }
-    }
-
-    return skip;
-}
-
-// vkCmdNextSubpass2:
-// Checked by chassis: commandBuffer: "VUID-vkCmdNextSubpass2-commandBuffer-parameter"
-
-// vkCmdEndRenderPass2:
-// Checked by chassis: commandBuffer: "VUID-vkCmdEndRenderPass2-commandBuffer-parameter"
 
 bool Device::PreCallValidateResetQueryPool(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount,
                                            const ErrorObject& error_obj) const {
@@ -2237,6 +2163,79 @@ bool Device::PreCallValidateGetDeviceMemoryOpaqueCaptureAddress(VkDevice device,
     return skip;
 }
 
+bool Device::PreCallValidateCmdDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                 VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
+                                                 uint32_t stride, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndirectCount-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndirectCount-commonparent"
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-buffer-parameter",
+                           "VUID-vkCmdDrawIndirectCount-commonparent", error_obj.location.dot(Field::buffer));
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-countBuffer-parameter",
+                           "VUID-vkCmdDrawIndirectCount-commonparent", error_obj.location.dot(Field::countBuffer));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdDrawIndexedIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                        VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
+                                                        uint32_t stride, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdDrawIndexedIndirectCount-commonparent"
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-buffer-parameter",
+                           "VUID-vkCmdDrawIndexedIndirectCount-commonparent", error_obj.location.dot(Field::buffer));
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-parameter",
+                           "VUID-vkCmdDrawIndexedIndirectCount-commonparent", error_obj.location.dot(Field::countBuffer));
+
+    return skip;
+}
+
+// vkCreateRenderPass2:
+// Checked by chassis: device: "VUID-vkCreateRenderPass2-device-parameter"
+
+void Device::PostCallRecordCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
+                                             const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
+                                             const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    tracker.CreateObject(*pRenderPass, kVulkanObjectTypeRenderPass, pAllocator, record_obj.location, device);
+}
+
+bool Device::PreCallValidateCmdBeginRenderPass2(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
+                                                const VkSubpassBeginInfo* pSubpassBeginInfo, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdBeginRenderPass2-commandBuffer-parameter"
+    if (pRenderPassBegin) {
+        [[maybe_unused]] const Location pRenderPassBegin_loc = error_obj.location.dot(Field::pRenderPassBegin);
+        skip |= ValidateObject(pRenderPassBegin->renderPass, kVulkanObjectTypeRenderPass, false,
+                               "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-VkRenderPassBeginInfo-commonparent",
+                               pRenderPassBegin_loc.dot(Field::renderPass));
+        skip |= ValidateObject(pRenderPassBegin->framebuffer, kVulkanObjectTypeFramebuffer, false,
+                               "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-VkRenderPassBeginInfo-commonparent",
+                               pRenderPassBegin_loc.dot(Field::framebuffer));
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkRenderPassAttachmentBeginInfo>(pRenderPassBegin->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pRenderPassBegin_loc.pNext(Struct::VkRenderPassAttachmentBeginInfo);
+
+            if ((pNext->attachmentCount > 0) && (pNext->pAttachments)) {
+                for (uint32_t index2 = 0; index2 < pNext->attachmentCount; ++index2) {
+                    skip |=
+                        ValidateObject(pNext->pAttachments[index2], kVulkanObjectTypeImageView, false,
+                                       "VUID-VkRenderPassAttachmentBeginInfo-pAttachments-parameter",
+                                       "VUID-VkRenderPassBeginInfo-framebuffer-02780", pNext_loc.dot(Field::pAttachments, index2));
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+// vkCmdNextSubpass2:
+// Checked by chassis: commandBuffer: "VUID-vkCmdNextSubpass2-commandBuffer-parameter"
+
+// vkCmdEndRenderPass2:
+// Checked by chassis: commandBuffer: "VUID-vkCmdEndRenderPass2-commandBuffer-parameter"
+
 // vkGetPhysicalDeviceToolProperties:
 // Checked by chassis: physicalDevice: kVUIDUndefined
 
@@ -2263,91 +2262,6 @@ bool Device::PreCallValidateDestroyPrivateDataSlot(VkDevice device, VkPrivateDat
 void Device::PreCallRecordDestroyPrivateDataSlot(VkDevice device, VkPrivateDataSlot privateDataSlot,
                                                  const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
     RecordDestroyObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, record_obj.location);
-}
-
-bool Device::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfo* pDependencyInfo,
-                                         const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdSetEvent2-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdSetEvent2-commonparent"
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdSetEvent2-event-parameter",
-                           "VUID-vkCmdSetEvent2-commonparent", error_obj.location.dot(Field::event));
-    if (pDependencyInfo) {
-        [[maybe_unused]] const Location pDependencyInfo_loc = error_obj.location.dot(Field::pDependencyInfo);
-        if (pDependencyInfo->pBufferMemoryBarriers) {
-            for (uint32_t index1 = 0; index1 < pDependencyInfo->bufferMemoryBarrierCount; ++index1) {
-                [[maybe_unused]] const Location index1_loc = pDependencyInfo_loc.dot(Field::pBufferMemoryBarriers, index1);
-                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false,
-                                       "VUID-VkBufferMemoryBarrier2-buffer-parameter",
-                                       "UNASSIGNED-vkCmdSetEvent2-commandBuffer-commonparent", index1_loc.dot(Field::buffer));
-            }
-        }
-        if (pDependencyInfo->pImageMemoryBarriers) {
-            for (uint32_t index1 = 0; index1 < pDependencyInfo->imageMemoryBarrierCount; ++index1) {
-                [[maybe_unused]] const Location index1_loc = pDependencyInfo_loc.dot(Field::pImageMemoryBarriers, index1);
-                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false,
-                                       "VUID-VkImageMemoryBarrier2-image-parameter",
-                                       "UNASSIGNED-vkCmdSetEvent2-commandBuffer-commonparent", index1_loc.dot(Field::image));
-            }
-        }
-        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkTensorMemoryBarrierARM>(pDependencyInfo->pNext)) {
-            [[maybe_unused]] const Location pNext_loc = pDependencyInfo_loc.pNext(Struct::VkTensorMemoryBarrierARM);
-        }
-    }
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
-                                           const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdResetEvent2-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdResetEvent2-commonparent"
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdResetEvent2-event-parameter",
-                           "VUID-vkCmdResetEvent2-commonparent", error_obj.location.dot(Field::event));
-
-    return skip;
-}
-
-bool Device::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
-                                           const VkDependencyInfo* pDependencyInfos, const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: commandBuffer: "VUID-vkCmdWaitEvents2-commandBuffer-parameter"
-    // Checked by chassis: commandBuffer: "VUID-vkCmdWaitEvents2-commonparent"
-
-    if ((eventCount > 0) && (pEvents)) {
-        for (uint32_t index0 = 0; index0 < eventCount; ++index0) {
-            skip |= ValidateObject(pEvents[index0], kVulkanObjectTypeEvent, false, "VUID-vkCmdWaitEvents2-pEvents-parameter",
-                                   "VUID-vkCmdWaitEvents2-commonparent", error_obj.location.dot(Field::pEvents, index0));
-        }
-    }
-    if (pDependencyInfos) {
-        for (uint32_t index0 = 0; index0 < eventCount; ++index0) {
-            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pDependencyInfos, index0);
-            if (pDependencyInfos[index0].pBufferMemoryBarriers) {
-                for (uint32_t index1 = 0; index1 < pDependencyInfos[index0].bufferMemoryBarrierCount; ++index1) {
-                    [[maybe_unused]] const Location index1_loc = index0_loc.dot(Field::pBufferMemoryBarriers, index1);
-                    skip |= ValidateObject(pDependencyInfos[index0].pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer,
-                                           false, "VUID-VkBufferMemoryBarrier2-buffer-parameter",
-                                           "UNASSIGNED-vkCmdWaitEvents2-commandBuffer-commonparent", index1_loc.dot(Field::buffer));
-                }
-            }
-            if (pDependencyInfos[index0].pImageMemoryBarriers) {
-                for (uint32_t index1 = 0; index1 < pDependencyInfos[index0].imageMemoryBarrierCount; ++index1) {
-                    [[maybe_unused]] const Location index1_loc = index0_loc.dot(Field::pImageMemoryBarriers, index1);
-                    skip |= ValidateObject(pDependencyInfos[index0].pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage,
-                                           false, "VUID-VkImageMemoryBarrier2-image-parameter",
-                                           "UNASSIGNED-vkCmdWaitEvents2-commandBuffer-commonparent", index1_loc.dot(Field::image));
-                }
-            }
-            if ([[maybe_unused]] auto pNext =
-                    vku::FindStructInPNextChain<VkTensorMemoryBarrierARM>(pDependencyInfos[index0].pNext)) {
-                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkTensorMemoryBarrierARM);
-            }
-        }
-    }
-
-    return skip;
 }
 
 bool Device::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
@@ -2572,6 +2486,100 @@ bool Device::PreCallValidateCmdCopyImageToBuffer2(VkCommandBuffer commandBuffer,
     return skip;
 }
 
+// vkGetDeviceBufferMemoryRequirements:
+// Checked by chassis: device: kVUIDUndefined
+
+// vkGetDeviceImageMemoryRequirements:
+// Checked by chassis: device: kVUIDUndefined
+
+// vkGetDeviceImageSparseMemoryRequirements:
+// Checked by chassis: device: kVUIDUndefined
+
+bool Device::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfo* pDependencyInfo,
+                                         const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdSetEvent2-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdSetEvent2-commonparent"
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdSetEvent2-event-parameter",
+                           "VUID-vkCmdSetEvent2-commonparent", error_obj.location.dot(Field::event));
+    if (pDependencyInfo) {
+        [[maybe_unused]] const Location pDependencyInfo_loc = error_obj.location.dot(Field::pDependencyInfo);
+        if (pDependencyInfo->pBufferMemoryBarriers) {
+            for (uint32_t index1 = 0; index1 < pDependencyInfo->bufferMemoryBarrierCount; ++index1) {
+                [[maybe_unused]] const Location index1_loc = pDependencyInfo_loc.dot(Field::pBufferMemoryBarriers, index1);
+                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false,
+                                       "VUID-VkBufferMemoryBarrier2-buffer-parameter",
+                                       "UNASSIGNED-vkCmdSetEvent2-commandBuffer-commonparent", index1_loc.dot(Field::buffer));
+            }
+        }
+        if (pDependencyInfo->pImageMemoryBarriers) {
+            for (uint32_t index1 = 0; index1 < pDependencyInfo->imageMemoryBarrierCount; ++index1) {
+                [[maybe_unused]] const Location index1_loc = pDependencyInfo_loc.dot(Field::pImageMemoryBarriers, index1);
+                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false,
+                                       "VUID-VkImageMemoryBarrier2-image-parameter",
+                                       "UNASSIGNED-vkCmdSetEvent2-commandBuffer-commonparent", index1_loc.dot(Field::image));
+            }
+        }
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkTensorMemoryBarrierARM>(pDependencyInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pDependencyInfo_loc.pNext(Struct::VkTensorMemoryBarrierARM);
+        }
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
+                                           const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdResetEvent2-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdResetEvent2-commonparent"
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdResetEvent2-event-parameter",
+                           "VUID-vkCmdResetEvent2-commonparent", error_obj.location.dot(Field::event));
+
+    return skip;
+}
+
+bool Device::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
+                                           const VkDependencyInfo* pDependencyInfos, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: "VUID-vkCmdWaitEvents2-commandBuffer-parameter"
+    // Checked by chassis: commandBuffer: "VUID-vkCmdWaitEvents2-commonparent"
+
+    if ((eventCount > 0) && (pEvents)) {
+        for (uint32_t index0 = 0; index0 < eventCount; ++index0) {
+            skip |= ValidateObject(pEvents[index0], kVulkanObjectTypeEvent, false, "VUID-vkCmdWaitEvents2-pEvents-parameter",
+                                   "VUID-vkCmdWaitEvents2-commonparent", error_obj.location.dot(Field::pEvents, index0));
+        }
+    }
+    if (pDependencyInfos) {
+        for (uint32_t index0 = 0; index0 < eventCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pDependencyInfos, index0);
+            if (pDependencyInfos[index0].pBufferMemoryBarriers) {
+                for (uint32_t index1 = 0; index1 < pDependencyInfos[index0].bufferMemoryBarrierCount; ++index1) {
+                    [[maybe_unused]] const Location index1_loc = index0_loc.dot(Field::pBufferMemoryBarriers, index1);
+                    skip |= ValidateObject(pDependencyInfos[index0].pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer,
+                                           false, "VUID-VkBufferMemoryBarrier2-buffer-parameter",
+                                           "UNASSIGNED-vkCmdWaitEvents2-commandBuffer-commonparent", index1_loc.dot(Field::buffer));
+                }
+            }
+            if (pDependencyInfos[index0].pImageMemoryBarriers) {
+                for (uint32_t index1 = 0; index1 < pDependencyInfos[index0].imageMemoryBarrierCount; ++index1) {
+                    [[maybe_unused]] const Location index1_loc = index0_loc.dot(Field::pImageMemoryBarriers, index1);
+                    skip |= ValidateObject(pDependencyInfos[index0].pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage,
+                                           false, "VUID-VkImageMemoryBarrier2-image-parameter",
+                                           "UNASSIGNED-vkCmdWaitEvents2-commandBuffer-commonparent", index1_loc.dot(Field::image));
+                }
+            }
+            if ([[maybe_unused]] auto pNext =
+                    vku::FindStructInPNextChain<VkTensorMemoryBarrierARM>(pDependencyInfos[index0].pNext)) {
+                [[maybe_unused]] const Location pNext_loc = index0_loc.pNext(Struct::VkTensorMemoryBarrierARM);
+            }
+        }
+    }
+
+    return skip;
+}
+
 bool Device::PreCallValidateCmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2* pBlitImageInfo,
                                           const ErrorObject& error_obj) const {
     bool skip = false;
@@ -2700,18 +2708,6 @@ bool Device::PreCallValidateCmdBindVertexBuffers2(VkCommandBuffer commandBuffer,
 // vkCmdSetPrimitiveRestartEnable:
 // Checked by chassis: commandBuffer: "VUID-vkCmdSetPrimitiveRestartEnable-commandBuffer-parameter"
 
-// vkGetDeviceBufferMemoryRequirements:
-// Checked by chassis: device: kVUIDUndefined
-
-// vkGetDeviceImageMemoryRequirements:
-// Checked by chassis: device: kVUIDUndefined
-
-// vkGetDeviceImageSparseMemoryRequirements:
-// Checked by chassis: device: kVUIDUndefined
-
-// vkCmdSetLineStipple:
-// Checked by chassis: commandBuffer: "VUID-vkCmdSetLineStipple-commandBuffer-parameter"
-
 bool Device::PreCallValidateMapMemory2(VkDevice device, const VkMemoryMapInfo* pMemoryMapInfo, void** ppData,
                                        const ErrorObject& error_obj) const {
     bool skip = false;
@@ -2734,28 +2730,62 @@ bool Device::PreCallValidateUnmapMemory2(VkDevice device, const VkMemoryUnmapInf
     return skip;
 }
 
-// vkCmdBindIndexBuffer2:
-// Checked by chassis: commandBuffer: kVUIDUndefined
-// Checked by chassis: commandBuffer: "UNASSIGNED-vkCmdBindIndexBuffer2-commonparent"
-
-// vkGetRenderingAreaGranularity:
-// Checked by chassis: device: kVUIDUndefined
-
 // vkGetDeviceImageSubresourceLayout:
 // Checked by chassis: device: kVUIDUndefined
 
 // vkGetImageSubresourceLayout2:
 // Checked by chassis: device: kVUIDUndefined
 
+bool Device::PreCallValidateCopyMemoryToImage(VkDevice device, const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo,
+                                              const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pCopyMemoryToImageInfo) {
+        [[maybe_unused]] const Location pCopyMemoryToImageInfo_loc = error_obj.location.dot(Field::pCopyMemoryToImageInfo);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateCopyImageToMemory(VkDevice device, const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo,
+                                              const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pCopyImageToMemoryInfo) {
+        [[maybe_unused]] const Location pCopyImageToMemoryInfo_loc = error_obj.location.dot(Field::pCopyImageToMemoryInfo);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateCopyImageToImage(VkDevice device, const VkCopyImageToImageInfo* pCopyImageToImageInfo,
+                                             const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pCopyImageToImageInfo) {
+        [[maybe_unused]] const Location pCopyImageToImageInfo_loc = error_obj.location.dot(Field::pCopyImageToImageInfo);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateTransitionImageLayout(VkDevice device, uint32_t transitionCount,
+                                                  const VkHostImageLayoutTransitionInfo* pTransitions,
+                                                  const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pTransitions) {
+        for (uint32_t index0 = 0; index0 < transitionCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pTransitions, index0);
+        }
+    }
+
+    return skip;
+}
+
 // vkCmdPushDescriptorSetWithTemplate:
 // Checked by chassis: commandBuffer: kVUIDUndefined
 // Checked by chassis: commandBuffer: "UNASSIGNED-vkCmdPushDescriptorSetWithTemplate-commonparent"
-
-// vkCmdSetRenderingAttachmentLocations:
-// Checked by chassis: commandBuffer: kVUIDUndefined
-
-// vkCmdSetRenderingInputAttachmentIndices:
-// Checked by chassis: commandBuffer: kVUIDUndefined
 
 bool Device::PreCallValidateCmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
                                                    const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo,
@@ -2839,52 +2869,21 @@ bool Device::PreCallValidateCmdPushDescriptorSetWithTemplate2(
     return skip;
 }
 
-bool Device::PreCallValidateCopyMemoryToImage(VkDevice device, const VkCopyMemoryToImageInfo* pCopyMemoryToImageInfo,
-                                              const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: kVUIDUndefined
-    if (pCopyMemoryToImageInfo) {
-        [[maybe_unused]] const Location pCopyMemoryToImageInfo_loc = error_obj.location.dot(Field::pCopyMemoryToImageInfo);
-    }
+// vkCmdSetLineStipple:
+// Checked by chassis: commandBuffer: "VUID-vkCmdSetLineStipple-commandBuffer-parameter"
 
-    return skip;
-}
+// vkCmdBindIndexBuffer2:
+// Checked by chassis: commandBuffer: kVUIDUndefined
+// Checked by chassis: commandBuffer: "UNASSIGNED-vkCmdBindIndexBuffer2-commonparent"
 
-bool Device::PreCallValidateCopyImageToMemory(VkDevice device, const VkCopyImageToMemoryInfo* pCopyImageToMemoryInfo,
-                                              const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: kVUIDUndefined
-    if (pCopyImageToMemoryInfo) {
-        [[maybe_unused]] const Location pCopyImageToMemoryInfo_loc = error_obj.location.dot(Field::pCopyImageToMemoryInfo);
-    }
+// vkGetRenderingAreaGranularity:
+// Checked by chassis: device: kVUIDUndefined
 
-    return skip;
-}
+// vkCmdSetRenderingAttachmentLocations:
+// Checked by chassis: commandBuffer: kVUIDUndefined
 
-bool Device::PreCallValidateCopyImageToImage(VkDevice device, const VkCopyImageToImageInfo* pCopyImageToImageInfo,
-                                             const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: kVUIDUndefined
-    if (pCopyImageToImageInfo) {
-        [[maybe_unused]] const Location pCopyImageToImageInfo_loc = error_obj.location.dot(Field::pCopyImageToImageInfo);
-    }
-
-    return skip;
-}
-
-bool Device::PreCallValidateTransitionImageLayout(VkDevice device, uint32_t transitionCount,
-                                                  const VkHostImageLayoutTransitionInfo* pTransitions,
-                                                  const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: kVUIDUndefined
-    if (pTransitions) {
-        for (uint32_t index0 = 0; index0 < transitionCount; ++index0) {
-            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pTransitions, index0);
-        }
-    }
-
-    return skip;
-}
+// vkCmdSetRenderingInputAttachmentIndices:
+// Checked by chassis: commandBuffer: kVUIDUndefined
 
 bool Device::PreCallValidateGetCommandPoolMemoryConsumption(VkDevice device, VkCommandPool commandPool,
                                                             VkCommandBuffer commandBuffer,
@@ -3086,13 +3085,13 @@ bool Device::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentInfoKH
                 }
             }
         }
-        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkSwapchainPresentFenceInfoEXT>(pPresentInfo->pNext)) {
-            [[maybe_unused]] const Location pNext_loc = pPresentInfo_loc.pNext(Struct::VkSwapchainPresentFenceInfoEXT);
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkSwapchainPresentFenceInfoKHR>(pPresentInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pPresentInfo_loc.pNext(Struct::VkSwapchainPresentFenceInfoKHR);
 
             if ((pNext->swapchainCount > 0) && (pNext->pFences)) {
                 for (uint32_t index2 = 0; index2 < pNext->swapchainCount; ++index2) {
                     skip |= ValidateObject(pNext->pFences[index2], kVulkanObjectTypeFence, true, kVUIDUndefined,
-                                           "UNASSIGNED-VkSwapchainPresentFenceInfoEXT-pFences-parent",
+                                           "UNASSIGNED-VkSwapchainPresentFenceInfoKHR-pFences-parent",
                                            pNext_loc.dot(Field::pFences, index2));
                 }
             }
@@ -4231,6 +4230,17 @@ bool Device::PreCallValidateGetPipelineBinaryDataKHR(VkDevice device, const VkPi
     return skip;
 }
 
+bool Device::PreCallValidateReleaseSwapchainImagesKHR(VkDevice device, const VkReleaseSwapchainImagesInfoKHR* pReleaseInfo,
+                                                      const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pReleaseInfo) {
+        [[maybe_unused]] const Location pReleaseInfo_loc = error_obj.location.dot(Field::pReleaseInfo);
+    }
+
+    return skip;
+}
+
 // vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR:
 // Checked by chassis: physicalDevice: kVUIDUndefined
 
@@ -4313,6 +4323,25 @@ bool Device::PreCallValidateCmdBindDescriptorBufferEmbeddedSamplers2EXT(
 
     return skip;
 }
+
+// vkCmdCopyMemoryIndirectKHR:
+// Checked by chassis: commandBuffer: kVUIDUndefined
+
+bool Device::PreCallValidateCmdCopyMemoryToImageIndirectKHR(
+    VkCommandBuffer commandBuffer, const VkCopyMemoryToImageIndirectInfoKHR* pCopyMemoryToImageIndirectInfo,
+    const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: kVUIDUndefined
+    if (pCopyMemoryToImageIndirectInfo) {
+        [[maybe_unused]] const Location pCopyMemoryToImageIndirectInfo_loc =
+            error_obj.location.dot(Field::pCopyMemoryToImageIndirectInfo);
+    }
+
+    return skip;
+}
+
+// vkCmdEndRendering2KHR:
+// Checked by chassis: commandBuffer: kVUIDUndefined
 
 // vkCreateDebugReportCallbackEXT:
 // Checked by chassis: instance: kVUIDUndefined
@@ -5420,15 +5449,9 @@ bool Device::PreCallValidateTransitionImageLayoutEXT(VkDevice device, uint32_t t
 // vkGetImageSubresourceLayout2EXT:
 // Checked by chassis: device: kVUIDUndefined
 
-bool Device::PreCallValidateReleaseSwapchainImagesEXT(VkDevice device, const VkReleaseSwapchainImagesInfoEXT* pReleaseInfo,
+bool Device::PreCallValidateReleaseSwapchainImagesEXT(VkDevice device, const VkReleaseSwapchainImagesInfoKHR* pReleaseInfo,
                                                       const ErrorObject& error_obj) const {
-    bool skip = false;
-    // Checked by chassis: device: kVUIDUndefined
-    if (pReleaseInfo) {
-        [[maybe_unused]] const Location pReleaseInfo_loc = error_obj.location.dot(Field::pReleaseInfo);
-    }
-
-    return skip;
+    return PreCallValidateReleaseSwapchainImagesKHR(device, pReleaseInfo, error_obj);
 }
 
 bool Device::PreCallValidateGetGeneratedCommandsMemoryRequirementsNV(VkDevice device,
@@ -6803,6 +6826,16 @@ bool Device::PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, VkDefer
                                                         const ErrorObject& error_obj) const {
     bool skip = false;
     // Checked by chassis: device: kVUIDUndefined
+    // There should be an explicit VU (if not that is a spec bug)
+    {
+        skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined,
+                               error_obj.location.dot(Field::deferredOperation));
+    }
+    // There should be an explicit VU (if not that is a spec bug)
+    {
+        skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, true, kVUIDUndefined, kVUIDUndefined,
+                               error_obj.location.dot(Field::pipelineCache));
+    }
     if (pCreateInfos) {
         for (uint32_t index0 = 0; index0 < createInfoCount; ++index0) {
             [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pCreateInfos, index0);
@@ -6821,9 +6854,10 @@ void Device::PostCallRecordCreateDataGraphPipelinesARM(VkDevice device, VkDeferr
                                                        const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
                                                        const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
                                                        const RecordObject& record_obj) {
-    if (record_obj.result < VK_SUCCESS) return;
+    if (VK_ERROR_VALIDATION_FAILED_EXT == record_obj.result) return;
     if (pPipelines) {
         for (uint32_t index = 0; index < createInfoCount; index++) {
+            if (!pPipelines[index]) continue;
             tracker.CreateObject(pPipelines[index], kVulkanObjectTypePipeline, pAllocator,
                                  record_obj.location.dot(Field::pPipelines, index), device);
         }
@@ -6966,6 +7000,12 @@ bool Device::PreCallValidateCmdBindTileMemoryQCOM(VkCommandBuffer commandBuffer,
 
     return skip;
 }
+
+// vkCmdDecompressMemoryEXT:
+// Checked by chassis: commandBuffer: kVUIDUndefined
+
+// vkCmdDecompressMemoryIndirectCountEXT:
+// Checked by chassis: commandBuffer: kVUIDUndefined
 
 bool Device::PreCallValidateCreateExternalComputeQueueNV(VkDevice device, const VkExternalComputeQueueCreateInfoNV* pCreateInfo,
                                                          const VkAllocationCallbacks* pAllocator,
@@ -7226,6 +7266,30 @@ void Instance::PostCallRecordCreateSurfaceOHOS(VkInstance instance, const VkSurf
                                                const RecordObject& record_obj) {
     if (record_obj.result < VK_SUCCESS) return;
     tracker.CreateObject(*pSurface, kVulkanObjectTypeSurfaceKHR, pAllocator, record_obj.location, instance);
+}
+
+// vkGetSwapchainGrallocUsageOHOS:
+// Checked by chassis: device: kVUIDUndefined
+
+// vkAcquireImageOHOS:
+// Checked by chassis: device: kVUIDUndefined
+
+bool Device::PreCallValidateQueueSignalReleaseImageOHOS(VkQueue queue, uint32_t waitSemaphoreCount,
+                                                        const VkSemaphore* pWaitSemaphores, VkImage image, int32_t* pNativeFenceFd,
+                                                        const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: queue: kVUIDUndefined
+    // Checked by chassis: queue: "UNASSIGNED-vkQueueSignalReleaseImageOHOS-commonparent"
+
+    if ((waitSemaphoreCount > 0) && (pWaitSemaphores)) {
+        for (uint32_t index0 = 0; index0 < waitSemaphoreCount; ++index0) {
+            skip |= ValidateObject(pWaitSemaphores[index0], kVulkanObjectTypeSemaphore, false, kVUIDUndefined,
+                                   "UNASSIGNED-vkQueueSignalReleaseImageOHOS-commonparent",
+                                   error_obj.location.dot(Field::pWaitSemaphores, index0));
+        }
+    }
+
+    return skip;
 }
 #endif  // VK_USE_PLATFORM_OHOS
 

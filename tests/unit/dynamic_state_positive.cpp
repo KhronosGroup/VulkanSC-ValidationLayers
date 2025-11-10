@@ -273,7 +273,7 @@ TEST_F(PositiveDynamicState, DepthTestEnableOverridesPipelineDepthWriteEnable) {
     rp.AddColorAttachment(0);
     rp.AddDepthStencilAttachment(1);
     rp.CreateRenderPass();
-    VkImageView views[2] = {color_view.handle(), ds_view.handle()};
+    VkImageView views[2] = {color_view, ds_view};
     vkt::Framebuffer fb(*m_device, rp, 2, views);
 
     VkPipelineDepthStencilStateCreateInfo ds_state = vku::InitStructHelper();
@@ -316,7 +316,7 @@ TEST_F(PositiveDynamicState, DepthTestEnableOverridesDynamicDepthWriteEnable) {
     rp.AddColorAttachment(0);
     rp.AddDepthStencilAttachment(1);
     rp.CreateRenderPass();
-    VkImageView views[2] = {color_view.handle(), ds_view.handle()};
+    VkImageView views[2] = {color_view, ds_view};
     vkt::Framebuffer fb(*m_device, rp, 2, views);
 
     VkPipelineDepthStencilStateCreateInfo ds_state = vku::InitStructHelper();
@@ -359,7 +359,7 @@ TEST_F(PositiveDynamicState, DepthTestEnableDepthWriteEnable) {
     rp.AddColorAttachment(0);
     rp.AddDepthStencilAttachment(1);
     rp.CreateRenderPass();
-    VkImageView views[2] = {color_view.handle(), ds_view.handle()};
+    VkImageView views[2] = {color_view, ds_view};
     vkt::Framebuffer fb(*m_device, rp, 2, views);
 
     VkPipelineDepthStencilStateCreateInfo ds_state = vku::InitStructHelper();
@@ -371,13 +371,13 @@ TEST_F(PositiveDynamicState, DepthTestEnableDepthWriteEnable) {
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    m_command_buffer.BeginRenderPass(rp, fb.handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.BeginRenderPass(rp, fb);
 
-    vk::CmdSetDepthTestEnableEXT(m_command_buffer.handle(), VK_FALSE);
+    vk::CmdSetDepthTestEnableEXT(m_command_buffer, VK_FALSE);
     // never call vkCmdSetDepthWriteEnableEXT as not needed
 
-    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
@@ -576,7 +576,7 @@ TEST_F(PositiveDynamicState, AlphaToCoverageSetFalse) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location = 0) out float x;
         void main(){
@@ -801,12 +801,12 @@ TEST_F(PositiveDynamicState, ViewportInheritance) {
     info.pInheritanceInfo = &hinfo;
 
     cmd_buffer.Begin(&info);
-    vk::CmdBindPipeline(cmd_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-    vk::CmdDraw(cmd_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDraw(cmd_buffer, 3, 1, 0, 0);
     cmd_buffer.End();
 
     set_state.Begin();
-    vk::CmdSetViewport(set_state.handle(), 1u, 1u, &viewports[1]);
+    vk::CmdSetViewport(set_state, 1u, 1u, &viewports[1]);
     set_state.End();
 
     m_command_buffer.Begin();
@@ -875,7 +875,7 @@ TEST_F(PositiveDynamicState, RasterizationSamplesDynamicRendering) {
     colorAttachment.imageView = image_view;
     colorAttachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     colorAttachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-    colorAttachment.resolveImageView = resolve_image_view.handle();
+    colorAttachment.resolveImageView = resolve_image_view;
     colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -1026,7 +1026,7 @@ TEST_F(PositiveDynamicState, VertexInputMultipleBindings) {
     attributes[3].format = VK_FORMAT_R32_SFLOAT;
     attributes[3].offset = offsetof(PerInstance, d);
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location = 0) in int a;
         layout(location = 1) in float b;
@@ -1047,7 +1047,7 @@ TEST_F(PositiveDynamicState, VertexInputMultipleBindings) {
     vkt::Buffer vertex_buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     vkt::Buffer instance_buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-    VkBuffer buffers[2] = {vertex_buffer.handle(), instance_buffer};
+    VkBuffer buffers[2] = {vertex_buffer, instance_buffer};
     VkDeviceSize offsets[2] = {0u, 0u};
 
     m_command_buffer.Begin();
@@ -1188,12 +1188,12 @@ TEST_F(PositiveDynamicState, DynamicColorBlendEnable) {
 
     VkRenderingAttachmentInfo color_attachments[3];
     color_attachments[0] = vku::InitStructHelper();
-    color_attachments[0].imageView = image_view1.handle();
+    color_attachments[0].imageView = image_view1;
     color_attachments[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     color_attachments[1] = color_attachments[0];
-    color_attachments[1].imageView = image_view2.handle();
+    color_attachments[1].imageView = image_view2;
     color_attachments[2] = color_attachments[0];
-    color_attachments[2].imageView = image_view3.handle();
+    color_attachments[2].imageView = image_view3;
 
     VkRenderingAttachmentInfo depth_attachment = vku::InitStructHelper();
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -1304,6 +1304,65 @@ TEST_F(PositiveDynamicState, DynamicAdvancedBlendMaxAttachments) {
 
     vk::CmdDraw(m_command_buffer, 4u, 1u, 0u, 0u);
 
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDynamicState, DynamicBlendMix) {
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendEquation);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendAdvanced);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Image image_0(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image_1(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView image_view_0 = image_0.CreateView();
+    vkt::ImageView image_view_1 = image_1.CreateView();
+
+    VkRenderingAttachmentInfo color_attachments[2];
+    color_attachments[0] = vku::InitStructHelper();
+    color_attachments[0].imageView = image_view_0;
+    color_attachments[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachments[1] = vku::InitStructHelper();
+    color_attachments[1].imageView = image_view_1;
+    color_attachments[1].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkPipelineColorBlendAttachmentState color_blend[2] = {};
+    color_blend[0] = DefaultColorBlendAttachmentState();
+    color_blend[1] = DefaultColorBlendAttachmentState();
+
+    VkFormat color_formats[2] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 2;
+    pipeline_rendering_info.pColorAttachmentFormats = color_formats;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT);
+    pipe.cb_ci_.attachmentCount = 2;
+    pipe.cb_ci_.pAttachments = color_blend;
+    pipe.CreateGraphicsPipeline();
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {32, 32}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 2;
+    rendering_info.pColorAttachments = color_attachments;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    VkColorBlendEquationEXT equation = {VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD,
+                                        VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD};
+    VkColorBlendAdvancedEXT advanced = {VK_BLEND_OP_ADD, VK_FALSE, VK_FALSE, VK_BLEND_OVERLAP_UNCORRELATED_EXT, VK_FALSE};
+    vk::CmdSetColorBlendEquationEXT(m_command_buffer, 0, 1, &equation);
+    vk::CmdSetColorBlendAdvancedEXT(m_command_buffer, 1, 1, &advanced);
+    vk::CmdDraw(m_command_buffer, 4u, 1u, 0u, 0u);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
 }
@@ -1516,7 +1575,7 @@ TEST_F(PositiveDynamicState, VertexInputLocationMissing) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location = 0) in vec4 x;
         layout(location = 1) in vec4 y;
@@ -1535,11 +1594,11 @@ TEST_F(PositiveDynamicState, VertexInputLocationMissing) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     VkDeviceSize offset = 0u;
-    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0u, 1u, &buffer.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 0u, 1u, &buffer.handle(), &offset);
 
     VkVertexInputBindingDescription2EXT vertexInputBindingDescription = vku::InitStructHelper();
     vertexInputBindingDescription.binding = 0u;
@@ -1551,9 +1610,9 @@ TEST_F(PositiveDynamicState, VertexInputLocationMissing) {
     vertexAttributeDescription.binding = 0u;
     vertexAttributeDescription.format = VK_FORMAT_R32G32B32A32_SFLOAT;
     vertexAttributeDescription.offset = 0u;
-    vk::CmdSetVertexInputEXT(m_command_buffer.handle(), 1u, &vertexInputBindingDescription, 1u, &vertexAttributeDescription);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1u, &vertexInputBindingDescription, 1u, &vertexAttributeDescription);
 
-    vk::CmdDraw(m_command_buffer.handle(), 4u, 1u, 0u, 0u);
+    vk::CmdDraw(m_command_buffer, 4u, 1u, 0u, 0u);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
@@ -1647,6 +1706,181 @@ TEST_F(PositiveDynamicState, ColorBlendEnableNotSet) {
     m_command_buffer.BeginRenderPass(render_pass, framebuffer, 32u, 32u);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDynamicState, SampleLocations) {
+    TEST_DESCRIPTION("Test invalid cases of VK_EXT_sample_location");
+
+    AddRequiredExtensions(VK_EXT_SAMPLE_LOCATIONS_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceSampleLocationsPropertiesEXT sample_locations_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(sample_locations_props);
+
+    if ((sample_locations_props.sampleLocationSampleCounts & VK_SAMPLE_COUNT_1_BIT) == 0) {
+        GTEST_SKIP() << "VK_SAMPLE_COUNT_1_BIT sampleLocationSampleCounts is not supported";
+    }
+
+    const VkFormat stencil_format = FindSupportedStencilOnlyFormat(Gpu());
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.format = stencil_format;
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.extent.width = 128;
+    image_create_info.extent.height = 128;
+    image_create_info.extent.depth = 1;
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 1;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    vkt::Image stencil_image(*m_device, image_create_info, vkt::set_layout);
+
+    vkt::Image color_image(*m_device, 128, 128, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddAttachmentDescription(stencil_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
+    rp.AddColorAttachment(0);
+    rp.AddDepthStencilAttachment(1);
+    rp.CreateRenderPass();
+
+    // Create a framebuffer
+    vkt::ImageView color_view = color_image.CreateView();
+    vkt::ImageView stencil_view = stencil_image.CreateView(VK_IMAGE_ASPECT_STENCIL_BIT);
+    const std::array<VkImageView, 2> attachments = {color_view, stencil_view};
+
+    vkt::Framebuffer fb(*m_device, rp, static_cast<uint32_t>(attachments.size()), attachments.data(), 128, 128);
+
+    VkMultisamplePropertiesEXT multisample_prop = vku::InitStructHelper();
+    vk::GetPhysicalDeviceMultisamplePropertiesEXT(Gpu(), VK_SAMPLE_COUNT_1_BIT, &multisample_prop);
+    // 1 from VK_SAMPLE_COUNT_1_BIT
+    const uint32_t valid_count =
+        multisample_prop.maxSampleLocationGridSize.width * multisample_prop.maxSampleLocationGridSize.height * 1;
+
+    if (valid_count <= 1) {
+        GTEST_SKIP() << "Need a maxSampleLocationGridSize width x height greater than 1";
+    }
+
+    std::vector<VkSampleLocationEXT> sample_location(valid_count, {0.5, 0.5});
+    VkSampleLocationsInfoEXT sample_locations_info = vku::InitStructHelper();
+    sample_locations_info.sampleLocationsPerPixel = VK_SAMPLE_COUNT_1_BIT;
+    sample_locations_info.sampleLocationGridSize = multisample_prop.maxSampleLocationGridSize;
+    sample_locations_info.sampleLocationsCount = valid_count;
+    sample_locations_info.pSampleLocations = sample_location.data();
+
+    VkPipelineSampleLocationsStateCreateInfoEXT sample_location_state = vku::InitStructHelper();
+    sample_location_state.sampleLocationsEnable = VK_TRUE;
+    sample_location_state.sampleLocationsInfo = sample_locations_info;
+
+    VkPipelineMultisampleStateCreateInfo pipe_ms_state_ci = vku::InitStructHelper(&sample_location_state);
+    pipe_ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    pipe_ms_state_ci.sampleShadingEnable = 0;
+    pipe_ms_state_ci.minSampleShading = 1.0;
+    pipe_ms_state_ci.pSampleMask = nullptr;
+
+    VkPipelineDepthStencilStateCreateInfo pipe_ds_state_ci = vku::InitStructHelper();
+    pipe_ds_state_ci.depthTestEnable = VK_TRUE;
+    pipe_ds_state_ci.stencilTestEnable = VK_FALSE;
+
+    // Creates valid pipelines with dynamic state
+    CreatePipelineHelper dynamic_pipe(*this);
+    dynamic_pipe.ms_ci_ = pipe_ms_state_ci;
+    dynamic_pipe.AddDynamicState(VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT);
+    dynamic_pipe.gp_ci_.renderPass = rp;
+    dynamic_pipe.gp_ci_.pDepthStencilState = &pipe_ds_state_ci;
+    dynamic_pipe.CreateGraphicsPipeline();
+
+    vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp, fb, 128, 128);
+    vk::CmdBindVertexBuffers(m_command_buffer, 1, 1, &vbo.handle(), &kZeroDeviceSize);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, dynamic_pipe);
+
+    vk::CmdSetSampleLocationsEXT(m_command_buffer, &sample_locations_info);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDynamicState, MeshPipelineInvalidtion) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8378");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState2);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE_EXT);
+    pipe.CreateGraphicsPipeline();
+
+    VkShaderObj ms(this, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    CreatePipelineHelper mesh_pipe(*this);
+    mesh_pipe.shader_stages_ = {ms.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    mesh_pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+
+    vk::CmdSetPrimitiveRestartEnableEXT(m_command_buffer, VK_TRUE);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipe);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDynamicState, UnusedFragmentShaderState) {
+    TEST_DESCRIPTION("mimics dEQP-VK.shader_object.misc.state.pipeline.vert.alphaToOne.disabled");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendEnable);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT);  // tied to frag shader
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    // never call vkCmdSetColorBlendEnableEXT
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDynamicState, DepthWriteFromVertexShader) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7858");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
+    pipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    float blends[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    vk::CmdSetBlendConstants(m_command_buffer, blends);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
+
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }

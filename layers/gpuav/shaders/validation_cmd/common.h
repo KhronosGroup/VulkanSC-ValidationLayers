@@ -17,21 +17,23 @@
 #include "gpuav_error_header.h"
 #include "gpuav_shaders_constants.h"
 
-layout(set = kDiagCommonDescriptorSet, binding = kBindingDiagErrorBuffer) buffer ErrorBuffer {
+#extension GL_EXT_scalar_block_layout : require
+
+layout(set = kDiagCommonDescriptorSet, binding = kBindingDiagErrorBuffer, scalar) buffer ErrorBuffer {
     uint flags;
     uint errors_count;
     uint errors_buffer[];
 };
 
-layout(set = kDiagCommonDescriptorSet, binding = kBindingDiagActionIndex) readonly buffer ActionIndexBuffer {
+layout(set = kDiagCommonDescriptorSet, binding = kBindingDiagActionIndex, scalar) readonly buffer ActionIndexBuffer {
     uint action_index[];
 };
 
-layout(set = kDiagCommonDescriptorSet, binding = kBindingDiagCmdResourceIndex) readonly buffer ResourceIndexBuffer {
+layout(set = kDiagCommonDescriptorSet, binding = kBindingDiagCmdResourceIndex, scalar) readonly buffer ResourceIndexBuffer {
     uint resource_index[];
 };
 
-layout(set = kDiagCommonDescriptorSet, binding = kBindingDiagCmdErrorsCount) buffer CmdErrorsCountBuffer {
+layout(set = kDiagCommonDescriptorSet, binding = kBindingDiagCmdErrorsCount, scalar) buffer CmdErrorsCountBuffer {
     uint cmd_errors_count[];
 };
 
@@ -41,7 +43,7 @@ bool MaxCmdErrorsCountReached() {
     return cmd_errors_count >= kMaxErrorsPerCmd;
 }
 
-void GpuavLogError4(uint error_group, uint error_sub_code, uint param_0, uint param_1, uint param_2, uint param_3) {
+void GpuavLogError4(uint error_group, uint error_sub_code, uint dword_0, uint dword_1, uint dword_2, uint dword_3) {
     if (MaxCmdErrorsCountReached()) return;
 
     uint vo_idx = atomicAdd(errors_count, kErrorRecordSize);
@@ -50,14 +52,14 @@ void GpuavLogError4(uint error_group, uint error_sub_code, uint param_0, uint pa
 
     errors_buffer[vo_idx + kHeaderShaderIdErrorOffset] = (error_group << kErrorGroupShift) | (error_sub_code << kErrorSubCodeShift);
     errors_buffer[vo_idx + kHeaderErrorRecordSizeOffset] = kErrorRecordSize;
-    errors_buffer[vo_idx + kHeaderActionIdOffset] = (action_index[0] << kActionIdShift) | resource_index[0];
+    errors_buffer[vo_idx + kHeaderActionIdErrorLoggerIdOffset] = (action_index[0] << kActionIdShift) | resource_index[0];
 
-    errors_buffer[vo_idx + kPreActionParamOffset_0] = param_0;
-    errors_buffer[vo_idx + kPreActionParamOffset_1] = param_1;
-    errors_buffer[vo_idx + kPreActionParamOffset_2] = param_2;
-    errors_buffer[vo_idx + kPreActionParamOffset_3] = param_3;
+    errors_buffer[vo_idx + kValCmdErrorPayloadDword_0] = dword_0;
+    errors_buffer[vo_idx + kValCmdErrorPayloadDword_1] = dword_1;
+    errors_buffer[vo_idx + kValCmdErrorPayloadDword_2] = dword_2;
+    errors_buffer[vo_idx + kValCmdErrorPayloadDword_3] = dword_3;
 }
 
-void GpuavLogError2(uint error_group, uint error_sub_code, uint param_0, uint param_1) {
-    GpuavLogError4(error_group, error_sub_code, param_0, param_1, 0, 0);
+void GpuavLogError2(uint error_group, uint error_sub_code, uint dword_0, uint dword_1) {
+    GpuavLogError4(error_group, error_sub_code, dword_0, dword_1, 0, 0);
 }

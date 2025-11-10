@@ -13,6 +13,7 @@
 #include "../framework/shader_object_helper.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/shader_templates.h"
+#include "utils/math_utils.h"
 
 void ShaderObjectTest::InitBasicShaderObject() {
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -55,14 +56,14 @@ void ShaderObjectTest::CreateMinimalShaders() {
     create_info.codeSize = vert_spirv.size() * sizeof(uint32_t);
     create_info.pCode = vert_spirv.data();
     create_info.pName = "main";
-    m_vert_shader.init(*m_device, create_info);
+    m_vert_shader.Init(*m_device, create_info);
 
     std::vector<uint32_t> frag_spirv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
     create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     create_info.nextStage = 0u;
     create_info.codeSize = frag_spirv.size() * sizeof(uint32_t);
     create_info.pCode = frag_spirv.data();
-    m_frag_shader.init(*m_device, create_info);
+    m_frag_shader.Init(*m_device, create_info);
 }
 
 TEST_F(PositiveShaderObject, CreateAndDestroyShaderObject) {
@@ -125,14 +126,14 @@ TEST_F(PositiveShaderObject, DrawWithVertAndFragBinaryShaderObjects) {
     CreateMinimalShaders();
 
     size_t vertDataSize;
-    vk::GetShaderBinaryDataEXT(*m_device, m_vert_shader.handle(), &vertDataSize, nullptr);
+    vk::GetShaderBinaryDataEXT(*m_device, m_vert_shader, &vertDataSize, nullptr);
     std::vector<uint8_t> vertData(vertDataSize);
-    vk::GetShaderBinaryDataEXT(*m_device, m_vert_shader.handle(), &vertDataSize, vertData.data());
+    vk::GetShaderBinaryDataEXT(*m_device, m_vert_shader, &vertDataSize, vertData.data());
 
     size_t fragDataSize;
-    vk::GetShaderBinaryDataEXT(*m_device, m_frag_shader.handle(), &fragDataSize, nullptr);
+    vk::GetShaderBinaryDataEXT(*m_device, m_frag_shader, &fragDataSize, nullptr);
     std::vector<uint8_t> fragData(fragDataSize);
-    vk::GetShaderBinaryDataEXT(*m_device, m_frag_shader.handle(), &fragDataSize, fragData.data());
+    vk::GetShaderBinaryDataEXT(*m_device, m_frag_shader, &fragDataSize, fragData.data());
 
     vkt::Shader binary_vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vertData);
     vkt::Shader binary_frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, fragData);
@@ -216,7 +217,7 @@ TEST_F(PositiveShaderObject, VertFragShaderDraw) {
 
     RETURN_IF_SKIP(InitBasicShaderObject());
 
-    static const char vert_src[] = R"glsl(
+    const char vert_src[] = R"glsl(
         #version 460
         void main() {
             vec2 pos = vec2(float(gl_VertexIndex & 1), float((gl_VertexIndex >> 1) & 1));
@@ -224,7 +225,7 @@ TEST_F(PositiveShaderObject, VertFragShaderDraw) {
         }
     )glsl";
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 460
         layout(location = 0) out vec4 uFragColor;
         void main(){
@@ -297,7 +298,7 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
     AddRequiredFeature(vkt::Feature::tessellationShader);
     RETURN_IF_SKIP(InitBasicShaderObject());
 
-    static const char vert_src[] = R"glsl(
+    const char vert_src[] = R"glsl(
         #version 460
         void main() {
             vec2 pos = vec2(float(gl_VertexIndex & 1), float((gl_VertexIndex >> 1) & 1));
@@ -305,7 +306,7 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
         }
     )glsl";
 
-    static const char tesc_src[] = R"glsl(
+    const char tesc_src[] = R"glsl(
         #version 450
         layout(vertices = 4) out;
         void main (void) {
@@ -321,7 +322,7 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
         }
     )glsl";
 
-    static const char tese_src[] = R"glsl(
+    const char tese_src[] = R"glsl(
         #version 450
         layout(quads, equal_spacing) in;
         void main (void) {
@@ -334,7 +335,7 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
         }
     )glsl";
 
-    static const char geom_src[] = R"glsl(
+    const char geom_src[] = R"glsl(
         #version 450
         layout(triangles) in;
         layout(triangle_strip, max_vertices = 4) out;
@@ -357,7 +358,7 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
         }
     )glsl";
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 460
         layout(location = 0) out vec4 uFragColor;
         void main(){
@@ -407,7 +408,7 @@ TEST_F(PositiveShaderObject, ComputeShader) {
 
     RETURN_IF_SKIP(InitBasicShaderObject());
 
-    static const char comp_src[] = R"glsl(
+    const char comp_src[] = R"glsl(
         #version 450
         layout(local_size_x=16, local_size_x=1, local_size_x=1) in;
         layout(binding = 0) buffer Output {
@@ -447,7 +448,7 @@ TEST_F(PositiveShaderObject, TaskMeshShadersDraw) {
 
     RETURN_IF_SKIP(InitBasicMeshShaderObject(VK_API_VERSION_1_3));
 
-    static const char task_src[] = R"glsl(
+    const char task_src[] = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         layout (local_size_x=1, local_size_y=1, local_size_z=1) in;
@@ -456,7 +457,7 @@ TEST_F(PositiveShaderObject, TaskMeshShadersDraw) {
         }
     )glsl";
 
-    static const char mesh_src[] = R"glsl(
+    const char mesh_src[] = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require
         layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
@@ -472,7 +473,7 @@ TEST_F(PositiveShaderObject, TaskMeshShadersDraw) {
         }
     )glsl";
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 460
         layout(location = 0) out vec4 uFragColor;
         void main(){
@@ -526,7 +527,7 @@ TEST_F(PositiveShaderObject, FailCreateShaders) {
         GTEST_SKIP() << "Test not supported by MockICD because shader needs to fail";
     }
 
-    static const char vert_src[] = R"glsl(
+    const char vert_src[] = R"glsl(
         #version 460
         void main() {
             vec2 pos = vec2(float(gl_VertexIndex & 1), float((gl_VertexIndex >> 1) & 1));
@@ -534,7 +535,7 @@ TEST_F(PositiveShaderObject, FailCreateShaders) {
         }
     )glsl";
 
-    static const char tesc_src[] = R"glsl(
+    const char tesc_src[] = R"glsl(
         #version 450
         layout(vertices = 4) out;
         void main (void) {
@@ -550,7 +551,7 @@ TEST_F(PositiveShaderObject, FailCreateShaders) {
         }
     )glsl";
 
-    static const char tese_src[] = R"glsl(
+    const char tese_src[] = R"glsl(
         #version 450
         layout(quads, equal_spacing) in;
         void main (void) {
@@ -563,7 +564,7 @@ TEST_F(PositiveShaderObject, FailCreateShaders) {
         }
     )glsl";
 
-    static const char geom_src[] = R"glsl(
+    const char geom_src[] = R"glsl(
         #version 450
         layout(triangles) in;
         layout(triangle_strip, max_vertices = 4) out;
@@ -586,7 +587,7 @@ TEST_F(PositiveShaderObject, FailCreateShaders) {
         }
     )glsl";
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 460
         layout(location = 0) out vec4 uFragColor;
         void main(){
@@ -731,7 +732,7 @@ TEST_F(PositiveShaderObject, ShadersDescriptorSets) {
 
     vkt::PipelineLayout pipeline_layout(*m_device, {&vert_descriptor_set.layout_, &frag_descriptor_set.layout_});
 
-    static const char vert_src[] = R"glsl(
+    const char vert_src[] = R"glsl(
         #version 460
         layout(location = 0) out vec2 uv;
         layout(set = 0, binding = 0) buffer Buffer {
@@ -743,7 +744,7 @@ TEST_F(PositiveShaderObject, ShadersDescriptorSets) {
         }
     )glsl";
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 460
         layout(set = 1, binding = 0) uniform sampler2D s;
         layout(location = 0) in vec2 uv;
@@ -756,7 +757,7 @@ TEST_F(PositiveShaderObject, ShadersDescriptorSets) {
     const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert_src);
     const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag_src);
 
-    VkDescriptorSetLayout descriptor_set_layouts[] = {vert_descriptor_set.layout_.handle(), frag_descriptor_set.layout_.handle()};
+    VkDescriptorSetLayout descriptor_set_layouts[] = {vert_descriptor_set.layout_, frag_descriptor_set.layout_};
 
     const vkt::Shader vert_shader(*m_device, ShaderCreateInfo(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, 2, descriptor_set_layouts));
     const vkt::Shader frag_shader(*m_device, ShaderCreateInfo(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT, 2, descriptor_set_layouts));
@@ -806,6 +807,7 @@ TEST_F(PositiveShaderObject, DescriptorBuffer) {
 
     const VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     const vkt::DescriptorSetLayout set_layout(*m_device, {binding}, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&set_layout});
 
     const char frag_spv[] = R"glsl(
         #version 460
@@ -824,6 +826,12 @@ TEST_F(PositiveShaderObject, DescriptorBuffer) {
     SetDefaultDynamicStatesExclude();
     m_command_buffer.BindShaders(vert_shader, frag_shader);
     vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &buffer_binding_info);
+
+    uint32_t buffer_index = 0u;
+    VkDeviceSize offset = 0u;
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0u, 1u, &buffer_index,
+                                         &offset);
+
     vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
@@ -835,7 +843,7 @@ TEST_F(PositiveShaderObject, MultiplePushConstants) {
     RETURN_IF_SKIP(InitBasicShaderObject());
     InitDynamicRenderTarget();
 
-    static const char vert_src[] = R"glsl(
+    const char vert_src[] = R"glsl(
         #version 460
         layout (push_constant) uniform constants {
             int pos;
@@ -845,7 +853,7 @@ TEST_F(PositiveShaderObject, MultiplePushConstants) {
         }
     )glsl";
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 460
         layout (push_constant) uniform constants {
             layout(offset = 4) float c;
@@ -859,13 +867,10 @@ TEST_F(PositiveShaderObject, MultiplePushConstants) {
     const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert_src);
     const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag_src);
 
-    VkPushConstantRange push_constant_ranges[2];
-    push_constant_ranges[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    push_constant_ranges[0].offset = 0u;
-    push_constant_ranges[0].size = sizeof(int);
-    push_constant_ranges[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    push_constant_ranges[1].offset = sizeof(int);
-    push_constant_ranges[1].size = sizeof(float);
+    VkPushConstantRange push_constant_ranges[2] = {
+        {VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int)},
+        {VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(int), sizeof(float)},
+    };
     vkt::PipelineLayout pipeline_layout(*m_device, {}, {push_constant_ranges[0], push_constant_ranges[1]});
 
     const vkt::Shader vert_shader(*m_device,
@@ -894,7 +899,7 @@ TEST_F(PositiveShaderObject, MultipleSpecializationConstants) {
     RETURN_IF_SKIP(InitBasicShaderObject());
     InitDynamicRenderTarget();
 
-    static const char vert_src[] = R"glsl(
+    const char vert_src[] = R"glsl(
         #version 460
         layout (constant_id = 0) const int pos = 1;
         void main() {
@@ -902,7 +907,7 @@ TEST_F(PositiveShaderObject, MultipleSpecializationConstants) {
         }
     )glsl";
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 460
         layout (constant_id = 1) const float c = 0.0f;
         layout(location = 0) out vec4 uFragColor;
@@ -956,7 +961,7 @@ TEST_F(PositiveShaderObject, IndirectDraw) {
     RETURN_IF_SKIP(InitBasicShaderObject());
     InitDynamicRenderTarget();
 
-    static const char vert_src[] = R"glsl(
+    const char vert_src[] = R"glsl(
         #version 460
         void main() {
             vec2 pos = vec2(float(gl_VertexIndex & 1), float((gl_VertexIndex >> 1) & 1));
@@ -964,7 +969,7 @@ TEST_F(PositiveShaderObject, IndirectDraw) {
         }
     )glsl";
 
-    static const char tesc_src[] = R"glsl(
+    const char tesc_src[] = R"glsl(
         #version 450
         layout(vertices = 4) out;
         void main (void) {
@@ -980,7 +985,7 @@ TEST_F(PositiveShaderObject, IndirectDraw) {
         }
     )glsl";
 
-    static const char tese_src[] = R"glsl(
+    const char tese_src[] = R"glsl(
         #version 450
         layout(quads, equal_spacing) in;
         void main (void) {
@@ -993,7 +998,7 @@ TEST_F(PositiveShaderObject, IndirectDraw) {
         }
     )glsl";
 
-    static const char geom_src[] = R"glsl(
+    const char geom_src[] = R"glsl(
         #version 450
         layout(triangles) in;
         layout(triangle_strip, max_vertices = 4) out;
@@ -1016,7 +1021,7 @@ TEST_F(PositiveShaderObject, IndirectDraw) {
         }
     )glsl";
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 460
         layout(location = 0) out vec4 uFragColor;
         void main(){
@@ -1056,7 +1061,7 @@ TEST_F(PositiveShaderObject, DrawInSecondaryCommandBuffers) {
     command_buffer.Begin();
     command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     command_buffer.BindShaders(m_vert_shader, m_frag_shader);
-    SetDefaultDynamicStatesExclude({}, false, command_buffer.handle());
+    SetDefaultDynamicStatesExclude({}, false, command_buffer);
     vk::CmdDraw(command_buffer, 4, 1, 0, 0);
     command_buffer.EndRendering();
     command_buffer.End();
@@ -1073,7 +1078,7 @@ TEST_F(PositiveShaderObject, OutputToMultipleAttachments) {
 
     InitDynamicRenderTarget();
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 460
         layout(location = 0) out vec4 uFragColor1;
         layout(location = 1) out vec4 uFragColor2;
@@ -1177,7 +1182,7 @@ TEST_F(PositiveShaderObject, DrawInSecondaryCommandBuffersWithRenderPassContinue
     begin_info.pInheritanceInfo = &hinfo;
     command_buffer.Begin(&begin_info);
     command_buffer.BindShaders(m_vert_shader, m_frag_shader);
-    SetDefaultDynamicStatesExclude({}, false, command_buffer.handle());
+    SetDefaultDynamicStatesExclude({}, false, command_buffer);
     vk::CmdDraw(command_buffer, 4, 1, 0, 0);
     command_buffer.End();
 
@@ -1261,7 +1266,6 @@ TEST_F(PositiveShaderObject, DrawRebindingShaders) {
 
 TEST_F(PositiveShaderObject, DrawWithBinaryShaders) {
     TEST_DESCRIPTION("Draw using binary shaders.");
-
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::geometryShader);
     AddRequiredFeature(vkt::Feature::tessellationShader);
@@ -1297,14 +1301,18 @@ TEST_F(PositiveShaderObject, DrawWithBinaryShaders) {
         create_info.pName = "main";
 
         vk::CreateShadersEXT(*m_device, 1u, &create_info, nullptr, &shaders[i]);
-        size_t dataSize;
-        vk::GetShaderBinaryDataEXT(*m_device, shaders[i], &dataSize, nullptr);
-        std::vector<uint8_t> data(dataSize);
-        vk::GetShaderBinaryDataEXT(*m_device, shaders[i], &dataSize, data.data());
+        size_t data_size;
+        vk::GetShaderBinaryDataEXT(*m_device, shaders[i], &data_size, nullptr);
+        // Allocate enough space to guarantee 16 byte alignment
+        std::vector<uint8_t> data(data_size + 15);
+        // Get 16 byte aligned pointer
+        void *storage_ptr = reinterpret_cast<void *>(Align(reinterpret_cast<uintptr_t>(data.data()), (uintptr_t)16));
+
+        vk::GetShaderBinaryDataEXT(*m_device, shaders[i], &data_size, storage_ptr);
 
         create_info.codeType = VK_SHADER_CODE_TYPE_BINARY_EXT;
-        create_info.codeSize = dataSize;
-        create_info.pCode = data.data();
+        create_info.codeSize = data_size;
+        create_info.pCode = storage_ptr;
         vk::CreateShadersEXT(*m_device, 1u, &create_info, nullptr, &binary_shaders[i]);
     }
 
@@ -1461,7 +1469,7 @@ TEST_F(PositiveShaderObject, DrawWithVertGeomFragShaderObjects) {
 
     InitDynamicRenderTarget();
 
-    static const char vert_src[] = R"glsl(
+    const char vert_src[] = R"glsl(
         #version 450
 
         void main(void) {
@@ -1470,7 +1478,7 @@ TEST_F(PositiveShaderObject, DrawWithVertGeomFragShaderObjects) {
         }
     )glsl";
 
-    static const char geom_src[] = R"glsl(
+    const char geom_src[] = R"glsl(
         #version 450
         layout(triangles) in;
         layout(triangle_strip, max_vertices = 4) out;
@@ -1498,7 +1506,7 @@ TEST_F(PositiveShaderObject, DrawWithVertGeomFragShaderObjects) {
         }
     )glsl";
 
-    static const char frag_src[] = R"glsl(
+    const char frag_src[] = R"glsl(
         #version 450
 
         layout(location = 0) in vec4 in_color;
@@ -1607,6 +1615,34 @@ TEST_F(PositiveShaderObject, SetPointTopologyNoWrite) {
     m_command_buffer.End();
 }
 
+TEST_F(PositiveShaderObject, SetColorBlendAdvancedEXT) {
+    AddRequiredExtensions(VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+    CreateMinimalShaders();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude({VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT});
+    VkBool32 blend_enable = VK_TRUE;
+    vk::CmdSetColorBlendEnableEXT(m_command_buffer, 0u, 1u, &blend_enable);
+    VkColorBlendAdvancedEXT advanced = {VK_BLEND_OP_ADD, VK_FALSE, VK_FALSE, VK_BLEND_OVERLAP_UNCORRELATED_EXT, VK_FALSE};
+    vk::CmdSetColorBlendAdvancedEXT(m_command_buffer, 0u, 1u, &advanced);
+    VkColorBlendEquationEXT equation = {
+        VK_BLEND_FACTOR_CONSTANT_COLOR,
+        VK_BLEND_FACTOR_ONE,
+        VK_BLEND_OP_ADD,
+        VK_BLEND_FACTOR_ONE,
+        VK_BLEND_FACTOR_ONE,
+        VK_BLEND_OP_ADD,
+    };
+    vk::CmdSetColorBlendEquationEXT(m_command_buffer, 1u, 1u, &equation);
+    m_command_buffer.BindShaders(m_vert_shader, m_frag_shader);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
 TEST_F(PositiveShaderObject, MultiCreateGraphicsCompute) {
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -1644,4 +1680,26 @@ TEST_F(PositiveShaderObject, MultiCreateGraphicsCompute) {
     for (uint32_t i = 0; i < 3; ++i) {
         vk::DestroyShaderEXT(*m_device, shaders[i], nullptr);
     }
+}
+
+TEST_F(PositiveShaderObject, DisableShaderValidation) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "check_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse};
+    VkLayerSettingsCreateInfoEXT layer_setting_ci = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    RETURN_IF_SKIP(InitFramework(&layer_setting_ci));
+    RETURN_IF_SKIP(InitState());
+    InitDynamicRenderTarget();
+    CreateMinimalShaders();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(m_vert_shader, m_frag_shader);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }

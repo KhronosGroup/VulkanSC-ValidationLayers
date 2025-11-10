@@ -341,7 +341,7 @@ TEST_F(PositiveSecondaryCommandBuffer, Sync2ImageLayouts) {
     descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                             VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
     descriptor_set.UpdateDescriptorSets();
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler2D color_image;
         void main() {
@@ -394,21 +394,15 @@ TEST_F(PositiveSecondaryCommandBuffer, EventsIn) {
     TEST_DESCRIPTION("Test setting and waiting for an event in a secondary command buffer");
     RETURN_IF_SKIP(Init());
 
-    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        GTEST_SKIP() << "VK_KHR_portability_subset enabled, skipping.\n";
-    }
-
-    vkt::Event ev(*m_device);
-    VkEvent ev_handle = ev.handle();
+    vkt::Event event(*m_device);
     vkt::CommandBuffer secondary_cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    VkCommandBuffer scb = secondary_cb.handle();
     secondary_cb.Begin();
-    vk::CmdSetEvent(scb, ev_handle, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-    vk::CmdWaitEvents(scb, 1, &ev_handle, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, nullptr, 0,
-                      nullptr, 0, nullptr);
+    vk::CmdSetEvent(secondary_cb, event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    vk::CmdWaitEvents(secondary_cb, 1, &event.handle(), VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                      0, nullptr, 0, nullptr, 0, nullptr);
     secondary_cb.End();
     m_command_buffer.Begin();
-    vk::CmdExecuteCommands(m_command_buffer, 1, &scb);
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary_cb.handle());
     m_command_buffer.End();
 
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -447,9 +441,9 @@ TEST_F(PositiveSecondaryCommandBuffer, Nested) {
     secondary1.End();
 
     secondary2.Begin(&cbbi);
-    vk::CmdBeginQuery(secondary2.handle(), query_pool, 0, 0);
-    vk::CmdExecuteCommands(secondary2.handle(), 1u, &secondary1.handle());
-    vk::CmdEndQuery(secondary2.handle(), query_pool, 0);
+    vk::CmdBeginQuery(secondary2, query_pool, 0, 0);
+    vk::CmdExecuteCommands(secondary2, 1u, &secondary1.handle());
+    vk::CmdEndQuery(secondary2, query_pool, 0);
     secondary2.End();
 }
 
@@ -491,7 +485,7 @@ TEST_F(PositiveSecondaryCommandBuffer, NestedPrimary) {
     secondary1.End();
 
     secondary2.Begin(&cbbi);
-    vk::CmdExecuteCommands(secondary2.handle(), 1u, &secondary1.handle());
+    vk::CmdExecuteCommands(secondary2, 1u, &secondary1.handle());
     secondary2.End();
 
     // The primary command buffer doesn't count toward nesting
@@ -526,4 +520,39 @@ TEST_F(PositiveSecondaryCommandBuffer, NonNestedWithRenderPassContinue) {
     m_command_buffer.End();
 
     m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveSecondaryCommandBuffer, NestedDrawWithoutInline) {
+    TEST_DESCRIPTION("http://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10761");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::nestedCommandBuffer);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+
+    VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 1;
+    pipeline_rendering_info.pColorAttachmentFormats = &color_format;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.CreateGraphicsPipeline();
+
+    VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info = vku::InitStructHelper();
+    inheritance_rendering_info.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
+    inheritance_rendering_info.colorAttachmentCount = 1;
+    inheritance_rendering_info.pColorAttachmentFormats = &color_format;
+    inheritance_rendering_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    const VkCommandBufferInheritanceInfo cmdbuff_ii = vku::InitStructHelper(&inheritance_rendering_info);
+    VkCommandBufferBeginInfo cmdbuff_bi = vku::InitStructHelper();
+    cmdbuff_bi.pInheritanceInfo = &cmdbuff_ii;
+    cmdbuff_bi.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary.Begin(&cmdbuff_bi);
+    vk::CmdBindPipeline(secondary, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDraw(secondary, 3, 1, 0, 0);
+    secondary.End();
 }

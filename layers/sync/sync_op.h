@@ -20,16 +20,20 @@
 #include <vulkan/utility/vk_safe_struct.hpp>
 #include "error_message/error_location.h"
 
-class CommandBufferAccessContext;
-class CommandExecutionContext;
-class RenderPassAccessContext;
-class ReplayState;
-class SyncValidator;
+struct DeviceExtensions;
 
 namespace vvl {
 class ImageView;
 class RenderPass;
 }  // namespace vvl
+
+namespace syncval {
+
+class CommandBufferAccessContext;
+class CommandExecutionContext;
+class RenderPassAccessContext;
+class ReplayState;
+class SyncValidator;
 
 struct SyncEventState {
     enum IgnoreReason { NotIgnored = 0, ResetWaitRace, Reset2WaitRace, SetRace, MissingStageBits, SetVsWait2, MissingSetEvent };
@@ -60,7 +64,7 @@ struct SyncEventState {
     SyncEventState(const SyncEventState::EventPointer &event_state);
 
     void ResetFirstScope();
-    const AccessContext::ScopeMap &FirstScope() const { return first_scope->GetAccessStateMap(); }
+    const AccessContext::ScopeMap &FirstScope() const { return first_scope->GetAccessMap(); }
     IgnoreReason IsIgnoredByWait(vvl::Func command, VkPipelineStageFlags2 srcStageMask) const;
     bool HasBarrier(VkPipelineStageFlags2 stageMask, VkPipelineStageFlags2 exec_scope) const;
     void AddReferencedTags(ResourceUsageTagSet &referenced) const;
@@ -116,11 +120,11 @@ class SyncEventsContext {
 struct SyncBufferMemoryBarrier {
     std::shared_ptr<const vvl::Buffer> buffer;
     SyncBarrier barrier;
-    ResourceAccessRange range;
+    AccessRange range;
 
-    SyncBufferMemoryBarrier(const std::shared_ptr<const vvl::Buffer> &buffer, const SyncBarrier &barrier,
-                            const ResourceAccessRange &range)
-        : buffer(buffer), barrier(barrier), range(range) {}
+	SyncBufferMemoryBarrier(const std::shared_ptr<const vvl::Buffer> &buffer, const SyncBarrier &barrier,
+							const AccessRange &range)
+		: buffer(buffer), barrier(barrier), range(range) {}
 };
 
 struct SyncImageMemoryBarrier {
@@ -152,12 +156,13 @@ struct BarrierSet {
     void MakeBufferMemoryBarriers(const SyncValidator &sync_state, const SyncExecScope &src, const SyncExecScope &dst,
                                   uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier *pBufferMemoryBarriers);
     void MakeImageMemoryBarriers(const SyncValidator &sync_state, const SyncExecScope &src, const SyncExecScope &dst,
-                                 uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier *pImageMemoryBarriers);
-    void MakeMemoryBarriers(VkQueueFlags queue_flags, uint32_t barrier_count, const VkMemoryBarrier2 *barriers);
+                                 uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier *pImageMemoryBarriers,
+                                 const DeviceExtensions &extensions);
+    void MakeMemoryBarriers(VkQueueFlags queue_flags, const VkDependencyInfo &dep_info);
     void MakeBufferMemoryBarriers(const SyncValidator &sync_state, VkQueueFlags queue_flags, uint32_t barrier_count,
                                   const VkBufferMemoryBarrier2 *barriers);
     void MakeImageMemoryBarriers(const SyncValidator &sync_state, VkQueueFlags queue_flags, uint32_t barrier_count,
-                                 const VkImageMemoryBarrier2 *barriers);
+                                 const VkImageMemoryBarrier2 *barriers, const DeviceExtensions &extensions);
 };
 
 class SyncOpBase {
@@ -192,6 +197,13 @@ class SyncOpPipelineBarrier : public SyncOpBase {
     ResourceUsageTag Record(CommandBufferAccessContext *cb_context) override;
     bool ReplayValidate(ReplayState &replay, ResourceUsageTag recorded_tag) const override;
     void ReplayRecord(CommandExecutionContext &exec_context, ResourceUsageTag exec_tag) const override;
+
+  private:
+    // Single barrier can be applied more efficently since there is no need to support independent
+    // barrier application and collect pending state.
+    void ApplySingleBarrier(CommandExecutionContext &exec_context) const;
+
+    void ApplyMultipleBarriers(CommandExecutionContext &exec_context, const ResourceUsageTag exec_tag) const;
 
   private:
     BarrierSet barrier_set_;
@@ -320,89 +332,32 @@ class SyncOpEndRenderPass : public SyncOpBase {
     vku::safe_VkSubpassEndInfo subpass_end_info_;
 };
 
-// The barrier operation for pipeline and subpass dependencies
-struct PipelineBarrierOp {
-    SyncBarrier barrier;
-    bool layout_transition;
-    uint32_t layout_transition_handle_index;
-    ResourceAccessState::QueueScopeOps scope;
-    PipelineBarrierOp(QueueId queue_id, const SyncBarrier &barrier_, bool layout_transition_,
-                      uint32_t layout_transition_handle_index = vvl::kNoIndex32)
-        : barrier(barrier_),
-          layout_transition(layout_transition_),
-          layout_transition_handle_index(layout_transition_handle_index),
-          scope(queue_id) {
-        if (queue_id != kQueueIdInvalid) {
-            // This is a submit time application... suppress layout transitions to not taint the QueueBatchContext write state
-            layout_transition = false;
-            this->layout_transition_handle_index = vvl::kNoIndex32;
-        }
-    }
-
-    PipelineBarrierOp(const PipelineBarrierOp &rhs)
-        : barrier(rhs.barrier),
-          layout_transition(rhs.layout_transition),
-          layout_transition_handle_index(rhs.layout_transition_handle_index),
-          scope(rhs.scope) {}
-
-    void operator()(ResourceAccessState *access_state) const {
-        access_state->ApplyBarrier(scope, barrier, layout_transition, layout_transition_handle_index);
-    }
-};
-
 // Batch barrier ops don't modify in place, and thus don't need to hold pending state, and also are *never* layout transitions.
 struct BatchBarrierOp {
     SyncBarrier barrier;
-    ResourceAccessState::QueueScopeOps scope;
+    BarrierScope barrier_scope;
 
-    BatchBarrierOp(QueueId queue_id, const SyncBarrier &barrier) : barrier(barrier), scope(queue_id) {}
+    BatchBarrierOp(QueueId queue_id, const SyncBarrier &barrier) : barrier(barrier), barrier_scope(barrier, queue_id) {}
 
-    void operator()(ResourceAccessState *access_state) const {
-        access_state->ApplyBarrier(scope, barrier, false);
-        access_state->ApplyPendingBarriers(kInvalidTag);  // There can't be any need for this tag
-    }
-};
-
-// The barrier operation for wait events
-struct WaitEventBarrierOp {
-    ResourceAccessState::EventScopeOps scope_ops;
-    SyncBarrier barrier;
-    bool layout_transition;
-
-    WaitEventBarrierOp(const QueueId scope_queue_, const ResourceUsageTag scope_tag_, const SyncBarrier &barrier_,
-                       bool layout_transition_)
-        : scope_ops(scope_queue_, scope_tag_), barrier(barrier_), layout_transition(layout_transition_) {
-        if (scope_queue_ != kQueueIdInvalid) {
-            // This is a submit time application... suppress layout transitions to not taint the QueueBatchContext write state
-            layout_transition = false;
-        }
-    }
-    void operator()(ResourceAccessState *access_state) const { access_state->ApplyBarrier(scope_ops, barrier, layout_transition); }
+    void operator()(AccessState *access_state) const { access_state->ApplyBarrier(barrier_scope, barrier); }
 };
 
 // Allow keep track of the exec contexts replay state
 class ReplayState {
   public:
+    // A minimal subset of the functionality present in the RenderPassAccessContext. Since the accesses are recorded in the
+    // first_use information of the recorded access contexts, s.t. all we need to support is the barrier/resolve operations
     struct RenderPassReplayState {
-        // A minimal subset of the functionality present in the RenderPassAccessContext. Since the accesses are recorded in the
-        // first_use information of the recorded access contexts, s.t. all we need to support is the barrier/resolve operations
-        RenderPassReplayState() { Reset(); }
         AccessContext *Begin(VkQueueFlags queue_flags, const SyncOpBeginRenderPass &begin_op_,
                              const AccessContext &external_context);
         AccessContext *Next();
         void End(AccessContext &external_context);
+        vvl::span<AccessContext> GetSubpassContexts();
 
         const SyncOpBeginRenderPass *begin_op = nullptr;
         const AccessContext *replay_context = nullptr;
         uint32_t subpass = VK_SUBPASS_EXTERNAL;
-        std::vector<AccessContext> subpass_contexts;
-        void Reset() {
-            begin_op = nullptr;
-            replay_context = nullptr;
-            subpass = VK_SUBPASS_EXTERNAL;
-            subpass_contexts.clear();
-        }
-        operator bool() const { return begin_op != nullptr; }
+        std::unique_ptr<AccessContext[]> subpass_contexts;
     };
 
     bool ValidateFirstUse();
@@ -429,3 +384,5 @@ class ReplayState {
     const ResourceUsageTag base_tag_;
     RenderPassReplayState rp_replay_;
 };
+
+}  // namespace syncval

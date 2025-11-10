@@ -48,11 +48,11 @@ TEST_F(NegativeDebugExtensions, DebugMarkerName) {
     name_info.pObjectName = memory_name.c_str();
     vk::DebugMarkerSetObjectNameEXT(device(), &name_info);
 
-    vk::BindBufferMemory(device(), buffer, memory_1.handle(), 0);
+    vk::BindBufferMemory(device(), buffer, memory_1, 0);
 
     // Test core_validation layer
     m_errorMonitor->SetDesiredError(memory_name.c_str());
-    vk::BindBufferMemory(device(), buffer, memory_2.handle(), 0);
+    vk::BindBufferMemory(device(), buffer, memory_2, 0);
     m_errorMonitor->VerifyFound();
 
     VkCommandBuffer commandBuffer;
@@ -64,7 +64,7 @@ TEST_F(NegativeDebugExtensions, DebugMarkerName) {
     vkt::CommandPool command_pool_2(*m_device, pool_create_info);
 
     VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
-    command_buffer_allocate_info.commandPool = command_pool_1.handle();
+    command_buffer_allocate_info.commandPool = command_pool_1;
     command_buffer_allocate_info.commandBufferCount = 1;
     command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     vk::AllocateCommandBuffers(device(), &command_buffer_allocate_info, &commandBuffer);
@@ -88,7 +88,7 @@ TEST_F(NegativeDebugExtensions, DebugMarkerName) {
 
     // Test object_tracker layer
     m_errorMonitor->SetDesiredError(commandBuffer_name.c_str());
-    vk::FreeCommandBuffers(device(), command_pool_2.handle(), 1, &commandBuffer);
+    vk::FreeCommandBuffers(device(), command_pool_2, 1, &commandBuffer);
     m_errorMonitor->VerifyFound();
 }
 
@@ -139,9 +139,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
     }
 
     DebugUtilsLabelCheckData callback_data;
-    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, DebugUtilsLabelCheckData *data) {
-        data->count++;
-    };
+    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *, DebugUtilsLabelCheckData *data) { data->count++; };
     callback_data.count = 0;
     callback_data.callback = empty_callback;
 
@@ -197,11 +195,11 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
     name_info.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
 
-    vk::BindBufferMemory(device(), buffer, memory_1.handle(), 0);
+    vk::BindBufferMemory(device(), buffer, memory_1, 0);
 
     // Test core_validation layer
     m_errorMonitor->SetDesiredError(memory_name.c_str());
-    vk::BindBufferMemory(device(), buffer, memory_2.handle(), 0);
+    vk::BindBufferMemory(device(), buffer, memory_2, 0);
     m_errorMonitor->VerifyFound();
 
     VkCommandBuffer commandBuffer;
@@ -213,7 +211,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
     vkt::CommandPool command_pool_2(*m_device, pool_create_info);
 
     VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
-    command_buffer_allocate_info.commandPool = command_pool_1.handle();
+    command_buffer_allocate_info.commandPool = command_pool_1;
     command_buffer_allocate_info.commandBufferCount = 1;
     command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     vk::AllocateCommandBuffers(device(), &command_buffer_allocate_info, &commandBuffer);
@@ -260,7 +258,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
 
     // Test object_tracker layer
     m_errorMonitor->SetDesiredError(commandBuffer_name.c_str());
-    vk::FreeCommandBuffers(device(), command_pool_2.handle(), 1, &commandBuffer);
+    vk::FreeCommandBuffers(device(), command_pool_2, 1, &commandBuffer);
     m_errorMonitor->VerifyFound();
 
     vk::DestroyDebugUtilsMessengerEXT(instance(), my_messenger, nullptr);
@@ -308,9 +306,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsParameterFlags) {
     RETURN_IF_SKIP(Init());
 
     DebugUtilsLabelCheckData callback_data;
-    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, DebugUtilsLabelCheckData *data) {
-        data->count++;
-    };
+    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *, DebugUtilsLabelCheckData *data) { data->count++; };
     callback_data.count = 0;
     callback_data.callback = empty_callback;
 
@@ -383,9 +379,7 @@ TEST_F(NegativeDebugExtensions, SetDebugUtilsObjectSecondDevice) {
     vkt::Device second_device(gpu_, m_device_extension_names, &features);
 
     DebugUtilsLabelCheckData callback_data;
-    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, DebugUtilsLabelCheckData *data) {
-        data->count++;
-    };
+    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *, DebugUtilsLabelCheckData *data) { data->count++; };
     callback_data.count = 0;
     callback_data.callback = empty_callback;
 
@@ -421,9 +415,7 @@ TEST_F(NegativeDebugExtensions, SetDebugUtilsObjectDestroyedHandle) {
     }
 
     DebugUtilsLabelCheckData callback_data;
-    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, DebugUtilsLabelCheckData *data) {
-        data->count++;
-    };
+    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *, DebugUtilsLabelCheckData *data) { data->count++; };
     callback_data.count = 0;
     callback_data.callback = empty_callback;
 
@@ -438,7 +430,7 @@ TEST_F(NegativeDebugExtensions, SetDebugUtilsObjectDestroyedHandle) {
 
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
     uint64_t bad_handle = (uint64_t)sampler.handle();
-    sampler.destroy();
+    sampler.Destroy();
     const char *object_name = "sampler_object";
 
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();

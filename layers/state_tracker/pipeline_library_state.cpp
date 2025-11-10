@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-#include "state_tracker/pipeline_sub_state.h"
+#include "state_tracker/pipeline_library_state.h"
 #include "state_tracker/pipeline_state.h"
 #include "state_tracker/shader_module.h"
 
-bool PipelineSubState::IsIndependentSets() const {
+bool PipelineLibraryState::IsIndependentSets() const {
     if (const auto layout_state = parent.PipelineLayoutState()) {
         if (layout_state->CreateFlags() & VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT) {
             return true;
@@ -29,7 +29,7 @@ bool PipelineSubState::IsIndependentSets() const {
 }
 
 VertexInputState::VertexInputState(const vvl::Pipeline &p, const vku::safe_VkGraphicsPipelineCreateInfo &create_info)
-    : PipelineSubState(p) {
+    : PipelineLibraryState(p) {
     for (uint32_t i = 0; i < create_info.stageCount; i++) {
         if (create_info.pStages && create_info.pStages[i].stage == VK_SHADER_STAGE_MESH_BIT_EXT) {
             return;  // if mesh shaders are used, all vertex input state is ignored
@@ -68,7 +68,7 @@ VertexInputState::VertexInputState(const vvl::Pipeline &p, const vku::safe_VkGra
 PreRasterState::PreRasterState(const vvl::Pipeline &p, const vvl::DeviceState &state_data,
                                const vku::safe_VkGraphicsPipelineCreateInfo &create_info, std::shared_ptr<const vvl::RenderPass> rp,
                                spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages])
-    : PipelineSubState(p),
+    : PipelineLibraryState(p),
       pipeline_layout(state_data.Get<vvl::PipelineLayout>(create_info.layout)),
       viewport_state(create_info.pViewportState),
       raster_state(create_info.pRasterizationState),
@@ -80,8 +80,7 @@ PreRasterState::PreRasterState(const vvl::Pipeline &p, const vvl::DeviceState &s
     for (uint32_t i = 0; i < create_info.stageCount; ++i) {
         const auto &stage_ci = create_info.pStages[i];
         const VkShaderStageFlagBits stage = stage_ci.stage;
-        // TODO might need to filter out more than just fragment shaders here
-        if (stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
+        if ((stage & ValidShaderStages()) == 0) {
             continue;
         }
         all_stages |= stage;
@@ -92,14 +91,12 @@ PreRasterState::PreRasterState(const vvl::Pipeline &p, const vvl::DeviceState &s
             module_state = p.pipeline_cache->GetStageModule(p, i);
         }
         if (!module_state) {
-            // If module is null and there is a VkShaderModuleCreateInfo in the pNext chain of the stage info, then this
-            // module is part of a library and the state must be created.
-            // This support was also added in VK_KHR_maintenance5
+            // Using VkShaderModuleCreateInfo to inline with VK_KHR_maintenance5
             if (const auto shader_ci = vku::FindStructInPNextChain<VkShaderModuleCreateInfo>(stage_ci.pNext)) {
-                // don't need to worry about GroupDecoration in GPL
                 spirv::StatelessData *stateless_data_stage =
                     (stateless_data && i < kCommonMaxGraphicsShaderStages) ? &stateless_data[i] : nullptr;
-                auto spirv_module = std::make_shared<spirv::Module>(shader_ci->codeSize, shader_ci->pCode, stateless_data_stage);
+                auto spirv_module = vvl::CreateSpirvModuleState(shader_ci->codeSize, shader_ci->pCode, state_data.global_settings,
+                                                                stateless_data_stage);
                 module_state = std::make_shared<vvl::ShaderModule>(VK_NULL_HANDLE, spirv_module);
                 if (stateless_data_stage) {
                     stateless_data_stage->pipeline_pnext_module = spirv_module;
@@ -109,7 +106,8 @@ PreRasterState::PreRasterState(const vvl::Pipeline &p, const vvl::DeviceState &s
 
         // Check if a shader module identifier is used to reference the shader module.
         if (!module_state) {
-            if (const auto shader_stage_id = vku::FindStructInPNextChain<VkPipelineShaderStageModuleIdentifierCreateInfoEXT>(stage_ci.pNext);
+            if (const auto shader_stage_id =
+                    vku::FindStructInPNextChain<VkPipelineShaderStageModuleIdentifierCreateInfoEXT>(stage_ci.pNext);
                 shader_stage_id) {
                 module_state = state_data.GetShaderModuleStateFromIdentifier(*shader_stage_id);
             }
@@ -142,7 +140,7 @@ PreRasterState::PreRasterState(const vvl::Pipeline &p, const vvl::DeviceState &s
                     mesh_shader_ci = &stage_ci;
                     break;
                 default:
-                    // TODO is this an error?
+                    assert(false);  // Not a valid pre-raster shader stage
                     break;
             }
         }
@@ -204,46 +202,44 @@ void SetFragmentShaderInfoPrivate(const vvl::Pipeline &pipeline_state, FragmentS
                                   const vvl::DeviceState &state_data, const CreateInfo &create_info,
                                   spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]) {
     for (uint32_t i = 0; i < create_info.stageCount; ++i) {
-        if (create_info.pStages[i].stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
-            auto module_state = state_data.Get<vvl::ShaderModule>(create_info.pStages[i].module);
-            if (!module_state && pipeline_state.pipeline_cache) {
-                // Attempt to look up the pipeline cache for shader module data
-                module_state = pipeline_state.pipeline_cache->GetStageModule(pipeline_state, i);
-            }
-            if (!module_state) {
-                // If module is null and there is a VkShaderModuleCreateInfo in the pNext chain of the stage info, then this
-                // module is part of a library and the state must be created
-                // This support was also added in VK_KHR_maintenance5
-                if (const auto shader_ci = vku::FindStructInPNextChain<VkShaderModuleCreateInfo>(create_info.pStages[i].pNext)) {
-                    // don't need to worry about GroupDecoration in GPL
-                    spirv::StatelessData *stateless_data_stage =
-                        (stateless_data && i < kCommonMaxGraphicsShaderStages) ? &stateless_data[i] : nullptr;
-                    auto spirv_module =
-                        std::make_shared<spirv::Module>(shader_ci->codeSize, shader_ci->pCode, stateless_data_stage);
-                    module_state = std::make_shared<vvl::ShaderModule>(VK_NULL_HANDLE, spirv_module);
-                    if (stateless_data_stage) {
-                        stateless_data_stage->pipeline_pnext_module = spirv_module;
-                    }
+        if (create_info.pStages[i].stage != VK_SHADER_STAGE_FRAGMENT_BIT) {
+            continue;
+        }
+        auto module_state = state_data.Get<vvl::ShaderModule>(create_info.pStages[i].module);
+        if (!module_state && pipeline_state.pipeline_cache) {
+            // Attempt to look up the pipeline cache for shader module data
+            module_state = pipeline_state.pipeline_cache->GetStageModule(pipeline_state, i);
+        }
+        if (!module_state) {
+            // Using VkShaderModuleCreateInfo to inline with VK_KHR_maintenance5
+            if (const auto shader_ci = vku::FindStructInPNextChain<VkShaderModuleCreateInfo>(create_info.pStages[i].pNext)) {
+                spirv::StatelessData *stateless_data_stage =
+                    (stateless_data && i < kCommonMaxGraphicsShaderStages) ? &stateless_data[i] : nullptr;
+                auto spirv_module = vvl::CreateSpirvModuleState(shader_ci->codeSize, shader_ci->pCode, state_data.global_settings,
+                                                                stateless_data_stage);
+                module_state = std::make_shared<vvl::ShaderModule>(VK_NULL_HANDLE, spirv_module);
+                if (stateless_data_stage) {
+                    stateless_data_stage->pipeline_pnext_module = spirv_module;
                 }
             }
+        }
 
-            // Check if a shader module identifier is used to reference the shader module.
-            if (!module_state) {
-                if (const auto shader_stage_id =
-                        vku::FindStructInPNextChain<VkPipelineShaderStageModuleIdentifierCreateInfoEXT>(create_info.pStages[i].pNext);
-                    shader_stage_id) {
-                    module_state = state_data.GetShaderModuleStateFromIdentifier(*shader_stage_id);
-                }
+        // Check if a shader module identifier is used to reference the shader module.
+        if (!module_state) {
+            if (const auto shader_stage_id =
+                    vku::FindStructInPNextChain<VkPipelineShaderStageModuleIdentifierCreateInfoEXT>(create_info.pStages[i].pNext);
+                shader_stage_id) {
+                module_state = state_data.GetShaderModuleStateFromIdentifier(*shader_stage_id);
             }
+        }
 
-            if (module_state) {
-                fs_state.fragment_shader = std::move(module_state);
-                fs_state.fragment_shader_ci = ToShaderStageCI(create_info.pStages[i]);
-                // can be null if using VK_EXT_shader_module_identifier
-                if (fs_state.fragment_shader->spirv) {
-                    fs_state.fragment_entry_point = fs_state.fragment_shader->spirv->FindEntrypoint(
-                        fs_state.fragment_shader_ci->pName, fs_state.fragment_shader_ci->stage);
-                }
+        if (module_state) {
+            fs_state.fragment_shader = std::move(module_state);
+            fs_state.fragment_shader_ci = ToShaderStageCI(create_info.pStages[i]);
+            // can be null if using VK_EXT_shader_module_identifier
+            if (fs_state.fragment_shader->spirv) {
+                fs_state.fragment_entry_point = fs_state.fragment_shader->spirv->FindEntrypoint(fs_state.fragment_shader_ci->pName,
+                                                                                                fs_state.fragment_shader_ci->stage);
             }
         }
     }
@@ -265,29 +261,8 @@ void FragmentShaderState::SetFragmentShaderInfo(const vvl::Pipeline &pipeline_st
 }
 
 FragmentShaderState::FragmentShaderState(const vvl::Pipeline &p, const vvl::DeviceState &dev_data,
-                                         std::shared_ptr<const vvl::RenderPass> rp, uint32_t subp, VkPipelineLayout layout)
-    : PipelineSubState(p), rp_state(rp), subpass(subp), pipeline_layout(dev_data.Get<vvl::PipelineLayout>(layout)) {}
+                                         std::shared_ptr<const vvl::RenderPass> rp, uint32_t subpass_index, VkPipelineLayout layout)
+    : PipelineLibraryState(p), rp_state(rp), subpass(subpass_index), pipeline_layout(dev_data.Get<vvl::PipelineLayout>(layout)) {}
 
-FragmentOutputState::FragmentOutputState(const vvl::Pipeline &p, std::shared_ptr<const vvl::RenderPass> rp, uint32_t sp)
-    : PipelineSubState(p), rp_state(rp), subpass(sp) {}
-
-// static
-bool FragmentOutputState::IsBlendConstantsEnabled(const AttachmentStateVector &attachment_states) {
-    bool result = false;
-    for (const auto &attachment : attachment_states) {
-        if (VK_TRUE == attachment.blendEnable) {
-            if (((attachment.dstAlphaBlendFactor >= VK_BLEND_FACTOR_CONSTANT_COLOR) &&
-                 (attachment.dstAlphaBlendFactor <= VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA)) ||
-                ((attachment.dstColorBlendFactor >= VK_BLEND_FACTOR_CONSTANT_COLOR) &&
-                 (attachment.dstColorBlendFactor <= VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA)) ||
-                ((attachment.srcAlphaBlendFactor >= VK_BLEND_FACTOR_CONSTANT_COLOR) &&
-                 (attachment.srcAlphaBlendFactor <= VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA)) ||
-                ((attachment.srcColorBlendFactor >= VK_BLEND_FACTOR_CONSTANT_COLOR) &&
-                 (attachment.srcColorBlendFactor <= VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA))) {
-                result = true;
-                break;
-            }
-        }
-    }
-    return result;
-}
+FragmentOutputState::FragmentOutputState(const vvl::Pipeline &p, std::shared_ptr<const vvl::RenderPass> rp, uint32_t subpass_index)
+    : PipelineLibraryState(p), rp_state(rp), subpass(subpass_index) {}

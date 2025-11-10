@@ -25,6 +25,7 @@
 #include "containers/container_utils.h"
 #include "utils/math_utils.h"
 #include "utils/image_utils.h"
+#include <cmath>
 
 namespace stateless {
 
@@ -38,17 +39,13 @@ bool Device::manual_PreCallValidateCreateImage(VkDevice device, const VkImageCre
         return skip;
     }
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
-    // Validation for parameters excluded from the generated validation code due to a 'noautovalidity' tag in vk.xml
     if (pCreateInfo->sharingMode == VK_SHARING_MODE_CONCURRENT) {
-        // If sharingMode is VK_SHARING_MODE_CONCURRENT, queueFamilyIndexCount must be greater than 1
         auto const queue_family_index_count = pCreateInfo->queueFamilyIndexCount;
         if (queue_family_index_count <= 1) {
             skip |= LogError("VUID-VkImageCreateInfo-sharingMode-00942", device, create_info_loc.dot(Field::queueFamilyIndexCount),
                              "is %" PRIu32 ".", queue_family_index_count);
         }
 
-        // If sharingMode is VK_SHARING_MODE_CONCURRENT, pQueueFamilyIndices must be a pointer to an array of
-        // queueFamilyIndexCount uint32_t values
         if (pCreateInfo->pQueueFamilyIndices == nullptr) {
             skip |= LogError("VUID-VkImageCreateInfo-sharingMode-00941", device, create_info_loc.dot(Field::pQueueFamilyIndices),
                              "is NULL.");
@@ -113,7 +110,6 @@ bool Device::manual_PreCallValidateCreateImage(VkDevice device, const VkImageCre
         }
     }
 
-    // 3D image may have only 1 layer
     if ((pCreateInfo->imageType == VK_IMAGE_TYPE_3D) && (pCreateInfo->arrayLayers != 1)) {
         skip |= LogError("VUID-VkImageCreateInfo-imageType-00961", device, create_info_loc.dot(Field::imageType),
                          "is VK_IMAGE_TYPE_3D but arrayLayers (%" PRIu32 ") must be 1.", pCreateInfo->arrayLayers);
@@ -122,13 +118,11 @@ bool Device::manual_PreCallValidateCreateImage(VkDevice device, const VkImageCre
     if (0 != (pCreateInfo->usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)) {
         VkImageUsageFlags legal_flags = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
                                          VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
-        // At least one of the legal attachment bits must be set
         if (0 == (pCreateInfo->usage & legal_flags)) {
             skip |= LogError("VUID-VkImageCreateInfo-usage-00966", device, create_info_loc.dot(Field::usage),
                              "(%s) includes VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT but is missing one of %s.",
                              string_VkImageUsageFlags(pCreateInfo->usage).c_str(), string_VkImageUsageFlags(legal_flags).c_str());
         }
-        // No flags other than the legal attachment bits may be set
         legal_flags |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
         if (0 != (pCreateInfo->usage & ~legal_flags)) {
             skip |= LogError("VUID-VkImageCreateInfo-usage-00963", device, create_info_loc,
@@ -400,8 +394,6 @@ bool Device::ValidateCreateImageSparse(const VkImageCreateInfo &create_info, con
                          "includes VK_IMAGE_CREATE_SPARSE_ALIASED_BIT but the sparseResidencyAliased feature was not enabled.");
     }
 
-    // If flags contains VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT or VK_IMAGE_CREATE_SPARSE_ALIASED_BIT, it must also contain
-    // VK_IMAGE_CREATE_SPARSE_BINDING_BIT
     if (((image_flags & (VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT | VK_IMAGE_CREATE_SPARSE_ALIASED_BIT)) != 0) &&
         ((image_flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != VK_IMAGE_CREATE_SPARSE_BINDING_BIT)) {
         skip |= LogError("VUID-VkImageCreateInfo-flags-00987", device, create_info_loc.dot(Field::flags), "is %s.",
@@ -410,33 +402,28 @@ bool Device::ValidateCreateImageSparse(const VkImageCreateInfo &create_info, con
 
     // Check for combinations of attributes that are incompatible with having VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT set
     if ((image_flags & VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT) != 0) {
-        // Linear tiling is unsupported
         if (VK_IMAGE_TILING_LINEAR == create_info.tiling) {
             skip |= LogError("VUID-VkImageCreateInfo-tiling-04121", device, create_info_loc.dot(Field::flags),
                              "includes VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT but tiling is VK_IMAGE_TILING_LINEAR.");
         }
 
-        // Sparse 1D image isn't valid
         if (VK_IMAGE_TYPE_1D == create_info.imageType) {
             skip |= LogError("VUID-VkImageCreateInfo-imageType-00970", device, create_info_loc.dot(Field::flags),
                              "includes VK_IMAGE_CREATE_SPARSE_BINDING_BIT but imageType is VK_IMAGE_TYPE_1D.");
         }
 
-        // Sparse 2D image when device doesn't support it
         if ((!enabled_features.sparseResidencyImage2D) && (VK_IMAGE_TYPE_2D == create_info.imageType)) {
             skip |= LogError("VUID-VkImageCreateInfo-imageType-00971", device, create_info_loc.dot(Field::flags),
                              "includes VK_IMAGE_CREATE_SPARSE_BINDING_BIT and imageType is VK_IMAGE_TYPE_2D, but "
                              "sparseResidencyImage2D feature was not enabled.");
         }
 
-        // Sparse 3D image when device doesn't support it
         if ((!enabled_features.sparseResidencyImage3D) && (VK_IMAGE_TYPE_3D == create_info.imageType)) {
             skip |= LogError("VUID-VkImageCreateInfo-imageType-00972", device, create_info_loc.dot(Field::flags),
                              "includes VK_IMAGE_CREATE_SPARSE_BINDING_BIT and imageType is VK_IMAGE_TYPE_3D, but "
                              "sparseResidencyImage3D feature was not enabled.");
         }
 
-        // Multi-sample 2D image when device doesn't support it
         if (VK_IMAGE_TYPE_2D == create_info.imageType) {
             if ((!enabled_features.sparseResidency2Samples) && (VK_SAMPLE_COUNT_2_BIT == create_info.samples)) {
                 skip |= LogError("VUID-VkImageCreateInfo-imageType-00973", device, create_info_loc.dot(Field::flags),
@@ -527,7 +514,6 @@ bool Device::ValidateCreateImageStencilUsage(const VkImageCreateInfo &create_inf
 
     if ((image_stencil_struct->stencilUsage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT) != 0) {
         VkImageUsageFlags legal_flags = (VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
-        // No flags other than the legal attachment bits may be set
         legal_flags |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
         if ((image_stencil_struct->stencilUsage & ~legal_flags) != 0) {
             skip |= LogError("VUID-VkImageStencilUsageCreateInfo-stencilUsage-02539", device,
@@ -799,7 +785,7 @@ bool Device::ValidateCreateImageMetalObject(const VkImageCreateInfo &create_info
             skip |=
                 LogError("VUID-VkImageCreateInfo-pNext-06785", device, texture_info_loc,
                          "is %s, but only VK_IMAGE_ASPECT_PLANE_0_BIT is allowed for an image created with format %s, "
-                         "which is not multiplaner",
+                         "which is not multiplanar",
                          string_VkImageAspectFlags(import_metal_texture_info->plane).c_str(), string_VkFormat(create_info.format));
         }
         if ((format_plane_count == 2) && (import_metal_texture_info->plane == VK_IMAGE_ASPECT_PLANE_2_BIT)) {
@@ -896,6 +882,65 @@ bool Device::ValidateCreateImageDrmFormatModifiers(const VkImageCreateInfo &crea
     return skip;
 }
 
+bool Device::ValidateImageViewCreateInfo(const VkImageViewCreateInfo &create_info, const Location &create_info_loc) const {
+    bool skip = false;
+
+    if ((create_info.viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) && (!enabled_features.imageCubeArray)) {
+        skip |= LogError("VUID-VkImageViewCreateInfo-viewType-01004", create_info.image, create_info_loc.dot(Field::viewType),
+                         "is VK_IMAGE_VIEW_TYPE_CUBE_ARRAY but the imageCubeArray feature is not enabled.");
+    }
+
+    if (create_info.subresourceRange.layerCount != VK_REMAINING_ARRAY_LAYERS) {
+        if (create_info.viewType == VK_IMAGE_VIEW_TYPE_CUBE && create_info.subresourceRange.layerCount != 6) {
+            skip |= LogError("VUID-VkImageViewCreateInfo-viewType-02960", create_info.image,
+                             create_info_loc.dot(Field::subresourceRange).dot(Field::layerCount),
+                             "(%" PRIu32 ") must be 6 or VK_REMAINING_ARRAY_LAYERS.", create_info.subresourceRange.layerCount);
+        }
+        if (create_info.viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY && (create_info.subresourceRange.layerCount % 6) != 0) {
+            skip |= LogError("VUID-VkImageViewCreateInfo-viewType-02961", create_info.image,
+                             create_info_loc.dot(Field::subresourceRange).dot(Field::layerCount),
+                             "(%" PRIu32 ") must be a multiple of 6 or VK_REMAINING_ARRAY_LAYERS.",
+                             create_info.subresourceRange.layerCount);
+        }
+    }
+
+    auto astc_decode_mode = vku::FindStructInPNextChain<VkImageViewASTCDecodeModeEXT>(create_info.pNext);
+    if (astc_decode_mode != nullptr) {
+        if ((astc_decode_mode->decodeMode != VK_FORMAT_R16G16B16A16_SFLOAT) &&
+            (astc_decode_mode->decodeMode != VK_FORMAT_R8G8B8A8_UNORM) &&
+            (astc_decode_mode->decodeMode != VK_FORMAT_E5B9G9R9_UFLOAT_PACK32)) {
+            skip |= LogError("VUID-VkImageViewASTCDecodeModeEXT-decodeMode-02230", create_info.image,
+                             create_info_loc.pNext(Struct::VkImageViewASTCDecodeModeEXT, Field::decodeMode), "is %s.",
+                             string_VkFormat(astc_decode_mode->decodeMode));
+        }
+        if ((vkuFormatIsCompressed_ASTC_LDR(create_info.format) == false) &&
+            (vkuFormatIsCompressed_ASTC_HDR(create_info.format) == false)) {
+            skip |=
+                LogError("VUID-VkImageViewASTCDecodeModeEXT-format-04084", create_info.image, create_info_loc.dot(Field::format),
+                         "%s is not an ASTC format (because VkImageViewASTCDecodeModeEXT was passed in the pNext chain).",
+                         string_VkFormat(create_info.format));
+        }
+    }
+
+    auto ycbcr_conversion = vku::FindStructInPNextChain<VkSamplerYcbcrConversionInfo>(create_info.pNext);
+    if (ycbcr_conversion != nullptr) {
+        if (ycbcr_conversion->conversion != VK_NULL_HANDLE) {
+            if (IsIdentitySwizzle(create_info.components) == false) {
+                skip |= LogError("VUID-VkImageViewCreateInfo-pNext-01970", create_info.image, create_info_loc,
+                                 "If there is a VkSamplerYcbcrConversion, the imageView must "
+                                 "be created with the identity swizzle. Here are the actual swizzle values:\n%s",
+                                 string_VkComponentMapping(create_info.components).c_str());
+            }
+        }
+    }
+#ifdef VK_USE_PLATFORM_METAL_EXT
+    skip |= ExportMetalObjectsPNextUtil(VK_EXPORT_METAL_OBJECT_TYPE_METAL_TEXTURE_BIT_EXT, "VUID-VkImageViewCreateInfo-pNext-06787",
+                                        create_info_loc, "VK_EXPORT_METAL_OBJECT_TYPE_METAL_TEXTURE_BIT_EXT", create_info.pNext);
+#endif  // VK_USE_PLATFORM_METAL_EXT
+
+    return skip;
+}
+
 bool Device::manual_PreCallValidateCreateImageView(VkDevice device, const VkImageViewCreateInfo *pCreateInfo,
                                                    const VkAllocationCallbacks *pAllocator, VkImageView *pView,
                                                    const Context &context) const {
@@ -906,60 +951,7 @@ bool Device::manual_PreCallValidateCreateImageView(VkDevice device, const VkImag
         return skip;
     }
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
-    // Validate feature set if using CUBE_ARRAY
-    if ((pCreateInfo->viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) && (!enabled_features.imageCubeArray)) {
-        skip |= LogError("VUID-VkImageViewCreateInfo-viewType-01004", pCreateInfo->image, create_info_loc.dot(Field::viewType),
-                         "is VK_IMAGE_VIEW_TYPE_CUBE_ARRAY but the imageCubeArray feature is not enabled.");
-    }
-
-    if (pCreateInfo->subresourceRange.layerCount != VK_REMAINING_ARRAY_LAYERS) {
-        if (pCreateInfo->viewType == VK_IMAGE_VIEW_TYPE_CUBE && pCreateInfo->subresourceRange.layerCount != 6) {
-            skip |= LogError("VUID-VkImageViewCreateInfo-viewType-02960", pCreateInfo->image,
-                             create_info_loc.dot(Field::subresourceRange).dot(Field::layerCount),
-                             "(%" PRIu32 ") must be 6 or VK_REMAINING_ARRAY_LAYERS.", pCreateInfo->subresourceRange.layerCount);
-        }
-        if (pCreateInfo->viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY && (pCreateInfo->subresourceRange.layerCount % 6) != 0) {
-            skip |= LogError("VUID-VkImageViewCreateInfo-viewType-02961", pCreateInfo->image,
-                             create_info_loc.dot(Field::subresourceRange).dot(Field::layerCount),
-                             "(%" PRIu32 ") must be a multiple of 6 or VK_REMAINING_ARRAY_LAYERS.",
-                             pCreateInfo->subresourceRange.layerCount);
-        }
-    }
-
-    auto astc_decode_mode = vku::FindStructInPNextChain<VkImageViewASTCDecodeModeEXT>(pCreateInfo->pNext);
-    if (astc_decode_mode != nullptr) {
-        if ((astc_decode_mode->decodeMode != VK_FORMAT_R16G16B16A16_SFLOAT) &&
-            (astc_decode_mode->decodeMode != VK_FORMAT_R8G8B8A8_UNORM) &&
-            (astc_decode_mode->decodeMode != VK_FORMAT_E5B9G9R9_UFLOAT_PACK32)) {
-            skip |= LogError("VUID-VkImageViewASTCDecodeModeEXT-decodeMode-02230", pCreateInfo->image,
-                             create_info_loc.pNext(Struct::VkImageViewASTCDecodeModeEXT, Field::decodeMode), "is %s.",
-                             string_VkFormat(astc_decode_mode->decodeMode));
-        }
-        if ((vkuFormatIsCompressed_ASTC_LDR(pCreateInfo->format) == false) &&
-            (vkuFormatIsCompressed_ASTC_HDR(pCreateInfo->format) == false)) {
-            skip |=
-                LogError("VUID-VkImageViewASTCDecodeModeEXT-format-04084", pCreateInfo->image, create_info_loc.dot(Field::format),
-                         "%s is not an ASTC format (because VkImageViewASTCDecodeModeEXT was passed in the pNext chain).",
-                         string_VkFormat(pCreateInfo->format));
-        }
-    }
-
-    auto ycbcr_conversion = vku::FindStructInPNextChain<VkSamplerYcbcrConversionInfo>(pCreateInfo->pNext);
-    if (ycbcr_conversion != nullptr) {
-        if (ycbcr_conversion->conversion != VK_NULL_HANDLE) {
-            if (IsIdentitySwizzle(pCreateInfo->components) == false) {
-                skip |= LogError("VUID-VkImageViewCreateInfo-pNext-01970", pCreateInfo->image, create_info_loc,
-                                 "If there is a VkSamplerYcbcrConversion, the imageView must "
-                                 "be created with the identity swizzle. Here are the actual swizzle values:\n%s",
-                                 string_VkComponentMapping(pCreateInfo->components).c_str());
-            }
-        }
-    }
-#ifdef VK_USE_PLATFORM_METAL_EXT
-    skip |=
-        ExportMetalObjectsPNextUtil(VK_EXPORT_METAL_OBJECT_TYPE_METAL_TEXTURE_BIT_EXT, "VUID-VkImageViewCreateInfo-pNext-06787",
-                                    error_obj.location, "VK_EXPORT_METAL_OBJECT_TYPE_METAL_TEXTURE_BIT_EXT", pCreateInfo->pNext);
-#endif  // VK_USE_PLATFORM_METAL_EXT
+    skip = ValidateImageViewCreateInfo(*pCreateInfo, create_info_loc);
     return skip;
 }
 

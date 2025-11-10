@@ -340,7 +340,7 @@ void AccelerationStructureKHR::Create() {
         if (buffer_init_no_mem_) {
             device_buffer_.InitNoMemory(*device_, ci);
         } else {
-            device_buffer_.init(*device_, ci, buffer_memory_property_flags_, &alloc_flags);
+            device_buffer_.Init(*device_, ci, buffer_memory_property_flags_, &alloc_flags);
         }
     }
     vk_info_.buffer = device_buffer_.handle();
@@ -362,7 +362,7 @@ void AccelerationStructureKHR::Destroy() {
     assert(handle() != VK_NULL_HANDLE);
     vk::DestroyAccelerationStructureKHR(device_->handle(), handle(), nullptr);
     handle_ = VK_NULL_HANDLE;
-    device_buffer_.destroy();
+    device_buffer_.Destroy();
 }
 
 BuildGeometryInfoKHR::BuildGeometryInfoKHR(const vkt::Device *device)
@@ -492,9 +492,9 @@ BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetIndirectDeviceAddress(std::option
     return *this;
 }
 
-void BuildGeometryInfoKHR::BuildCmdBuffer(VkCommandBuffer cmd_buffer, bool use_ppGeometries /*= true*/) {
+void BuildGeometryInfoKHR::BuildCmdBuffer(VkCommandBuffer cmd_buffer) {
     SetupBuild(true);
-    VkCmdBuildAccelerationStructuresKHR(cmd_buffer, true);
+    VkCmdBuildAccelerationStructuresKHR(cmd_buffer);
 }
 
 void BuildGeometryInfoKHR::BuildCmdBufferIndirect(VkCommandBuffer cmd_buffer) {
@@ -546,7 +546,7 @@ void BuildGeometryInfoKHR::SetupBuild(bool is_on_device_build, bool use_ppGeomet
                 alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 
                 if (scratch_size > 0) {
-                    device_scratch_->init(*device_, scratch_size + as_props.minAccelerationStructureScratchOffsetAlignment,
+                    device_scratch_->Init(*device_, scratch_size + as_props.minAccelerationStructureScratchOffsetAlignment,
                                           VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                                               device_scratch_additional_flags_,
                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_flags);
@@ -631,7 +631,7 @@ void BuildGeometryInfoKHR::VkCmdBuildAccelerationStructuresIndirectKHR(VkCommand
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
     alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 
-    indirect_buffer_->init(*device_, 1 * vk_info_.geometryCount * sizeof(VkAccelerationStructureBuildRangeInfoKHR),
+    indirect_buffer_->Init(*device_, 1 * vk_info_.geometryCount * sizeof(VkAccelerationStructureBuildRangeInfoKHR),
                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps,
                            &alloc_flags);
 
@@ -1107,7 +1107,7 @@ GeometryKHR GeometrySimpleOnDeviceAABBInfo(const vkt::Device &device, VkBufferUs
                                             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
                                             VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | additional_geometry_buffer_flags;
 
-    aabb_buffer.init(device, aabb_buffer_size, buffer_usage, kHostVisibleMemProps, &alloc_flags);
+    aabb_buffer.Init(device, aabb_buffer_size, buffer_usage, kHostVisibleMemProps, &alloc_flags);
 
     // Fill buffer with one AABB
     aabb_geometry.SetPrimitiveCount(static_cast<uint32_t>(aabbs.size()));
@@ -1375,6 +1375,80 @@ BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device &device, vkt::Queue
     return top_level_accel_struct;
 }
 
+vkt::as::BuildGeometryInfoKHR GetCubesTLAS(vkt::Device &device, vkt::CommandBuffer &cb, vkt::Queue &queue,
+                                           std::shared_ptr<vkt::as::BuildGeometryInfoKHR> &out_cube_blas) {
+    vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(device));
+    out_cube_blas = std::make_shared<vkt::as::BuildGeometryInfoKHR>(
+        vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(device, std::move(cube)));
+
+    // Build Bottom Level Acceleration Structure
+    cb.Begin();
+    out_cube_blas->BuildCmdBuffer(cb);
+    cb.End();
+
+    queue.Submit(cb);
+    device.Wait();
+
+    vkt::as::BuildGeometryInfoKHR tlas(&device);
+
+    tlas.SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
+    tlas.SetBuildType(VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR);
+    tlas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR);
+
+    std::vector<vkt::as::GeometryKHR> cube_instances(1);
+    cube_instances[0].SetType(vkt::as::GeometryKHR::Type::Instance);
+
+    VkAccelerationStructureInstanceKHR cube_instance_1{};
+    cube_instance_1.transform.matrix[0][0] = 1.0f;
+    cube_instance_1.transform.matrix[1][1] = 1.0f;
+    cube_instance_1.transform.matrix[2][2] = 1.0f;
+    cube_instance_1.transform.matrix[0][3] = 50.0f;
+    cube_instance_1.transform.matrix[1][3] = 0.0f;
+    cube_instance_1.transform.matrix[2][3] = 0.0f;
+    cube_instance_1.mask = 0xff;
+    cube_instance_1.instanceCustomIndex = 0;
+    // Cube instance 1 will be associated to closest hit shader 1
+    cube_instance_1.instanceShaderBindingTableRecordOffset = 0;
+    cube_instances[0].AddInstanceDeviceAccelStructRef(device, out_cube_blas->GetDstAS()->handle(), cube_instance_1);
+
+    VkAccelerationStructureInstanceKHR cube_instance_2{};
+    cube_instance_2.transform.matrix[0][0] = 1.0f;
+    cube_instance_2.transform.matrix[1][1] = 1.0f;
+    cube_instance_2.transform.matrix[2][2] = 1.0f;
+    cube_instance_2.transform.matrix[0][3] = 0.0f;
+    cube_instance_2.transform.matrix[1][3] = 0.0f;
+    cube_instance_2.transform.matrix[2][3] = 50.0f;
+    cube_instance_2.mask = 0xff;
+    cube_instance_2.instanceCustomIndex = 0;
+    // Cube instance 2 will be associated to closest hit shader 2
+    cube_instance_2.instanceShaderBindingTableRecordOffset = 1;
+    cube_instances[0].AddInstanceDeviceAccelStructRef(device, out_cube_blas->GetDstAS()->handle(), cube_instance_2);
+
+    tlas.SetGeometries(std::move(cube_instances));
+    tlas.SetBuildRanges(tlas.GetBuildRangeInfosFromGeometries());
+
+    // Set source and destination acceleration structures info. Does not create handles, it is done in Build()
+    tlas.SetSrcAS(vkt::as::blueprint::AccelStructNull(device));
+    auto dstAsSize = tlas.GetSizeInfo().accelerationStructureSize;
+    auto dst_as = vkt::as::blueprint::AccelStructSimpleOnDeviceBottomLevel(device, dstAsSize);
+    dst_as->SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
+    tlas.SetDstAS(std::move(dst_as));
+    tlas.SetUpdateDstAccelStructSizeBeforeBuild(true);
+
+    tlas.SetInfoCount(1);
+    tlas.SetNullInfos(false);
+    tlas.SetNullBuildRangeInfos(false);
+
+    cb.Begin();
+    tlas.BuildCmdBuffer(cb);
+    cb.End();
+
+    queue.Submit(cb);
+    device.Wait();
+
+    return tlas;
+}
+
 }  // namespace blueprint
 
 }  // namespace as
@@ -1392,13 +1466,22 @@ Pipeline::~Pipeline() {
 
 void Pipeline::AddCreateInfoFlags(VkPipelineCreateFlags flags) { vk_info_.flags |= flags; }
 
-void Pipeline::InitLibraryInfo() {
+void Pipeline::AddCreateInfoFlags2(VkPipelineCreateFlags2 flags) {
+    create_flags_2_ = vku::InitStructHelper();
+    create_flags_2_.flags = flags;
+    vk_info_.pNext = &create_flags_2_;
+}
+
+void Pipeline::InitLibraryInfo(uint32_t max_pipeline_payload_size, bool is_exe_pipeline) {
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_props = vku::InitStructHelper();
     test_.GetPhysicalDeviceProperties2(rt_pipeline_props);
     rt_pipeline_interface_info_ = vku::InitStructHelper();
-    rt_pipeline_interface_info_.maxPipelineRayPayloadSize = sizeof(float);  // Set according to payload defined in kRayGenShaderText
+    rt_pipeline_interface_info_.maxPipelineRayPayloadSize =
+        max_pipeline_payload_size;  // Set according to payload defined in kRayGenShaderText
     rt_pipeline_interface_info_.maxPipelineRayHitAttributeSize = rt_pipeline_props.maxRayHitAttributeSize;
-    AddCreateInfoFlags(VK_PIPELINE_CREATE_LIBRARY_BIT_KHR);
+    if (!is_exe_pipeline) {
+        AddCreateInfoFlags(VK_PIPELINE_CREATE_LIBRARY_BIT_KHR);
+    }
     vk_info_.pLibraryInterface = &rt_pipeline_interface_info_;
 }
 
@@ -1407,11 +1490,28 @@ void Pipeline::AddBinding(VkDescriptorType descriptor_type, uint32_t binding, ui
     binding_layout.binding = binding;
     binding_layout.descriptorType = descriptor_type;
     binding_layout.descriptorCount = descriptor_count;
-    binding_layout.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
+    binding_layout.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                                VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
     bindings_.emplace_back(binding_layout);
 }
 
+void Pipeline::AddDescriptorIndexingBinding(VkDescriptorType descriptor_type, uint32_t binding,
+                                            VkDescriptorBindingFlags flags /*= 0*/, uint32_t descriptor_count /*= 1*/) {
+    OneOffDescriptorIndexingSet::Binding desc_indexing_binding = {};
+    desc_indexing_binding.binding = binding;
+    desc_indexing_binding.descriptorType = descriptor_type;
+    desc_indexing_binding.descriptorCount = descriptor_count;
+    desc_indexing_binding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                                       VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
+    desc_indexing_binding.pImmutableSamplers = nullptr;
+    desc_indexing_binding.flag = flags;
+    desc_indexing_bindings_.emplace_back(desc_indexing_binding);
+}
+
 void Pipeline::CreateDescriptorSet() { desc_set_ = std::make_unique<OneOffDescriptorSet>(device_, bindings_); }
+void Pipeline::CreateDescriptorIndexingSet() {
+    desc_indexing_set_ = std::make_unique<OneOffDescriptorIndexingSet>(device_, desc_indexing_bindings_);
+}
 
 void Pipeline::SetPipelineSetLayouts(uint32_t set_layout_count, const VkDescriptorSetLayout *set_layouts) {
     pipeline_layout_ci_.setLayoutCount = set_layout_count;
@@ -1420,13 +1520,19 @@ void Pipeline::SetPipelineSetLayouts(uint32_t set_layout_count, const VkDescript
 
 void Pipeline::SetPushConstantRangeSize(uint32_t byte_size) { push_constant_range_size_ = byte_size; }
 
-void Pipeline::SetGlslRayGenShader(const char *glsl) {
-    ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, glsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2));
+void Pipeline::SetGlslRayGenShader(const char *glsl, void *pNext) {
+    ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, glsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2,
+                                                                SPV_SOURCE_GLSL, nullptr, "main", pNext));
 }
 
 void Pipeline::AddSpirvRayGenShader(const char *spirv, const char *entry_point) {
     ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, spirv, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2,
                                                                 SPV_SOURCE_ASM, nullptr, entry_point));
+}
+
+void Pipeline::AddSlangRayGenShader(const char *slang, const char *entry_point) {
+    ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, slang, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2,
+                                                                SPV_SOURCE_SLANG, nullptr, entry_point));
 }
 
 void Pipeline::AddGlslMissShader(const char *glsl) {
@@ -1436,6 +1542,11 @@ void Pipeline::AddGlslMissShader(const char *glsl) {
 void Pipeline::AddSpirvMissShader(const char *spirv, const char *entry_point) {
     miss_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, spirv, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2,
                                                              SPV_SOURCE_ASM, nullptr, entry_point));
+}
+
+void Pipeline::AddSlangMissShader(const char *slang, const char *entry_point) {
+    miss_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, slang, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2,
+                                                             SPV_SOURCE_SLANG, nullptr, entry_point));
 }
 
 void Pipeline::AddGlslClosestHitShader(const char *glsl) {
@@ -1448,11 +1559,17 @@ void Pipeline::AddSpirvClosestHitShader(const char *spirv, const char *entry_poi
                                                                     SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, nullptr, entry_point));
 }
 
+void Pipeline::AddSlangClosestHitShader(const char *slang, const char *entry_point) {
+    closest_hit_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, slang, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+                                                                    SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG, nullptr, entry_point));
+}
+
 void Pipeline::AddLibrary(const Pipeline &library) {
-    libraries_.emplace_back(library.rt_pipeline_);
+    libraries_.emplace_back(&library);
+    library_handles_.emplace_back(library.rt_pipeline_);
     pipeline_lib_info_ = vku::InitStructHelper();
-    pipeline_lib_info_.libraryCount = size32(libraries_);
-    pipeline_lib_info_.pLibraries = libraries_.data();
+    pipeline_lib_info_.libraryCount = size32(library_handles_);
+    pipeline_lib_info_.pLibraries = library_handles_.data();
     vk_info_.pLibraryInfo = &pipeline_lib_info_;
 }
 
@@ -1476,11 +1593,16 @@ void Pipeline::BuildPipeline() {
             pipeline_layout_ci_.pushConstantRangeCount = 1;
             pipeline_layout_ci_.pPushConstantRanges = &push_constant_range;
         }
-        if (desc_set_) {
+        assert(!(desc_set_ && desc_indexing_set_));
+        VkDescriptorSetLayout *desc_set = desc_set_            ? &desc_set_->layout_.handle()
+                                          : desc_indexing_set_ ? &desc_indexing_set_->layout_.handle()
+                                                               : nullptr;
+
+        if (desc_set) {
             pipeline_layout_ci_.setLayoutCount = 1;
-            pipeline_layout_ci_.pSetLayouts = &desc_set_->layout_.handle();
+            pipeline_layout_ci_.pSetLayouts = desc_set;
         }
-        pipeline_layout_.init(*device_, pipeline_layout_ci_);
+        pipeline_layout_.Init(*device_, pipeline_layout_ci_);
     }
 
     // Assemble shaders information (stages and groups)
@@ -1554,7 +1676,7 @@ void Pipeline::BuildPipeline() {
     vk_info_.layout = pipeline_layout_;
 
     if (deferred_op_ == VK_NULL_HANDLE) {
-        rt_pipeline_.init(*device_, vk_info_);
+        rt_pipeline_.Init(*device_, vk_info_);
     } else {
         rt_pipeline_.InitDeferred(*device_, vk_info_, deferred_op_);
 
@@ -1573,9 +1695,38 @@ void Pipeline::BuildPipeline() {
 
 void Pipeline::BuildSbt() {
     // As of now, no function support if not using any ray generation shader
-    assert(!ray_gen_shaders_.empty());
+    assert(GetRayGenShadersCount() > 0);
 
-    std::vector<uint8_t> sbt_host_storage = GetRayTracingShaderGroupHandles();
+    // Gather shader indices
+    // ---
+    // Used this as reference:
+    // https://github.com/nvpro-samples/nvpro_core/blob/ba24b73e3a918adfe6ca932a6bf749a1d874d9b0/nvvk/sbtwrapper_vk.cpp#L81
+    std::vector<uint32_t> ray_gen_handle_indices;
+    std::vector<uint32_t> miss_handle_indices;
+    std::vector<uint32_t> closest_hit_handle_indices;
+
+    uint32_t shader_i = 0;
+    for (uint32_t ray_gen_i = 0; ray_gen_i < size32(ray_gen_shaders_); ++ray_gen_i) {
+        ray_gen_handle_indices.emplace_back(shader_i++);
+    }
+    for (uint32_t miss_i = 0; miss_i < size32(miss_shaders_); ++miss_i) {
+        miss_handle_indices.emplace_back(shader_i++);
+    }
+    for (uint32_t closest_hit_i = 0; closest_hit_i < size32(closest_hit_shaders_); ++closest_hit_i) {
+        closest_hit_handle_indices.emplace_back(shader_i++);
+    }
+
+    for (const Pipeline *lib : libraries_) {
+        for (uint32_t ray_gen_i = 0; ray_gen_i < size32(lib->ray_gen_shaders_); ++ray_gen_i) {
+            ray_gen_handle_indices.emplace_back(shader_i++);
+        }
+        for (uint32_t miss_i = 0; miss_i < size32(lib->miss_shaders_); ++miss_i) {
+            miss_handle_indices.emplace_back(shader_i++);
+        }
+        for (uint32_t closest_hit_i = 0; closest_hit_i < size32(lib->closest_hit_shaders_); ++closest_hit_i) {
+            closest_hit_handle_indices.emplace_back(shader_i++);
+        }
+    }
 
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_props = vku::InitStructHelper();
     test_.GetPhysicalDeviceProperties2(rt_pipeline_props);
@@ -1583,13 +1734,14 @@ void Pipeline::BuildSbt() {
         Align(rt_pipeline_props.shaderGroupHandleSize, rt_pipeline_props.shaderGroupHandleAlignment);
 
     // Since every ray generation entry in the ray tracing shader headers buffer can be the start of the ray gen SBT,
-    // they all have to be aligned to shaderGroupBaseAlignment
-    const VkDeviceSize ray_gen_shaders_sbt_entry_byte_size = ray_gen_shaders_.size() * rt_pipeline_props.shaderGroupBaseAlignment;
+    // they all have to be aligned to shaderGroupBaseAlignment (which may be smaller than the handle size)
+    const VkDeviceSize ray_gen_shaders_sbt_entry_byte_size =
+        GetRayGenShadersCount() * Align(rt_pipeline_props.shaderGroupHandleSize, rt_pipeline_props.shaderGroupBaseAlignment);
     // For miss and closest hit shaders, we consider that the corresponding SBTs always start at the first miss/closest hit entry
     // => only it needs to be aligned to shaderGroupBaseAlignment,
     // and within miss/closes hit entries alignment is shaderGroupHandleAlignment
-    const VkDeviceSize miss_shaders_sbt_entry_byte_size = miss_shaders_.size() * handle_size_aligned;
-    const VkDeviceSize closest_hit_shaders_sbt_entry_byte_size = closest_hit_shaders_.size() * handle_size_aligned;
+    const VkDeviceSize miss_shaders_sbt_entry_byte_size = GetMissShadersCount() * handle_size_aligned;
+    const VkDeviceSize closest_hit_shaders_sbt_entry_byte_size = GetClosestHitShadersCount() * handle_size_aligned;
     VkDeviceSize sbt_buffer_size = ray_gen_shaders_sbt_entry_byte_size;
     sbt_buffer_size = Align<VkDeviceSize>(sbt_buffer_size, rt_pipeline_props.shaderGroupBaseAlignment);
     sbt_buffer_size += miss_shaders_sbt_entry_byte_size;
@@ -1604,34 +1756,52 @@ void Pipeline::BuildSbt() {
         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
     alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-    sbt_buffer_.init(*device_, sbt_buffer_info, kHostVisibleMemProps, &alloc_flags);
-
-#ifdef VVL_DEBUG_LOG_SBT
-    std::cout << "SBT buffer fill:\n";
-#endif
+    sbt_buffer_.Init(*device_, sbt_buffer_info, kHostVisibleMemProps, &alloc_flags);
 
     void *const sbt_buffer_base_ptr = sbt_buffer_.Memory().Map();
     void *sbt_buffer_ptr = sbt_buffer_base_ptr;
     (void)sbt_buffer_base_ptr;
     size_t sbt_buffer_space_left = static_cast<size_t>(sbt_buffer_info.size);
-    uint8_t *sbt_host_storage_ptr = sbt_host_storage.data();
+    std::vector<uint8_t> sbt_host_storage = GetRayTracingShaderGroupHandles();
+    uint8_t *const sbt_host_storage_ptr = sbt_host_storage.data();
+
+#ifdef VVL_DEBUG_LOG_SBT
+    std::cout << __FUNCTION__ << "\n===\n\n";
+
+    std::cout << "Ray gen shader indices in SBT:\n    ";
+    for (uint32_t i : ray_gen_handle_indices) {
+        std::cout << i << ' ';
+    }
+    std::cout << "\nMiss shader indices in SBT:\n    ";
+    for (uint32_t i : miss_handle_indices) {
+        std::cout << i << ' ';
+    }
+    std::cout << "\nClosest shader indices in SBT:\n    ";
+    for (uint32_t i : closest_hit_handle_indices) {
+        std::cout << i << ' ';
+    }
+
+    std::cout << "\nSBT buffer fill:\n";
+#endif
 
     // Fill Ray Generation shaders headers
     // ---
     {
         void *ray_gen_sbt = nullptr;
-        for (size_t ray_gen_i = 0; ray_gen_i < ray_gen_shaders_.size(); ++ray_gen_i) {
+        for (size_t ray_gen_i = 0; ray_gen_i < ray_gen_handle_indices.size(); ++ray_gen_i) {
             if (!std::align(rt_pipeline_props.shaderGroupBaseAlignment, rt_pipeline_props.shaderGroupHandleSize, sbt_buffer_ptr,
                             sbt_buffer_space_left)) {
                 assert(false);
                 return;
             }
-            if (!ray_gen_sbt) ray_gen_sbt = sbt_buffer_ptr;
-            std::memcpy(sbt_buffer_ptr, sbt_host_storage_ptr, rt_pipeline_props.shaderGroupHandleSize);
+            if (!ray_gen_sbt) {
+                ray_gen_sbt = sbt_buffer_ptr;
+            }
+            uint8_t *ray_gen_handle =
+                sbt_host_storage_ptr + rt_pipeline_props.shaderGroupHandleSize * ray_gen_handle_indices[ray_gen_i];
+            std::memcpy(sbt_buffer_ptr, ray_gen_handle, rt_pipeline_props.shaderGroupHandleSize);
             sbt_buffer_ptr = (uint8_t *)sbt_buffer_ptr + rt_pipeline_props.shaderGroupHandleSize;
             sbt_buffer_space_left -= rt_pipeline_props.shaderGroupHandleSize;
-
-            sbt_host_storage_ptr += rt_pipeline_props.shaderGroupHandleSize;
         }
         (void)ray_gen_sbt;
 
@@ -1643,8 +1813,8 @@ void Pipeline::BuildSbt() {
             std::cout << "Ray Gen shader handles:\n";
             size_t line_i = 0;
             for (size_t byte_i = 0;
-                 byte_i < ray_gen_shaders_.size() * Align<VkDeviceSize>(rt_pipeline_props.shaderGroupHandleSize,
-                                                                        rt_pipeline_props.shaderGroupBaseAlignment);
+                 byte_i < ray_gen_handle_indices.size() * Align<VkDeviceSize>(rt_pipeline_props.shaderGroupHandleSize,
+                                                                              rt_pipeline_props.shaderGroupBaseAlignment);
                  ++byte_i) {
                 if (byte_i > 0 && (byte_i % break_every == 0)) {
                     std::cout << std::endl;
@@ -1674,7 +1844,7 @@ void Pipeline::BuildSbt() {
 
     // Fill Miss shaders headers
     // ---
-    if (!miss_shaders_.empty()) {
+    if (GetMissShadersCount() > 0) {
         if (!std::align(rt_pipeline_props.shaderGroupBaseAlignment, rt_pipeline_props.shaderGroupHandleSize, sbt_buffer_ptr,
                         sbt_buffer_space_left)) {
             assert(false);
@@ -1682,19 +1852,20 @@ void Pipeline::BuildSbt() {
         }
 
         void *miss_sbt = nullptr;
-        for (size_t miss_i = 0; miss_i < miss_shaders_.size(); ++miss_i) {
+        for (size_t miss_i = 0; miss_i < miss_handle_indices.size(); ++miss_i) {
             if (!std::align(rt_pipeline_props.shaderGroupHandleAlignment, rt_pipeline_props.shaderGroupHandleSize, sbt_buffer_ptr,
                             sbt_buffer_space_left)) {
                 assert(false);
                 return;
             }
-            if (!miss_sbt) miss_sbt = sbt_buffer_ptr;
+            if (!miss_sbt) {
+                miss_sbt = sbt_buffer_ptr;
+            }
 
-            std::memcpy(sbt_buffer_ptr, sbt_host_storage_ptr, rt_pipeline_props.shaderGroupHandleSize);
+            uint8_t *miss_handle = sbt_host_storage_ptr + rt_pipeline_props.shaderGroupHandleSize * miss_handle_indices[miss_i];
+            std::memcpy(sbt_buffer_ptr, miss_handle, rt_pipeline_props.shaderGroupHandleSize);
             sbt_buffer_ptr = (uint8_t *)sbt_buffer_ptr + rt_pipeline_props.shaderGroupHandleSize;
             sbt_buffer_space_left -= rt_pipeline_props.shaderGroupHandleSize;
-
-            sbt_host_storage_ptr += rt_pipeline_props.shaderGroupHandleSize;
         }
         (void)miss_sbt;
 
@@ -1706,7 +1877,7 @@ void Pipeline::BuildSbt() {
             const auto original_fmt_flags = std::cout.flags();
             std::cout << "Miss shader handles:\n";
             size_t line_i = 0;
-            for (size_t byte_i = 0; byte_i < miss_shaders_.size() * handle_size_aligned; ++byte_i) {
+            for (size_t byte_i = 0; byte_i < miss_handle_indices.size() * handle_size_aligned; ++byte_i) {
                 if (byte_i > 0 && (byte_i % break_every == 0)) {
                     std::cout << std::endl;
                 }
@@ -1735,7 +1906,7 @@ void Pipeline::BuildSbt() {
 
     // Fill Closest Hit shaders headers
     // ---
-    if (!closest_hit_shaders_.empty()) {
+    if (GetClosestHitShadersCount() > 0) {
         if (!std::align(rt_pipeline_props.shaderGroupBaseAlignment, rt_pipeline_props.shaderGroupHandleSize, sbt_buffer_ptr,
                         sbt_buffer_space_left)) {
             assert(false);
@@ -1743,19 +1914,21 @@ void Pipeline::BuildSbt() {
         }
 
         void *closest_hit_sbt = nullptr;
-        for (size_t closest_hit_i = 0; closest_hit_i < closest_hit_shaders_.size(); ++closest_hit_i) {
+        for (size_t closest_hit_i = 0; closest_hit_i < closest_hit_handle_indices.size(); ++closest_hit_i) {
             if (!std::align(rt_pipeline_props.shaderGroupHandleAlignment, rt_pipeline_props.shaderGroupHandleSize, sbt_buffer_ptr,
                             sbt_buffer_space_left)) {
                 assert(false);
                 return;
             }
-            if (!closest_hit_sbt) closest_hit_sbt = sbt_buffer_ptr;
+            if (!closest_hit_sbt) {
+                closest_hit_sbt = sbt_buffer_ptr;
+            }
 
-            std::memcpy(sbt_buffer_ptr, sbt_host_storage_ptr, rt_pipeline_props.shaderGroupHandleSize);
+            uint8_t *closest_hit_handle =
+                sbt_host_storage_ptr + rt_pipeline_props.shaderGroupHandleSize * closest_hit_handle_indices[closest_hit_i];
+            std::memcpy(sbt_buffer_ptr, closest_hit_handle, rt_pipeline_props.shaderGroupHandleSize);
             sbt_buffer_ptr = (uint8_t *)sbt_buffer_ptr + rt_pipeline_props.shaderGroupHandleSize;
             sbt_buffer_space_left -= rt_pipeline_props.shaderGroupHandleSize;
-
-            sbt_host_storage_ptr += rt_pipeline_props.shaderGroupHandleSize;
         }
         (void)closest_hit_sbt;
 
@@ -1767,7 +1940,7 @@ void Pipeline::BuildSbt() {
             const auto original_fmt_flags = std::cout.flags();
             std::cout << "Closest hit shader handles:\n";
             size_t line_i = 0;
-            for (size_t byte_i = 0; byte_i < closest_hit_shaders_.size() * handle_size_aligned; ++byte_i) {
+            for (size_t byte_i = 0; byte_i < closest_hit_handle_indices.size() * handle_size_aligned; ++byte_i) {
                 if (byte_i > 0 && (byte_i % break_every == 0)) {
                     std::cout << std::endl;
                 }
@@ -1809,7 +1982,7 @@ VkShaderObj &Pipeline::GetRayGenShader(uint32_t ray_gen_i) { return *ray_gen_sha
 
 vkt::rt::TraceRaysSbt Pipeline::GetTraceRaysSbt(uint32_t ray_gen_shader_i /*= 0*/) {
     // As of now, no function support if not using any ray generation shader
-    assert(!ray_gen_shaders_.empty());
+    assert(GetRayGenShadersCount() > 0);
 
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_props = vku::InitStructHelper();
     VkPhysicalDeviceProperties2 props2 = vku::InitStructHelper(&rt_pipeline_props);
@@ -1834,7 +2007,7 @@ vkt::rt::TraceRaysSbt Pipeline::GetTraceRaysSbt(uint32_t ray_gen_shader_i /*= 0*
     ray_gen_sbt.deviceAddress = sbt_address + ray_gen_shader_i * handle_size_base_aligned;
     ray_gen_sbt.stride = handle_size_base_aligned;
     ray_gen_sbt.size = handle_size_base_aligned;
-    sbt_address += ray_gen_shaders_.size() * handle_size_base_aligned;
+    sbt_address += GetRayGenShadersCount() * handle_size_base_aligned;
 #ifdef VVL_DEBUG_LOG_SBT
     std::cout << "Ray Gen SBT entry: @ = " << ray_gen_sbt.deviceAddress
               << " (offset from base = " << ray_gen_sbt.deviceAddress - sbt_base_address << ") | stride = " << ray_gen_sbt.stride
@@ -1842,11 +2015,11 @@ vkt::rt::TraceRaysSbt Pipeline::GetTraceRaysSbt(uint32_t ray_gen_shader_i /*= 0*
 #endif
 
     VkStridedDeviceAddressRegionKHR miss_sbt{};
-    if (!miss_shaders_.empty()) {
+    if (GetMissShadersCount() > 0) {
         sbt_address = Align<VkDeviceAddress>(sbt_address, rt_pipeline_props.shaderGroupBaseAlignment);
         miss_sbt.deviceAddress = sbt_address;
         miss_sbt.stride = handle_size_aligned;
-        miss_sbt.size = miss_shaders_.size() * handle_size_aligned;
+        miss_sbt.size = GetMissShadersCount() * handle_size_aligned;
         sbt_address += miss_sbt.size;
 #ifdef VVL_DEBUG_LOG_SBT
         std::cout << "Miss SBT entry: @ = " << miss_sbt.deviceAddress
@@ -1856,11 +2029,11 @@ vkt::rt::TraceRaysSbt Pipeline::GetTraceRaysSbt(uint32_t ray_gen_shader_i /*= 0*
     }
 
     VkStridedDeviceAddressRegionKHR closest_hit_sbt{};
-    if (!closest_hit_shaders_.empty()) {
+    if (GetClosestHitShadersCount() > 0) {
         sbt_address = Align<VkDeviceAddress>(sbt_address, rt_pipeline_props.shaderGroupBaseAlignment);
         closest_hit_sbt.deviceAddress = sbt_address;
         closest_hit_sbt.stride = handle_size_aligned;
-        closest_hit_sbt.size = closest_hit_shaders_.size() * handle_size_aligned;
+        closest_hit_sbt.size = GetClosestHitShadersCount() * handle_size_aligned;
         sbt_address += closest_hit_sbt.size;
 #ifdef VVL_DEBUG_LOG_SBT
         std::cout << "Closest hit SBT entry: @ = " << closest_hit_sbt.deviceAddress
@@ -1909,11 +2082,10 @@ vkt::Buffer Pipeline::GetTraceRaysSbtIndirectBuffer(uint32_t ray_gen_shader_i, u
 }
 
 uint32_t Pipeline::GetShaderGroupsCount() {
-    uint32_t shader_groups_count = 0;
-    shader_groups_count += size32(ray_gen_shaders_);
-    shader_groups_count += size32(miss_shaders_);
-    shader_groups_count += size32(closest_hit_shaders_);
-    return shader_groups_count;
+    const uint32_t ray_gen_count = GetRayGenShadersCount();
+    const uint32_t miss_count = GetMissShadersCount();
+    const uint32_t closest_hit_count = GetClosestHitShadersCount();
+    return ray_gen_count + miss_count + closest_hit_count;
 }
 
 std::vector<uint8_t> Pipeline::GetRayTracingShaderGroupHandles() {
@@ -1922,11 +2094,9 @@ std::vector<uint8_t> Pipeline::GetRayTracingShaderGroupHandles() {
 
     // Get shader group handles to fill shader binding tables (SBT)
     // Consider that handles are stored aligned to shaderGroupHandleSize
-    const uint32_t sbt_size = shader_group_cis_.size() * rt_pipeline_props.shaderGroupHandleSize;
-    std::vector<uint8_t> sbt_host_storage(sbt_size);
-
-    // #ARNO_TODO use correct group count
     const uint32_t shader_group_count = GetShaderGroupsCount();
+    const uint32_t sbt_size = shader_group_count * rt_pipeline_props.shaderGroupHandleSize;
+    std::vector<uint8_t> sbt_host_storage(sbt_size);
     const VkResult result =
         vk::GetRayTracingShaderGroupHandlesKHR(*device_, Handle(), 0, shader_group_count, sbt_size, sbt_host_storage.data());
     if (IsValueIn(result, {VK_ERROR_OUT_OF_HOST_MEMORY, VK_ERROR_OUT_OF_DEVICE_MEMORY})) {
@@ -1934,41 +2104,76 @@ std::vector<uint8_t> Pipeline::GetRayTracingShaderGroupHandles() {
     }
 
 #ifdef VVL_DEBUG_LOG_SBT
-    const uint32_t break_every = rt_pipeline_props.shaderGroupHandleSize;
-    const size_t ray_gen_entries_offset = 0;
-    const size_t miss_shaders_offset = ray_gen_shaders_.size();
-    const size_t closest_hit_shaders_offset = ray_gen_shaders_.size() + miss_shaders_.size();
 
-    std::cout << "SBT entries obtained from driver:\n";
-    const auto original_fmt_flags = std::cout.flags();
+    std::cout << __FUNCTION__ << "\n===\n\n";
+
+    std::vector<uint32_t> ray_gen_handle_indices;
+    std::vector<uint32_t> miss_handle_indices;
+    std::vector<uint32_t> closest_hit_handle_indices;
+
     {
-        size_t line_i = 0;
-        for (size_t i = 0; i < sbt_host_storage.size(); ++i) {
-            if (i > 0 && (i % break_every == 0)) {
-                std::cout << std::endl;
-            }
-            if (i % break_every == 0) {
-                if (line_i == ray_gen_entries_offset) {
-                    std::cout << "Ray Gen shader handles:\n";
-                } else if (line_i == miss_shaders_offset) {
-                    std::cout << "Miss shader handles:\n";
-                } else if (line_i == closest_hit_shaders_offset) {
-                    std::cout << "Closes hit shader handles:\n";
-                }
-                std::cout << std::setw(4) << line_i * break_every << ": ";
-                ++line_i;
-            }
+        uint32_t shader_i = 0;
+        for (uint32_t ray_gen_i = 0; ray_gen_i < size32(ray_gen_shaders_); ++ray_gen_i) {
+            ray_gen_handle_indices.emplace_back(shader_i++);
+        }
+        for (uint32_t miss_i = 0; miss_i < size32(miss_shaders_); ++miss_i) {
+            miss_handle_indices.emplace_back(shader_i++);
+        }
+        for (uint32_t closest_hit_i = 0; closest_hit_i < size32(closest_hit_shaders_); ++closest_hit_i) {
+            closest_hit_handle_indices.emplace_back(shader_i++);
+        }
 
-            uint32_t byte = sbt_host_storage[i];
-            std::cout << std::hex;
-            if (byte == 0)
-                std::cout << "-- ";
-            else {
-                std::cout << std::setw(2);
-                std::cout << byte;
-                std::cout << " ";
+        for (const Pipeline *lib : libraries_) {
+            for (uint32_t ray_gen_i = 0; ray_gen_i < size32(lib->ray_gen_shaders_); ++ray_gen_i) {
+                ray_gen_handle_indices.emplace_back(shader_i++);
             }
-            std::cout << std::dec;
+            for (uint32_t miss_i = 0; miss_i < size32(lib->miss_shaders_); ++miss_i) {
+                miss_handle_indices.emplace_back(shader_i++);
+            }
+            for (uint32_t closest_hit_i = 0; closest_hit_i < size32(lib->closest_hit_shaders_); ++closest_hit_i) {
+                closest_hit_handle_indices.emplace_back(shader_i++);
+            }
+        }
+    }
+
+    std::cout << "Ray gen shader indices in SBT:\n    ";
+    for (uint32_t i : ray_gen_handle_indices) {
+        std::cout << i << ' ';
+    }
+    std::cout << "\nMiss shader indices in SBT:\n    ";
+    for (uint32_t i : miss_handle_indices) {
+        std::cout << i << ' ';
+    }
+    std::cout << "\nClosest shader indices in SBT:\n    ";
+    for (uint32_t i : closest_hit_handle_indices) {
+        std::cout << i << ' ';
+    }
+
+    std::array<std::pair<const std::vector<uint32_t> &, const char *>, 3> shader_groups = {
+        {{ray_gen_handle_indices, "Ray Gen shader handles"},
+         {miss_handle_indices, "Miss shader handles"},
+         {closest_hit_handle_indices, "Closest hit shader handles"}}};
+
+    std::cout << "\nSBT entries obtained from driver:\n";
+    const auto original_fmt_flags = std::cout.flags();
+    for (const auto &shader_group : shader_groups) {
+        std::cout << shader_group.second << ":\n";
+        for (uint32_t shader_i : shader_group.first) {
+            const size_t start_offset = rt_pipeline_props.shaderGroupHandleSize * shader_i;
+            std::cout << std::setw(4) << start_offset << ": ";
+            for (size_t byte_i = 0; byte_i < rt_pipeline_props.shaderGroupHandleSize; ++byte_i) {
+                uint32_t byte = sbt_host_storage[rt_pipeline_props.shaderGroupHandleSize * shader_i + byte_i];
+                std::cout << std::hex;
+                if (byte == 0)
+                    std::cout << "-- ";
+                else {
+                    std::cout << std::setw(2);
+                    std::cout << byte;
+                    std::cout << " ";
+                }
+                std::cout << std::dec;
+            }
+            std::cout << '\n';
         }
     }
     std::cout.flags(original_fmt_flags);
@@ -1985,7 +2190,7 @@ std::vector<uint8_t> Pipeline::GetRayTracingCaptureReplayShaderGroupHandles() {
 
     // Get shader group handles to fill ray gen shader binding table (SBT)
     const uint32_t handle_size_aligned =
-        Align(rt_pipeline_props.shaderGroupHandleSize, rt_pipeline_props.shaderGroupHandleAlignment);
+        Align(rt_pipeline_props.shaderGroupHandleCaptureReplaySize, rt_pipeline_props.shaderGroupHandleAlignment);
     const uint32_t sbt_size = shader_group_cis_.size() * handle_size_aligned;
     std::vector<uint8_t> sbt_host_storage(sbt_size);
 
@@ -1998,6 +2203,33 @@ std::vector<uint8_t> Pipeline::GetRayTracingCaptureReplayShaderGroupHandles() {
 }
 
 std::vector<VkRayTracingShaderGroupCreateInfoKHR> Pipeline::GetRayTracingShaderGroupCreateInfos() { return shader_group_cis_; }
+
+uint32_t Pipeline::GetRayGenShadersCount() const {
+    uint32_t count = 0;
+    count += size32(ray_gen_shaders_);
+    for (const Pipeline *lib : libraries_) {
+        count += lib->GetRayGenShadersCount();
+    }
+    return count;
+}
+
+uint32_t Pipeline::GetMissShadersCount() const {
+    uint32_t count = 0;
+    count += size32(miss_shaders_);
+    for (const Pipeline *lib : libraries_) {
+        count += lib->GetMissShadersCount();
+    }
+    return count;
+}
+
+uint32_t Pipeline::GetClosestHitShadersCount() const {
+    uint32_t count = 0;
+    count += size32(closest_hit_shaders_);
+    for (const Pipeline *lib : libraries_) {
+        count += lib->GetClosestHitShadersCount();
+    }
+    return count;
+}
 
 }  // namespace rt
 }  // namespace vkt

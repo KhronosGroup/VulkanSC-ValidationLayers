@@ -1,6 +1,7 @@
 # ~~~
 # Copyright (c) 2014-2025 Valve Corporation
 # Copyright (c) 2014-2025 LunarG, Inc.
+# Copyright (C) 2025 Arm Limited.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,52 +21,18 @@ if (VULKANSC)
     return() # Return early
 endif()
 
+if(SLANG_INSTALL_DIR)
+    find_package(slang CONFIG QUIET)
+endif()
+
+add_subdirectory(framework)
+
 if (ANDROID)
     add_library(vk_layer_validation_tests MODULE)
 else()
     add_executable(vk_layer_validation_tests)
 endif()
 target_sources(vk_layer_validation_tests PRIVATE
-    framework/android_hardware_buffer.h
-    framework/layer_validation_tests.h
-    framework/layer_validation_tests.cpp
-    framework/pipeline_helper.h
-    framework/pipeline_helper.cpp
-    framework/shader_helper.h
-    framework/shader_helper.cpp
-    framework/shader_object_helper.h
-    framework/shader_object_helper.cpp
-    framework/test_common.h
-    framework/shader_templates.h
-    framework/error_monitor.cpp
-    framework/error_monitor.h
-    framework/video_objects.h
-    framework/render.cpp
-    framework/render.h
-    framework/binding.h
-    framework/binding.cpp
-    framework/buffer_helper.h
-    framework/test_framework.cpp
-    framework/ray_tracing_objects.h
-    framework/ray_tracing_objects.cpp
-    framework/ray_tracing_helper_nv.h
-    framework/ray_tracing_helper_nv.cpp
-    framework/external_memory_sync.h
-    framework/external_memory_sync.cpp
-    framework/sync_helper.h
-    framework/sync_helper.cpp
-    framework/sync_val_tests.h
-    framework/descriptor_helper.h
-    framework/descriptor_helper.cpp
-    framework/thread_helper.h
-    framework/thread_helper.cpp
-    framework/gpu_av_helper.h
-    framework/render_pass_helper.h
-    framework/render_pass_helper.cpp
-    framework/feature_requirements.h
-    framework/feature_requirements.cpp
-    framework/queue_submit_context.h
-    framework/queue_submit_context.cpp
     unit/amd_best_practices.cpp
     unit/android_hardware_buffer.cpp
     unit/android_hardware_buffer_positive.cpp
@@ -82,11 +49,16 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/command_positive.cpp
     unit/copy_buffer_image.cpp
     unit/copy_buffer_image_positive.cpp
+    unit/data_graph.cpp
+    unit/data_graph_positive.cpp
     unit/debug_extensions.cpp
     unit/debug_extensions_positive.cpp
     unit/debug_printf.cpp
     unit/debug_printf_shader_debug_info.cpp
     unit/debug_printf_ray_tracing.cpp
+    # Off until WG decides on naming
+    # unit/deprecation.cpp
+    # unit/deprecation_positive.cpp
     unit/descriptor_buffer.cpp
     unit/descriptor_buffer_positive.cpp
     unit/descriptor_indexing.cpp
@@ -143,6 +115,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_ray_tracing.cpp
     unit/gpu_av_ray_tracing_positive.cpp
     unit/gpu_av_vertex_attribute_fetch.cpp
+    unit/gpu_av_vertex_attribute_fetch_positive.cpp
     unit/graphics_library.cpp
     unit/graphics_library_positive.cpp
     unit/host_image_copy.cpp
@@ -229,6 +202,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/shader_storage_image_positive.cpp
     unit/shader_storage_texel.cpp
     unit/shader_storage_texel_positive.cpp
+    unit/shader_untyped.cpp
+    unit/shader_untyped_positive.cpp
     unit/sparse_buffer.cpp
     unit/sparse_buffer_positive.cpp
     unit/sparse_image.cpp
@@ -249,6 +224,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/sync_val_video_positive.cpp
     unit/sync_val_wsi.cpp
     unit/sync_val_wsi_positive.cpp
+    unit/tensor.cpp
+    unit/tensor_positive.cpp
     unit/threading.cpp
     unit/threading_positive.cpp
     unit/tooling.cpp
@@ -276,6 +253,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/video_encode_h264_positive.cpp
     unit/video_encode_h265.cpp
     unit/video_encode_h265_positive.cpp
+    unit/video_encode_intra_refresh.cpp
+    unit/video_encode_intra_refresh_positive.cpp
     unit/video_encode_quantization_map.cpp
     unit/video_encode_quantization_map_positive.cpp
     unit/viewport_inheritance.cpp
@@ -286,73 +265,14 @@ target_sources(vk_layer_validation_tests PRIVATE
     vvl_utils/small_vector.cpp
     vvl_utils/pnext_chain_extraction.cpp
 )
-if (APPLE)
-    target_sources(vk_layer_validation_tests PRIVATE
-        framework/apple_wsi.h
-        framework/apple_wsi.mm
-    )
-    # QuartzCore framework is needed for minimal Metal interaction
-    target_link_libraries(vk_layer_validation_tests PRIVATE "-framework QuartzCore")
-endif()
 
 get_target_property(TEST_SOURCES vk_layer_validation_tests SOURCES)
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${TEST_SOURCES})
 
 add_dependencies(vk_layer_validation_tests vvl)
 
-target_compile_options(vk_layer_validation_tests PRIVATE "$<IF:$<CXX_COMPILER_ID:MSVC>,/wd4100,-Wno-unused-parameter>")
-
-if(${CMAKE_CXX_COMPILER_ID} MATCHES "(GNU|Clang)")
-    target_compile_options(vk_layer_validation_tests PRIVATE
-        -Wno-sign-compare
-        -Wno-shorten-64-to-32
-        -Wno-missing-field-initializers
-    )
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        target_compile_options(vk_layer_validation_tests PRIVATE
-            -Wno-sign-conversion
-            -Wno-implicit-int-conversion
-        )
-    endif()
-elseif(MSVC)
-    target_compile_options(vk_layer_validation_tests PRIVATE
-        /wd4389 # signed/unsigned mismatch
-        /wd4267 # Disable some signed/unsigned mismatch warnings.
-    )
-
-    if (CMAKE_SIZEOF_VOID_P EQUAL 4)
-        # Due to IHV driver issues, we need the extra 2GB of virtual address space for 32 bit testing
-        target_link_options(vk_layer_validation_tests PRIVATE /LARGEADDRESSAWARE)
-    endif()
-endif()
-
-find_package(GTest CONFIG)
-find_package(glslang CONFIG)
-find_package(SPIRV-Tools CONFIG)
-
 target_link_libraries(vk_layer_validation_tests PRIVATE
-    VkLayer_utils
-    glslang::SPIRV
-    glslang::SPVRemapper
-    SPIRV-Tools-static
-    SPIRV-Headers::SPIRV-Headers
-    GTest::gtest
-    GTest::gtest_main
-    $<TARGET_NAME_IF_EXISTS:PkgConfig::XCB>
-    $<TARGET_NAME_IF_EXISTS:PkgConfig::X11>
-    $<TARGET_NAME_IF_EXISTS:PkgConfig::WAYlAND_CLIENT>
-)
-
-# setup framework/config.h using framework/config.h.in as a source
-file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h" INPUT "${CMAKE_CURRENT_SOURCE_DIR}/framework/config.h.in")
-
-# Since config_$<CONFIG>.h differs per build, set a compiler definition that files can use to include it
-target_compile_definitions(vk_layer_validation_tests PRIVATE CONFIG_HEADER_FILE="config_$<CONFIG>.h")
-
-target_sources(vk_layer_validation_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h)
-target_include_directories(vk_layer_validation_tests PRIVATE
-    ${CMAKE_CURRENT_BINARY_DIR}
-    ${VVL_SOURCE_DIR}/layers/external
+    vk_test_framework
 )
 
 # More details in tests/android/mock/README.md
@@ -367,10 +287,25 @@ elseif (ANDROID)
     return()
 endif()
 
+if(SLANG_INSTALL_DIR)
+    configure_slang_for_target(vk_layer_validation_tests)
+endif()
+
 install(TARGETS vk_layer_validation_tests)
+if (WIN32)
+    install(FILES $<TARGET_RUNTIME_DLLS:vk_layer_validation_tests> DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+if(SLANG_INSTALL_DIR)
+    install_slang_with_target(vk_layer_validation_tests ${CMAKE_INSTALL_LIBDIR})
+endif()
 
 include(GoogleTest)
-gtest_discover_tests(vk_layer_validation_tests DISCOVERY_TIMEOUT 100)
+# If cross-compiling, discovery will use an executable with the wrong architecture and stop execution here.
+# Set env. variable VVL_SKIP_GTEST_DISCOVERY to skip discovery.
+if(NOT VVL_SKIP_GTEST_DISCOVERY)
+    gtest_discover_tests(vk_layer_validation_tests DISCOVERY_TIMEOUT 100)
+endif()
 
+add_subdirectory(stress)
 add_subdirectory(layers)
 add_subdirectory(icd)

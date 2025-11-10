@@ -174,14 +174,14 @@ TEST_F(PositiveRayTracingPipeline, GetCaptureReplayShaderGroupHandlesKHR) {
 
     vkt::rt::Pipeline rt_pipe_lib(*this, m_device);
     rt_pipe_lib.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_SHADER_GROUP_HANDLE_CAPTURE_REPLAY_BIT_KHR);
-    rt_pipe_lib.InitLibraryInfo();
+    rt_pipe_lib.InitLibraryInfo(sizeof(float), false);
     rt_pipe_lib.SetGlslRayGenShader(kRayTracingMinimalGlsl);
     rt_pipe_lib.AddGlslMissShader(kRayTracingMinimalGlsl);
     rt_pipe_lib.Build();
 
     vkt::rt::Pipeline rt_pipe(*this, m_device);
     rt_pipe.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_SHADER_GROUP_HANDLE_CAPTURE_REPLAY_BIT_KHR);
-    rt_pipe.InitLibraryInfo();
+    rt_pipe.InitLibraryInfo(sizeof(float), true);
     rt_pipe.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
     rt_pipe.CreateDescriptorSet();
     vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
@@ -196,7 +196,7 @@ TEST_F(PositiveRayTracingPipeline, GetCaptureReplayShaderGroupHandlesKHR) {
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(ray_tracing_properties);
     const size_t buffer_size = (3 * ray_tracing_properties.shaderGroupHandleCaptureReplaySize);
-    void* out_buffer = malloc(buffer_size);
+    void *out_buffer = malloc(buffer_size);
     vk::GetRayTracingCaptureReplayShaderGroupHandlesKHR(*m_device, rt_pipe, 0, 3, buffer_size, out_buffer);
     free(out_buffer);
 }
@@ -216,13 +216,13 @@ TEST_F(PositiveRayTracingPipeline, GetRayTracingShaderGroupStackSizeKHR) {
     RETURN_IF_SKIP(InitState());
 
     vkt::rt::Pipeline rt_pipe_lib(*this, m_device);
-    rt_pipe_lib.InitLibraryInfo();
+    rt_pipe_lib.InitLibraryInfo(sizeof(float), false);
     rt_pipe_lib.SetGlslRayGenShader(kRayTracingMinimalGlsl);
     rt_pipe_lib.AddGlslMissShader(kRayTracingMinimalGlsl);
     rt_pipe_lib.Build();
 
     vkt::rt::Pipeline rt_pipe(*this, m_device);
-    rt_pipe.InitLibraryInfo();
+    rt_pipe.InitLibraryInfo(sizeof(float), true);
     rt_pipe.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
     rt_pipe.CreateDescriptorSet();
     vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
@@ -236,4 +236,151 @@ TEST_F(PositiveRayTracingPipeline, GetRayTracingShaderGroupStackSizeKHR) {
     const VkDeviceSize stack_size =
         vk::GetRayTracingShaderGroupStackSizeKHR(device(), rt_pipe, 1, VK_SHADER_GROUP_SHADER_GENERAL_KHR);
     (void)stack_size;
+}
+
+TEST_F(PositiveRayTracingPipeline, GetRayTracingShaderGroupStackSizeUnusedGroupPipelineLibraries) {
+    TEST_DESCRIPTION(
+        "Call vkGetRayTracingShaderGroupStackSizeKHR on a shader group coming from a RT pipeline created from libraries");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::rayQuery);
+    AddRequiredFeature(vkt::Feature::pipelineLibraryGroupHandles);
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline rt_pipe_lib(*this, m_device);
+    rt_pipe_lib.InitLibraryInfo(sizeof(float), false);
+    rt_pipe_lib.SetGlslRayGenShader(kRayTracingMinimalGlsl);
+    rt_pipe_lib.AddGlslMissShader(kRayTracingMinimalGlsl);
+    rt_pipe_lib.Build();
+
+    vkt::rt::Pipeline rt_pipe(*this, m_device);
+    rt_pipe.InitLibraryInfo(sizeof(float), true);
+    rt_pipe.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    rt_pipe.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    rt_pipe.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    rt_pipe.GetDescriptorSet().UpdateDescriptorSets();
+
+    rt_pipe.SetGlslRayGenShader(kRayTracingMinimalGlsl);
+    rt_pipe.AddLibrary(rt_pipe_lib);
+    rt_pipe.Build();
+
+    vk::GetRayTracingShaderGroupStackSizeKHR(*m_device, rt_pipe, 1, VK_SHADER_GROUP_SHADER_GENERAL_KHR);
+}
+
+TEST_F(PositiveRayTracingPipeline, ClusterAccelerationStructureFeatureEnabled) {
+    TEST_DESCRIPTION("Test that ray tracing pipeline creation succeeds when cluster acceleration structure feature is enabled");
+
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::clusterAccelerationStructure);
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
+    RETURN_IF_SKIP(InitState());
+
+    const vkt::PipelineLayout empty_pipeline_layout(*m_device, {});
+    VkShaderObj rgen_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
+
+    VkPipeline pipeline = VK_NULL_HANDLE;
+    VkPipelineShaderStageCreateInfo stage_create_info = vku::InitStructHelper();
+    stage_create_info.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    stage_create_info.module = rgen_shader;
+    stage_create_info.pName = "main";
+
+    VkRayTracingShaderGroupCreateInfoKHR group_create_info = vku::InitStructHelper();
+    group_create_info.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    group_create_info.generalShader = 0;
+    group_create_info.closestHitShader = VK_SHADER_UNUSED_KHR;
+    group_create_info.anyHitShader = VK_SHADER_UNUSED_KHR;
+    group_create_info.intersectionShader = VK_SHADER_UNUSED_KHR;
+
+    VkPipelineLibraryCreateInfoKHR library_info = vku::InitStructHelper();
+    library_info.libraryCount = 0;
+
+    VkRayTracingPipelineClusterAccelerationStructureCreateInfoNV cluster_info = vku::InitStructHelper();
+    cluster_info.allowClusterAccelerationStructure = VK_TRUE;
+
+    VkRayTracingPipelineCreateInfoKHR pipeline_ci = vku::InitStructHelper(&cluster_info);
+    pipeline_ci.pLibraryInfo = &library_info;
+    pipeline_ci.stageCount = 1;
+    pipeline_ci.pStages = &stage_create_info;
+    pipeline_ci.groupCount = 1;
+    pipeline_ci.pGroups = &group_create_info;
+    pipeline_ci.layout = empty_pipeline_layout;
+
+    // Should succeed because clusterAccelerationStructure feature is enabled
+    VkResult result =
+        vk::CreateRayTracingPipelinesKHR(*m_device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
+    ASSERT_EQ(VK_SUCCESS, result);
+
+    if (pipeline != VK_NULL_HANDLE) {
+        vk::DestroyPipeline(*m_device, pipeline, nullptr);
+    }
+}
+TEST_F(PositiveRayTracingPipeline, DescriptorBuffer) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
+    RETURN_IF_SKIP(InitState());
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+
+    const VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_ALL,
+                                                  nullptr};
+
+    VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper();
+    ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    ds_layout_ci.bindingCount = 1u;
+    ds_layout_ci.pBindings = &binding;
+    vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&ds_layout});
+
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+
+    vkt::Buffer descriptor_buffer(*m_device, 4096, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
+    uint8_t *descriptor_data = reinterpret_cast<uint8_t *>(descriptor_buffer.Memory().Map());
+    VkDeviceSize buffer_offset = ds_layout.GetDescriptorBufferBindingOffset(0);
+
+    vkt::DescriptorGetInfo buffer_get_info(tlas.GetDstAS()->GetBufferDeviceAddress());
+    vk::GetDescriptorEXT(*m_device, buffer_get_info, descriptor_buffer_properties.accelerationStructureDescriptorSize,
+                         descriptor_data + buffer_offset);
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+    pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+    pipeline.SetGlslRayGenShader(kRayTracingMinimalGlsl);
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.SetPipelineSetLayouts(1, &ds_layout.handle());
+    pipeline.Build();
+    vkt::rt::TraceRaysSbt sbt = pipeline.GetTraceRaysSbt();
+
+    VkDescriptorBufferBindingInfoEXT buffer_binding_info = vku::InitStructHelper();
+    buffer_binding_info.address = descriptor_buffer.Address();
+    buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &buffer_binding_info);
+    uint32_t buffer_index = 0u;
+    VkDeviceSize offset = 0u;
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0u, 1u,
+                                         &buffer_index, &offset);
+
+    vk::CmdTraceRaysKHR(m_command_buffer, &sbt.ray_gen_sbt, &sbt.miss_sbt, &sbt.hit_sbt, &sbt.callable_sbt, 32u, 32u, 1u);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }

@@ -318,8 +318,7 @@ TEST_F(NegativeYcbcr, Formats) {
     image_create_info.samples = VK_SAMPLE_COUNT_4_BIT;
     // Might need to add extra validation because implementation probably doesn't support YUV
     VkImageFormatProperties image_format_props;
-    vk::GetPhysicalDeviceImageFormatProperties(Gpu(), mp_format, image_create_info.imageType, image_create_info.tiling,
-                                               image_create_info.usage, image_create_info.flags, &image_format_props);
+    GetImageFormatProps(Gpu(), image_create_info, image_format_props);
     if ((image_format_props.sampleCounts & VK_SAMPLE_COUNT_4_BIT) == 0) {
         m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-samples-02258");
     }
@@ -338,10 +337,7 @@ TEST_F(NegativeYcbcr, Formats) {
 
     // invalid imageType
     image_create_info.imageType = VK_IMAGE_TYPE_1D;
-    // Check that image format is valid
-    if (vk::GetPhysicalDeviceImageFormatProperties(Gpu(), mp_format, image_create_info.imageType, image_create_info.tiling,
-                                                   image_create_info.usage, image_create_info.flags,
-                                                   &image_format_props) == VK_SUCCESS) {
+    if (GetImageFormatProps(Gpu(), image_create_info, image_format_props) == VK_SUCCESS) {
         // Can't just set height to 1 as stateless validation will hit 04713 first
         m_errorMonitor->SetUnexpectedError("VUID-VkImageCreateInfo-imageType-00956");
         m_errorMonitor->SetUnexpectedError("VUID-VkImageCreateInfo-extent-02253");
@@ -393,7 +389,7 @@ TEST_F(NegativeYcbcr, FormatsLimits) {
     image_create_info.arrayLayers = 1;
 
     VkImageFormatProperties img_limits;
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &image_create_info, &img_limits));
+    ASSERT_EQ(VK_SUCCESS, GetImageFormatProps(Gpu(), image_create_info, img_limits));
     if (img_limits.maxMipLevels == 1) {
         GTEST_SKIP() << "Multiplane image maxMipLevels is already 1.";
     }
@@ -449,12 +445,11 @@ TEST_F(NegativeYcbcr, ImageViewFormat) {
 }
 
 TEST_F(NegativeYcbcr, CopyImageSinglePlane422Alignment) {
-    // Image copy tests on single-plane _422 formats with block alignment errors
+    TEST_DESCRIPTION("Image copy tests on single-plane _422 formats with block alignment errors");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
     RETURN_IF_SKIP(Init());
 
-    // Select a _422 format and verify support
     VkImageCreateInfo ci = vku::InitStructHelper();
     ci.flags = 0;
     ci.imageType = VK_IMAGE_TYPE_2D;
@@ -465,15 +460,12 @@ TEST_F(NegativeYcbcr, CopyImageSinglePlane422Alignment) {
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
 
-    // Verify formats
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-    bool supported = ImageFormatIsSupported(instance(), Gpu(), ci, features);
-    if (!supported) {
+    if (!IsImageFormatSupported(Gpu(), ci, features)) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Single-plane _422 image format not supported";
     }
 
-    // Create images
     ci.extent = {64, 64, 1};
     vkt::Image image_422(*m_device, ci, vkt::set_layout);
 
@@ -484,7 +476,7 @@ TEST_F(NegativeYcbcr, CopyImageSinglePlane422Alignment) {
     m_command_buffer.Begin();
 
     VkImageCopy copy_region;
-    copy_region.extent = {48, 48, 1};
+    copy_region.extent = {24, 48, 1};
     copy_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copy_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copy_region.srcOffset = {0, 0, 0};
@@ -509,11 +501,6 @@ TEST_F(NegativeYcbcr, CopyImageSinglePlane422Alignment) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-srcImage-01728");
     vk::CmdCopyImage(m_command_buffer, image_422, VK_IMAGE_LAYOUT_GENERAL, image_ucmp, VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
     m_errorMonitor->VerifyFound();
-
-    // 422 dest
-    copy_region.extent.width = 30;
-    vk::CmdCopyImage(m_command_buffer, image_ucmp, VK_IMAGE_LAYOUT_GENERAL, image_422, VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
-    m_command_buffer.End();
 }
 
 TEST_F(NegativeYcbcr, MultiplaneImageCopyBufferToImage) {
@@ -535,7 +522,7 @@ TEST_F(NegativeYcbcr, MultiplaneImageCopyBufferToImage) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
 
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-    if (!ImageFormatIsSupported(instance(), Gpu(), ci, features)) {
+    if (!IsImageFormatSupported(Gpu(), ci, features)) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Multiplane image format not supported";
     }
@@ -556,10 +543,10 @@ TEST_F(NegativeYcbcr, MultiplaneImageCopyBufferToImage) {
     copy.bufferOffset = 16;  // pushes over
 
     for (size_t i = 0; i < aspects.size(); ++i) {
-        buffers[i].init(*m_device, 16 * 16 * 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+        buffers[i].Init(*m_device, 16 * 16 * 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
         copy.imageSubresource.aspectMask = aspects[i];
         m_errorMonitor->SetDesiredError("VUID-vkCmdCopyBufferToImage-pRegions-00171");
-        vk::CmdCopyBufferToImage(m_command_buffer, buffers[i].handle(), image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+        vk::CmdCopyBufferToImage(m_command_buffer, buffers[i], image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
         m_errorMonitor->VerifyFound();
     }
     m_command_buffer.End();
@@ -588,11 +575,11 @@ TEST_F(NegativeYcbcr, CopyImageMultiplaneAspectBits) {
 
     // Verify formats
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-    bool supported = ImageFormatIsSupported(instance(), Gpu(), ci, features);
+    bool supported = IsImageFormatSupported(Gpu(), ci, features);
     ci.format = VK_FORMAT_D24_UNORM_S8_UINT;
-    supported = supported && ImageFormatIsSupported(instance(), Gpu(), ci, features);
+    supported = supported && IsImageFormatSupported(Gpu(), ci, features);
     ci.format = mp3_format;
-    supported = supported && ImageFormatIsSupported(instance(), Gpu(), ci, features);
+    supported = supported && IsImageFormatSupported(Gpu(), ci, features);
     if (!supported) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Multiplane image formats or optimally tiled depth-stencil buffers not supported";
@@ -697,7 +684,7 @@ TEST_F(NegativeYcbcr, ClearColorImageFormat) {
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     image_create_info.arrayLayers = 1;
 
-    bool supported = ImageFormatIsSupported(instance(), Gpu(), image_create_info, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
+    bool supported = IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
     if (supported == false) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
@@ -776,9 +763,9 @@ TEST_F(NegativeYcbcr, MultiplaneImageLayoutAspectFlags) {
     ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     // Verify formats
-    bool supported = ImageFormatIsSupported(instance(), Gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
+    bool supported = IsImageFormatSupported(Gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
     ci.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
-    supported = supported && ImageFormatIsSupported(instance(), Gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
+    supported = supported && IsImageFormatSupported(Gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
     if (!supported) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Multiplane image format not supported";
@@ -1027,8 +1014,8 @@ TEST_F(NegativeYcbcr, BindMemory2Disjoint) {
         mp_image_alloc_info[1].allocationSize = mp_image_mem_reqs2[1].memoryRequirements.size;
         m_device->Physical().SetMemoryType(mp_image_mem_reqs2[1].memoryRequirements.memoryTypeBits, &mp_image_alloc_info[1], 0);
 
-        mp_image_mem[0].init(*m_device, mp_image_alloc_info[0]);
-        mp_image_mem[1].init(*m_device, mp_image_alloc_info[1]);
+        mp_image_mem[0].Init(*m_device, mp_image_alloc_info[0]);
+        mp_image_mem[1].Init(*m_device, mp_image_alloc_info[1]);
     }
 
     // All planes must be bound at once the same here
@@ -1222,8 +1209,8 @@ TEST_F(NegativeYcbcr, BindMemory2DisjointUnsupported) {
         mp_image_alloc_info[1].allocationSize = mp_image_mem_reqs2[1].memoryRequirements.size;
         m_device->Physical().SetMemoryType(mp_image_mem_reqs2[1].memoryRequirements.memoryTypeBits, &mp_image_alloc_info[1], 0);
 
-        mp_image_mem[0].init(*m_device, mp_image_alloc_info[0]);
-        mp_image_mem[1].init(*m_device, mp_image_alloc_info[1]);
+        mp_image_mem[0].Init(*m_device, mp_image_alloc_info[0]);
+        mp_image_mem[1].Init(*m_device, mp_image_alloc_info[1]);
     }
 
     // All planes must be bound at once the same here
@@ -1373,7 +1360,7 @@ TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat3Plane) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
 
     const VkFormatFeatureFlags features = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
-    bool supported = ImageFormatIsSupported(instance(), Gpu(), ci, features);
+    bool supported = IsImageFormatSupported(Gpu(), ci, features);
     // Verify format 3 Plane format
     if (!supported) {
         GTEST_SKIP() << "Multiplane image format not supported";
@@ -1429,7 +1416,7 @@ TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat2Plane) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
 
     const VkFormatFeatureFlags features = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
-    bool supported = ImageFormatIsSupported(instance(), Gpu(), ci, features);
+    bool supported = IsImageFormatSupported(Gpu(), ci, features);
 
     // Verify format 2 Plane format
     if (!supported) {
@@ -1473,9 +1460,6 @@ TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
     AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
     RETURN_IF_SKIP(Init());
 
-    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        GTEST_SKIP() << "VK_KHR_portability_subset enabled, can hit issues with imageViewFormatReinterpretation";
-    }
     const VkFormat mp_format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
 
     if (!(m_device->FormatFeaturesOptimal(mp_format) & VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT)) {
@@ -1580,7 +1564,7 @@ TEST_F(NegativeYcbcr, MultiplaneAspectBits) {
 
     auto image_view_ci = image_obj.BasicViewCreatInfo();
     image_view_ci.pNext = &ycbcr_info;
-    const auto image_view = vkt::ImageView(*m_device, image_view_ci);
+    vkt::ImageView image_view(*m_device, image_view_ci);
 
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&ycbcr_info));
     ASSERT_TRUE(sampler.initialized());
@@ -1938,7 +1922,7 @@ TEST_F(NegativeYcbcr, FormatCompatibilitySamePlane) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    if (!ImageFormatIsSupported(instance(), Gpu(), image_create_info, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+    if (!IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
     m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-10062");
@@ -1968,7 +1952,7 @@ TEST_F(NegativeYcbcr, FormatCompatibilityDifferentPlane) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    if (!ImageFormatIsSupported(instance(), Gpu(), image_create_info, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+    if (!IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
     m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-10062");
@@ -1999,7 +1983,7 @@ TEST_F(NegativeYcbcr, DISABLED_FormatCompatibilityNonMutable) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    if (!ImageFormatIsSupported(instance(), Gpu(), image_create_info, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+    if (!IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
     m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-10062");
@@ -2023,7 +2007,7 @@ TEST_F(NegativeYcbcr, MultiplaneImageCopyAspectMask) {
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
 
-    if (!ImageFormatIsSupported(instance(), Gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT)) {
+    if (!IsImageFormatSupported(Gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT)) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
 

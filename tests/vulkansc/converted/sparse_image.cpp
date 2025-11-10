@@ -430,11 +430,11 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType) {
     /// Specify memory bindings
     VkSparseMemoryBind buffer_memory_bind = {};
     buffer_memory_bind.size = buffer_mem_reqs.size;
-    buffer_memory_bind.memory = buffer_mem.handle();
+    buffer_memory_bind.memory = buffer_mem;
 
     VkSparseMemoryBind image_memory_bind = {};
     image_memory_bind.size = image_mem_reqs.size;
-    image_memory_bind.memory = image_mem.handle();
+    image_memory_bind.memory = image_mem;
 
     VkSparseBufferMemoryBindInfo buffer_memory_bind_info = {};
     buffer_memory_bind_info.buffer = buffer;
@@ -564,11 +564,11 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType2) {
 
     VkSparseMemoryBind buffer_memory_bind = {};
     buffer_memory_bind.size = buffer_mem_reqs.size;
-    buffer_memory_bind.memory = buffer_mem.handle();
+    buffer_memory_bind.memory = buffer_mem;
 
     VkSparseMemoryBind image_memory_bind = {};
     image_memory_bind.size = image_mem_reqs.size;
-    image_memory_bind.memory = image_mem.handle();
+    image_memory_bind.memory = image_mem;
 
     VkSparseBufferMemoryBindInfo buffer_memory_bind_info = {};
     buffer_memory_bind_info.buffer = buffer;
@@ -697,7 +697,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType3) {
     // Setup memory bindings
     VkSparseMemoryBind buffer_memory_bind = {};
     buffer_memory_bind.size = buffer_mem_reqs.size;
-    buffer_memory_bind.memory = buffer_mem.handle();
+    buffer_memory_bind.memory = buffer_mem;
 
     VkSparseBufferMemoryBindInfo buffer_memory_bind_info = {};
     buffer_memory_bind_info.buffer = buffer;
@@ -706,7 +706,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType3) {
 
     VkSparseMemoryBind image_memory_bind = {};
     image_memory_bind.size = image_mem_reqs.size;
-    image_memory_bind.memory = image_mem.handle();
+    image_memory_bind.memory = image_mem;
 
     VkSparseImageOpaqueMemoryBindInfo image_opaque_memory_bind_info = {};
     image_opaque_memory_bind_info.image = image;
@@ -715,7 +715,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType3) {
 
     VkSparseImageMemoryBind image_memory_bind_2 = {};
     image_memory_bind_2.extent = image_create_info.extent;
-    image_memory_bind_2.memory = image_mem.handle();
+    image_memory_bind_2.memory = image_mem;
     image_memory_bind_2.subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
     VkSparseImageMemoryBindInfo image_memory_bind_info = {};
@@ -909,7 +909,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
     // Setup memory bindings
     VkSparseMemoryBind buffer_memory_bind = {};
     buffer_memory_bind.size = buffer1.MemoryRequirements().size;
-    buffer_memory_bind.memory = buffer_memory_imported.handle();
+    buffer_memory_bind.memory = buffer_memory_imported;
 
     VkSparseBufferMemoryBindInfo buffer_memory_bind_info = {};
     buffer_memory_bind_info.buffer = buffer1;
@@ -918,7 +918,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
 
     VkSparseMemoryBind image_memory_bind = {};
     image_memory_bind.size = image_mem_reqs.size;
-    image_memory_bind.memory = image_mem.handle();
+    image_memory_bind.memory = image_mem;
 
     VkSparseImageOpaqueMemoryBindInfo image_opaque_memory_bind_info = {};
     image_opaque_memory_bind_info.image = image;
@@ -927,7 +927,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
 
     VkSparseImageMemoryBind image_memory_bind_2 = {};
     image_memory_bind_2.extent = image_create_info.extent;
-    image_memory_bind_2.memory = image_mem.handle();
+    image_memory_bind_2.memory = image_mem;
     image_memory_bind_2.subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
     VkSparseImageMemoryBindInfo image_memory_bind_info = {};
@@ -1001,8 +1001,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBind) {
     const auto image_mem_alloc =
         vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image_mem_reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    vkt::DeviceMemory image_mem;
-    image_mem.init(*m_device, image_mem_alloc);
+    vkt::DeviceMemory image_mem(*m_device, image_mem_alloc);
 
     uint32_t requirements_count = 0u;
     vk::GetImageSparseMemoryRequirements(*m_device, image, &requirements_count, nullptr);
@@ -1017,7 +1016,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBind) {
     VkExtent3D granularity = sparse_reqs[0].formatProperties.imageGranularity;
     VkSparseImageMemoryBind image_bind{};
     image_bind.subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    image_bind.memory = image_mem.handle();
+    image_bind.memory = image_mem;
     image_bind.extent = granularity;
 
     VkSparseImageMemoryBindInfo image_bind_info{};
@@ -1118,14 +1117,13 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidMemory) {
     const auto image_mem_alloc =
         vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image_mem_reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    vkt::DeviceMemory image_mem;
-    image_mem.init(*m_device, image_mem_alloc);
+    vkt::DeviceMemory image_mem(*m_device, image_mem_alloc);
 
     VkImageCreateInfo invalid_create_info = create_info;
     vkt::Image invalid_image(*m_device, invalid_create_info, vkt::no_mem);
 
     VkMemoryRequirements invalid_image_mem_reqs;
-    vk::GetImageMemoryRequirements(*m_device, invalid_image.handle(), &invalid_image_mem_reqs);
+    vk::GetImageMemoryRequirements(*m_device, invalid_image, &invalid_image_mem_reqs);
 
     // Make sure that the same memory type is not chosen.
     invalid_image_mem_reqs.memoryTypeBits = ~image_mem_reqs.memoryTypeBits;
@@ -1138,8 +1136,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidMemory) {
         GTEST_SKIP() << "Could not find required memory type";
     }
 
-    vkt::DeviceMemory invalid_image_mem;
-    invalid_image_mem.init(*m_device, invalid_image_mem_alloc);
+    vkt::DeviceMemory invalid_image_mem(*m_device, invalid_image_mem_alloc);
 
     uint32_t requirements_count = 0u;
     vk::GetImageSparseMemoryRequirements(*m_device, image, &requirements_count, nullptr);
@@ -1154,7 +1151,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidMemory) {
     VkExtent3D granularity = sparse_reqs[0].formatProperties.imageGranularity;
     VkSparseImageMemoryBind image_bind{};
     image_bind.subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    image_bind.memory = image_mem.handle();
+    image_bind.memory = image_mem;
     image_bind.memoryOffset = 0;
     image_bind.extent = granularity;
 
@@ -1170,7 +1167,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidMemory) {
     VkQueue sparse_queue = m_device->QueuesWithSparseCapability()[0]->handle();
 
     // Force invalid device memory
-    image_bind.memory = invalid_image_mem.handle();
+    image_bind.memory = invalid_image_mem;
     m_errorMonitor->SetDesiredError("VUID-VkSparseImageMemoryBind-memory-01105");
     vk::QueueBindSparse(sparse_queue, 1, &bind_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
@@ -1203,14 +1200,13 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidAlignment) {
     const auto image_mem_alloc =
         vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image_mem_reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    vkt::DeviceMemory image_mem;
-    image_mem.init(*m_device, image_mem_alloc);
+    vkt::DeviceMemory image_mem(*m_device, image_mem_alloc);
 
     VkImageCreateInfo invalid_create_info = create_info;
     vkt::Image invalid_image(*m_device, invalid_create_info, vkt::no_mem);
 
     VkMemoryRequirements invalid_image_mem_reqs;
-    vk::GetImageMemoryRequirements(*m_device, invalid_image.handle(), &invalid_image_mem_reqs);
+    vk::GetImageMemoryRequirements(*m_device, invalid_image, &invalid_image_mem_reqs);
 
     // Make sure that the same memory type is not chosen.
     invalid_image_mem_reqs.memoryTypeBits = ~image_mem_reqs.memoryTypeBits;
@@ -1223,8 +1219,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidAlignment) {
         GTEST_SKIP() << "Could not find required memory type";
     }
 
-    vkt::DeviceMemory invalid_image_mem;
-    invalid_image_mem.init(*m_device, invalid_image_mem_alloc);
+    vkt::DeviceMemory invalid_image_mem(*m_device, invalid_image_mem_alloc);
 
     uint32_t requirements_count = 0u;
     vk::GetImageSparseMemoryRequirements(*m_device, image, &requirements_count, nullptr);
@@ -1239,7 +1234,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidAlignment) {
     VkExtent3D granularity = sparse_reqs[0].formatProperties.imageGranularity;
     VkSparseImageMemoryBind image_bind{};
     image_bind.subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    image_bind.memory = image_mem.handle();
+    image_bind.memory = image_mem;
     image_bind.memoryOffset = 0;
     image_bind.extent = granularity;
 
@@ -1286,8 +1281,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidExtent) {
     const auto image_mem_alloc =
         vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image_mem_reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    vkt::DeviceMemory image_mem;
-    image_mem.init(*m_device, image_mem_alloc);
+    vkt::DeviceMemory image_mem(*m_device, image_mem_alloc);
 
     uint32_t requirements_count = 0u;
     vk::GetImageSparseMemoryRequirements(*m_device, image, &requirements_count, nullptr);
@@ -1302,7 +1296,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidExtent) {
     VkExtent3D granularity = sparse_reqs[0].formatProperties.imageGranularity;
     VkSparseImageMemoryBind image_bind{};
     image_bind.subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    image_bind.memory = image_mem.handle();
+    image_bind.memory = image_mem;
     image_bind.extent = granularity;
 
     VkSparseImageMemoryBindInfo image_bind_info{};
@@ -1372,7 +1366,7 @@ TEST_F(NegativeSparseImage, DISABLED_UnalignedBindOffsets) {
     // size of the required alignment, to ensure we can bind both
     // allocated memory blocks to the image on aligned offsets.
     while (memory_reqs.size < (memory_reqs.alignment * 2)) {
-        image.destroy();
+        image.Destroy();
         image_create_info.extent.width *= 2;
         image_create_info.extent.height *= 2;
         image.InitNoMemory(*m_device, image_create_info);

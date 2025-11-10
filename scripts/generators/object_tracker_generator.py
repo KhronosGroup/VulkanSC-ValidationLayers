@@ -5,6 +5,7 @@
 # Copyright (c) 2015-2025 LunarG, Inc.
 # Copyright (c) 2015-2025 Google Inc.
 # Copyright (c) 2023-2025 RasterGrid Kft.
+# Copyright (C) 2025 Arm Limited.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -237,6 +238,12 @@ class ObjectTrackerOutputGenerator(BaseGenerator):
             "pipelineBinary-nullalloc": '"VUID-vkDestroyPipelineBinaryKHR-pipelineBinary-09615"',
             "VkIndirectCommandsLayoutEXT-indirectCommandsLayout-compatalloc": '"VUID-vkDestroyIndirectCommandsLayoutEXT-indirectCommandsLayout-11115"',
             "VkIndirectCommandsLayoutEXT-indirectCommandsLayout-nullalloc": '"VUID-vkDestroyIndirectCommandsLayoutEXT-indirectCommandsLayout-11116"',
+            "tensor-compatalloc": '"VUID-vkDestroyTensorARM-tensor-09731"',
+            "tensor-nullalloc": '"VUID-vkDestroyTensorARM-tensor-09732"',
+            "tensorView-compatalloc": '"VUID-vkDestroyTensorViewARM-tensorView-09751"',
+            "tensorView-nullalloc": '"VUID-vkDestroyTensorViewARM-tensorView-09752"',
+            "VkDataGraphPipelineSessionARM-session-compatalloc": '"VUID-vkDestroyDataGraphPipelineSessionARM-session-09794"',
+            "VkDataGraphPipelineSessionARM-session-nullalloc": '"VUID-vkDestroyDataGraphPipelineSessionARM-session-09795"',
            }
 
         # Structures that do not define parent/commonparent VUIDs for vulkan handles.
@@ -497,7 +504,7 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
                 postPrototype = postPrototype.replace(')', ', const RecordObject& record_obj)')
                 if command.returnType == 'VkResult':
                     # Some commands can have partial valid handles be created
-                    partial_success_commands = ['vkCreateGraphicsPipelines', 'vkCreateComputePipelines', 'vkCreateRayTracingPipelinesNV', 'vkCreateRayTracingPipelinesKHR', 'vkCreateShadersEXT']
+                    partial_success_commands = ['vkCreateGraphicsPipelines', 'vkCreateComputePipelines', 'vkCreateRayTracingPipelinesNV', 'vkCreateRayTracingPipelinesKHR', 'vkCreateShadersEXT', 'vkCreateDataGraphPipelinesARM']
                     if command.name not in partial_success_commands:
                         postPrototype = postPrototype.replace('{', '{\n    if (record_obj.result < VK_SUCCESS) return;')
                 out.append(postPrototype)
@@ -577,7 +584,7 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
         # Special case: vkReleaseFullScreenExclusiveModeEXT.
         # The specification does not define a parent VUID for the swapchain parameter.
         # It mentions in a free form that device should be associated with a swapchain.
-        if commandName == 'vkReleaseFullScreenExclusiveModeEXT':
+        if commandName == 'vkReleaseFullScreenExclusiveModeEXT' or commandName == 'vkCreateDataGraphPipelinesARM':
             return False
 
         # Not a vulkan handle. Parent VUIDs are only for vulkan handles
@@ -700,6 +707,8 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
             return '"UNASSIGNED-VkDescriptorBufferBindingPushDescriptorBufferHandleEXT-buffer-parent"'
         if commandName == 'vkReleaseSwapchainImagesEXT' and memberName == 'swapchain':
             return '"UNASSIGNED-VkReleaseSwapchainImagesInfoEXT-swapchain-parent"'
+        if commandName == 'vkReleaseSwapchainImagesKHR' and memberName == 'swapchain':
+            return '"UNASSIGNED-VkReleaseSwapchainImagesInfoKHR-swapchain-parent"'
         if commandName == 'vkCmdBeginConditionalRenderingEXT' and memberName == 'buffer':
             return '"UNASSIGNED-VkConditionalRenderingBeginInfoEXT-buffer-parent"'
         if (commandName == 'vkMapMemory2' or commandName == 'vkMapMemory2KHR') and memberName == 'memory':
@@ -719,7 +728,7 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
         if commandName == 'vkCreateImage' and memberName == 'swapchain':
             return '"UNASSIGNED-VkImageSwapchainCreateInfoKHR-swapchain-parent"'
         if commandName == 'vkQueuePresentKHR' and memberName == 'pFences':
-            return '"UNASSIGNED-VkSwapchainPresentFenceInfoEXT-pFences-parent"'
+            return '"UNASSIGNED-VkSwapchainPresentFenceInfoKHR-pFences-parent"'
         if commandName == 'vkGetAccelerationStructureDeviceAddressKHR' and memberName == 'accelerationStructure':
             return '"UNASSIGNED-VkAccelerationStructureDeviceAddressInfoKHR-accelerationStructure-parent"'
         if commandName == 'vkCreatePipelineBinariesKHR' and memberName == 'pipeline':
@@ -748,6 +757,12 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
         # Same as above, but memberName has naming collision so need to use struct name as well
         if commandName == 'vkCreateGraphicsPipelines' and structName == 'VkGraphicsPipelineShaderGroupsCreateInfoNV' and memberName == 'pPipelines':
             return '"UNASSIGNED-VkGraphicsPipelineShaderGroupsCreateInfoNV-pPipelines-parent"'
+        if commandName == 'vkGetDataGraphPipelineSessionBindPointRequirementsARM' and memberName == 'session':
+            return '"VUID-vkGetDataGraphPipelineSessionBindPointRequirementsARM-session-09783"'
+
+        if structName == 'VkDataGraphPipelineInfoARM' and memberName == 'dataGraphPipeline':
+            if commandName == 'vkGetDataGraphPipelinePropertiesARM':
+                return '"VUID-vkGetDataGraphPipelinePropertiesARM-dataGraphPipeline-09802"'
 
         # These are cases where multiple commands call the struct
         if structName == 'VkPipelineExecutableInfoKHR' and memberName == 'pipeline':
@@ -841,6 +856,20 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
             return '"UNASSIGNED-VkTensorCaptureDescriptorDataInfoARM-tensor-parent"'
         if structName == 'VkTensorViewCaptureDescriptorDataInfoARM' and memberName == 'tensorView':
             return '"UNASSIGNED-VkTensorViewCaptureDescriptorDataInfoARM-tensorView-parent"'
+        if structName == 'VkDataGraphPipelineCreateInfoARM' and memberName == 'layout':
+            return '"UNASSIGNED-VkDataGraphPipelineCreateInfoARM-layout-parent"'
+        if structName == 'VkDataGraphPipelineShaderModuleCreateInfoARM' and memberName == 'module':
+            return '"UNASSIGNED-VkDataGraphPipelineShaderModuleCreateInfoARM-module-parent"'
+        if structName == 'VkDataGraphPipelineSessionCreateInfoARM' and memberName == 'dataGraphPipeline':
+            return '"UNASSIGNED-VkDataGraphPipelineSessionCreateInfoARM-dataGraphPipeline-parent"'
+        if structName == 'VkDataGraphPipelineSessionBindPointRequirementsInfoARM' and memberName == 'session':
+            return '"UNASSIGNED-VkDataGraphPipelineSessionBindPointRequirementsInfoARM-session-parent"'
+        if structName == 'VkDataGraphPipelineSessionMemoryRequirementsInfoARM' and memberName == 'session':
+            return '"UNASSIGNED-VkDataGraphPipelineSessionMemoryRequirementsInfoARM-session-parent"'
+        if structName == 'VkDataGraphPipelineInfoARM' and memberName == 'dataGraphPipeline':
+            return '"UNASSIGNED-VkDataGraphPipelineInfoARM-dataGraphPipeline-parent"'
+        if structName == 'VkCopyMemoryToImageIndirectInfoKHR' and memberName == 'dstImage':
+            return '"UNASSIGNED-VkCopyMemoryToImageIndirectInfoKHR-dstImage-parent"'
 
         # Common parents because the structs have more then one handle that needs to be check
         if (structName == 'VkBufferMemoryBarrier' and memberName == 'buffer') or (structName == 'VkImageMemoryBarrier' and memberName == 'image'):
@@ -1095,7 +1124,7 @@ bool Device::ReportUndestroyedObjects(const Location& loc) const {
         # Handle object create operations if last parameter is created by this call
         if isCreate:
             handle_type = command.params[-1].type
-            partial_success_commands = ['vkCreateGraphicsPipelines', 'vkCreateComputePipelines', 'vkCreateRayTracingPipelinesNV', 'vkCreateRayTracingPipelinesKHR', 'vkCreateShadersEXT']
+            partial_success_commands = ['vkCreateGraphicsPipelines', 'vkCreateComputePipelines', 'vkCreateRayTracingPipelinesNV', 'vkCreateRayTracingPipelinesKHR', 'vkCreateShadersEXT', 'vkCreateDataGraphPipelinesARM']
             if handle_type in self.vk.handles:
                 # Check for special case where multiple handles are returned
                 objectArray = command.params[-1].length is not None

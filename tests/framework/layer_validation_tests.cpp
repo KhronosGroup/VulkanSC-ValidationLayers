@@ -22,11 +22,11 @@
 // Global list of sType,size identifiers
 std::vector<std::pair<uint32_t, uint32_t>> custom_stype_info{};
 
-VkFormat FindSupportedDepthOnlyFormat(VkPhysicalDevice phy) {
+VkFormat FindSupportedDepthOnlyFormat(VkPhysicalDevice gpu) {
     constexpr std::array depth_formats = {VK_FORMAT_D16_UNORM, VK_FORMAT_X8_D24_UNORM_PACK32, VK_FORMAT_D32_SFLOAT};
     for (VkFormat depth_format : depth_formats) {
         VkFormatProperties format_props;
-        vk::GetPhysicalDeviceFormatProperties(phy, depth_format, &format_props);
+        vk::GetPhysicalDeviceFormatProperties(gpu, depth_format, &format_props);
 
         if (format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
             return depth_format;
@@ -36,11 +36,11 @@ VkFormat FindSupportedDepthOnlyFormat(VkPhysicalDevice phy) {
     return VK_FORMAT_UNDEFINED;
 }
 
-VkFormat FindSupportedStencilOnlyFormat(VkPhysicalDevice phy) {
+VkFormat FindSupportedStencilOnlyFormat(VkPhysicalDevice gpu) {
     constexpr std::array stencil_formats = {VK_FORMAT_S8_UINT};
     for (VkFormat stencil_format : stencil_formats) {
         VkFormatProperties format_props;
-        vk::GetPhysicalDeviceFormatProperties(phy, stencil_format, &format_props);
+        vk::GetPhysicalDeviceFormatProperties(gpu, stencil_format, &format_props);
 
         if (format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
             return stencil_format;
@@ -49,11 +49,11 @@ VkFormat FindSupportedStencilOnlyFormat(VkPhysicalDevice phy) {
     return VK_FORMAT_UNDEFINED;
 }
 
-VkFormat FindSupportedDepthStencilFormat(VkPhysicalDevice phy) {
+VkFormat FindSupportedDepthStencilFormat(VkPhysicalDevice gpu) {
     const VkFormat ds_formats[] = {VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT};
     for (uint32_t i = 0; i < size32(ds_formats); ++i) {
         VkFormatProperties format_props;
-        vk::GetPhysicalDeviceFormatProperties(phy, ds_formats[i], &format_props);
+        vk::GetPhysicalDeviceFormatProperties(gpu, ds_formats[i], &format_props);
 
         if (format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
             return ds_formats[i];
@@ -63,48 +63,50 @@ VkFormat FindSupportedDepthStencilFormat(VkPhysicalDevice phy) {
     return VK_FORMAT_UNDEFINED;
 }
 
-bool FormatIsSupported(VkPhysicalDevice phy, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features) {
+bool FormatIsSupported(VkPhysicalDevice gpu, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features) {
     VkFormatProperties format_props;
-    vk::GetPhysicalDeviceFormatProperties(phy, format, &format_props);
-    VkFormatFeatureFlags phy_features =
+    vk::GetPhysicalDeviceFormatProperties(gpu, format, &format_props);
+    VkFormatFeatureFlags gpu_features =
         (VK_IMAGE_TILING_OPTIMAL == tiling ? format_props.optimalTilingFeatures : format_props.linearTilingFeatures);
-    return (0 != (phy_features & features));
+    return (0 != (gpu_features & features));
 }
 
-bool FormatFeaturesAreSupported(VkPhysicalDevice phy, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features) {
+bool FormatFeaturesAreSupported(VkPhysicalDevice gpu, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features) {
     VkFormatProperties format_props;
-    vk::GetPhysicalDeviceFormatProperties(phy, format, &format_props);
-    VkFormatFeatureFlags phy_features =
+    vk::GetPhysicalDeviceFormatProperties(gpu, format, &format_props);
+    VkFormatFeatureFlags gpu_features =
         (VK_IMAGE_TILING_OPTIMAL == tiling ? format_props.optimalTilingFeatures : format_props.linearTilingFeatures);
-    return (features == (phy_features & features));
+    return (features == (gpu_features & features));
 }
 
-bool ImageFormatIsSupported(const VkInstance inst, const VkPhysicalDevice phy, const VkImageCreateInfo info,
-                            const VkFormatFeatureFlags features) {
+VkResult GetImageFormatProps(VkPhysicalDevice gpu, const VkImageCreateInfo &ci, VkImageFormatProperties &out_limits) {
+    return vk::GetPhysicalDeviceImageFormatProperties(gpu, ci.format, ci.imageType, ci.tiling, ci.usage, ci.flags, &out_limits);
+}
+
+bool IsImageFormatSupported(const VkPhysicalDevice gpu, const VkImageCreateInfo &ci, const VkFormatFeatureFlags features) {
     // Verify physical device support of format features
-    if (!FormatFeaturesAreSupported(phy, info.format, info.tiling, features)) {
+    if (!FormatFeaturesAreSupported(gpu, ci.format, ci.tiling, features)) {
         return false;
     }
 
     // Verify that PhysDevImageFormatProp() also claims support for the specific usage
     VkImageFormatProperties props;
-    VkResult err =
-        vk::GetPhysicalDeviceImageFormatProperties(phy, info.format, info.imageType, info.tiling, info.usage, info.flags, &props);
+    VkResult err = GetImageFormatProps(gpu, ci, props);
     if (VK_SUCCESS != err) {
         return false;
     }
-    if (info.arrayLayers > props.maxArrayLayers) {
+    if (ci.arrayLayers > props.maxArrayLayers) {
         return false;
     }
 
     return true;
 }
 
-bool BufferFormatAndFeaturesSupported(VkPhysicalDevice phy, VkFormat format, VkFormatFeatureFlags features) {
+bool BufferFormatAndFeaturesSupported(VkPhysicalDevice gpu, VkFormat format, VkFormatFeatureFlags features) {
     VkFormatProperties format_props;
-    vk::GetPhysicalDeviceFormatProperties(phy, format, &format_props);
-    VkFormatFeatureFlags phy_features = format_props.bufferFeatures;
-    return (features == (phy_features & features));
+    vk::GetPhysicalDeviceFormatProperties(gpu, format, &format_props);
+    VkFormatFeatureFlags gpu_features = format_props.bufferFeatures;
+    return (features == (gpu_features & features));
 }
 
 bool operator==(const VkDebugUtilsLabelEXT &rhs, const VkDebugUtilsLabelEXT &lhs) {
@@ -120,95 +122,11 @@ bool operator==(const VkDebugUtilsLabelEXT &rhs, const VkDebugUtilsLabelEXT &lhs
     return is_equal;
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                  VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback(VkDebugUtilsMessageSeverityFlagBitsEXT, VkDebugUtilsMessageTypeFlagsEXT,
                                                   const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) {
     auto *data = reinterpret_cast<DebugUtilsLabelCheckData *>(pUserData);
     data->callback(pCallbackData, data);
     return VK_FALSE;
-}
-
-void TestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo &create_info,
-                          bool rp2_supported, const char *rp1_vuid, const char *rp2_vuid) {
-    if (rp1_vuid) {
-        // If the second VUID is not provided, set it equal to the first VUID.  In this way,
-        // we can check both vkCreateRenderPass and vkCreateRenderPass2 with the same VUID
-        // if rp2_supported is true;
-        if (rp2_supported && !rp2_vuid) {
-            rp2_vuid = rp1_vuid;
-        }
-
-        error_monitor->SetDesiredError(rp1_vuid);
-        vkt::RenderPass rp(device, create_info);
-        error_monitor->VerifyFound();
-    }
-
-    if (rp2_supported && rp2_vuid) {
-        auto create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(create_info);
-        error_monitor->SetDesiredError(rp2_vuid);
-        vkt::RenderPass rp2(device, *create_info2.ptr());
-        error_monitor->VerifyFound();
-    }
-}
-
-void PositiveTestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo &create_info,
-                                  bool rp2_supported) {
-    vkt::RenderPass rp(device, create_info);
-    if (rp2_supported) {
-        vkt::RenderPass rp2(device, *ConvertVkRenderPassCreateInfoToV2KHR(create_info).ptr());
-    }
-}
-
-void PositiveTestRenderPass2KHRCreate(const vkt::Device &device, const VkRenderPassCreateInfo2KHR &create_info) {
-    vkt::RenderPass rp(device, create_info);
-}
-
-void TestRenderPass2KHRCreate(ErrorMonitor &error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo2KHR &create_info,
-                              const std::vector<const char *> &vuids) {
-    for (auto vuid : vuids) {
-        error_monitor.SetDesiredError(vuid);
-    }
-    vkt::RenderPass rp(device, create_info);
-    error_monitor.VerifyFound();
-}
-
-void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, const VkCommandBuffer command_buffer,
-                         const VkRenderPassBeginInfo *begin_info, bool rp2Supported, const char *rp1_vuid, const char *rp2_vuid) {
-    VkCommandBufferBeginInfo cmd_begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr,
-                                               VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, nullptr};
-
-    if (rp1_vuid) {
-        vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
-        error_monitor->SetDesiredError(rp1_vuid);
-        vk::CmdBeginRenderPass(command_buffer, begin_info, VK_SUBPASS_CONTENTS_INLINE);
-        error_monitor->VerifyFound();
-        vk::ResetCommandBuffer(command_buffer, 0);
-    }
-    if (rp2Supported && rp2_vuid) {
-        VkSubpassBeginInfo subpass_begin_info = {VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO_KHR, nullptr, VK_SUBPASS_CONTENTS_INLINE};
-        vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
-        error_monitor->SetDesiredError(rp2_vuid);
-        vk::CmdBeginRenderPass2KHR(command_buffer, begin_info, &subpass_begin_info);
-        error_monitor->VerifyFound();
-        vk::ResetCommandBuffer(command_buffer, 0);
-
-        // For api version >= 1.2, try core entrypoint
-        PFN_vkCmdBeginRenderPass2KHR vkCmdBeginRenderPass2 =
-            (PFN_vkCmdBeginRenderPass2KHR)vk::GetDeviceProcAddr(device, "vkCmdBeginRenderPass2");
-        if (vkCmdBeginRenderPass2) {
-            vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
-            error_monitor->SetDesiredError(rp2_vuid);
-            vkCmdBeginRenderPass2(command_buffer, begin_info, &subpass_begin_info);
-            error_monitor->VerifyFound();
-            vk::ResetCommandBuffer(command_buffer, 0);
-        }
-    }
-}
-
-VkResult GPDIFPHelper(VkPhysicalDevice dev, const VkImageCreateInfo *ci, VkImageFormatProperties *limits) {
-    VkImageFormatProperties tmp_limits;
-    limits = limits ? limits : &tmp_limits;
-    return vk::GetPhysicalDeviceImageFormatProperties(dev, ci->format, ci->imageType, ci->tiling, ci->usage, ci->flags, limits);
 }
 
 VkFormat FindFormatWithoutFeatures(VkPhysicalDevice gpu, VkImageTiling tiling, VkFormatFeatureFlags undesired_features) {
@@ -235,7 +153,7 @@ VkFormat FindFormatWithoutFeatures2(VkPhysicalDevice gpu, VkImageTiling tiling, 
     const VkFormat first_vk_format = VK_FORMAT_R4G4_UNORM_PACK8;
     VkFormat return_format = VK_FORMAT_UNDEFINED;
     for (VkFormat format = first_vk_format; format < first_compressed_format; format = static_cast<VkFormat>(format + 1)) {
-        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props_2 = vku::InitStructHelper(&fmt_props_3);
         vk::GetPhysicalDeviceFormatProperties2(gpu, format, &fmt_props_2);
         auto features = (tiling == VK_IMAGE_TILING_LINEAR) ? fmt_props_3.linearTilingFeatures : fmt_props_3.optimalTilingFeatures;
@@ -276,6 +194,62 @@ void VkLayerTest::CreateImageViewTest(const VkImageViewCreateInfo &create_info, 
     Monitor().SetDesiredError(vuid);
     vkt::ImageView view(*m_device, create_info);
     Monitor().VerifyFound();
+}
+
+void VkLayerTest::CreateRenderPassTest(const VkRenderPassCreateInfo &create_info, bool rp2_supported, const char *rp1_vuid,
+                                       const char *rp2_vuid) {
+    if (rp1_vuid) {
+        // If the second VUID is not provided, set it equal to the first VUID.  In this way,
+        // we can check both vkCreateRenderPass and vkCreateRenderPass2 with the same VUID
+        // if rp2_supported is true;
+        if (rp2_supported && !rp2_vuid) {
+            rp2_vuid = rp1_vuid;
+        }
+
+        Monitor().SetDesiredError(rp1_vuid);
+        vkt::RenderPass rp(*m_device, create_info);
+        Monitor().VerifyFound();
+    }
+
+    if (rp2_supported && rp2_vuid) {
+        auto create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(create_info);
+        Monitor().SetDesiredError(rp2_vuid);
+        vkt::RenderPass rp2(*m_device, *create_info2.ptr());
+        Monitor().VerifyFound();
+    }
+}
+
+void VkLayerTest::CreateRenderPassBeginTest(const VkCommandBuffer command_buffer, const VkRenderPassBeginInfo *begin_info,
+                                            bool rp2_supported, const char *rp1_vuid, const char *rp2_vuid) {
+    VkCommandBufferBeginInfo cmd_begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr,
+                                               VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, nullptr};
+
+    if (rp1_vuid) {
+        vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
+        Monitor().SetDesiredError(rp1_vuid);
+        vk::CmdBeginRenderPass(command_buffer, begin_info, VK_SUBPASS_CONTENTS_INLINE);
+        Monitor().VerifyFound();
+        vk::ResetCommandBuffer(command_buffer, 0);
+    }
+    if (rp2_supported && rp2_vuid) {
+        VkSubpassBeginInfo subpass_begin_info = {VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO_KHR, nullptr, VK_SUBPASS_CONTENTS_INLINE};
+        vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
+        Monitor().SetDesiredError(rp2_vuid);
+        vk::CmdBeginRenderPass2KHR(command_buffer, begin_info, &subpass_begin_info);
+        Monitor().VerifyFound();
+        vk::ResetCommandBuffer(command_buffer, 0);
+
+        // For api version >= 1.2, try core entrypoint
+        PFN_vkCmdBeginRenderPass2KHR vkCmdBeginRenderPass2 =
+            (PFN_vkCmdBeginRenderPass2KHR)vk::GetDeviceProcAddr(*m_device, "vkCmdBeginRenderPass2");
+        if (vkCmdBeginRenderPass2) {
+            vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
+            Monitor().SetDesiredError(rp2_vuid);
+            vkCmdBeginRenderPass2(command_buffer, begin_info, &subpass_begin_info);
+            Monitor().VerifyFound();
+            vk::ResetCommandBuffer(command_buffer, 0);
+        }
+    }
 }
 
 VkSamplerCreateInfo SafeSaneSamplerCreateInfo(void *p_next) {
@@ -537,6 +511,7 @@ bool VkLayerTest::LoadDeviceProfileLayer(PFN_VkSetPhysicalDeviceProperties2EXT &
 }
 
 void PrintAndroid(const char *c) {
+    (void)c;
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
     __android_log_print(ANDROID_LOG_INFO, "VulkanLayerValidationTests", "%s", c);
 #endif  // VK_USE_PLATFORM_ANDROID_KHR
@@ -641,7 +616,7 @@ class LogcatPrinter : public ::testing::EmptyTestEventListener {
     };
 };
 
-static int32_t processInput(struct android_app *app, AInputEvent *event) { return 0; }
+static int32_t processInput(struct android_app *, AInputEvent *) { return 0; }
 
 static void processCommand(struct android_app *app, int32_t cmd) {
     switch (cmd) {

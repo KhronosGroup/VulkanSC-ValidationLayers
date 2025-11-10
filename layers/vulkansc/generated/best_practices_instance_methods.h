@@ -47,6 +47,9 @@ void PostCallRecordEnumerateDeviceExtensionProperties(VkPhysicalDevice physicalD
 void PostCallRecordEnumerateInstanceLayerProperties(uint32_t* pPropertyCount, VkLayerProperties* pProperties,
                                                     const RecordObject& record_obj) override;
 
+void PostCallRecordEnumerateDeviceLayerProperties(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
+                                                  VkLayerProperties* pProperties, const RecordObject& record_obj) override;
+
 void PostCallRecordEnumeratePhysicalDeviceGroups(VkInstance instance, uint32_t* pPhysicalDeviceGroupCount,
                                                  VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties,
                                                  const RecordObject& record_obj) override;
@@ -228,6 +231,9 @@ void PostCallRecordCreateViSurfaceNN(VkInstance instance, const VkViSurfaceCreat
                                      const RecordObject& record_obj) override;
 
 #endif  // VK_USE_PLATFORM_VI_NN
+void PostCallRecordReleaseDisplayEXT(VkPhysicalDevice physicalDevice, VkDisplayKHR display,
+                                     const RecordObject& record_obj) override;
+
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
 void PostCallRecordAcquireXlibDisplayEXT(VkPhysicalDevice physicalDevice, Display* dpy, VkDisplayKHR display,
                                          const RecordObject& record_obj) override;

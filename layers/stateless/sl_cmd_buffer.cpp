@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+#include <cmath>
 #include "stateless/stateless_validation.h"
 #include "generated/enum_flag_bits.h"
 #include "containers/range.h"
@@ -140,21 +141,6 @@ bool Device::manual_PreCallValidateCmdBindTransformFeedbackBuffersEXT(VkCommandB
                          firstBinding, bindingCount, phys_dev_ext_props.transform_feedback_props.maxTransformFeedbackBuffers);
     }
 
-    for (uint32_t i = 0; i < bindingCount; ++i) {
-        // pSizes is optional and may be nullptr.
-        if (pSizes != nullptr) {
-            if (pSizes[i] != VK_WHOLE_SIZE &&
-                pSizes[i] > phys_dev_ext_props.transform_feedback_props.maxTransformFeedbackBufferSize) {
-                skip |= LogError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pSize-02361", commandBuffer,
-                                 error_obj.location.dot(Field::pSizes, i),
-                                 "(%" PRIu64
-                                 ") is not VK_WHOLE_SIZE and is greater than "
-                                 "maxTransformFeedbackBufferSize (%" PRIu64 ").",
-                                 pSizes[i], phys_dev_ext_props.transform_feedback_props.maxTransformFeedbackBufferSize);
-            }
-        }
-    }
-
     return skip;
 }
 
@@ -199,7 +185,7 @@ bool Device::manual_PreCallValidateCmdEndTransformFeedbackEXT(VkCommandBuffer co
     }
 
     // pCounterBuffers and pCounterBufferOffsets are optional and may be nullptr.
-    //  Additionaly, pCounterBufferOffsets must be nullptr if pCounterBuffers is nullptr.
+    // Additionally, pCounterBufferOffsets must be nullptr if pCounterBuffers is nullptr.
     if (pCounterBuffers == nullptr && pCounterBufferOffsets != nullptr) {
         skip |= LogError("VUID-vkCmdEndTransformFeedbackEXT-pCounterBuffer-02379", commandBuffer,
                          error_obj.location.dot(Field::pCounterBuffers), "is NULL but pCounterBufferOffsets is not NULL.");
@@ -553,7 +539,7 @@ bool Device::manual_PreCallValidateCmdPushDescriptorSet2(VkCommandBuffer command
         if (!enabled_features.dynamicPipelineLayout) {
             skip |= LogError("VUID-VkPushDescriptorSetInfo-None-09495", commandBuffer,
                              error_obj.location.dot(Field::pPushDescriptorSetInfo).dot(Field::layout), "is VK_NULL_HANDLE.");
-        } else if (vku::FindStructInPNextChain<VkPipelineLayoutCreateInfo>(pPushDescriptorSetInfo->pNext)) {
+        } else if (!vku::FindStructInPNextChain<VkPipelineLayoutCreateInfo>(pPushDescriptorSetInfo->pNext)) {
             skip |= LogError("VUID-VkPushDescriptorSetInfo-layout-09496", commandBuffer,
                              error_obj.location.dot(Field::pPushDescriptorSetInfo).dot(Field::layout),
                              "is VK_NULL_HANDLE and pNext is missing VkPipelineLayoutCreateInfo.");
@@ -747,28 +733,27 @@ bool Device::manual_PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuf
                                                   "VUID-VkCommandBufferInheritanceInfo-pipelineStatistics-00058");
         }
 
-        const auto *conditional_rendering =
-            vku::FindStructInPNextChain<VkCommandBufferInheritanceConditionalRenderingInfoEXT>(info.pNext);
-        if (conditional_rendering) {
+        if (const auto *conditional_rendering =
+                vku::FindStructInPNextChain<VkCommandBufferInheritanceConditionalRenderingInfoEXT>(info.pNext)) {
             if (!enabled_features.inheritedConditionalRendering && conditional_rendering->conditionalRenderingEnable == VK_TRUE) {
-                skip |= LogError(
-                    "VUID-VkCommandBufferInheritanceConditionalRenderingInfoEXT-conditionalRenderingEnable-01977", commandBuffer,
-                    error_obj.location,
-                    "Inherited conditional rendering is disabled, but "
-                    "pBeginInfo->pInheritanceInfo->pNext<VkCommandBufferInheritanceConditionalRenderingInfoEXT> is VK_TRUE.");
+                skip |= LogError("VUID-VkCommandBufferInheritanceConditionalRenderingInfoEXT-conditionalRenderingEnable-01977",
+                                 commandBuffer,
+                                 inheritance_loc.pNext(Struct::VkCommandBufferInheritanceConditionalRenderingInfoEXT,
+                                                       Field::conditionalRenderingEnable),
+                                 "is VK_TRUE but the inheritedConditionalRendering feature was not enabled.");
             }
         }
 
-        auto p_inherited_viewport_scissor_info =
-            vku::FindStructInPNextChain<VkCommandBufferInheritanceViewportScissorInfoNV>(info.pNext);
-        if (p_inherited_viewport_scissor_info != nullptr && !enabled_features.multiViewport &&
-            p_inherited_viewport_scissor_info->viewportScissor2D == VK_TRUE &&
-            p_inherited_viewport_scissor_info->viewportDepthCount != 1) {
-            skip |= LogError("VUID-VkCommandBufferInheritanceViewportScissorInfoNV-viewportScissor2D-04783", commandBuffer,
-                             error_obj.location,
-                             "multiViewport feature was not enabled, but "
-                             "VkCommandBufferInheritanceViewportScissorInfoNV::viewportScissor2D in "
-                             "pBeginInfo->pInheritanceInfo->pNext is VK_TRUE and viewportDepthCount is not 1.");
+        if (auto inherited_viewport_scissor_info =
+                vku::FindStructInPNextChain<VkCommandBufferInheritanceViewportScissorInfoNV>(info.pNext)) {
+            if (!enabled_features.multiViewport && inherited_viewport_scissor_info->viewportScissor2D &&
+                inherited_viewport_scissor_info->viewportDepthCount != 1) {
+                skip |= LogError(
+                    "VUID-VkCommandBufferInheritanceViewportScissorInfoNV-viewportScissor2D-04783", commandBuffer,
+                    inheritance_loc.pNext(Struct::VkCommandBufferInheritanceViewportScissorInfoNV, Field::viewportScissor2D),
+                    "is VK_TRUE and viewportDepthCount is %" PRIu32 " (not 1), but the multiViewport feature was not enabled.",
+                    inherited_viewport_scissor_info->viewportDepthCount);
+            }
         }
     }
     return skip;

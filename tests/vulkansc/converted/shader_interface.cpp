@@ -367,7 +367,7 @@ TEST_F(NegativeShaderInterface, FragmentInputNotProvided) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) in float x;
         layout(location=0) out vec4 color;
@@ -393,7 +393,7 @@ TEST_F(NegativeShaderInterface, FragmentInputNotProvidedInBlock) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         in block { layout(location=0) float x; } ins;
         layout(location=0) out vec4 color;
@@ -418,7 +418,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatch) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) out int x;
         void main(){
@@ -426,7 +426,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatch) {
            gl_Position = vec4(1);
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) in float x; /* VS writes int */
         layout(location=0) out vec4 color;
@@ -452,7 +452,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatch2) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) out int x;
         void main(){
@@ -460,7 +460,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatch2) {
            gl_Position = vec4(1);
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) in float x; /* VS writes int */
         layout(location=0) out vec4 color;
@@ -489,7 +489,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchInBlock) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         out block { layout(location=0) int x; } outs;
         void main(){
@@ -497,7 +497,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchInBlock) {
            gl_Position = vec4(1);
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         in block { layout(location=0) float x; } ins; /* VS writes int */
         layout(location=0) out vec4 color;
@@ -524,14 +524,14 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSize) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 x;
         void main(){
            gl_Position = vec4(1.0);
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) in vec3 x;
         layout(location=0) out vec4 color;
@@ -557,7 +557,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -577,7 +577,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct) {
         }
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -615,7 +615,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct64bit) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
 
@@ -633,7 +633,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct64bit) {
         void main() {}
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -668,7 +668,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockArrayOfStruct) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -688,7 +688,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockArrayOfStruct) {
         }
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -728,7 +728,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructInnerArraySize) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -748,7 +748,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructInnerArraySize) {
         }
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -790,7 +790,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuterArraySize) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -810,7 +810,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuterArraySize) {
         }
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -851,7 +851,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructArraySizeVertex) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -871,7 +871,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructArraySizeVertex) {
         }
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -913,7 +913,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuter2DArraySize) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -929,7 +929,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuter2DArraySize) {
         void main() {}
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         struct S {
             vec4 a[2];
@@ -964,7 +964,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructType64bit) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
 
@@ -988,7 +988,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructType64bit) {
         void main() {}
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         struct A {
             float a0_;
@@ -1028,7 +1028,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructArray) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         struct A {
             float a0_;
@@ -1051,7 +1051,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructArray) {
         void main() {}
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         struct A {
             float a0_;
@@ -1094,7 +1094,7 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByLocation) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         out block { layout(location=1) float x; } outs;
         void main(){
@@ -1102,7 +1102,7 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByLocation) {
            gl_Position = vec4(1);
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         in block { layout(location=0) float x; } ins;
         layout(location=0) out vec4 color;
@@ -1130,7 +1130,7 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByComponent) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         out block { layout(location=0, component=0) float x; } outs;
         void main(){
@@ -1138,7 +1138,7 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByComponent) {
            gl_Position = vec4(1);
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         in block { layout(location=0, component=1) float x; } ins;
         layout(location=0) out vec4 color;
@@ -1167,7 +1167,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchShaderObject) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) out int x;
         void main(){
@@ -1175,7 +1175,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchShaderObject) {
            gl_Position = vec4(1);
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) in float x; /* VS writes int */
         layout(location=0) out vec4 color;
@@ -1209,14 +1209,14 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSizeShaderObject) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 x;
         void main(){
            gl_Position = vec4(1.0);
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) in vec3 x;
         layout(location=0) out vec4 color;
@@ -1284,7 +1284,7 @@ TEST_F(NegativeShaderInterface, VertexOutputNotConsumed) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) out float x;
         void main(){
@@ -1311,7 +1311,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
     InitRenderTarget();
 
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
                 #version 450
 
                 layout(location = 0, component = 0) out float r;
@@ -1324,7 +1324,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
             )glsl";
         VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
                 #version 450
 
                 layout(location = 0) in vec3 rgb;
@@ -1344,7 +1344,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
     }
 
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
                 #version 450
 
                 layout(location = 0) out vec3 v;
@@ -1354,7 +1354,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
             )glsl";
         VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
                 #version 450
 
                 layout(location = 0, component = 0) in float a;
@@ -1375,7 +1375,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
     }
 
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
                 #version 450
 
                 layout(location = 0) out vec3 v;
@@ -1386,7 +1386,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
             )glsl";
         VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
                 #version 450
 
                 layout(location = 0) in vec4 v;
@@ -1406,7 +1406,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
     }
 
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
                 #version 450
 
                 layout(location = 0) out vec3 v;
@@ -1417,7 +1417,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
             )glsl";
         VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
                 #version 450
 
                 layout (location = 0) out vec4 color;
@@ -1435,7 +1435,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
     }
 
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
                 #version 450
 
                 layout(location = 0) out vec3 v1;
@@ -1450,7 +1450,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
             )glsl";
         VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
                 #version 450
 
                 layout (location = 0) in vec3 v1;
@@ -1529,7 +1529,7 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageOutputNoAlpha) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget(0u);
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) out vec3 x;
         void main(){
@@ -1557,7 +1557,7 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageArrayIndex) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget(0u);
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=1) out vec4 fragData[3];
         void main() {
@@ -1585,7 +1585,7 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageArrayVec3) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget(0u);
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) out vec3 fragData[4];
         void main() {
@@ -1616,13 +1616,13 @@ TEST_F(NegativeShaderInterface, MultidimensionalArray) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) out float[4][2][2] x;
         void main() {}
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) in float[4][3][2] x; // 2 extra Locations
         layout(location=0) out float color;
@@ -1649,13 +1649,13 @@ TEST_F(NegativeShaderInterface, MultidimensionalArrayDim) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) out float[4][2][2] x;
         void main() {}
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) in float[17] x; // 1 extra Locations
         layout(location=0) out float color;
@@ -1684,7 +1684,7 @@ TEST_F(NegativeShaderInterface, MultidimensionalArray64bit) {
         GTEST_SKIP() << "maxFragmentOutputAttachments is too low";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
         layout(location=0) out f64vec3[2][2][2] x; // take 2 locations each (total 16)
@@ -1692,7 +1692,7 @@ TEST_F(NegativeShaderInterface, MultidimensionalArray64bit) {
         void main() {}
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
         layout(location=0) flat in f64vec3[2][3][2] x;
@@ -1717,13 +1717,13 @@ TEST_F(NegativeShaderInterface, PackingInsideArray) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location = 0, component = 1) out float[2] x;
         void main() {}
     )glsl";
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location = 0, component = 1) in float x;
         layout(location = 1, component = 0) in float y;
@@ -1738,73 +1738,6 @@ TEST_F(NegativeShaderInterface, PackingInsideArray) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
-}
-
-TEST_F(NegativeShaderInterface, PackingInsideArray2) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
-    TEST_DESCRIPTION(
-        "From https://gitlab.khronos.org/vulkan/vulkan/-/issues/3558, but then overturned in "
-        "https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/4719");
-
-    RETURN_IF_SKIP(Init());
-    InitRenderTarget();
-
-    // GLSL use to allow alias location of different types
-    // https://github.com/KhronosGroup/glslang/pull/3438
-    //
-    // layout(location = 0, component = 1) out float[2] x;
-    // layout(location = 1, component = 0) out int y;
-    // layout(location = 1, component = 2) out int z;
-    char const *vsSource = R"(
-               OpCapability Shader
-               OpMemoryModel Logical GLSL450
-               OpEntryPoint Vertex %main "main" %x %y %z
-               OpDecorate %x Component 1
-               OpDecorate %x Location 0
-               OpDecorate %y Component 0
-               OpDecorate %y Location 1
-               OpDecorate %z Component 2
-               OpDecorate %z Location 1
-       %void = OpTypeVoid
-          %3 = OpTypeFunction %void
-      %float = OpTypeFloat 32
-       %uint = OpTypeInt 32 0
-     %uint_2 = OpConstant %uint 2
-%_arr_float_uint_2 = OpTypeArray %float %uint_2
-%_ptr_Output__arr_float_uint_2 = OpTypePointer Output %_arr_float_uint_2
-          %x = OpVariable %_ptr_Output__arr_float_uint_2 Output
-        %int = OpTypeInt 32 1
-%_ptr_Output_int = OpTypePointer Output %int
-          %y = OpVariable %_ptr_Output_int Output
-          %z = OpVariable %_ptr_Output_int Output
-       %main = OpFunction %void None %3
-          %5 = OpLabel
-               OpReturn
-               OpFunctionEnd
-    )";
-
-    m_errorMonitor->SetDesiredError("VUID-StandaloneSpirv-OpEntryPoint-08722");
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeShaderInterface, PackingInsideArray3) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
-    TEST_DESCRIPTION("From https://gitlab.khronos.org/vulkan/vulkan/-/issues/3558");
-    RETURN_IF_SKIP(Init());
-
-    char const *vsSource = R"glsl(
-        #version 450
-        layout(location = 0, component = 0) out float x;
-        layout(location = 0, component = 1) out float[2] y;
-        void main() {}
-    )glsl";
-
-    m_errorMonitor->SetDesiredError("VUID-StandaloneSpirv-OpEntryPoint-08722");
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    m_errorMonitor->VerifyFound();
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
@@ -1896,7 +1829,7 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArray) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 460
         layout(location = 0) out vec4 uFragColor[2];
         void main(){
@@ -1941,7 +1874,7 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArrayDynamicRen
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 460
         layout(location = 0) out vec4 uFragColor[2];
         void main(){
@@ -1999,7 +1932,7 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputTypeMismatch) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) out ivec4 x; /* not UNORM */
         void main(){
@@ -2023,7 +1956,7 @@ TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRendering) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         layout(location=0) out ivec4 x; /* not UNORM */
         void main(){
@@ -2046,6 +1979,71 @@ TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRendering) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderFragmentOutputMismatch-DynamicRendering");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRenderingLocalRead) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::dynamicRenderingLocalRead);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget(VK_FORMAT_R8G8B8A8_SINT);
+    InitDynamicRenderTarget(VK_FORMAT_R8G8B8A8_UNORM);
+
+    const char *fs_source = R"glsl(
+        #version 450
+        layout(location=0) out ivec4 x; /* not UNORM */
+        void main(){
+           x = ivec4(1);
+        }
+    )glsl";
+
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    static constexpr uint32_t locations[] = {VK_ATTACHMENT_UNUSED, 0};
+    VkRenderingAttachmentLocationInfo locations_info = vku::InitStructHelper();
+    locations_info.colorAttachmentCount = std::size(locations);
+    locations_info.pColorAttachmentLocations = locations;
+
+    static constexpr VkFormat color_formats[] = {VK_FORMAT_R8G8B8A8_SINT, VK_FORMAT_R8G8B8A8_UNORM};
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper(&locations_info);
+    pipeline_rendering_info.colorAttachmentCount = std::size(color_formats);
+    pipeline_rendering_info.pColorAttachmentFormats = color_formats;
+
+    VkPipelineColorBlendAttachmentState color_blend_attachments[2] = {};
+    VkPipelineColorBlendStateCreateInfo cbi = vku::InitStructHelper();
+    cbi.attachmentCount = 2u;
+    cbi.pAttachments = color_blend_attachments;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
+    pipe.gp_ci_.pColorBlendState = &cbi;
+    pipe.CreateGraphicsPipeline();
+
+    VkRenderingAttachmentInfo color_attachment[] = {vku::InitStructHelper(), vku::InitStructHelper()};
+    color_attachment[0].imageView = GetDynamicRenderTarget(0);
+    color_attachment[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment[1].imageView = GetDynamicRenderTarget(1);
+    color_attachment[1].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.colorAttachmentCount = std::size(color_attachment);
+    rendering_info.pColorAttachments = color_attachment;
+    rendering_info.layerCount = 1;
+    rendering_info.renderArea = GetRenderTargetArea();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &locations_info);
     m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderFragmentOutputMismatch-DynamicRendering");
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
@@ -2086,7 +2084,7 @@ TEST_F(NegativeShaderInterface, FragmentOutputDynamicRenderingUnusedAttachments)
 
     VkRenderingAttachmentInfo depth_stencil_attachment = vku::InitStructHelper();
     depth_stencil_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depth_stencil_attachment.imageView = depth_view.handle();
+    depth_stencil_attachment.imageView = depth_view;
 
     m_command_buffer.Begin();
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
@@ -2113,7 +2111,7 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotConsumed) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 x;
         layout(location=1) out vec4 y; /* no matching attachment for this */
@@ -2139,7 +2137,7 @@ TEST_F(NegativeShaderInterface, FragmentOutputNotConsumedDynamicRendering) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         layout(location=0) out vec4 x;
         layout(location=1) out vec4 y; /* no matching attachment for this */
@@ -2308,7 +2306,7 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBuffer) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vs_source = R"(
+    const char *vs_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_physical_storage_buffer"
@@ -2351,7 +2349,7 @@ TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachment) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923");
     RETURN_IF_SKIP(Init());
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 color0;
         layout(location=1) out vec4 color1;
@@ -2404,7 +2402,7 @@ TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachmentDynamicRender
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 color0;
         layout(location=1) out vec4 color1;
@@ -2650,7 +2648,7 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferArray) {
     RETURN_IF_SKIP(Init())
     InitRenderTarget();
 
-    char const *vs_source = R"(
+    const char *vs_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_physical_storage_buffer"
@@ -2701,7 +2699,7 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferLinkedList) {
     RETURN_IF_SKIP(Init())
     InitRenderTarget();
 
-    char const *fs_source = R"(
+    const char *fs_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_physical_storage_buffer"
@@ -2753,7 +2751,7 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferNested) {
     RETURN_IF_SKIP(Init())
     InitRenderTarget();
 
-    char const *fs_source = R"(
+    const char *fs_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_physical_storage_buffer"
@@ -2810,7 +2808,7 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferNested) {
                OpFunctionEnd
     )";
 
-    m_errorMonitor->SetDesiredWarning("VUID-StandaloneSpirv-Input-09557");
+    m_errorMonitor->SetDesiredWarning("VUID-StandaloneSpirv-PhysicalStorageBuffer64-06314");
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }

@@ -59,10 +59,9 @@ TEST_F(NegativeShaderSpirv, DISABLED_CodeSize) {
     }
 
     {
-        std::vector<uint32_t> shader;
         VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
         VkShaderModule module;
-        GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl, shader);
+        std::vector<uint32_t> shader = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
         module_create_info.pCode = shader.data();
         // Introduce failure by making codeSize a non-multiple of 4
         module_create_info.codeSize = shader.size() * sizeof(uint32_t) - 1;
@@ -98,8 +97,7 @@ TEST_F(NegativeShaderSpirv, CodeSizeMaintenance5) {
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 
-    std::vector<uint32_t> shader;
-    GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl, shader);
+    std::vector<uint32_t> shader = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
     module_create_info.pCode = shader.data();
     // Introduce failure by making codeSize a non-multiple of 4
     module_create_info.codeSize = shader.size() * sizeof(uint32_t) - 1;
@@ -134,8 +132,7 @@ TEST_F(NegativeShaderSpirv, CodeSizeMaintenance5Compute) {
     pipe.CreateComputePipeline(false);
     m_errorMonitor->VerifyFound();
 
-    std::vector<uint32_t> shader;
-    GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_VERTEX_BIT, kMinimalShaderGlsl, shader);
+    std::vector<uint32_t> shader = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kMinimalShaderGlsl);
     module_create_info.pCode = shader.data();
     // Introduce failure by making codeSize a non-multiple of 4
     module_create_info.codeSize = shader.size() * sizeof(uint32_t) - 1;
@@ -371,7 +368,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // storageBuffer8BitAccess
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_8bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -389,7 +386,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
     }
     // uniformAndStorageBuffer8BitAccess
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_8bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -408,7 +405,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // storagePushConstant8
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_8bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -427,7 +424,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // storageBuffer16BitAccess - Float
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -437,7 +434,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
                gl_Position = vec4(float(a) * 0.0);
             }
         )glsl";
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-06331");  // feature
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-11161");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);      // Int8
         VkShaderObj const vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
@@ -445,7 +442,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // uniformAndStorageBuffer16BitAccess - Float
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -464,7 +461,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // storagePushConstant16 - Float
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -483,7 +480,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // storageInputOutput16 - Float
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -494,13 +491,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
             }
         )glsl";
 
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-06334");  // feature
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);  // Int8
         VkShaderObj const vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
 
         // Need to match in/out
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -511,7 +508,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
             }
         )glsl";
 
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-06334");  // feature
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");     // Int8
         VkShaderObj const fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
@@ -519,7 +516,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // storageBuffer16BitAccess - Int
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -530,7 +527,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
             }
         )glsl";
 
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-06331");  // feature
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-11161");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);      // Int16 and StorageBuffer16BitAccess
         VkShaderObj const vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
@@ -538,7 +535,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // uniformAndStorageBuffer16BitAccess - Int
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -558,7 +555,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // storagePushConstant16 - Int
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -577,7 +574,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // storageInputOutput16 - Int
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -588,13 +585,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
             }
         )glsl";
 
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-06334");  // feature
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);  // Int16 and StorageInputOutput16
         VkShaderObj const vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
 
         // Need to match in/out
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -605,11 +602,49 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
             }
         )glsl";
 
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-06334");  // feature
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");     // StorageInputOutput16
         VkShaderObj const fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(NegativeShaderSpirv, InputOutput8Bit) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-Docs/issues/2595");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    RETURN_IF_SKIP(Init());
+
+    const char *vsSource = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_8bit_storage: enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
+        layout(location = 0) in int8_t inData;
+        void main(){
+            gl_Position = vec4(float(inData));
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10980");
+    VkShaderObj const vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
+    m_errorMonitor->VerifyFound();
+
+    const char *fsSource = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_8bit_storage: enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
+        layout(location = 0) out uint8_t outData;
+        void main(){
+            outData = uint8_t(3);
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10980");
+    VkShaderObj const fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5) {
@@ -624,7 +659,7 @@ TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         #extension GL_EXT_shader_8bit_storage: enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -634,8 +669,7 @@ TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5) {
             gl_Position = vec4(float(a) * 0.0);
         }
     )glsl";
-    std::vector<uint32_t> shader;
-    GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_VERTEX_BIT, vsSource, shader);
+    std::vector<uint32_t> shader = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vsSource);
 
     VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
     module_create_info.pCode = shader.data();
@@ -653,6 +687,61 @@ TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5) {
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-uniformAndStorageBuffer8BitAccess-06329");  // feature
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);               // Int8
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5VertAndFrag) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::fragmentStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const char shader[] = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_atomic_float : enable
+        #extension GL_KHR_memory_scope_semantics : enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_float32 : enable
+        layout(set = 0, binding = 0) buffer ssbo { float32_t y; };
+        void main() {
+           y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+        }
+    )glsl";
+
+    const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, shader);
+    const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, shader);
+
+    VkShaderModuleCreateInfo module_create_info_vs = vku::InitStructHelper();
+    module_create_info_vs.pCode = vs_spv.data();
+    module_create_info_vs.codeSize = vs_spv.size() * sizeof(uint32_t);
+
+    VkPipelineShaderStageCreateInfo stage_ci_vs = vku::InitStructHelper(&module_create_info_vs);
+    stage_ci_vs.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stage_ci_vs.module = VK_NULL_HANDLE;
+    stage_ci_vs.pName = "main";
+
+    VkShaderModuleCreateInfo module_create_info_fs = vku::InitStructHelper();
+    module_create_info_fs.pCode = fs_spv.data();
+    module_create_info_fs.codeSize = fs_spv.size() * sizeof(uint32_t);
+
+    VkPipelineShaderStageCreateInfo stage_ci_fs = vku::InitStructHelper(&module_create_info_fs);
+    stage_ci_fs.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    stage_ci_fs.module = VK_NULL_HANDLE;
+    stage_ci_fs.pName = "main";
+
+    std::array stages = {stage_ci_vs, stage_ci_fs};
+
+    CreatePipelineHelper pipe(*this);
+    pipe.gp_ci_.stageCount = size32(stages);
+    pipe.gp_ci_.pStages = stages.data();
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06338", 2);  // Vertex and Fragment
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -798,7 +887,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
                OpReturn
                OpFunctionEnd
         )";
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-06331");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-11161");
             auto vs = VkShaderObj::CreateFromASM(this, spv_source, VK_SHADER_STAGE_VERTEX_BIT);
             m_errorMonitor->VerifyFound();
         }
@@ -881,7 +970,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
                OpFunctionEnd
         )";
 
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-06334");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");
             auto vs = VkShaderObj::CreateFromASM(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
             m_errorMonitor->VerifyFound();
 
@@ -910,7 +999,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
                OpFunctionEnd
         )";
 
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-06334");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");
             auto fs = VkShaderObj::CreateFromASM(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
             m_errorMonitor->VerifyFound();
         }
@@ -942,7 +1031,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
                OpReturn
                OpFunctionEnd
         )";
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-06331");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-11161");
             auto vs = VkShaderObj::CreateFromASM(this, spv_source, VK_SHADER_STAGE_VERTEX_BIT);
             m_errorMonitor->VerifyFound();
         }
@@ -1024,7 +1113,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
                OpReturn
                OpFunctionEnd
         )";
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-06334");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");
             auto vs = VkShaderObj::CreateFromASM(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
             m_errorMonitor->VerifyFound();
 
@@ -1054,7 +1143,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
                OpFunctionEnd
         )";
 
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-06334");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");
             auto fs = VkShaderObj::CreateFromASM(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
             m_errorMonitor->VerifyFound();
         }
@@ -1103,7 +1192,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
                OpFunctionEnd
         )";
 
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-06331");  // 16 bit var
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-11161");  // 16 bit var
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer8BitAccess-06328");   // 8 bit var
         auto vs = VkShaderObj::CreateFromASM(this, spv_source, VK_SHADER_STAGE_VERTEX_BIT);
         m_errorMonitor->VerifyFound();
@@ -1121,7 +1210,7 @@ TEST_F(NegativeShaderSpirv, ReadShaderClock) {
     InitRenderTarget();
 
     // Device scope using GL_EXT_shader_realtime_clock
-    char const *vsSourceDevice = R"glsl(
+    const char *vsSourceDevice = R"glsl(
         #version 450
         #extension GL_EXT_shader_realtime_clock: enable
         void main(){
@@ -1134,7 +1223,7 @@ TEST_F(NegativeShaderSpirv, ReadShaderClock) {
     m_errorMonitor->VerifyFound();
 
     // Subgroup scope using ARB_shader_clock
-    char const *vsSourceScope = R"glsl(
+    const char *vsSourceScope = R"glsl(
         #version 450
         #extension GL_ARB_shader_clock: enable
         void main(){
@@ -1209,12 +1298,15 @@ TEST_F(NegativeShaderSpirv, SpecializationApplied) {
 }
 
 TEST_F(NegativeShaderSpirv, SpecializationOffsetOutOfBounds) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate VkSpecializationInfo offset.");
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const float r = 0.0f;
         layout(location = 0) out vec4 uFragColor;
@@ -1251,7 +1343,7 @@ TEST_F(NegativeShaderSpirv, SpecializationOffsetOutOfBoundsWithIdentifier) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         layout (constant_id = 0) const float x = 0.0f;
         void main(){
@@ -1293,12 +1385,15 @@ TEST_F(NegativeShaderSpirv, SpecializationOffsetOutOfBoundsWithIdentifier) {
 }
 
 TEST_F(NegativeShaderSpirv, SpecializationSizeOutOfBounds) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Challenge core_validation with shader validation issues related to vkCreateGraphicsPipelines.");
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const float r = 0.0f;
         layout(location = 0) out vec4 uFragColor;
@@ -1641,11 +1736,14 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatchFloat64) {
 }
 
 TEST_F(NegativeShaderSpirv, DuplicatedSpecializationConstantID) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a pipeline with non unique constantID in specialization pMapEntries.");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const float r = 0.0f;
         layout(location = 0) out vec4 uFragColor;
@@ -1708,7 +1806,7 @@ TEST_F(NegativeShaderSpirv, ShaderNotEnabled) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 color;
         void main(){
@@ -1726,7 +1824,7 @@ TEST_F(NegativeShaderSpirv, ShaderImageFootprintEnabled) {
     AddRequiredExtensions(VK_NV_SHADER_IMAGE_FOOTPRINT_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         #extension GL_NV_shader_texture_footprint  : require
         layout(set=0, binding=0) uniform sampler2D s;
@@ -1752,7 +1850,7 @@ TEST_F(NegativeShaderSpirv, FragmentShaderBarycentricEnabled) {
     AddRequiredExtensions(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         #extension GL_NV_fragment_shader_barycentric : require
         layout(location=0) out float value;
@@ -1772,7 +1870,7 @@ TEST_F(NegativeShaderSpirv, ComputeShaderDerivativesEnabled) {
     AddRequiredExtensions(VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #extension GL_NV_compute_shader_derivatives : require
         layout(local_size_x=2, local_size_y=4) in;
@@ -1798,7 +1896,7 @@ TEST_F(NegativeShaderSpirv, FragmentShaderInterlockEnabled) {
     AddRequiredExtensions(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         #extension GL_ARB_fragment_shader_interlock : require
         layout(sample_interlock_ordered) in;
@@ -1819,7 +1917,7 @@ TEST_F(NegativeShaderSpirv, DemoteToHelperInvocation) {
     AddRequiredExtensions(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         #extension GL_EXT_demote_to_helper_invocation : require
         void main(){
@@ -2012,7 +2110,7 @@ TEST_F(NegativeShaderSpirv, SubgroupRotate) {
 
     RETURN_IF_SKIP(Init());
 
-    char const *source = R"glsl(
+    const char *source = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_rotate: enable
         layout(binding = 0) buffer Buffers { vec4  x; } data;
@@ -2034,7 +2132,7 @@ TEST_F(NegativeShaderSpirv, SubgroupRotateClustered) {
 
     RETURN_IF_SKIP(Init());
 
-    char const *source = R"glsl(
+    const char *source = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_rotate: enable
         layout(binding = 0) buffer Buffers { vec4  x; } data;
@@ -2058,12 +2156,12 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
 
     RETURN_IF_SKIP(Init());
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0) buffer ssbo { uint y; };
         void main() {
-            atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+            atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
        }
     )glsl";
 
@@ -2082,12 +2180,12 @@ TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
     RETURN_IF_SKIP(Init());
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0) buffer ssbo { uint y; };
         void main() {
-            atomicStore(y, 1u, gl_ScopeQueueFamily, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+            atomicStore(y, 1u, gl_ScopeQueueFamily, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
        }
     )glsl";
 
@@ -2104,7 +2202,7 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScopeDebugInfo) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     RETURN_IF_SKIP(Init());
 
-    char const *csSource = R"(
+    const char *csSource = R"(
                OpCapability Shader
           %2 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -2119,7 +2217,7 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScopeDebugInfo) {
 #extension GL_KHR_memory_scope_semantics : enable
 layout(set = 0, binding = 0) buffer ssbo { uint y; };
 void main() {
-    atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+    atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
 }"
                OpSourceExtension "GL_KHR_memory_scope_semantics"
                OpName %main "main"
@@ -2143,20 +2241,20 @@ void main() {
       %int_1 = OpConstant %int 1
      %int_64 = OpConstant %int 64
      %uint_0 = OpConstant %uint 0
-    %uint_64 = OpConstant %uint 64
+    %uint_68 = OpConstant %uint 68
                OpLine %1 4 19
        %main = OpFunction %void None %4
           %6 = OpLabel
                OpLine %1 5 0
          %14 = OpAccessChain %_ptr_Uniform_uint %_ %int_0
-               OpAtomicStore %14 %int_1 %uint_64 %uint_1
+               OpAtomicStore %14 %int_1 %uint_68 %uint_1
                OpLine %1 6 0
                OpReturn
                OpFunctionEnd
     )";
 
     // VUID-RuntimeSpirv-vulkanMemoryModel-06265
-    m_errorMonitor->SetDesiredError("5:     atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);");
+    m_errorMonitor->SetDesiredError("5:     atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);");
     VkShaderObj const cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
@@ -2389,7 +2487,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountConstant) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout (set = 0, binding = 0) uniform sampler2D tex[3];
         layout (location = 0) out vec4 out_color;
@@ -2413,7 +2511,7 @@ TEST_F(NegativeShaderSpirv, DISABLED_DescriptorCountSpecConstant) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const int index = 2;
         layout (set = 0, binding = 0) uniform sampler2D tex[index];
@@ -2446,7 +2544,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountConstantRuntimeArray) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : enable
         layout (set = 0, binding = 0) uniform sampler2D tex[];
@@ -2599,7 +2697,7 @@ TEST_F(NegativeShaderSpirv, ScalarBlockLayoutShaderCache) {
     RETURN_IF_SKIP(Init());
 
     // Matches glsl from other ScalarBlockLayoutShaderCache test
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_buffer_reference : require
         #extension GL_EXT_scalar_block_layout : require
@@ -2731,7 +2829,7 @@ TEST_F(NegativeShaderSpirv, ShaderViewportIndexLayerEXT) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         #extension GL_ARB_shader_viewport_layer_array : enable
         void main() {
@@ -2824,7 +2922,7 @@ TEST_F(NegativeShaderSpirv, Bitwise32bitMaintenance9) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
     RETURN_IF_SKIP(Init());  // missing maintenance9
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_explicit_arithmetic_types_int64 : enable
         void main() {
@@ -2835,5 +2933,140 @@ TEST_F(NegativeShaderSpirv, Bitwise32bitMaintenance9) {
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10824");
     VkShaderObj cs(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, ShaderFma32) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_FMA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderFmaFloat64);
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
+    RETURN_IF_SKIP(Init());
+
+    const char *spv_source = R"(
+               OpCapability Shader
+               OpCapability FMAKHR
+               OpExtension "SPV_KHR_fma"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %_
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %SSBO Block
+               OpMemberDecorate %SSBO 0 Offset 0
+               OpDecorate %_ Binding 0
+               OpDecorate %_ DescriptorSet 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+%_ptr_Function_float = OpTypePointer Function %float
+    %float_1 = OpConstant %float 1
+       %SSBO = OpTypeStruct %float
+%_ptr_StorageBuffer_SSBO = OpTypePointer StorageBuffer %SSBO
+          %_ = OpVariable %_ptr_StorageBuffer_SSBO StorageBuffer
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+          %a = OpVariable %_ptr_Function_float Function
+          %b = OpVariable %_ptr_Function_float Function
+          %c = OpVariable %_ptr_Function_float Function
+               OpStore %a %float_1
+               OpStore %b %float_1
+               OpStore %c %float_1
+     %load_a = OpLoad %float %a
+     %load_b = OpLoad %float %b
+     %load_c = OpLoad %float %c
+         %24 = OpFmaKHR %float %load_a %load_b %load_c
+         %26 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
+               OpStore %26 %24
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-shaderFmaFloat32-10978");
+    VkShaderObj cs(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, ShaderFmaNon32) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_FMA_EXTENSION_NAME);
+    // Missing 16 and 64 support for FMA
+    AddRequiredFeature(vkt::Feature::shaderFmaFloat32);
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
+    RETURN_IF_SKIP(Init());
+
+    const char *spv_source = R"(
+               OpCapability Shader
+               OpCapability Float16
+               OpCapability Float64
+               OpCapability FMAKHR
+               OpExtension "SPV_KHR_fma"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %_
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %SSBO Block
+               OpMemberDecorate %SSBO 0 Offset 0
+               OpDecorate %_ Binding 0
+               OpDecorate %_ DescriptorSet 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+      %float16 = OpTypeFloat 16
+      %float64 = OpTypeFloat 64
+%_ptr_Function_float = OpTypePointer Function %float
+%_ptr_Function_float16 = OpTypePointer Function %float16
+%_ptr_Function_float64 = OpTypePointer Function %float64
+    %float_1 = OpConstant %float 1
+  %float16_1 = OpConstant %float16 1
+  %float64_1 = OpConstant %float64 1
+       %SSBO = OpTypeStruct %float
+%_ptr_StorageBuffer_SSBO = OpTypePointer StorageBuffer %SSBO
+          %_ = OpVariable %_ptr_StorageBuffer_SSBO StorageBuffer
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+          %a = OpVariable %_ptr_Function_float Function
+          %b = OpVariable %_ptr_Function_float Function
+          %c = OpVariable %_ptr_Function_float Function
+        %a16 = OpVariable %_ptr_Function_float16 Function
+        %b16 = OpVariable %_ptr_Function_float16 Function
+        %c16 = OpVariable %_ptr_Function_float16 Function
+        %a64 = OpVariable %_ptr_Function_float64 Function
+        %b64 = OpVariable %_ptr_Function_float64 Function
+        %c64 = OpVariable %_ptr_Function_float64 Function
+
+               OpStore %a %float_1
+               OpStore %b %float_1
+               OpStore %c %float_1
+     %load_a = OpLoad %float %a
+     %load_b = OpLoad %float %b
+     %load_c = OpLoad %float %c
+      %fma32 = OpFmaKHR %float %load_a %load_b %load_c
+
+               OpStore %a16 %float16_1
+               OpStore %b16 %float16_1
+               OpStore %c16 %float16_1
+   %load_a16 = OpLoad %float16 %a16
+   %load_b16 = OpLoad %float16 %b16
+   %load_c16 = OpLoad %float16 %c16
+      %fma16 = OpFmaKHR %float16 %load_a16 %load_b16 %load_c16
+
+               OpStore %a64 %float64_1
+               OpStore %b64 %float64_1
+               OpStore %c64 %float64_1
+   %load_a64 = OpLoad %float64 %a64
+   %load_b64 = OpLoad %float64 %b64
+   %load_c64 = OpLoad %float64 %c64
+      %fma64 = OpFmaKHR %float64 %load_a64 %load_b64 %load_c64
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-shaderFmaFloat16-10977");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-shaderFmaFloat64-10979");
+    VkShaderObj cs(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }

@@ -77,19 +77,26 @@ std::string PipelineLayoutCompatDef::DescribeDifference(const PipelineLayoutComp
             ss << "Empty\n";
         } else {
             for (const auto [pcr_i, pcr] : vvl::enumerate(push_constant_ranges->data(), push_constant_ranges->size())) {
-                ss << "VkPushConstantRange[ " << pcr_i << " ]: " << string_VkPushConstantRange(pcr) << '\n';
+                ss << "VkPushConstantRange[" << pcr_i << "]: " << string_VkPushConstantRange(pcr) << '\n';
             }
         }
         ss << "But pipeline layout of last bound pipeline or last bound shaders has following push constant ranges:\n";
-        if (push_constant_ranges->empty()) {
+        if (other.push_constant_ranges->empty()) {
             ss << "Empty\n";
         } else {
             for (const auto [pcr_i, pcr] : vvl::enumerate(other.push_constant_ranges->data(), other.push_constant_ranges->size())) {
-                ss << "VkPushConstantRange[ " << pcr_i << " ]: " << string_VkPushConstantRange(pcr) << '\n';
+                ss << "VkPushConstantRange[" << pcr_i << "]: " << string_VkPushConstantRange(pcr) << '\n';
             }
         }
     } else if (is_independent_sets != other.is_independent_sets) {
-        ss << "One set is created with VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT while the other is not\n";
+        ss << "The pipeline layout used to bind set " << set;
+        if (is_independent_sets) {
+            ss << " was created with VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT when the pipeline layout of last bound "
+                  "pipeline was not.";
+        } else {
+            ss << " was created without VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT when the pipeline layout of last bound "
+                  "pipeline was.";
+        }
     } else {
         const auto &descriptor_set_layouts = *set_layouts_id.get();
         const auto &other_ds_layouts = *other.set_layouts_id.get();
@@ -209,10 +216,6 @@ static PipelineLayout::SetLayoutVector GetSetLayouts(const vvl::span<const Pipel
         if (layout && (layout->set_layouts.size() > num_layouts)) {
             num_layouts = layout->set_layouts.size();
         }
-    }
-
-    if (!num_layouts) {
-        return {};
     }
 
     set_layouts.reserve(num_layouts);

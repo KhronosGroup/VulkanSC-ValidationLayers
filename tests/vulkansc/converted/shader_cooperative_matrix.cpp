@@ -23,9 +23,7 @@ class NegativeShaderCooperativeMatrix : public CooperativeMatrixTest {};
 
 TEST_F(NegativeShaderCooperativeMatrix, SpecInfo) {
     TEST_DESCRIPTION("Test VK_KHR_cooperative_matrix.");
-
     SetTargetApiVersion(VK_API_VERSION_1_3);
-
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
     RETURN_IF_SKIP(InitCooperativeMatrixKHR());
@@ -34,7 +32,7 @@ TEST_F(NegativeShaderCooperativeMatrix, SpecInfo) {
     const vkt::DescriptorSetLayout dsl(*m_device, bindings);
     const vkt::PipelineLayout pl(*m_device, {&dsl});
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -95,7 +93,7 @@ TEST_F(NegativeShaderCooperativeMatrix, UnsupportedStageUint32) {
         GTEST_SKIP() << "Cannot execute test due to vertex stage expected to be unsupported";
     }
 
-    char const *vtSource = R"glsl(
+    const char *vtSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -124,6 +122,7 @@ TEST_F(NegativeShaderCooperativeMatrix, UnsupportedStageFloat16) {
     TEST_DESCRIPTION("Test error using cooperative matrix in unsupported stage");
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
     RETURN_IF_SKIP(InitCooperativeMatrixKHR());
     InitRenderTarget();
 
@@ -137,7 +136,7 @@ TEST_F(NegativeShaderCooperativeMatrix, UnsupportedStageFloat16) {
         GTEST_SKIP() << "Cannot execute test due to vertex stage expected to be unsupported";
     }
 
-    char const *vtSource = R"glsl(
+    const char *vtSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -182,7 +181,7 @@ TEST_F(NegativeShaderCooperativeMatrix, ParametersMatchProperties) {
     }
 
     // Tests are assume that Float16 3*5 is not available
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -216,7 +215,7 @@ TEST_F(NegativeShaderCooperativeMatrix, DimXMultipleSubgroupSize) {
         GTEST_SKIP() << "Valid Property not found";
     }
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -274,7 +273,7 @@ TEST_F(NegativeShaderCooperativeMatrix, DimXMultipleSubgroupSizeWorkgroupScope) 
         GTEST_SKIP() << "Valid Property not found";
     }
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -330,7 +329,7 @@ TEST_F(NegativeShaderCooperativeMatrix, SameScope) {
         GTEST_SKIP() << "Valid Property not found";
     }
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -394,7 +393,7 @@ TEST_F(NegativeShaderCooperativeMatrix, WorkgroupScope) {
         GTEST_SKIP() << "Valid Property not found";
     }
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -435,7 +434,7 @@ TEST_F(NegativeShaderCooperativeMatrix, WorkgroupScopeMaxDimensions) {
         GTEST_SKIP() << "Valid Property not found";
     }
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -498,7 +497,7 @@ TEST_F(NegativeShaderCooperativeMatrix, WorkgroupScopeMaxSharedMemory) {
         GTEST_SKIP() << "Valid Property not found";
     }
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable
@@ -567,7 +566,7 @@ TEST_F(NegativeShaderCooperativeMatrix, MatchSizeWithProperties) {
         GTEST_SKIP() << "Valid Property found, need invalid to test";
     }
 
-    char const *source = R"glsl(
+    const char *source = R"glsl(
         #version 450
         #pragma use_vulkan_memory_model
         #extension GL_KHR_cooperative_matrix : enable

@@ -50,10 +50,37 @@ cd build
 ./tests/vk_layer_validation_tests --device-index 1
 
 # Run a single test
-./tests/vk_layer_validation_tests --gtest_filter=VkLayerTest.BufferExtents
+./tests/vk_layer_validation_tests --gtest_filter=PositiveBuffer.OwnershipTranfers
 
-# Run a multiple tests with a patter
+# Run a multiple tests with a pattern
 ./tests/vk_layer_validation_tests --gtest_filter=*Buffer*
+```
+
+## Running Test on Windows
+
+For Visual Studio users, the tests can be run directly from the IDE. `vk_layer_validation_tests` should be set as the startup project.
+
+Running the tests from the command line works the same as on Linux, with corresponding syntax differences. The `VK_LAYER_PATH` is also set automatically by the tests. When the Visual Studio generator is used, the location of the test executable follows this pattern (example for a Debug build):
+```
+<path-to-build-dir>\Debug\tests\Debug\vk_layer_validation_tests.exe
+```
+
+To run the tests:
+```cmd
+cd \to\test\exe\location\
+
+REM Run all the test
+vk_layer_validation_tests
+
+REM Run with certain VkPhysicalDevice
+REM see --help for more options
+vk_layer_validation_tests --device-index 1
+
+REM Run a single test
+vk_layer_validation_tests --gtest_filter=PositiveBuffer.OwnershipTranfers
+
+REM Run a multiple tests with a pattern
+vk_layer_validation_tests --gtest_filter=*Buffer*
 ```
 
 ## Running Test on Android
@@ -107,6 +134,7 @@ The Profile Layer can be found in the Vulkan SDK, otherwise, they will need to b
 - Allowing both adds complexity due to the order the layers must be in, while adding little over value to test coverage
 
 Here is an example of setting up and running the Profile layer with Test Driver on a Linux environment
+
 ```bash
 export VULKAN_SDK=/path/to/vulkansdk
 export VVL=/path/to/Vulkan-ValidationLayers
@@ -135,6 +163,10 @@ export VK_KHRONOS_PROFILES_PROFILE_FILE=$VVL/tests/device_profiles/max_profile.j
 
 # Expose all the parts of the profile layer
 export VK_KHRONOS_PROFILES_SIMULATE_CAPABILITIES=SIMULATE_API_VERSION_BIT,SIMULATE_FEATURES_BIT,SIMULATE_PROPERTIES_BIT,SIMULATE_EXTENSIONS_BIT,SIMULATE_FORMATS_BIT,SIMULATE_QUEUE_FAMILY_PROPERTIES_BIT,SIMULATE_VIDEO_CAPABILITIES_BIT,SIMULATE_VIDEO_FORMATS_BIT
+
+# Will allow unsupported things not detected to pass through into test_icd.cpp at
+# GetPhysicalDeviceFeatures2 and GetPhysicalDeviceProperties2
+export VK_KHRONOS_PROFILES_UNKNOWN_FEATURE_VALUES=UNKNOWN_FEATURE_VALUES_DEVICE
 
 # Test Driver exposes VK_KHR_portability_subset but most tests are not testing for it
 export VK_KHRONOS_PROFILES_EMULATE_PORTABILITY=false

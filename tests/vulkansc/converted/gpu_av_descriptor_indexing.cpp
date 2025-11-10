@@ -70,7 +70,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBBuffer) {
     descriptor_writes[1].pBufferInfo = &buffer_info[1];
     vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
 
         layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
@@ -84,7 +84,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBBuffer) {
            index = uniform_index_buffer.tex_index[0];
         }
         )glsl";
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -178,7 +178,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBBufferEmptyUnusedDescSet) {
     descriptor_writes[1].pBufferInfo = &buffer_info[1];
     vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
 
         layout(std140, set = 1, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
@@ -192,7 +192,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBBufferEmptyUnusedDescSet) {
            index = uniform_index_buffer.tex_index[0];
         }
         )glsl";
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -286,7 +286,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVertex) {
     descriptor_writes[1].pImageInfo = image_info;
     vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
 
         layout(std140, set = 0, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
@@ -300,7 +300,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVertex) {
            gl_Position += 1e-30 * texture(tex[uniform_index_buffer.tex_index[0]], vec2(0, 0));
         }
         )glsl";
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
 
         layout(set = 0, binding = 1) uniform sampler2D tex[6];
@@ -386,7 +386,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBFragment) {
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
 
         layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
@@ -400,7 +400,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBFragment) {
            index = uniform_index_buffer.tex_index[0];
         }
         )glsl";
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
 
         layout(set = 0, binding = 1) uniform sampler2D tex[6];
@@ -509,7 +509,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBRuntime) {
     descriptor_writes[1].dstSet = descriptor_set_variable.set_;
     vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
 
         layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
@@ -523,7 +523,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBRuntime) {
            index = uniform_index_buffer.tex_index[0];
         }
         )glsl";
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -612,7 +612,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVariableDescriptorCountAllocate)
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform foo { uint tex_index; };
@@ -692,7 +692,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVariableDescriptorCountAllocateU
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform foo { uint tex_index; };
@@ -896,7 +896,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBGeom) {
            gl_Position = vec4(1);
         }
     )glsl";
-    char const *gs_source = R"glsl(
+    const char *gs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(triangles) in;
@@ -994,7 +994,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBCompute) {
     descriptor_writes[1].pBufferInfo = &buffer_info[1];
     vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform ufoo { uint index; } u_index;
@@ -1097,7 +1097,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlyDelete) {
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
 
         layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
@@ -1113,7 +1113,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlyDelete) {
         )glsl";
     VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -1147,7 +1147,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlyDelete) {
     // destroying before submit still needs to be caught by GPU-AV. Once GPU-AV no
     // longer does QueueWaitIdle() in each submit call, we should also be able to detect
     // resource destruction while a submission is blocked on a semaphore as well.
-    image.destroy();
+    image.Destroy();
 
     // UNASSIGNED-Descriptor destroyed
     m_errorMonitor->SetDesiredError("(set = 0, binding = 1) Descriptor index 1 references a resource that was destroyed.",
@@ -1216,7 +1216,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlySamplerDelete) {
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
 
         layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
@@ -1232,7 +1232,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlySamplerDelete) {
          )glsl";
     VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -1267,7 +1267,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlySamplerDelete) {
     // destroying before submit still needs to be caught by GPU-AV. Once GPU-AV no
     // longer does QueueWaitIdle() in each submit call, we should also be able to detect
     // resource destruction while a submission is blocked on a semaphore as well.
-    sampler.destroy();
+    sampler.Destroy();
 
     // UNASSIGNED-Descriptor destroyed
     m_errorMonitor->SetDesiredError("(set = 0, binding = 1) Descriptor index 1 references a resource that was destroyed.",
@@ -1353,7 +1353,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, UpdateAfterBind) {
     vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci);
 
     // Create a dummy pipeline, since VL inspects which bindings are actually used at draw time
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         layout(location=0) out vec4 color;
         layout(set=0, binding=0) uniform foo0 { float x0; } bar0;
@@ -1431,7 +1431,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, VariableDescriptorCountAllocateAfterPipe
 
     vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci);
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set=0, binding=0) uniform UBO { uint in_buffer; };
@@ -1553,7 +1553,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, BasicHLSL) {
     // void main(uint3 tid : SV_DispatchThreadID) {
     //     data[0].output = textures[data[0].index].SampleLevel(ss, float2(0,0), 0);
     // }
-    char const *cs_source = R"asm(
+    const char *cs_source = R"asm(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main" %data %ss %textures
@@ -1672,7 +1672,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, BasicHLSLRuntimeArray) {
     // void main(uint3 tid : SV_DispatchThreadID) {
     //     data[0].output = textures[data[0].index].SampleLevel(ss, float2(0,0), 0);
     // }
-    char const *cs_source = R"asm(
+    const char *cs_source = R"asm(
                OpCapability Shader
                OpCapability RuntimeDescriptorArray
                OpExtension "SPV_EXT_descriptor_indexing"
@@ -1770,7 +1770,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, PushConstant) {
     descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -1834,7 +1834,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleIndexes) {
     descriptor_set.WriteDescriptorImageInfo(1, image_view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -1928,7 +1928,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleOOBInMultipleCmdBuffers) {
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
 
         layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
@@ -1942,7 +1942,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleOOBInMultipleCmdBuffers) {
            index = uniform_index_buffer.tex_index[0];
         }
         )glsl";
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
 
         layout(set = 0, binding = 1) uniform sampler2D tex[6];
@@ -2024,7 +2024,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleOOBInMultipleCmdBuffers) {
         vk::UpdateDescriptorSets(device(), 2, descriptor_writes_cb_2, 0, nullptr);
     }
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform ufoo { uint index; } u_index;
@@ -2117,7 +2117,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleOOBTypesInOneCmdBuffer) {
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
 
         layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
@@ -2131,7 +2131,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleOOBTypesInOneCmdBuffer) {
            index = uniform_index_buffer.tex_index[0];
         }
         )glsl";
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
 
         layout(set = 0, binding = 1) uniform sampler2D tex[6];
@@ -2207,7 +2207,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleOOBTypesInOneCmdBuffer) {
         vk::UpdateDescriptorSets(device(), 2, descriptor_writes_cb_2, 0, nullptr);
     }
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform ufoo { uint index; } u_index;
@@ -2275,7 +2275,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, BindingOOB) {
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -2317,7 +2317,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleBoundDescriptorsSameSetFirst) {
     uint32_t *input_buffer_ptr = (uint32_t *)input_buffer.Memory().Map();
     input_buffer_ptr[0] = 1;
 
-    char const *cs_source_1 = R"glsl(
+    const char *cs_source_1 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform Input { uint index; };
@@ -2344,7 +2344,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleBoundDescriptorsSameSetFirst) {
                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
     pipe_1.descriptor_set_.UpdateDescriptorSets();
 
-    char const *cs_source_2 = R"glsl(
+    const char *cs_source_2 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 1) uniform Input { uint index; };
@@ -2391,7 +2391,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleBoundDescriptorsSameSetLast) {
     uint32_t *input_buffer_ptr = (uint32_t *)input_buffer.Memory().Map();
     input_buffer_ptr[0] = 1;
 
-    char const *cs_source_1 = R"glsl(
+    const char *cs_source_1 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform Input { uint index; };
@@ -2419,7 +2419,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleBoundDescriptorsSameSetLast) {
                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
     pipe_1.descriptor_set_.UpdateDescriptorSets();
 
-    char const *cs_source_2 = R"glsl(
+    const char *cs_source_2 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 1) uniform Input { uint index; };
@@ -2468,7 +2468,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleBoundDescriptorsUpdateAfterBindF
     uint32_t *input_buffer_ptr = (uint32_t *)input_buffer.Memory().Map();
     input_buffer_ptr[0] = 1;  // will be valid for both shaders
 
-    char const *cs_source_1 = R"glsl(
+    const char *cs_source_1 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform Input { uint index; };
@@ -2492,7 +2492,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleBoundDescriptorsUpdateAfterBindF
     pipe_1.cp_ci_.layout = pipeline_layout_1;
     pipe_1.CreateComputePipeline();
 
-    char const *cs_source_2 = R"glsl(
+    const char *cs_source_2 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 1) uniform Input { uint index; };
@@ -2560,7 +2560,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleBoundDescriptorsUpdateAfterBindL
     uint32_t *input_buffer_ptr = (uint32_t *)input_buffer.Memory().Map();
     input_buffer_ptr[0] = 1;  // will be valid for both shaders
 
-    char const *cs_source_1 = R"glsl(
+    const char *cs_source_1 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform Input { uint index; };
@@ -2584,7 +2584,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleBoundDescriptorsUpdateAfterBindL
     pipe_1.cp_ci_.layout = pipeline_layout_1;
     pipe_1.CreateComputePipeline();
 
-    char const *cs_source_2 = R"glsl(
+    const char *cs_source_2 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 1) uniform Input { uint index; };
@@ -2668,7 +2668,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleSetSomeUninitialized) {
     ds_bad.WriteDescriptorBufferInfo(0, input_buffer, 0, VK_WHOLE_SIZE);
     ds_bad.UpdateDescriptorSets();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -2739,7 +2739,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleSetSomeUninitializedUpdateAfterB
         });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&ds_good.layout_});
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -2819,7 +2819,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ReSubmitCommandBuffer) {
     ds_bad.WriteDescriptorBufferInfo(0, input_buffer, 0, VK_WHOLE_SIZE);
     ds_bad.UpdateDescriptorSets();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -2870,7 +2870,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, SpecConstantUpdateAfterBind) {
     AddRequiredFeature(vkt::Feature::descriptorBindingStorageBufferUpdateAfterBind);
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout(constant_id = 0) const uint index = 0;
 
@@ -2929,7 +2929,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, SpecConstantPartiallyBound) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout(constant_id = 0) const uint index = 0;
 
@@ -2987,7 +2987,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, SpecConstantPartiallyBound) {
 TEST_F(NegativeGpuAVDescriptorIndexing, SpecConstant) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout(constant_id = 0) const uint index = 1;
 
@@ -3032,7 +3032,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, SpecConstantNullDescriptorBindless) {
     AddRequiredFeature(vkt::Feature::nullDescriptor);
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         // will update to zero which is uninitialized
         layout(constant_id = 0) const uint index = 1;
@@ -3081,7 +3081,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, SpecConstantNullDescriptorBindless) {
 TEST_F(NegativeGpuAVDescriptorIndexing, PartiallyBoundNoArray) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout(constant_id = 0) const uint index = 0;
 
@@ -3121,7 +3121,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, TexelFetch) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
     InitRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : enable
         layout (set = 0, binding = 0) uniform sampler2D tex[];
@@ -3541,7 +3541,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, TexelFetchNested) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
     InitRenderTarget();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : enable
         layout (set = 0, binding = 0) uniform sampler2D tex[];
@@ -3606,7 +3606,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, TexelFetchTexelBuffer) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
     InitRenderTarget();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         layout (set = 0, binding = 0) uniform samplerBuffer u_buffer;
         layout (set = 0, binding = 1) buffer SSBO { vec4 color; };
@@ -3652,7 +3652,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, TexelFetchConstantArrayOOB) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0, std430) buffer foo {
             int index;
@@ -3700,16 +3700,16 @@ TEST_F(NegativeGpuAVDescriptorIndexing, AtomicImagePartiallyBound) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
     InitRenderTarget();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : enable
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0, R32ui) uniform uimage2D atomic_image;
 
         void main() {
-            uint y = imageAtomicLoad(atomic_image, ivec2(0), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
-            imageAtomicStore(atomic_image, ivec2(0), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
-            imageAtomicExchange(atomic_image, ivec2(0), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+            uint y = imageAtomicLoad(atomic_image, ivec2(0), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
+            imageAtomicStore(atomic_image, ivec2(0), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
+            imageAtomicExchange(atomic_image, ivec2(0), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -3742,14 +3742,14 @@ TEST_F(NegativeGpuAVDescriptorIndexing, AtomicImageRuntimeArray) {
     InitRenderTarget();
 
     auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R32_UINT, VK_IMAGE_USAGE_STORAGE_BIT);
-    if (!ImageFormatIsSupported(instance(), Gpu(), image_ci, VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT)) {
+    if (!IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT is not supported.";
     }
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : enable
         #extension GL_KHR_memory_scope_semantics : enable
@@ -3757,9 +3757,9 @@ TEST_F(NegativeGpuAVDescriptorIndexing, AtomicImageRuntimeArray) {
         layout(set = 0, binding = 0, R32ui) uniform uimage2D atomic_image_array[];
 
         void main() {
-            uint y = imageAtomicLoad(atomic_image_array[1], ivec2(0), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
-            imageAtomicStore(atomic_image_array[1], ivec2(0), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
-            imageAtomicExchange(atomic_image_array[1], ivec2(0), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelaxed);
+            uint y = imageAtomicLoad(atomic_image_array[1], ivec2(0), gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsAcquire);
+            imageAtomicStore(atomic_image_array[1], ivec2(0), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
+            imageAtomicExchange(atomic_image_array[1], ivec2(0), y, gl_ScopeDevice, gl_StorageSemanticsImage, gl_SemanticsRelease);
         }
     )glsl";
 
@@ -3792,7 +3792,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, AtomicBufferPartiallyBound) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
     InitRenderTarget();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer ssbo { uint z; };
         void main() {
@@ -3825,7 +3825,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, AtomicBufferRuntimeArray) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
     InitRenderTarget();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer ssbo { uint x; } atomic_buffers[];
         void main() {
@@ -3862,7 +3862,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, StorageImagePartiallyBound) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
     InitRenderTarget();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         // VK_FORMAT_R32_UINT
         layout(set = 0, binding = 0, r32ui) uniform uimage2D storageImage;
@@ -3889,7 +3889,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, StorageImagePartiallyBound) {
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08114");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-None-08114");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -3898,7 +3898,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, StorageImageRuntimeArray) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
     InitRenderTarget();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         // VK_FORMAT_R32_UINT
         layout(set = 0, binding = 0, r32ui) uniform uimage2D storageImageArray[];
@@ -3925,7 +3925,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, StorageImageRuntimeArray) {
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08114");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-None-08114");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -3956,7 +3956,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleCommandBuffersSameDescriptorSet)
     descriptor_set.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *cs_source0 = R"glsl(
+    const char *cs_source0 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set=0, binding=0) uniform sampler2D sample_array[]; // only [0] is set
@@ -3974,7 +3974,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleCommandBuffersSameDescriptorSet)
     pipe0.CreateComputePipeline();
 
     // Create different shaders so pipelines are different
-    char const *cs_source1 = R"glsl(
+    const char *cs_source1 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set=0, binding=0) uniform sampler2D sample_array[2];
@@ -4046,7 +4046,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, CommandBufferRerecordSameDescriptorSet) 
     descriptor_set.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *cs_source0 = R"glsl(
+    const char *cs_source0 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set=0, binding=0) uniform sampler2D sample_array[]; // only [0] is set
@@ -4065,7 +4065,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, CommandBufferRerecordSameDescriptorSet) 
     pipe_good.CreateComputePipeline();
 
     // Create different shaders so pipelines are different
-    char const *cs_source1 = R"glsl(
+    const char *cs_source1 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set=0, binding=0) uniform sampler2D sample_array[2];
@@ -4123,63 +4123,24 @@ TEST_F(NegativeGpuAVDescriptorIndexing, CommandBufferRerecordSameDescriptorSet) 
 
 TEST_F(NegativeGpuAVDescriptorIndexing, MultipleAccessChains) {
     TEST_DESCRIPTION("Slang will produce a chain of OpAccessChains");
+
+    RETURN_IF_SKIP(CheckSlangSupport());
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
 
-    // struct Bar {
-    //     uint x;
-    // };
-    //
-    // [[vk::binding(0, 0)]]
-    // RWStructuredBuffer<Bar> foo[4];
-    //
-    // [shader("compute")]
-    // void main() {
-    //     uint index = foo[0][0].x;
-    //     foo[index][7].x = 8;
-    // }
-    char const *cs_source = R"(
-               OpCapability Shader
-               OpExtension "SPV_KHR_storage_buffer_storage_class"
-               OpMemoryModel Logical GLSL450
-               OpEntryPoint GLCompute %main "main" %foo
-               OpExecutionMode %main LocalSize 1 1 1
-               OpMemberDecorate %Bar_std430 0 Offset 0
-               OpDecorate %_runtimearr_Bar_std430 ArrayStride 4
-               OpDecorate %RWStructuredBuffer Block
-               OpMemberDecorate %RWStructuredBuffer 0 Offset 0
-               OpDecorate %foo Binding 0
-               OpDecorate %foo DescriptorSet 0
-       %void = OpTypeVoid
-          %3 = OpTypeFunction %void
-       %uint = OpTypeInt 32 0
- %Bar_std430 = OpTypeStruct %uint
-%_runtimearr_Bar_std430 = OpTypeRuntimeArray %Bar_std430
-%RWStructuredBuffer = OpTypeStruct %_runtimearr_Bar_std430
-        %int = OpTypeInt 32 1
-      %int_4 = OpConstant %int 4
-%_arr_RWStructuredBuffer_int_4 = OpTypeArray %RWStructuredBuffer %int_4
-%_ptr_StorageBuffer__arr_RWStructuredBuffer_int_4 = OpTypePointer StorageBuffer %_arr_RWStructuredBuffer_int_4
-%_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
-      %int_0 = OpConstant %int 0
-%_ptr_StorageBuffer_Bar_std430 = OpTypePointer StorageBuffer %Bar_std430
-%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
-      %int_7 = OpConstant %int 7
-     %uint_8 = OpConstant %uint 8
-        %foo = OpVariable %_ptr_StorageBuffer__arr_RWStructuredBuffer_int_4 StorageBuffer
-       %main = OpFunction %void None %3
-          %4 = OpLabel
-         %15 = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %foo %int_0
-         %18 = OpAccessChain %_ptr_StorageBuffer_Bar_std430 %15 %int_0 %int_0
-         %20 = OpAccessChain %_ptr_StorageBuffer_uint %18 %int_0
-      %index = OpLoad %uint %20
-         %22 = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %foo %index
-         %24 = OpAccessChain %_ptr_StorageBuffer_Bar_std430 %22 %int_0 %int_7
-         %25 = OpAccessChain %_ptr_StorageBuffer_uint %24 %int_0
-               OpStore %25 %uint_8
-               OpReturn
-               OpFunctionEnd
-    )";
+    const char *slang_shader = R"slang(
+        struct Bar {
+            uint x;
+        };
 
+        [[vk::binding(0, 0)]]
+        RWStructuredBuffer<Bar> foo[4];
+
+        [shader("compute")]
+        void main() {
+            uint index = foo[0][0].x;
+            foo[index][7].x = 8;
+        }
+    )slang";
     OneOffDescriptorSet descriptor_set(m_device, {
                                                      {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, VK_SHADER_STAGE_ALL, nullptr},
                                                  });
@@ -4197,7 +4158,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleAccessChains) {
 
     CreateComputePipelineHelper pipe(*this);
     pipe.cp_ci_.layout = pipeline_layout;
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, slang_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG);
     pipe.CreateComputePipeline();
 
     m_command_buffer.Begin();
@@ -4222,7 +4183,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, OpInBoundsAccessChain) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
     // Use OpInBoundsAccessChain instead of normal generated OpAccessChain
-    char const *cs_source = R"(
+    const char *cs_source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main"
@@ -4293,7 +4254,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MiddleBindingOOB) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -4333,7 +4294,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, DualShaderLibrary) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
     InitRenderTarget();
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) uniform sampler2D tex;
         void main() {
@@ -4386,8 +4347,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, DualShaderLibrary) {
     link_info.pLibraries = libraries;
 
     // Destroy VkShaderModule as not required to have when linking
-    vs.destroy();
-    fs.destroy();
+    vs.Destroy();
+    fs.Destroy();
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pipeline_layout;
@@ -4412,7 +4373,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, PushDescriptor) {
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer UBO {
@@ -4469,7 +4430,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, PushDescriptor) {
 TEST_F(NegativeGpuAVDescriptorIndexing, DescriptorTemplates) {
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer UBO {
@@ -4543,7 +4504,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, PushDescriptorTemplates) {
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer UBO {

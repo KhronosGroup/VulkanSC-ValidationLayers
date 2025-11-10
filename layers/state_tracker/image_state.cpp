@@ -20,7 +20,6 @@
 #include "state_tracker/image_state.h"
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/vulkan_core.h>
-#include <cmath>
 #include <cstdint>
 #include <string>
 #include "error_message/error_strings.h"
@@ -95,6 +94,24 @@ static std::vector<VkSparseImageMemoryRequirements> GetSparseRequirements(const 
     return result;
 }
 
+static VkImageSubresourceRange MakeImageFullRange(const VkImageCreateInfo &create_info) {
+    const VkFormat format = create_info.format;
+    VkImageAspectFlags aspect_mask = 0;
+    if (vkuFormatIsMultiplane(format)) {
+        aspect_mask = NormalizeAspectMask(VK_IMAGE_ASPECT_COLOR_BIT, format);
+    } else if (vkuFormatIsColor(format) || GetExternalFormat(create_info.pNext) != 0) {
+        aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+    } else {
+        if (vkuFormatHasDepth(format)) {
+            aspect_mask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+        }
+        if (vkuFormatHasStencil(format)) {
+            aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+    }
+    return VkImageSubresourceRange{aspect_mask, 0, create_info.mipLevels, 0, create_info.arrayLayers};
+}
+
 #ifdef VK_USE_PLATFORM_METAL_EXT
 static bool GetMetalExport(const VkImageCreateInfo *info, VkExportMetalObjectTypeFlagBitsEXT object_type_required) {
     bool retval = false;
@@ -112,7 +129,7 @@ static bool GetMetalExport(const VkImageCreateInfo *info, VkExportMetalObjectTyp
 
 namespace vvl {
 
-Image::Image(const vvl::DeviceState &dev_data, VkImage img, const VkImageCreateInfo *pCreateInfo, VkFormatFeatureFlags2KHR ff)
+Image::Image(const vvl::DeviceState &dev_data, VkImage img, const VkImageCreateInfo *pCreateInfo, VkFormatFeatureFlags2 ff)
     : Bindable(img, kVulkanObjectTypeImage, (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0,
                (pCreateInfo->flags & VK_IMAGE_CREATE_PROTECTED_BIT) == 0, GetExternalHandleTypes(pCreateInfo)),
       safe_create_info(pCreateInfo),
@@ -120,7 +137,7 @@ Image::Image(const vvl::DeviceState &dev_data, VkImage img, const VkImageCreateI
       shared_presentable(false),
       layout_locked(false),
       ahb_format(GetExternalFormat(pCreateInfo->pNext)),
-      full_range{MakeImageFullRange()},
+      full_range{MakeImageFullRange(create_info)},
       create_from_swapchain(GetSwapchain(pCreateInfo)),
       owned_by_swapchain(false),
       swapchain_image_index(0),
@@ -151,7 +168,7 @@ Image::Image(const vvl::DeviceState &dev_data, VkImage img, const VkImageCreateI
 }
 
 Image::Image(const vvl::DeviceState &dev_data, VkImage img, const VkImageCreateInfo *pCreateInfo, VkSwapchainKHR swapchain,
-             uint32_t swapchain_index, VkFormatFeatureFlags2KHR ff)
+             uint32_t swapchain_index, VkFormatFeatureFlags2 ff)
     : Bindable(img, kVulkanObjectTypeImage, (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0,
                (pCreateInfo->flags & VK_IMAGE_CREATE_PROTECTED_BIT) == 0, GetExternalHandleTypes(pCreateInfo)),
       safe_create_info(pCreateInfo),
@@ -159,7 +176,7 @@ Image::Image(const vvl::DeviceState &dev_data, VkImage img, const VkImageCreateI
       shared_presentable(false),
       layout_locked(false),
       ahb_format(GetExternalFormat(pCreateInfo->pNext)),
-      full_range{MakeImageFullRange()},
+      full_range{MakeImageFullRange(create_info)},
       create_from_swapchain(swapchain),
       owned_by_swapchain(true),
       swapchain_image_index(swapchain_index),
@@ -372,21 +389,9 @@ std::string Image::DescribeSubresourceLayers(const VkImageSubresourceLayers &sub
 
 VkImageSubresourceRange Image::NormalizeSubresourceRange(const VkImageSubresourceRange &range) const {
     VkImageSubresourceRange norm = range;
-    norm.levelCount =
-        (range.levelCount == VK_REMAINING_MIP_LEVELS) ? (create_info.mipLevels - range.baseMipLevel) : range.levelCount;
-    norm.layerCount =
-        (range.layerCount == VK_REMAINING_ARRAY_LAYERS) ? (create_info.arrayLayers - range.baseArrayLayer) : range.layerCount;
-
-    // For multiplanar formats, IMAGE_ASPECT_COLOR is equivalent to adding the aspect of the individual planes
-    if (vkuFormatIsMultiplane(create_info.format)) {
-        if (norm.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) {
-            norm.aspectMask &= ~VK_IMAGE_ASPECT_COLOR_BIT;
-            norm.aspectMask |= (VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT);
-            if (vkuFormatPlaneCount(create_info.format) > 2) {
-                norm.aspectMask |= VK_IMAGE_ASPECT_PLANE_2_BIT;
-            }
-        }
-    }
+    norm.levelCount = GetEffectiveLevelCount(range, create_info.mipLevels);
+    norm.layerCount = GetEffectiveLayerCount(range, create_info.arrayLayers);
+    norm.aspectMask = NormalizeAspectMask(range.aspectMask, create_info.format);
     return norm;
 }
 
@@ -395,24 +400,10 @@ uint32_t Image::NormalizeLayerCount(const VkImageSubresourceLayers &resource) co
                                                               : resource.layerCount;
 }
 
-VkImageSubresourceRange Image::MakeImageFullRange() {
-    const auto format = create_info.format;
-    VkImageSubresourceRange init_range{0, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS};
-
-    if (vkuFormatIsColor(format) || vkuFormatIsMultiplane(format) || GetExternalFormat(create_info.pNext) != 0) {
-        init_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;  // Normalization will expand this for multiplane
-    } else {
-        init_range.aspectMask = (vkuFormatHasDepth(format) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
-                                (vkuFormatHasStencil(format) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0);
-    }
-    return NormalizeSubresourceRange(init_range);
-}
-
 VkImageSubresourceRange Image::GetSubresourceEncoderRange(const DeviceState &device_state,
                                                           const VkImageSubresourceRange &full_range) {
     VkImageSubresourceRange encoder_range = full_range;
-    if (device_state.extensions.vk_khr_maintenance9 && create_info.imageType == VK_IMAGE_TYPE_3D &&
-        (create_info.flags & VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT) != 0) {
+    if (CanTransitionDepthSlices(device_state.extensions, create_info)) {
         encoder_range.layerCount = create_info.extent.depth;
     }
     return encoder_range;
@@ -469,6 +460,10 @@ void Image::SetSwapchain(std::shared_ptr<vvl::Swapchain> &swapchain, uint32_t sw
     bind_swapchain = swapchain;
     swapchain_image_index = swapchain_index;
     bind_swapchain->AddParent(this);
+
+    for (auto &item : sub_states_) {
+        item.second->SetSwapchain(*swapchain);
+    }
 }
 
 bool Image::CompareCreateInfo(const Image &other) const {
@@ -533,8 +528,9 @@ static bool GetMetalExport(const VkImageViewCreateInfo *info) {
 
 namespace vvl {
 
-ImageView::ImageView(const std::shared_ptr<vvl::Image> &image_state, VkImageView handle, const VkImageViewCreateInfo *ci,
-                     VkFormatFeatureFlags2KHR ff, const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props)
+ImageView::ImageView(const DeviceState &device_state, const std::shared_ptr<vvl::Image> &image_state, VkImageView handle,
+                     const VkImageViewCreateInfo *ci, VkFormatFeatureFlags2 ff,
+                     const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props)
     : StateObject(handle, kVulkanObjectTypeImageView),
       safe_create_info(ci),
       create_info(*safe_create_info.ptr()),
@@ -542,9 +538,9 @@ ImageView::ImageView(const std::shared_ptr<vvl::Image> &image_state, VkImageView
 #ifdef VK_USE_PLATFORM_METAL_EXT
       metal_imageview_export(GetMetalExport(ci)),
 #endif
-      is_depth_sliced(IsDepthSliced()),
-      normalized_subresource_range(NormalizeSubresourceRange()),
-      range_generator(image_state->subresource_encoder, normalized_subresource_range),
+      is_depth_sliced(IsDepthSliceView(image_state->create_info, create_info.viewType)),
+      normalized_subresource_range(ImageView::NormalizeImageViewSubresourceRange(*image_state, create_info)),
+      range_generator(image_state->subresource_encoder, GetRangeGeneratorRange(device_state.extensions)),
       samples(image_state->create_info.samples),
       samplerConversion(GetSamplerConversion(ci)),
       filter_cubic_props(cubic_props),
@@ -571,38 +567,50 @@ void ImageView::Destroy() {
     StateObject::Destroy();
 }
 
-bool ImageView::IsDepthSliced() {
-    auto depth_slice_flag = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT | VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
-    return ((image_state->create_info.flags & depth_slice_flag) != 0) &&
-           (create_info.viewType == VK_IMAGE_VIEW_TYPE_2D || create_info.viewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY);
-}
-
-VkImageSubresourceRange ImageView::NormalizeSubresourceRange() const {
-    auto subres_range = create_info.subresourceRange;
-
-    // if we're mapping a 3D image to a 2d image view, convert the view's subresource range to be compatible with the
-    // image's understanding of the world. From the VkImageSubresourceRange section of the Vulkan spec:
-    //
-    //     When the VkImageSubresourceRange structure is used to select a subset of the slices of a 3D image’s mip level in
-    //     order to create a 2D or 2D array image view of a 3D image created with VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT,
-    //     baseArrayLayer and layerCount specify the first slice index and the number of slices to include in the created
-    //     image view. Such an image view can be used as a framebuffer attachment that refers only to the specified range
-    //     of slices of the selected mip level. However, any layout transitions performed on such an attachment view during
-    //     a render pass instance still apply to the entire subresource referenced which includes all the slices of the
-    //     selected mip level.
-    //
-    if (is_depth_sliced) {
-        subres_range.baseArrayLayer = 0;
-        subres_range.layerCount = 1;
-    }
-    return image_state->NormalizeSubresourceRange(subres_range);
-}
-
 uint32_t ImageView::GetAttachmentLayerCount() const {
     if (create_info.subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS && !is_depth_sliced) {
         return image_state->create_info.arrayLayers;
     }
     return create_info.subresourceRange.layerCount;
+}
+
+VkImageSubresourceRange ImageView::NormalizeImageViewSubresourceRange(const Image &image_state,
+                                                                      const VkImageViewCreateInfo &image_view_ci) {
+    const VkImageCreateInfo &image_ci = image_state.create_info;
+
+    VkImageSubresourceRange range = image_view_ci.subresourceRange;
+    range.levelCount = GetEffectiveLevelCount(range, image_ci.mipLevels);
+    range.aspectMask = NormalizeAspectMask(range.aspectMask, image_view_ci.format);
+
+    if (image_view_ci.subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS) {
+        if (IsDepthSliceView(image_state.create_info, image_view_ci.viewType)) {
+            const VkExtent3D extent = GetEffectiveExtent(image_ci, range.aspectMask, range.baseMipLevel);
+            range.layerCount = extent.depth - image_view_ci.subresourceRange.baseArrayLayer;
+        } else {
+            range.layerCount = GetEffectiveLayerCount(range, image_ci.arrayLayers);
+        }
+    }
+    return range;
+}
+
+VkImageSubresourceRange ImageView::GetRangeGeneratorRange(const DeviceExtensions &extensions) const {
+    VkImageSubresourceRange subres_range = create_info.subresourceRange;
+
+    // if we're mapping a 3D image to a 2d image view, convert the view's subresource range to be compatible with the
+    // image's understanding of the world. From the VkImageSubresourceRange section of the Vulkan spec:
+    //
+    //     When the VkImageSubresourceRange structure is used to select a subset of the slices of a 3D image’s mip level in order to
+    //     create a 2D or 2D array image view of a 3D image created with VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT, baseArrayLayer and
+    //     layerCount specify the first slice index and the number of slices to include in the created image view. Such an image
+    //     view can be used as a framebuffer attachment that refers only to the specified range of slices of the selected mip level.
+    //     If the maintenance9 feature is not enabled, any layout transitions performed on such an attachment view during a render
+    //     pass instance still apply to the entire subresource referenced which includes all the slices of the selected mip level.
+    //
+    if (is_depth_sliced && !CanTransitionDepthSlices(extensions, image_state->create_info)) {
+        subres_range.baseArrayLayer = 0;
+        subres_range.layerCount = 1;
+    }
+    return image_state->NormalizeSubresourceRange(subres_range);
 }
 
 bool ImageView::OverlapSubresource(const ImageView &compare_view) const {

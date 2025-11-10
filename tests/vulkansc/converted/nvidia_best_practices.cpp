@@ -14,6 +14,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <vulkan/vulkan_core.h>
 #include <chrono>
 #include <thread>
 
@@ -481,28 +482,17 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindMemory_StaticPriority) {
     m_errorMonitor->Finish();
 }
 
-static VkDescriptorSetLayoutBinding CreateSingleDescriptorBinding(VkDescriptorType type, uint32_t binding) {
-    VkDescriptorSetLayoutBinding layout_binding = {};
-    layout_binding.binding = binding;
-    layout_binding.descriptorType = type;
-    layout_binding.descriptorCount = 1;
-    layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    layout_binding.pImmutableSamplers = nullptr;
-    return layout_binding;
-}
-
 // Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_CreatePipelineLayout_SeparateSampler) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     RETURN_IF_SKIP(InitState());
 
     VkDescriptorSetLayoutBinding separate_bindings[] = {
-        CreateSingleDescriptorBinding(VK_DESCRIPTOR_TYPE_SAMPLER, 0),
-        CreateSingleDescriptorBinding(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1),
+        {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
+        {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
     };
     VkDescriptorSetLayoutBinding combined_bindings[] = {
-        CreateSingleDescriptorBinding(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0),
-    };
+        {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}};
 
     VkDescriptorSetLayoutCreateInfo separate_set_layout_ci = vku::InitStructHelper();
     separate_set_layout_ci.flags = 0;
@@ -585,7 +575,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_CreatePipelineLayout_LargePipeli
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_SwitchTessGeometryMesh) {
+TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipelineSwitchTessGeometryMesh) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
@@ -597,12 +587,12 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_SwitchTessGeometryM
         GTEST_SKIP() << "Device doesn't support requried maxGeometryOutputVertices";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         void main() {}
     )glsl";
 
-    char const *gsSource = R"glsl(
+    const char *gsSource = R"glsl(
         #version 450
         layout(triangles) in;
         layout(triangle_strip, max_vertices = 3) out;
@@ -627,12 +617,13 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_SwitchTessGeometryM
     m_command_buffer.Begin();
 
     {
-        m_errorMonitor->SetAllowedFailureMsg("BestPractices-Pipeline-SortAndBind");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-Pipeline-SortAndBind");
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-BindPipeline-SwitchTessGeometryMesh");
         vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vsPipe);
         m_errorMonitor->Finish();
     }
     {
+        // will trigger every loop, but SwitchTessGeometryMesh will only trigger once
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-Pipeline-SortAndBind");
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-BindPipeline-SwitchTessGeometryMesh");
         for (int i = 0; i < 10; ++i) {
@@ -1152,7 +1143,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipelineZcullDirectionSubres
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_ClearColor_NotCompressed) {
+TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_ClearColorNotCompressed) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
@@ -1161,7 +1152,6 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_ClearColor_NotCompressed) {
     auto set_desired = [this] {
         m_errorMonitor->Finish();
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-ClearColor-NotCompressed");
-        m_errorMonitor->SetAllowedFailureMsg("BestPractices-DrawState-ClearCmdBeforeDraw");
     };
 
     vkt::Image image(*m_device, m_width, m_height, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);

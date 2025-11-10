@@ -34,7 +34,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd140) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, buffer_reference_align = 16) buffer bufStruct;
@@ -99,7 +99,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd140NumerousAddressRanges) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, buffer_reference_align = 16) buffer bufStruct;
@@ -168,7 +168,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd430) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, buffer_reference_align = 16) buffer bufStruct;
@@ -229,7 +229,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreExplicitOffset) {
     TEST_DESCRIPTION("Do a OpStore to a PhysicalStorageBuffer");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -282,7 +282,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StructLoad) {
     TEST_DESCRIPTION("Do a OpLoad through a struct PhysicalStorageBuffer");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -349,7 +349,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StructLoadPadded) {
     TEST_DESCRIPTION("Do a OpLoad through a padded struct PhysicalStorageBuffer");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -417,7 +417,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, UVec3Array) {
     AddRequiredFeature(vkt::Feature::scalarBlockLayout);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_EXT_scalar_block_layout : enable
@@ -472,7 +472,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ArrayOfStruct) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(std430, buffer_reference) buffer T1 {
@@ -534,7 +534,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, BitCastUvec2) {
     TEST_DESCRIPTION("test loading and storing with GL_EXT_buffer_reference_uvec2");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_EXT_buffer_reference_uvec2 : enable
@@ -610,7 +610,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreRelaxedBlockLayout) {
     //     ssbo.ptr.f = 42.0;
     //     ssbo.ptr.v = uvec3(1.0, 2.0, 3.0);
     // }
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpMemoryModel PhysicalStorageBuffer64 GLSL450
@@ -711,7 +711,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreScalarBlockLayout) {
 
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_scalar_block_layout : enable
         #extension GL_EXT_buffer_reference : enable
@@ -772,7 +772,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd430LinkedList) {
     const uint32_t uniform_buffer_size = 3 * sizeof(VkDeviceAddress);
     vkt::Buffer uniform_buffer(*m_device, uniform_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -842,7 +842,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleBufferReferenceBlocks) {
 
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -912,7 +912,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, LoadStoreStruct) {
 
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_scalar_block_layout : enable
         #extension GL_EXT_buffer_reference : enable
@@ -1019,7 +1019,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ConcurrentAccessesToBdaBuffer) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -1038,10 +1038,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ConcurrentAccessesToBdaBuffer) {
     )glsl";
     VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT);
 
-    VkPushConstantRange pc;
-    pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pc.offset = 0;
-    pc.size = sizeof(VkDeviceAddress);
+    VkPushConstantRange pc{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkDeviceAddress)};
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo()};
@@ -1082,7 +1079,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ProxyStructLoad) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8073");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_scalar_block_layout : require
         #extension GL_EXT_buffer_reference2 : require
@@ -1135,7 +1132,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ProxyStructLoadLinkedList) {
     TEST_DESCRIPTION("Make sure we don't get in an infinite loop searching for BDA length");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -1169,7 +1166,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ProxyStructUnsafe) {
     TEST_DESCRIPTION("Make sure the range for a struct load is the whole struct.");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress(false));
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_buffer_reference2 : require
 
@@ -1243,7 +1240,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, BasicRangeUnsafe) {
     TEST_DESCRIPTION("Simple test to examine how we do the range check in unsafe mode.");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress(false));
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #extension GL_EXT_buffer_reference2 : require
 
@@ -1298,51 +1295,22 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, BasicRangeUnsafe) {
 
 TEST_F(PositiveGpuAVBufferDeviceAddress, NonStructPointer) {
     TEST_DESCRIPTION("Slang allows BDA pointers to be with POD instead of a struct");
+
+    RETURN_IF_SKIP(CheckSlangSupport());
+
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    // Slang code
-    // uniform uint* data_ptr;
-    // [numthreads(1,1,1)]
-    // void computeMain() {
-    //    data_ptr[2] = 999;
-    // }
-    char const *shader_source = R"(
-               OpCapability PhysicalStorageBufferAddresses
-               OpCapability Shader
-               OpExtension "SPV_KHR_physical_storage_buffer"
-               OpMemoryModel PhysicalStorageBuffer64 GLSL450
-               OpEntryPoint GLCompute %computeMain "main" %globalParams
-               OpExecutionMode %computeMain LocalSize 1 1 1
-               OpDecorate %_ptr_PhysicalStorageBuffer_uint ArrayStride 4
-               OpDecorate %GlobalParams_std140 Block
-               OpMemberDecorate %GlobalParams_std140 0 Offset 0
-               OpDecorate %globalParams Binding 0
-               OpDecorate %globalParams DescriptorSet 0
-       %void = OpTypeVoid
-       %uint = OpTypeInt 32 0
-        %int = OpTypeInt 32 1
-      %int_0 = OpConstant %int 0
-      %int_2 = OpConstant %int 2
-   %uint_999 = OpConstant %uint 999
-         %12 = OpTypeFunction %void
-%_ptr_PhysicalStorageBuffer_uint = OpTypePointer PhysicalStorageBuffer %uint
-%GlobalParams_std140 = OpTypeStruct %_ptr_PhysicalStorageBuffer_uint
-%_ptr_Uniform_GlobalParams_std140 = OpTypePointer Uniform %GlobalParams_std140
-%_ptr_Uniform__ptr_PhysicalStorageBuffer_uint = OpTypePointer Uniform %_ptr_PhysicalStorageBuffer_uint
-%globalParams = OpVariable %_ptr_Uniform_GlobalParams_std140 Uniform
-%computeMain = OpFunction %void None %12
-         %13 = OpLabel
-         %35 = OpAccessChain %_ptr_Uniform__ptr_PhysicalStorageBuffer_uint %globalParams %int_0
-         %36 = OpLoad %_ptr_PhysicalStorageBuffer_uint %35
-         %37 = OpPtrAccessChain %_ptr_PhysicalStorageBuffer_uint %36 %int_2
-               OpStore %37 %uint_999 Aligned 4
-               OpReturn
-               OpFunctionEnd
-    )";
+    const char *slang_shader = R"slang(
+        uniform uint* data_ptr;
+        [numthreads(1,1,1)]
+        void main() {
+           data_ptr[2] = 999;
+        }
+    )slang";
 
     CreateComputePipelineHelper pipe(*this);
     pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
-    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, slang_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG);
     pipe.CreateComputePipeline();
 
     vkt::Buffer block_buffer(*m_device, 256, 0, vkt::device_address);
@@ -1369,80 +1337,23 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, NonStructPointer) {
 
 TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleAccessChains) {
     TEST_DESCRIPTION("Slang will produce a chain of OpAccessChains");
+
+    RETURN_IF_SKIP(CheckSlangSupport());
+
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    // Slang code
-    // struct Data {
-    //     uint x;
-    //     uint payload[16]; // last item is OOB
-    // }
-    // uniform Data* bda;
-    // [numthreads(1,1,1)]
-    // void computeMain() {
-    //    uint a = bda->payload[0] * bda->payload[14];
-    //    bda->x = a;
-    // }
-    char const *shader_source = R"(
-               OpCapability PhysicalStorageBufferAddresses
-               OpCapability Shader
-               OpExtension "SPV_KHR_physical_storage_buffer"
-               OpMemoryModel PhysicalStorageBuffer64 GLSL450
-               OpEntryPoint GLCompute %computeMain "main" %globalParams
-               OpExecutionMode %computeMain LocalSize 1 1 1
-               OpDecorate %_ptr_PhysicalStorageBuffer_Data_natural ArrayStride 68
-               OpDecorate %GlobalParams_std140 Block
-               OpMemberDecorate %GlobalParams_std140 0 Offset 0
-               OpDecorate %globalParams Binding 0
-               OpDecorate %globalParams DescriptorSet 0
-               OpDecorate %_ptr_PhysicalStorageBuffer__Array_natural_uint16 ArrayStride 64
-               OpDecorate %_arr_uint_int_16 ArrayStride 4
-               OpDecorate %_ptr_PhysicalStorageBuffer__arr_uint_int_16 ArrayStride 64
-               OpDecorate %_ptr_PhysicalStorageBuffer_uint ArrayStride 4
-               OpMemberDecorate %_Array_natural_uint16 0 Offset 0
-               OpMemberDecorate %Data_natural 0 Offset 0
-               OpMemberDecorate %Data_natural 1 Offset 4
-       %void = OpTypeVoid
-          %3 = OpTypeFunction %void
-               OpTypeForwardPointer %_ptr_PhysicalStorageBuffer_Data_natural PhysicalStorageBuffer
-%GlobalParams_std140 = OpTypeStruct %_ptr_PhysicalStorageBuffer_Data_natural
-%_ptr_Uniform_GlobalParams_std140 = OpTypePointer Uniform %GlobalParams_std140
-        %int = OpTypeInt 32 1
-      %int_0 = OpConstant %int 0
-%_ptr_Uniform_7 = OpTypePointer Uniform %_ptr_PhysicalStorageBuffer_Data_natural
-      %int_1 = OpConstant %int 1
-               OpTypeForwardPointer %_ptr_PhysicalStorageBuffer__Array_natural_uint16 PhysicalStorageBuffer
-       %uint = OpTypeInt 32 0
-     %int_16 = OpConstant %int 16
-%_arr_uint_int_16 = OpTypeArray %uint %int_16
-%_ptr_PhysicalStorageBuffer__arr_uint_int_16 = OpTypePointer PhysicalStorageBuffer %_arr_uint_int_16
-%_ptr_PhysicalStorageBuffer_uint = OpTypePointer PhysicalStorageBuffer %uint
-     %int_14 = OpConstant %int 14
-%_Array_natural_uint16 = OpTypeStruct %_arr_uint_int_16
-%Data_natural = OpTypeStruct %uint %_Array_natural_uint16
-%_ptr_PhysicalStorageBuffer_Data_natural = OpTypePointer PhysicalStorageBuffer %Data_natural
-%_ptr_PhysicalStorageBuffer__Array_natural_uint16 = OpTypePointer PhysicalStorageBuffer %_Array_natural_uint16
-%globalParams = OpVariable %_ptr_Uniform_GlobalParams_std140 Uniform
-%computeMain = OpFunction %void None %3
-          %4 = OpLabel
-         %13 = OpAccessChain %_ptr_Uniform_7 %globalParams %int_0
-         %14 = OpLoad %_ptr_PhysicalStorageBuffer_Data_natural %13
-         %18 = OpAccessChain %_ptr_PhysicalStorageBuffer__Array_natural_uint16 %14 %int_1
-         %23 = OpAccessChain %_ptr_PhysicalStorageBuffer__arr_uint_int_16 %18 %int_0
-         %25 = OpAccessChain %_ptr_PhysicalStorageBuffer_uint %23 %int_0
-         %26 = OpLoad %uint %25 Aligned 4
-         %27 = OpLoad %_ptr_PhysicalStorageBuffer_Data_natural %13
-         %28 = OpAccessChain %_ptr_PhysicalStorageBuffer__Array_natural_uint16 %27 %int_1
-         %29 = OpAccessChain %_ptr_PhysicalStorageBuffer__arr_uint_int_16 %28 %int_0
-         %30 = OpAccessChain %_ptr_PhysicalStorageBuffer_uint %29 %int_14
-         %32 = OpLoad %uint %30 Aligned 4
-          %a = OpIMul %uint %26 %32
-         %34 = OpLoad %_ptr_PhysicalStorageBuffer_Data_natural %13
-         %35 = OpAccessChain %_ptr_PhysicalStorageBuffer_uint %34 %int_0
-               OpStore %35 %a Aligned 4
-               OpReturn
-               OpFunctionEnd
-    )";
-
+    const char *slang_shader = R"slang(
+        struct Data {
+            uint x;
+            uint payload[16]; // last item is OOB
+        }
+        uniform Data* bda;
+        [numthreads(1,1,1)]
+        void main() {
+           uint a = bda->payload[0] * bda->payload[14];
+           bda->x = a;
+        }
+    )slang";
     vkt::Buffer bda_buffer(*m_device, 64, 0, vkt::device_address);
     vkt::Buffer ubo_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
@@ -1456,7 +1367,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleAccessChains) {
     descriptor_set.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, slang_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG);
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
@@ -1464,6 +1375,83 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleAccessChains) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
                               nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleAccessChainsDescriptorBuffer) {
+    TEST_DESCRIPTION("Slang will produce a chain of OpAccessChains");
+
+    RETURN_IF_SKIP(CheckSlangSupport());
+
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+
+    const char *slang_shader = R"slang(
+        struct Data {
+            uint x;
+            uint payload[16]; // last item is OOB
+        }
+        uniform Data* bda;
+        [numthreads(1,1,1)]
+        void main() {
+           uint a = bda->payload[0] * bda->payload[14];
+           bda->x = a;
+        }
+    )slang";
+    vkt::Buffer bda_buffer(*m_device, 64, 0, vkt::device_address);
+    vkt::Buffer ubo_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vkt::device_address);
+
+    auto ubo_buffer_ptr = static_cast<VkDeviceAddress *>(ubo_buffer.Memory().Map());
+    ubo_buffer_ptr[0] = bda_buffer.Address();
+
+    const VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+
+    const VkDescriptorBindingFlags ds_binding_flags = 0;
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo flags_create_info = vku::InitStructHelper();
+    flags_create_info.bindingCount = 1u;
+    flags_create_info.pBindingFlags = &ds_binding_flags;
+
+    VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper(&flags_create_info);
+    ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    ds_layout_ci.bindingCount = 1u;
+    ds_layout_ci.pBindings = &binding;
+    vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&ds_layout});
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cp_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    pipe.cs_ = VkShaderObj(this, slang_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    vkt::Buffer descriptor_buffer(*m_device, 4096, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
+    uint8_t *descriptor_data = reinterpret_cast<uint8_t *>(descriptor_buffer.Memory().Map());
+    VkDeviceSize buffer_offset = ds_layout.GetDescriptorBufferBindingOffset(0);
+
+    vkt::DescriptorGetInfo buffer_get_info(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, ubo_buffer, ubo_buffer.CreateInfo().size);
+    vk::GetDescriptorEXT(*m_device, buffer_get_info, descriptor_buffer_properties.uniformBufferDescriptorSize,
+                         descriptor_data + buffer_offset);
+
+    VkDescriptorBufferBindingInfoEXT buffer_binding_info = vku::InitStructHelper();
+    buffer_binding_info.address = descriptor_buffer.Address();
+    buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &buffer_binding_info);
+    uint32_t buffer_index = 0u;
+    VkDeviceSize offset = 0u;
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0u, 1u,
+                                         &buffer_index, &offset);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
@@ -1490,7 +1478,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, AtomicExchangeSlang) {
     //     InterlockedExchange(*foo.a, 0);
     //     InterlockedExchange(*(x->b), 0);
     // }
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Int64
                OpCapability PhysicalStorageBufferAddresses
                OpCapability Shader
@@ -1584,7 +1572,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MemoryModelOperand) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -1638,7 +1626,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MemoryModelOperand2) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #pragma use_vulkan_memory_model
         #extension GL_KHR_memory_scope_semantics : enable
@@ -1700,7 +1688,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, Atomics) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 460
         #pragma use_vulkan_memory_model
         #extension GL_KHR_memory_scope_semantics : enable
@@ -1713,11 +1701,11 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, Atomics) {
         };
 
         void main() {
-            uint a = atomicLoad(node.x[8], gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
-            uint b = atomicLoad(non_bda, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+            uint a = atomicLoad(node.x[8], gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
+            uint b = atomicLoad(non_bda, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAcquire);
 
-            atomicStore(node.x[6], 0u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
-            atomicStore(non_bda, a + b, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+            atomicStore(node.x[6], 0u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
+            atomicStore(non_bda, a + b, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
 
             atomicExchange(node.x[2], node.x[4]);
         }
@@ -1754,7 +1742,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, Atomics2) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -1813,7 +1801,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, AtomicsWorkgroups) {
     TEST_DESCRIPTION("Found case where a potential BDA points to a variable not in the function");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
 
         shared int x;
@@ -1836,61 +1824,23 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, AtomicsWorkgroups) {
 
 TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointer) {
     TEST_DESCRIPTION("Slang can have a BDA pointer of a int that is not wrapped in a struct");
+
+    RETURN_IF_SKIP(CheckSlangSupport());
+
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    // RWStructuredBuffer<uint> result;
-    // struct Data{
-    //    uint* node;
-    // };
-    // [[vk::push_constant]] Data pc;
-    // [shader("compute")]
-    // void main(uint3 threadId : SV_DispatchThreadID) {
-    //     result[0] = pc.node[1];
-    // }
-    char const *shader_source = R"(
-               OpCapability PhysicalStorageBufferAddresses
-               OpCapability Shader
-               OpExtension "SPV_KHR_storage_buffer_storage_class"
-               OpExtension "SPV_KHR_physical_storage_buffer"
-               OpMemoryModel PhysicalStorageBuffer64 GLSL450
-               OpEntryPoint GLCompute %main "main" %result %pc
-               OpExecutionMode %main LocalSize 1 1 1
-               OpDecorate %_runtimearr_uint ArrayStride 4
-               OpDecorate %RWStructuredBuffer Block
-               OpMemberDecorate %RWStructuredBuffer 0 Offset 0
-               OpDecorate %result Binding 0
-               OpDecorate %result DescriptorSet 0
-               OpDecorate %_ptr_PhysicalStorageBuffer_uint ArrayStride 4
-               OpDecorate %Data_std430 Block
-               OpMemberDecorate %Data_std430 0 Offset 0
-       %void = OpTypeVoid
-          %3 = OpTypeFunction %void
-        %int = OpTypeInt 32 1
-      %int_0 = OpConstant %int 0
-       %uint = OpTypeInt 32 0
-%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
-%_runtimearr_uint = OpTypeRuntimeArray %uint
-%RWStructuredBuffer = OpTypeStruct %_runtimearr_uint
-%_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
-%_ptr_PhysicalStorageBuffer_uint = OpTypePointer PhysicalStorageBuffer %uint
-%Data_std430 = OpTypeStruct %_ptr_PhysicalStorageBuffer_uint
-%_ptr_PushConstant_Data_std430 = OpTypePointer PushConstant %Data_std430
-%_ptr_PushConstant__ptr_PhysicalStorageBuffer_uint = OpTypePointer PushConstant %_ptr_PhysicalStorageBuffer_uint
-     %int_1 = OpConstant %int 1
-     %result = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer
-         %pc = OpVariable %_ptr_PushConstant_Data_std430 PushConstant
-       %main = OpFunction %void None %3
-          %4 = OpLabel
-          %9 = OpAccessChain %_ptr_StorageBuffer_uint %result %int_0 %int_0
-         %19 = OpAccessChain %_ptr_PushConstant__ptr_PhysicalStorageBuffer_uint %pc %int_0
-         %20 = OpLoad %_ptr_PhysicalStorageBuffer_uint %19
-         %21 = OpPtrAccessChain %_ptr_PhysicalStorageBuffer_uint %20 %int_1
-         %23 = OpLoad %uint %21 Aligned 4
-               OpStore %9 %23
-               OpReturn
-               OpFunctionEnd
-    )";
+    const char *slang_shader = R"slang(
+        RWStructuredBuffer<uint> result;
+        struct Data{
+           uint* node;
+        };
+        [[vk::push_constant]] Data pc;
+        [shader("compute")]
+        void main(uint3 threadId : SV_DispatchThreadID) {
+            result[0] = pc.node[1];
+        }
+    )slang";
 
     vkt::Buffer bda_buffer(*m_device, 32, 0, vkt::device_address);
     vkt::Buffer out_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
@@ -1908,7 +1858,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointer) {
     descriptor_set.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, slang_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG);
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
@@ -1930,79 +1880,31 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointer) {
 
 TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointerInStruct) {
     TEST_DESCRIPTION("Slang can have a BDA pointer of a int that is not wrapped in a struct");
+
+    RETURN_IF_SKIP(CheckSlangSupport());
+
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    // RWStructuredBuffer<uint> result;
-    // struct Foo {
-    //     uint pad_0;
-    //     float3 pad_1;
-    //     uint* a; // offset 48 (16 + 32)
-    // }
-    //
-    // struct Data{
-    //    float4 pad_2;
-    //    Foo node;
-    // };
-    // [[vk::push_constant]] Data pc;
-    //
-    // [shader("compute")]
-    // void main(uint3 threadId : SV_DispatchThreadID) {
-    //     result[0] = *pc.node.a;
-    // }
-    char const *shader_source = R"(
-               OpCapability PhysicalStorageBufferAddresses
-               OpCapability Shader
-               OpExtension "SPV_KHR_storage_buffer_storage_class"
-               OpExtension "SPV_KHR_physical_storage_buffer"
-               OpMemoryModel PhysicalStorageBuffer64 GLSL450
-               OpEntryPoint GLCompute %main "main" %result %pc
-               OpExecutionMode %main LocalSize 1 1 1
-               OpDecorate %_runtimearr_uint ArrayStride 4
-               OpDecorate %RWStructuredBuffer Block
-               OpMemberDecorate %RWStructuredBuffer 0 Offset 0
-               OpDecorate %result Binding 0
-               OpDecorate %result DescriptorSet 0
-               OpDecorate %_ptr_PhysicalStorageBuffer_uint ArrayStride 4
-               OpMemberDecorate %Foo_std430 0 Offset 0
-               OpMemberDecorate %Foo_std430 1 Offset 16
-               OpMemberDecorate %Foo_std430 2 Offset 32
-               OpDecorate %Data_std430 Block
-               OpMemberDecorate %Data_std430 0 Offset 0
-               OpMemberDecorate %Data_std430 1 Offset 16
-       %void = OpTypeVoid
-          %3 = OpTypeFunction %void
-        %int = OpTypeInt 32 1
-      %int_0 = OpConstant %int 0
-       %uint = OpTypeInt 32 0
-%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
-%_runtimearr_uint = OpTypeRuntimeArray %uint
-%RWStructuredBuffer = OpTypeStruct %_runtimearr_uint
-%_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
-      %float = OpTypeFloat 32
-    %v4float = OpTypeVector %float 4
-    %v3float = OpTypeVector %float 3
-%_ptr_PhysicalStorageBuffer_uint = OpTypePointer PhysicalStorageBuffer %uint
- %Foo_std430 = OpTypeStruct %uint %v3float %_ptr_PhysicalStorageBuffer_uint
-%Data_std430 = OpTypeStruct %v4float %Foo_std430
-%_ptr_PushConstant_Data_std430 = OpTypePointer PushConstant %Data_std430
-      %int_1 = OpConstant %int 1
-%_ptr_PushConstant_Foo_std430 = OpTypePointer PushConstant %Foo_std430
-      %int_2 = OpConstant %int 2
-%_ptr_PushConstant__ptr_PhysicalStorageBuffer_uint = OpTypePointer PushConstant %_ptr_PhysicalStorageBuffer_uint
-     %result = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer
-         %pc = OpVariable %_ptr_PushConstant_Data_std430 PushConstant
-       %main = OpFunction %void None %3
-          %4 = OpLabel
-          %9 = OpAccessChain %_ptr_StorageBuffer_uint %result %int_0 %int_0
-         %24 = OpAccessChain %_ptr_PushConstant_Foo_std430 %pc %int_1
-         %27 = OpAccessChain %_ptr_PushConstant__ptr_PhysicalStorageBuffer_uint %24 %int_2
-         %28 = OpLoad %_ptr_PhysicalStorageBuffer_uint %27
-         %29 = OpLoad %uint %28 Aligned 4
-               OpStore %9 %29
-               OpReturn
-               OpFunctionEnd
-    )";
+    const char *slang_shader = R"slang(
+        RWStructuredBuffer<uint> result;
+        struct Foo {
+            uint pad_0;
+            float3 pad_1;
+            uint* a; // offset 48 (16 + 32)
+        }
+
+        struct Data{
+           float4 pad_2;
+           Foo node;
+        };
+        [[vk::push_constant]] Data pc;
+
+        [shader("compute")]
+        void main(uint3 threadId : SV_DispatchThreadID) {
+            result[0] = *pc.node.a;
+        }
+    )slang";
 
     vkt::Buffer bda_buffer(*m_device, 32, 0, vkt::device_address);
     vkt::Buffer out_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
@@ -2018,7 +1920,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointerInStruct) {
     descriptor_set.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, slang_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG);
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
@@ -2065,7 +1967,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, SharedPipelineLayoutSubsetGraphicsPushC
     pipeline_layout_ci.pushConstantRangeCount = 2;
     const vkt::PipelineLayout pipeline_layout_2(*m_device, pipeline_layout_ci);
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2083,7 +1985,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, SharedPipelineLayoutSubsetGraphicsPushC
         }
     )glsl";
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo_1 { uint c; };
         void main() {}
@@ -2100,7 +2002,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, SharedPipelineLayoutSubsetGraphicsPushC
 
     CreatePipelineHelper pipe_2(*this);
     pipe_2.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe_2.gp_ci_.layout = pipeline_layout_2.handle();
+    pipe_2.gp_ci_.layout = pipeline_layout_2;
     pipe_2.CreateGraphicsPipeline();
 
     vkt::Buffer out_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
@@ -2163,7 +2065,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, SharedPipelineLayoutSubsetGraphicsPushC
     pipeline_layout_ci.pPushConstantRanges = push_constant_ranges.data();
     const vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci);
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2181,7 +2083,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, SharedPipelineLayoutSubsetGraphicsPushC
         }
     )glsl";
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo_1 { uint c; };
         void main() {}
@@ -2253,7 +2155,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PointerChain) {
     TEST_DESCRIPTION("Have BDA point to more BDA creating a chain");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2317,7 +2219,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ManyAccessToSameStruct) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2371,55 +2273,6 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ManyAccessToSameStruct) {
     m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
-// Used to test large accesses to a single struct from a single pointer
-// If on Mesa, also add MESA_SHADER_CACHE_DISABLE=1
-TEST_F(PositiveGpuAVBufferDeviceAddress, Stress) {
-    // About a 5x speed up to run in unsafe mode
-    RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress(false));
-    InitRenderTarget();
-    const uint32_t count = 32;
-
-    std::stringstream cs_source;
-    cs_source << R"glsl(
-        #version 450
-        #extension GL_EXT_buffer_reference : enable
-
-        layout(buffer_reference) buffer BDA {
-            vec3 x;
-            vec3 payload[4096];
-        };
-
-        layout(push_constant) uniform Uniforms {
-            BDA ptr;
-        };
-
-        void main() {
-            vec3 a = vec3(0);
-            // a += fma(vec3(ptr.payload[0].x, ptr.payload[0].y, ptr.payload[0].z),
-            //          vec3(ptr.payload[1].x, ptr.payload[1].y, ptr.payload[1].z),
-            //          vec3(ptr.payload[2].x, ptr.payload[2].y, ptr.payload[2].z));
-            //
-            // .... many times
-            //
-            // ptr.x = a;
-    )glsl";
-
-    for (uint32_t i = 0; i < count; i += 3) {
-        cs_source << "a += fma(vec3(ptr.payload[" << i << "].x, ptr.payload[" << i << "].y, ptr.payload[" << i << "].z), ";
-        cs_source << "vec3(ptr.payload[" << i + 1 << "].x, ptr.payload[" << i + 1 << "].y, ptr.payload[" << i + 1 << "].z), ";
-        cs_source << "vec3(ptr.payload[" << i + 2 << "].x, ptr.payload[" << i + 2 << "].y, ptr.payload[" << i + 2 << "].z));\n";
-    }
-    cs_source << "\nptr.x = a;\n}";
-
-    VkPushConstantRange pc_range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkDeviceAddress)};
-    const vkt::PipelineLayout pipeline_layout(*m_device, {}, {pc_range});
-
-    CreateComputePipelineHelper pipe(*this);
-    pipe.cp_ci_.layout = pipeline_layout;
-    pipe.cs_ = VkShaderObj(this, cs_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.CreateComputePipeline();
-}
-
 TEST_F(PositiveGpuAVBufferDeviceAddress, GlobalInvocationIdIVec3) {
     TEST_DESCRIPTION("Found issue when we assumed GlobalInvocationId was a uvec3 and it was a ivec3");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
@@ -2430,7 +2283,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, GlobalInvocationIdIVec3) {
     // void main() {
     //     ptr.x = int(gl_GlobalInvocationID.x);
     // }
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_physical_storage_buffer"
@@ -2488,7 +2341,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, DualShaderLibrary) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2563,7 +2416,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, DualShaderLibraryDestroyModule) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2625,8 +2478,8 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, DualShaderLibraryDestroyModule) {
     link_info.pLibraries = libraries;
 
     // Destroy VkShaderModule as not required to have when linking
-    vs.destroy();
-    fs.destroy();
+    vs.Destroy();
+    fs.Destroy();
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pipeline_layout;

@@ -2,6 +2,7 @@
  * Copyright (c) 2015-2025 Valve Corporation
  * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (C) 2015-2025 Google Inc.
+ * Copyright (c) 2025 Arm Limited.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,22 +20,20 @@
 
 #include <assert.h>
 
-#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/vulkan_core.h>
 #include "generated/pnext_chain_extraction.h"
 #include "core_validation.h"
 #include "cc_buffer_address.h"
 #include "state_tracker/image_state.h"
+#include "state_tracker/tensor_state.h"
 #include "state_tracker/buffer_state.h"
 #include "state_tracker/ray_tracing_state.h"
 #include "state_tracker/wsi_state.h"
 #include "error_message/error_strings.h"
-#include "containers/limits.h"
-#include "containers/container_utils.h"
-#include "generated/dispatch_functions.h"
 #include "utils/image_utils.h"
 #include "utils/math_utils.h"
+#include "state_tracker/data_graph_pipeline_session_state.h"
 
 // For given mem object, verify that it is not null or UNBOUND, if it is, report error. Return skip value.
 bool CoreChecks::VerifyBoundMemoryIsValid(const vvl::DeviceMemory *memory_state, const LogObjectList &objlist,
@@ -104,6 +103,25 @@ bool CoreChecks::ValidateMemoryIsBoundToImage(const LogObjectList &objlist, cons
     return result;
 }
 
+bool CoreChecks::ValidateMemoryIsBoundToTensor(const LogObjectList &objlist, const vvl::Tensor &tensor_state, const Location &loc,
+                                               const char *vuid) const {
+    bool result = false;
+    const auto &memory_states = tensor_state.GetBoundMemoryStates();
+    if (memory_states.empty()) {
+        result |= LogError(vuid, objlist, loc, "has no memory bound. Memory should be bound by calling vkBindTensorMemory().");
+    } else {
+        for (const auto &state : memory_states) {
+            result |= VerifyBoundMemoryIsValid(state.get(), objlist, tensor_state.Handle(), loc, vuid);
+        }
+        if (!tensor_state.sparse) {
+            if (memory_states.size() > 1) {
+                result |= LogError(vuid, objlist, loc, "is non-sparse and bound to %zu memory allocations.", memory_states.size());
+            }
+        }
+    }
+    return result;
+}
+
 bool CoreChecks::ValidateAccelStructsMemoryDoNotOverlap(const Location &function_loc, LogObjectList objlist,
                                                         const vvl::AccelerationStructureKHR &accel_struct_a, const Location &loc_a,
                                                         const vvl::AccelerationStructureKHR &accel_struct_b, const Location &loc_b,
@@ -127,125 +145,6 @@ bool CoreChecks::ValidateAccelStructsMemoryDoNotOverlap(const Location &function
                          FormatHandle(buffer_b).c_str(), loc_b.Fields().c_str(), FormatHandle(accel_struct_b.Handle()).c_str(),
                          FormatHandle(memory).c_str(), string_range_hex(overlap_range).c_str());
     }
-
-    return skip;
-}
-
-static bool ValidateBufferAndAccelStructsMemoryDoNotOverlap(const CoreChecks &validator, const vvl::Buffer &buffer_a,
-                                                            vvl::range<VkDeviceSize> range_a,
-                                                            const vvl::AccelerationStructureKHR &accel_struct_b,
-                                                            const Location &loc_b, std::string *err_msg) {
-    const vvl::Buffer &buffer_b = *accel_struct_b.buffer_state;
-    const vvl::range<VkDeviceSize> range_b(accel_struct_b.create_info.offset, accel_struct_b.create_info.size);
-
-    if (const auto [memory, overlap_range] = buffer_a.GetResourceMemoryOverlap(range_a, &buffer_b, range_b);
-        memory != VK_NULL_HANDLE) {
-        if (err_msg) {
-            std::stringstream err_msg_strm;
-            err_msg_strm << "memory backing buffer (" << validator.FormatHandle(buffer_a) << ") overlaps memory backing buffer ("
-                         << validator.FormatHandle(buffer_b) << ") used as storage for " << loc_b.Fields() << " ("
-                         << validator.FormatHandle(accel_struct_b.Handle()) << "). Overlapped memory is ("
-                         << validator.FormatHandle(memory) << ") on range " << string_range_hex(overlap_range);
-            *err_msg = err_msg_strm.str();
-        }
-        return false;
-    }
-
-    return true;
-}
-
-bool CoreChecks::ValidateScratchMemoryNoOverlap(const Location &function_loc, LogObjectList objlist,
-                                                const vvl::span<vvl::Buffer *const> &scratches_a, VkDeviceAddress scratch_a_address,
-                                                VkDeviceSize scratch_a_size, const Location &loc_scratches_a,
-                                                const vvl::AccelerationStructureKHR *src_accel_struct,
-                                                const Location &loc_src_accel_struct,
-                                                const vvl::AccelerationStructureKHR &dst_accel_struct,
-                                                const Location &loc_dst_accel_struct,
-                                                const vvl::span<vvl::Buffer *const> &scratches_b, VkDeviceAddress scratch_b_address,
-                                                VkDeviceSize scratch_b_size, const Location *loc_scratches_b) const {
-    bool skip = false;
-
-    const char *scratch_dst_accel_struct_overlap = "VUID-vkCmdBuildAccelerationStructuresKHR-dstAccelerationStructure-03703";
-    const char *scratch_src_accel_struct_overlap = "VUID-vkCmdBuildAccelerationStructuresKHR-scratchData-03705";
-    const char *scratch_scratch_overlap = "VUID-vkCmdBuildAccelerationStructuresKHR-scratchData-03704";
-    const std::string scratch_b_address_str = [&]() {
-        std::stringstream ss;
-        ss << std::hex << "0x" << scratch_b_address;
-        return ss.str();
-    }();
-
-    BufferAddressValidation<3> buffer_address_validator = {{{
-        {scratch_dst_accel_struct_overlap,
-         [this, scratch_a_address, scratch_a_size, &dst_accel_struct, &loc_dst_accel_struct](vvl::Buffer *const scratch_a,
-                                                                                             std::string *out_error_msg) {
-             const VkDeviceSize scratch_a_offset = scratch_a_address - scratch_a->deviceAddress;
-             const vvl::range<VkDeviceSize> scratch_a_range(scratch_a_offset, scratch_a_offset + scratch_a_size);
-
-             const bool no_overlap_found = ValidateBufferAndAccelStructsMemoryDoNotOverlap(
-                 *this, *scratch_a, scratch_a_range, dst_accel_struct, loc_dst_accel_struct, out_error_msg);
-
-             return no_overlap_found;
-         },
-         [scratch_a_size, &loc_dst_accel_struct]() {
-             return std::string("The following scratch buffers associated to this device address (assumed scratch byte size: ") +
-                    std::to_string(scratch_a_size) + ") overlap with memory backing " + loc_dst_accel_struct.Fields();
-         }},
-
-    }}};
-
-    if (src_accel_struct) {
-        buffer_address_validator.AddVuidValidation(
-            {scratch_src_accel_struct_overlap,
-             [this, scratch_a_address, scratch_a_size, src_accel_struct, &loc_src_accel_struct](vvl::Buffer *const scratch_a,
-                                                                                                std::string *out_error_msg) {
-                 const VkDeviceSize scratch_a_offset = scratch_a_address - scratch_a->deviceAddress;
-                 const vvl::range<VkDeviceSize> scratch_a_range(scratch_a_offset, scratch_a_offset + scratch_a_size);
-
-                 const bool no_overlap_found = ValidateBufferAndAccelStructsMemoryDoNotOverlap(
-                     *this, *scratch_a, scratch_a_range, *src_accel_struct, loc_src_accel_struct, out_error_msg);
-
-                 return no_overlap_found;
-             },
-             [scratch_a_size, &loc_src_accel_struct]() {
-                 return std::string(
-                            "The following scratch buffers associated to this device address (assumed scratch byte size: ") +
-                        std::to_string(scratch_a_size) + ") overlap with memory backing " + loc_src_accel_struct.Fields();
-             }});
-    }
-
-    if (!scratches_b.empty()) {
-        assert(loc_scratches_b);
-        buffer_address_validator.AddVuidValidation(
-            {scratch_scratch_overlap,
-             [this, scratch_a_address, scratch_a_size, scratches_b, scratch_b_address, scratch_b_size](vvl::Buffer *const scratch_a,
-                                                                                                       std::string *out_error_msg) {
-                 const VkDeviceSize scratch_a_offset = scratch_a_address - scratch_a->deviceAddress;
-                 const vvl::range<VkDeviceSize> scratch_a_range(scratch_a_offset, scratch_a_offset + scratch_a_size);
-
-                 for (auto scratch_b : scratches_b) {
-                     const VkDeviceSize scratch_b_offset = scratch_b_address - scratch_b->deviceAddress;
-                     const vvl::range<VkDeviceSize> scratch_b_range(scratch_b_offset, scratch_b_offset + scratch_b_size);
-
-                     if (auto [mem, mem_range] = scratch_b->GetResourceMemoryOverlap(scratch_b_range, scratch_a, scratch_a_range);
-                         mem != VK_NULL_HANDLE) {
-                         if (out_error_msg) {
-                             *out_error_msg +=
-                                 "Memory (" + FormatHandle(mem) + ") overlap on memory range " + string_range_hex(mem_range);
-                         }
-                         return false;
-                     }
-                 }
-                 return true;
-             },
-             [loc_scratches_b, scratch_a_size, scratch_b_size, &scratch_b_address_str]() {
-                 return std::string("The following scratch buffers associated to this device address (assumed scratch byte size: " +
-                                    std::to_string(scratch_a_size) + ") overlap with at least one scratch buffer associated to ") +
-                        loc_scratches_b->Fields() + " (" + scratch_b_address_str +
-                        ") (assumed scratch byte size: " + std::to_string(scratch_b_size) + "):";
-             }});
-    }
-
-    skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(*this, scratches_a, loc_scratches_a, objlist, scratch_a_address);
 
     return skip;
 }
@@ -295,14 +194,19 @@ bool CoreChecks::ValidateSetMemBinding(const vvl::DeviceMemory &memory_state, co
     const bool bind_2 = (loc.function != Func::vkBindBufferMemory) && (loc.function != Func::vkBindImageMemory);
     auto typed_handle = mem_binding.Handle();
     const bool is_buffer = typed_handle.type == kVulkanObjectTypeBuffer;
+    const bool is_image = typed_handle.type == kVulkanObjectTypeImage;
+    const bool is_tensor = typed_handle.type == kVulkanObjectTypeTensorARM;
 
     if (mem_binding.sparse) {
         const char *vuid = kVUIDUndefined;
-        const char *handle_type = is_buffer ? "BUFFER" : "IMAGE";
+        const char *handle_type = is_buffer ? "BUFFER" : is_image ? "IMAGE" : "TENSOR";
         if (is_buffer) {
             vuid = bind_2 ? "VUID-VkBindBufferMemoryInfo-buffer-01030" : "VUID-vkBindBufferMemory-buffer-01030";
-        } else {
+        } else if (is_image) {
             vuid = bind_2 ? "VUID-VkBindImageMemoryInfo-image-01045" : "VUID-vkBindImageMemory-image-01045";
+        } else {
+            /* only buffer and image can be sparse */
+            assert(false);
         }
 
         const LogObjectList objlist(memory_state.Handle(), typed_handle);
@@ -317,13 +221,17 @@ bool CoreChecks::ValidateSetMemBinding(const vvl::DeviceMemory &memory_state, co
         const char *vuid = kVUIDUndefined;
         if (is_buffer) {
             vuid = bind_2 ? "VUID-VkBindBufferMemoryInfo-buffer-07459" : "VUID-vkBindBufferMemory-buffer-07459";
-        } else {
+        } else if (is_image) {
             vuid = bind_2 ? "VUID-VkBindImageMemoryInfo-image-07460" : "VUID-vkBindImageMemory-image-07460";
+        } else if (is_tensor) {
+            vuid = "VUID-VkBindTensorMemoryInfoARM-tensor-09712";
         }
 
         if (mem_binding.indeterminate_state) {
-            Func bind_call = is_buffer ? Func::vkBindBufferMemory2 : Func::vkBindImageMemory2;
-            const char *handle_type = is_buffer ? "buffer" : "image";
+            Func bind_call = is_buffer  ? Func::vkBindBufferMemory2
+                             : is_image ? Func::vkBindImageMemory2
+                                        : Func::vkBindTensorMemoryARM;
+            const char *handle_type = is_buffer ? "buffer" : is_image ? "image" : "tensor";
             const LogObjectList objlist(memory_state.Handle(), typed_handle);
             skip |= LogError(
                 vuid, objlist, loc,
@@ -435,6 +343,15 @@ bool CoreChecks::HasExternalMemoryImportSupport(const vvl::Image &image, VkExter
         }
     }
     return (external_properties.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0;
+}
+
+bool CoreChecks::HasExternalMemoryImportSupport(const vvl::Tensor &tensor, VkExternalMemoryHandleTypeFlagBits handle_type) const {
+    VkPhysicalDeviceExternalTensorInfoARM info = vku::InitStructHelper();
+    info.flags = tensor.create_info.flags;
+    info.handleType = handle_type;
+    VkExternalTensorPropertiesARM properties = vku::InitStructHelper();
+    dispatch_instance_->GetPhysicalDeviceExternalTensorPropertiesARM(physical_device, &info, &properties);
+    return (properties.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0;
 }
 
 bool CoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAllocateInfo *pAllocateInfo,
@@ -554,6 +471,7 @@ bool CoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAl
         imported_qnx_buffer = imported_buffer_info->buffer != nullptr;
     }
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+    const bool is_external_memory = imported_ahb_buffer || imported_qnx_buffer;
 
     VkBuffer dedicated_buffer = VK_NULL_HANDLE;
     VkImage dedicated_image = VK_NULL_HANDLE;
@@ -575,13 +493,13 @@ bool CoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAl
                 skip |= LogError("VUID-VkMemoryDedicatedAllocateInfo-image-01797", objlist, image_loc,
                                  "(%s) was created with VK_IMAGE_CREATE_DISJOINT_BIT.", FormatHandle(dedicated_image).c_str());
             } else {
-                if (!IgnoreAllocationSize(*pAllocateInfo) && (pAllocateInfo->allocationSize != image_state->requirements[0].size) &&
-                    !imported_ahb_buffer && !imported_qnx_buffer) {
-                    skip |= LogError("VUID-VkMemoryDedicatedAllocateInfo-image-02964", objlist,
-                                     allocate_info_loc.dot(Field::allocationSize),
-                                     "(%" PRIu64 ") needs to be equal to %s (%s) VkMemoryRequirements::size (%" PRIu64 ").",
-                                     pAllocateInfo->allocationSize, image_loc.Fields().c_str(),
-                                     FormatHandle(dedicated_image).c_str(), image_state->requirements[0].size);
+                if (!IgnoreAllocationSize(*pAllocateInfo) && !is_external_memory &&
+                    (pAllocateInfo->allocationSize < image_state->requirements[0].size)) {
+                    skip |= LogError(
+                        "VUID-VkMemoryDedicatedAllocateInfo-image-02964", objlist, allocate_info_loc.dot(Field::allocationSize),
+                        "(%" PRIu64 ") needs to be greater than or equal to %s (%s) VkMemoryRequirements::size (%" PRIu64 ").",
+                        pAllocateInfo->allocationSize, image_loc.Fields().c_str(), FormatHandle(dedicated_image).c_str(),
+                        image_state->requirements[0].size);
                 }
                 if ((image_state->create_info.flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0) {
                     skip |= LogError("VUID-VkMemoryDedicatedAllocateInfo-image-01434", objlist, image_loc,
@@ -594,13 +512,13 @@ bool CoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAl
             const LogObjectList objlist(device, dedicated_buffer);
             const Location buffer_loc = allocate_info_loc.pNext(Struct::VkMemoryDedicatedAllocateInfo, Field::buffer);
             if (auto buffer_state = Get<vvl::Buffer>(dedicated_buffer)) {
-                if (!IgnoreAllocationSize(*pAllocateInfo) && (pAllocateInfo->allocationSize != buffer_state->requirements.size) &&
-                    !imported_ahb_buffer && !imported_qnx_buffer) {
-                    skip |= LogError("VUID-VkMemoryDedicatedAllocateInfo-buffer-02965", objlist,
-                                     allocate_info_loc.dot(Field::allocationSize),
-                                     "(%" PRIu64 ") needs to be equal to %s (%s) VkMemoryRequirements::size (%" PRIu64 ").",
-                                     pAllocateInfo->allocationSize, buffer_loc.Fields().c_str(),
-                                     FormatHandle(dedicated_buffer).c_str(), buffer_state->requirements.size);
+                if (!IgnoreAllocationSize(*pAllocateInfo) && !is_external_memory &&
+                    (pAllocateInfo->allocationSize < buffer_state->requirements.size)) {
+                    skip |= LogError(
+                        "VUID-VkMemoryDedicatedAllocateInfo-buffer-02965", objlist, allocate_info_loc.dot(Field::allocationSize),
+                        "(%" PRIu64 ") needs to be greater than or equal to %s (%s) VkMemoryRequirements::size (%" PRIu64 ").",
+                        pAllocateInfo->allocationSize, buffer_loc.Fields().c_str(), FormatHandle(dedicated_buffer).c_str(),
+                        buffer_state->requirements.size);
                 }
                 if ((buffer_state->create_info.flags & VK_BUFFER_CREATE_SPARSE_BINDING_BIT) != 0) {
                     skip |= LogError("VUID-VkMemoryDedicatedAllocateInfo-buffer-01436", objlist, buffer_loc,
@@ -608,6 +526,24 @@ bool CoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAl
                                      FormatHandle(dedicated_buffer).c_str());
                 }
             }
+        }
+    }
+
+    const auto dedicated_allocate_info_tensor =
+        vku::FindStructInPNextChain<VkMemoryDedicatedAllocateInfoTensorARM>(pAllocateInfo->pNext);
+    if (dedicated_allocate_info_tensor) {
+        const VkTensorARM dedicated_tensor = dedicated_allocate_info_tensor->tensor;
+        const auto tensor_state = Get<vvl::Tensor>(dedicated_tensor);
+        ASSERT_AND_RETURN_SKIP(tensor_state);
+        auto mem_reqs = tensor_state->MemReqs()->memoryRequirements;
+        if (!IgnoreAllocationSize(*pAllocateInfo) && (pAllocateInfo->allocationSize != mem_reqs.size)) {
+            const Location tensor_loc = allocate_info_loc.pNext(Struct::VkMemoryDedicatedAllocateInfoTensorARM, Field::tensor);
+            const LogObjectList objlist(device, dedicated_tensor);
+            skip |= LogError("VUID-VkMemoryDedicatedAllocateInfoTensorARM-allocationSize-09710", objlist,
+                                allocate_info_loc.dot(Field::allocationSize),
+                                "(%" PRIu64 ") needs to be equal to %s (%s) VkMemoryRequirements::size (%" PRIu64 ").",
+                                pAllocateInfo->allocationSize, tensor_loc.Fields().c_str(), FormatHandle(dedicated_tensor).c_str(),
+                                mem_reqs.size);
         }
     }
 
@@ -843,21 +779,26 @@ bool CoreChecks::ValidateInsertMemoryRange(const VulkanTypedHandle &typed_handle
     bool skip = false;
 
     if (!IgnoreAllocationSize(mem_info.allocate_info) && memoryOffset >= mem_info.allocate_info.allocationSize) {
-        const bool bind_2 = (loc.function != Func::vkBindBufferMemory) && (loc.function != Func::vkBindImageMemory);
         const char *vuid = nullptr;
         if (typed_handle.type == kVulkanObjectTypeBuffer) {
-            vuid = bind_2 ? "VUID-VkBindBufferMemoryInfo-memoryOffset-01031" : "VUID-vkBindBufferMemory-memoryOffset-01031";
+            vuid = loc.function == Func::vkBindBufferMemory ? "VUID-vkBindBufferMemory-memoryOffset-01031"
+                                                            : "VUID-VkBindBufferMemoryInfo-memoryOffset-01031";
         } else if (typed_handle.type == kVulkanObjectTypeImage) {
-            vuid = bind_2 ? "VUID-VkBindImageMemoryInfo-memoryOffset-01046" : "VUID-vkBindImageMemory-memoryOffset-01046";
+            vuid = loc.function == Func::vkBindImageMemory ? "VUID-vkBindImageMemory-memoryOffset-01046"
+                                                           : "VUID-VkBindImageMemoryInfo-memoryOffset-01046";
         } else if (typed_handle.type == kVulkanObjectTypeAccelerationStructureNV) {
             vuid = "VUID-VkBindAccelerationStructureMemoryInfoNV-memoryOffset-03621";
+        } else if (typed_handle.type == kVulkanObjectTypeTensorARM) {
+            vuid = "VUID-VkBindTensorMemoryInfoARM-memoryOffset-09713";
+        } else if (typed_handle.type == kVulkanObjectTypeDataGraphPipelineSessionARM) {
+            vuid = "VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-memoryOffset-09787";
         } else {
             assert(false);  // Unsupported object type
         }
 
         LogObjectList objlist(mem_info.Handle(), typed_handle);
         skip |= LogError(vuid, objlist, loc,
-                         "attempting to bind %s to %s, memoryOffset (%" PRIu64
+                         "attempting to bind %s to %s, but the memoryOffset (%" PRIu64
                          ") must be less than the memory allocation size (%" PRIu64 ").",
                          FormatHandle(mem_info.Handle()).c_str(), FormatHandle(typed_handle).c_str(), memoryOffset,
                          mem_info.allocate_info.allocationSize);
@@ -866,23 +807,15 @@ bool CoreChecks::ValidateInsertMemoryRange(const VulkanTypedHandle &typed_handle
     return skip;
 }
 
-bool CoreChecks::ValidateInsertImageMemoryRange(VkImage image, const vvl::DeviceMemory &mem_info, VkDeviceSize mem_offset,
-                                                const Location &loc) const {
-    return ValidateInsertMemoryRange(VulkanTypedHandle(image, kVulkanObjectTypeImage), mem_info, mem_offset, loc);
-}
-
-bool CoreChecks::ValidateInsertBufferMemoryRange(VkBuffer buffer, const vvl::DeviceMemory &mem_info, VkDeviceSize mem_offset,
-                                                 const Location &loc) const {
-    return ValidateInsertMemoryRange(VulkanTypedHandle(buffer, kVulkanObjectTypeBuffer), mem_info, mem_offset, loc);
-}
-
 bool CoreChecks::ValidateMemoryTypes(const vvl::DeviceMemory &mem_info, const uint32_t memory_type_bits,
                                      const Location &resource_loc, const char *vuid) const {
     bool skip = false;
     if (((1 << mem_info.allocate_info.memoryTypeIndex) & memory_type_bits) == 0) {
         skip |= LogError(vuid, mem_info.Handle(), resource_loc,
-                         "require memoryTypeBits (0x%x) but %s was allocated with memoryTypeIndex (%" PRIu32 ").", memory_type_bits,
-                         FormatHandle(mem_info.Handle()).c_str(), mem_info.allocate_info.memoryTypeIndex);
+                         "require memoryTypeBits (0x%x) but (%s) was allocated with memoryTypeIndex (%" PRIu32
+                         ") with memoryTypeBits (0x%x).",
+                         memory_type_bits, FormatHandle(mem_info.Handle()).c_str(), mem_info.allocate_info.memoryTypeIndex,
+                         phys_dev_mem_props.memoryTypes[mem_info.allocate_info.memoryTypeIndex].propertyFlags);
     }
     return skip;
 }
@@ -992,7 +925,7 @@ bool CoreChecks::ValidateBindBufferMemory(VkBuffer buffer, VkDeviceMemory memory
         }
 
         // Validate bound memory range information
-        skip |= ValidateInsertBufferMemoryRange(buffer, *mem_info, memoryOffset, loc);
+        skip |= ValidateInsertMemoryRange(VulkanTypedHandle(buffer, kVulkanObjectTypeBuffer), *mem_info, memoryOffset, loc);
 
         const char *mem_type_vuid =
             bind_buffer_mem_2 ? "VUID-VkBindBufferMemoryInfo-memory-01035" : "VUID-vkBindBufferMemory-memory-01035";
@@ -1046,6 +979,14 @@ bool CoreChecks::ValidateBindBufferMemory(VkBuffer buffer, VkDeviceMemory memory
                                  FormatHandle(buffer).c_str());
                 }
             }
+        }
+        const VkImage dedicated_image = mem_info->GetDedicatedImage();
+        if (dedicated_image != VK_NULL_HANDLE) {
+            const LogObjectList objlist(buffer, memory);
+            skip |= LogError("VUID-vkBindBufferMemory-memory-10925", objlist,
+                             loc.pNext(Struct::VkMemoryDedicatedAllocateInfo, Field::pNext).dot(Field::image),
+                             "is %s (not VK_NULL_HANDLE), but VkBindBufferMemoryInfo::buffer is %s.",
+                             FormatHandle(dedicated_image).c_str(), FormatHandle(buffer).c_str());
         }
 
         auto chained_flags_struct = vku::FindStructInPNextChain<VkMemoryAllocateFlagsInfo>(mem_info->allocate_info.pNext);
@@ -1599,6 +1540,107 @@ bool CoreChecks::PreCallValidateGetDeviceMemoryCommitment(VkDevice device, VkDev
     return skip;
 }
 
+bool CoreChecks::ValidateBindTensorMemoryARM(uint32_t bindInfoCount, const VkBindTensorMemoryInfoARM *pBindInfos,
+                                             const ErrorObject &error_obj) const {
+    bool skip = false;
+    for (uint32_t i = 0; i < bindInfoCount; i++) {
+        const VkBindTensorMemoryInfoARM &bind_info = pBindInfos[i];
+        const Location bind_info_loc = error_obj.location.dot(Field::pBindInfos, i);
+
+        const auto tensor_state = Get<vvl::Tensor>(bind_info.tensor);
+        const auto mem_info = Get<vvl::DeviceMemory>(bind_info.memory);
+        ASSERT_AND_RETURN_SKIP(tensor_state && mem_info);
+
+        skip |= ValidateSetMemBinding(*mem_info, *tensor_state, bind_info_loc);
+        skip |= ValidateInsertMemoryRange(VulkanTypedHandle(bind_info.tensor, kVulkanObjectTypeTensorARM), *mem_info,
+                                          bind_info.memoryOffset, bind_info_loc);
+        auto mem_reqs = tensor_state->MemReqs()->memoryRequirements;
+        skip |=
+            ValidateMemoryTypes(*mem_info, mem_reqs.memoryTypeBits, bind_info_loc, "VUID-VkBindTensorMemoryInfoARM-memory-09714");
+
+        if (SafeModulo(bind_info.memoryOffset, mem_reqs.alignment) != 0) {
+            const LogObjectList objlist(bind_info.tensor, bind_info.memory);
+            skip |= LogError("VUID-VkBindTensorMemoryInfoARM-memoryOffset-09715", objlist, bind_info_loc.dot(Field::memoryOffset),
+                             "(%" PRIu64 ") is not a multiple of the the tensor alignment requirement (%" PRIu64 ")",
+                             bind_info.memoryOffset, mem_reqs.alignment);
+        }
+        if (mem_reqs.size > (mem_info->allocate_info.allocationSize - bind_info.memoryOffset)) {
+            const LogObjectList objlist(bind_info.tensor, bind_info.memory);
+            skip |= LogError("VUID-VkBindTensorMemoryInfoARM-size-09716", objlist, bind_info_loc.dot(Field::tensor),
+                             "size requirement (%" PRIu64 ") is greater than allocationSize (%" PRIu64 ") - memoryOffset (%" PRIu64
+                             ").",
+                             mem_reqs.size, mem_info->allocate_info.allocationSize, bind_info.memoryOffset);
+        }
+
+        if (!tensor_state->unprotected && mem_info->unprotected) {
+            const LogObjectList objlist(bind_info.tensor, bind_info.memory);
+            skip |= LogError("VUID-VkBindTensorMemoryInfoARM-tensor-09718", objlist, bind_info_loc.dot(Field::memory),
+                             "(%s) was not created with protected memory but the VkTensorARM (%s) was "
+                             "set to use protected memory.",
+                             FormatHandle(bind_info.memory).c_str(), FormatHandle(bind_info.tensor).c_str());
+        } else if (tensor_state->unprotected && !mem_info->unprotected) {
+            const LogObjectList objlist(bind_info.tensor, bind_info.memory);
+            skip |= LogError("VUID-VkBindTensorMemoryInfoARM-tensor-09719", objlist, bind_info_loc.dot(Field::memory),
+                             "(%s) was created with protected memory but the VkTensorARM (%s) was not "
+                             "set to use protected memory.",
+                             FormatHandle(bind_info.memory).c_str(), FormatHandle(bind_info.tensor).c_str());
+        }
+
+        const VkTensorARM dedicated_tensor = mem_info->GetDedicatedTensor();
+        if (dedicated_tensor != VK_NULL_HANDLE) {
+            if (dedicated_tensor != bind_info.tensor) {
+                const LogObjectList objlist(bind_info.tensor, bind_info.memory, dedicated_tensor);
+                skip |= LogError("VUID-VkBindTensorMemoryInfoARM-tensor-09717", objlist, bind_info_loc.dot(Field::tensor),
+                                 "(%s) (dedicated) is different from bound tensor (%s).", FormatHandle(dedicated_tensor).c_str(),
+                                 FormatHandle(bind_info.tensor).c_str());
+            }
+            if (bind_info.memoryOffset != 0) {
+                const LogObjectList objlist(bind_info.tensor, bind_info.memory, dedicated_tensor);
+                skip |= LogError("VUID-VkBindTensorMemoryInfoARM-memory-09806", objlist, bind_info_loc.dot(Field::memoryOffset),
+                                 "(%" PRIu64 ") for memory (%s) not zero.", bind_info.memoryOffset,
+                                 FormatHandle(bind_info.memory).c_str());
+            }
+        }
+
+        // Validate export memory handles. Check if the memory meets the tensor's external memory requirements
+        if (mem_info->IsExport() && (mem_info->export_handle_types & tensor_state->external_memory_handle_types) == 0) {
+            const LogObjectList objlist(bind_info.tensor, bind_info.memory);
+            skip |= LogError("VUID-VkBindTensorMemoryInfoARM-memory-09895", objlist, bind_info_loc.dot(Field::memory),
+                            "(%s) has an external handleType of %s which does not include at least one "
+                            "handle from VkTensorARM (%s) handleType %s.",
+                            FormatHandle(bind_info.memory).c_str(),
+                            string_VkExternalMemoryHandleTypeFlags(mem_info->export_handle_types).c_str(),
+                            FormatHandle(bind_info.tensor).c_str(),
+                            string_VkExternalMemoryHandleTypeFlags(tensor_state->external_memory_handle_types).c_str());
+        }
+
+        // Validate import memory handles
+        if (mem_info->IsImportAHB()) {
+            skip |= ValidateTensorImportedHandleANDROID(tensor_state->external_memory_handle_types, bind_info.memory, bind_info.tensor, bind_info_loc);
+        } else if (mem_info->IsImport()) {
+            if ((mem_info->import_handle_type.value() & tensor_state->external_memory_handle_types) == 0) {
+                const LogObjectList objlist(bind_info.tensor, bind_info.memory);
+                skip |= LogError("VUID-VkBindTensorMemoryInfoARM-memory-09896", objlist, bind_info_loc.dot(Field::memory),
+                                "(%s) was created with an import operation with handleType of %s which "
+                                "is not set in VkExternalMemoryTensorCreateInfoARM::handleTypes (%s) for (%s)",
+                                FormatHandle(bind_info.memory).c_str(),
+                                string_VkExternalMemoryHandleTypeFlagBits(mem_info->import_handle_type.value()),
+                                string_VkExternalMemoryHandleTypeFlags(tensor_state->external_memory_handle_types).c_str(),
+                                FormatHandle(bind_info.tensor).c_str());
+            }
+            // Check if buffer can be bound to memory imported from specific handle type
+            if (!HasExternalMemoryImportSupport(*tensor_state, mem_info->import_handle_type.value())) {
+                const LogObjectList objlist(bind_info.tensor, bind_info.memory);
+                skip |= LogError(
+                    "VUID-VkImportMemoryWin32HandleInfoKHR-handleType-09861", objlist, bind_info_loc.dot(Field::memory),
+                    "(%s) was imported from handleType %s but VkExternalTensorProperties does not report it as importable.",
+                    FormatHandle(bind_info.memory).c_str(), string_VkExternalMemoryHandleTypeFlagBits(mem_info->import_handle_type.value()));
+            }
+        }
+    }
+    return skip;
+}
+
 bool CoreChecks::ValidateBindImageMemory(uint32_t bindInfoCount, const VkBindImageMemoryInfo *pBindInfos,
                                          const ErrorObject &error_obj) const {
     bool skip = false;
@@ -1687,7 +1729,7 @@ bool CoreChecks::ValidateBindImageMemory(uint32_t bindInfoCount, const VkBindIma
                     // since its a non-disjoint image, finding VkImage in map is a duplicate
                     auto it = resources_bound.find(image_state->VkHandle());
                     if (it == resources_bound.end()) {
-                        std::array<uint32_t, 3> bound_index = {i, vvl::kU32Max, vvl::kU32Max};
+                        std::array<uint32_t, 3> bound_index = {i, vvl::kNoIndex32, vvl::kNoIndex32};
                         resources_bound.emplace(image_state->VkHandle(), bound_index);
                     } else {
                         const LogObjectList objlist(bind_info.image, bind_info.memory);
@@ -1741,11 +1783,11 @@ bool CoreChecks::ValidateBindImageMemory(uint32_t bindInfoCount, const VkBindIma
 
                 auto it = resources_bound.find(image_state->VkHandle());
                 if (it == resources_bound.end()) {
-                    std::array<uint32_t, 3> bound_index = {vvl::kU32Max, vvl::kU32Max, vvl::kU32Max};
+                    std::array<uint32_t, 3> bound_index = {vvl::kNoIndex32, vvl::kNoIndex32, vvl::kNoIndex32};
                     bound_index[plane] = i;
                     resources_bound.emplace(image_state->VkHandle(), bound_index);
                 } else {
-                    if (it->second[plane] == vvl::kU32Max) {
+                    if (it->second[plane] == vvl::kNoIndex32) {
                         it->second[plane] = i;
                     } else {
                         const LogObjectList objlist(bind_info.image, bind_info.memory);
@@ -1762,7 +1804,8 @@ bool CoreChecks::ValidateBindImageMemory(uint32_t bindInfoCount, const VkBindIma
                 // if memory is exported to an AHB then the mem_info->allocationSize must be zero and this check is not needed
                 if ((mem_info->IsExport() == false) ||
                     ((mem_info->export_handle_types & VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID) == 0)) {
-                    skip |= ValidateInsertImageMemoryRange(bind_info.image, *mem_info, bind_info.memoryOffset, loc);
+                    skip |= ValidateInsertMemoryRange(VulkanTypedHandle(bind_info.image, kVulkanObjectTypeImage), *mem_info,
+                                                      bind_info.memoryOffset, loc);
                 }
 
                 // Validate dedicated allocation
@@ -1825,30 +1868,38 @@ bool CoreChecks::ValidateBindImageMemory(uint32_t bindInfoCount, const VkBindIma
                         }
                     }
                 }
+                const VkBuffer dedicated_buffer = mem_info->GetDedicatedBuffer();
+                if (dedicated_buffer != VK_NULL_HANDLE) {
+                    const LogObjectList objlist(bind_info.image, bind_info.memory);
+                    skip |= LogError("VUID-vkBindImageMemory-memory-10926", objlist,
+                                     loc.pNext(Struct::VkMemoryDedicatedAllocateInfo, Field::pNext).dot(Field::buffer),
+                                     "is %s (not VK_NULL_HANDLE), but VkBindImageMemoryInfo::image is %s.",
+                                     FormatHandle(dedicated_buffer).c_str(), FormatHandle(bind_info.image).c_str());
+                }
 
                 auto chained_flags_struct = vku::FindStructInPNextChain<VkMemoryAllocateFlagsInfo>(mem_info->allocate_info.pNext);
                 const VkMemoryAllocateFlags memory_allocate_flags = chained_flags_struct ? chained_flags_struct->flags : 0;
-                if ((image_state->create_info.flags & VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT) &&
-                    !(memory_allocate_flags & VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT)) {
-                    const char *vuid = bind_image_mem_2 ? "VUID-VkBindImageMemoryInfo-descriptorBufferCaptureReplay-08113"
-                                                        : "VUID-vkBindImageMemory-descriptorBufferCaptureReplay-08113";
-                    const LogObjectList objlist(bind_info.image, bind_info.memory);
-                    skip |= LogError(vuid, objlist, loc.dot(Field::image),
-                                     "was created with the VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT bit set,"
-                                     "but the bound memory was allocated with %s and needs "
-                                     "VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT.",
-                                     string_VkMemoryAllocateFlags(memory_allocate_flags).c_str());
-                }
-                if ((image_state->create_info.flags & VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT) &&
-                    !(memory_allocate_flags & VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT)) {
-                    const char *vuid =
-                        bind_image_mem_2 ? "VUID-VkBindImageMemoryInfo-image-09202" : "VUID-vkBindImageMemory-image-09202";
-                    const LogObjectList objlist(bind_info.image, bind_info.memory);
-                    skip |= LogError(vuid, objlist, loc.dot(Field::image),
-                                     "was created with the VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT bit set,"
-                                     "but the bound memory was allocated with %s and needs "
-                                     "VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT.",
-                                     string_VkMemoryAllocateFlags(memory_allocate_flags).c_str());
+                if (image_state->create_info.flags & VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT) {
+                    if ((memory_allocate_flags & VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT) == 0) {
+                        const char *vuid = bind_image_mem_2 ? "VUID-VkBindImageMemoryInfo-descriptorBufferCaptureReplay-08113"
+                                                            : "VUID-vkBindImageMemory-descriptorBufferCaptureReplay-08113";
+                        const LogObjectList objlist(bind_info.image, bind_info.memory);
+                        skip |= LogError(vuid, objlist, loc.dot(Field::image),
+                                         "was created with the VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT bit set, "
+                                         "but the bound memory was allocated with %s and needs "
+                                         "VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT.",
+                                         string_VkMemoryAllocateFlags(memory_allocate_flags).c_str());
+                    }
+                    if ((memory_allocate_flags & VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT) == 0) {
+                        const char *vuid =
+                            bind_image_mem_2 ? "VUID-VkBindImageMemoryInfo-image-09202" : "VUID-vkBindImageMemory-image-09202";
+                        const LogObjectList objlist(bind_info.image, bind_info.memory);
+                        skip |= LogError(vuid, objlist, loc.dot(Field::image),
+                                         "was created with the VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT bit set, "
+                                         "but the bound memory was allocated with %s and needs "
+                                         "VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT.",
+                                         string_VkMemoryAllocateFlags(memory_allocate_flags).c_str());
+                    }
                 }
 
                 // Validate export memory handles
@@ -2051,8 +2102,7 @@ bool CoreChecks::ValidateBindImageMemory(uint32_t bindInfoCount, const VkBindIma
                                          swapchain_info->imageIndex, FormatHandle(swapchain_info->swapchain).c_str(),
                                          swapchain_state->images.size());
                     }
-                    if (IsExtEnabled(extensions.vk_ext_swapchain_maintenance1) &&
-                        (swapchain_state->create_info.flags & VK_SWAPCHAIN_CREATE_DEFERRED_MEMORY_ALLOCATION_BIT_EXT)) {
+                    if (swapchain_state->create_info.flags & VK_SWAPCHAIN_CREATE_DEFERRED_MEMORY_ALLOCATION_BIT_EXT) {
                         if (swapchain_state->images[swapchain_info->imageIndex].acquired == false) {
                             const LogObjectList objlist(bind_info.image, bind_info.memory);
                             skip |= LogError("VUID-VkBindImageMemorySwapchainInfoKHR-swapchain-07756", objlist,
@@ -2171,9 +2221,10 @@ bool CoreChecks::ValidateBindImageMemory(uint32_t bindInfoCount, const VkBindIma
         if (image_state && image_state->disjoint == true && !is_drm) {
             uint32_t total_planes = vkuFormatPlaneCount(image_state->create_info.format);
             for (uint32_t i = 0; i < total_planes; i++) {
-                if (resource.second[i] == vvl::kU32Max) {
+                if (resource.second[i] == vvl::kNoIndex32) {
                     skip |= LogError("VUID-vkBindImageMemory2-pBindInfos-02858", resource.first, error_obj.location,
-                                     "Plane %u of the disjoint image was not bound. All %d planes need to bound individually "
+                                     "Plane %" PRIu32
+                                     " of the disjoint image was not bound. All %d planes need to bound individually "
                                      "in separate pBindInfos in a single call.",
                                      i, total_planes);
                 }
@@ -2468,8 +2519,15 @@ bool CoreChecks::ValidateSparseImageMemoryBind(vvl::Image const *image_state, Vk
     skip |=
         ValidateImageSubresourceSparseImageMemoryBind(*image_state, bind.subresource, bind_loc, memory_loc.dot(Field::subresource));
 
-    for (auto const &requirements : image_state->sparse_requirements) {
-        VkExtent3D const &granularity = requirements.formatProperties.imageGranularity;
+    const VkSparseImageMemoryRequirements *requirements = nullptr;
+    for (size_t memoryReqNdx = 0; memoryReqNdx < image_state->sparse_requirements.size(); ++memoryReqNdx) {
+        if (image_state->sparse_requirements[memoryReqNdx].formatProperties.aspectMask & bind.subresource.aspectMask) {
+            requirements = &image_state->sparse_requirements[memoryReqNdx];
+            break;
+        }
+    }
+    if (requirements) {
+        VkExtent3D const &granularity = requirements->formatProperties.imageGranularity;
         if (SafeModulo(bind.offset.x, granularity.width) != 0) {
             skip |= LogError("VUID-VkSparseImageMemoryBind-offset-01107", image_state->Handle(),
                              bind_loc.dot(Field::offset).dot(Field::x),
@@ -2665,6 +2723,123 @@ bool CoreChecks::ValidateMemoryIsBoundToBuffer(LogObjectList objlist, const vvl:
     if (!buffer_state.sparse) {
         objlist.add(buffer_state.Handle());
         skip |= VerifyBoundMemoryIsValid(buffer_state.MemoryState(), objlist, buffer_state.Handle(), buffer_loc, vuid);
+    }
+    return skip;
+}
+
+// Used when only need to check a VkDeviceAddress is tied to a VkBuffer
+bool CoreChecks::ValidateDeviceAddress(const Location &device_address_loc, const LogObjectList &objlist,
+                                       VkDeviceAddress device_address) const {
+    BufferAddressValidation<0> buffer_address_validator = {};
+    return buffer_address_validator.ValidateDeviceAddress(*this, device_address_loc, objlist, device_address);
+}
+
+bool CoreChecks::PreCallValidateBindTensorMemoryARM(VkDevice device, uint32_t bindInfoCount,
+                                                    const VkBindTensorMemoryInfoARM *pBindInfos,
+                                                    const ErrorObject &error_obj) const {
+    bool skip = false;
+    skip |= ValidateBindTensorMemoryARM(bindInfoCount, pBindInfos, error_obj);
+    return skip;
+}
+
+bool CoreChecks::ValidateBindDataGraphPipelineSessionMemoryARM(const VkBindDataGraphPipelineSessionMemoryInfoARM &bind_info,
+                                                               const Location &bind_info_loc) const {
+    bool skip = false;
+    auto session_state = Get<vvl::DataGraphPipelineSession>(bind_info.session);
+    ASSERT_AND_RETURN_SKIP(session_state);
+    const LogObjectList objlist(bind_info.session, bind_info.memory);
+
+    const auto& bp_requirements = session_state->BindPointReqs();
+    const auto bpr_match = std::find_if(bp_requirements.begin(), bp_requirements.end(), [bind_info](const VkDataGraphPipelineSessionBindPointRequirementARM& bpr) {
+        return bpr.bindPoint == bind_info.bindPoint;
+    });
+    if (bpr_match == bp_requirements.end()) {
+        std::stringstream required_bindpoints;
+        for (auto &bpr : bp_requirements) {
+            if (!required_bindpoints.str().empty()) {
+                required_bindpoints << ", ";
+            }
+            required_bindpoints << string_VkDataGraphPipelineSessionBindPointARM(bpr.bindPoint);
+        }
+        skip |= LogError("VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-bindPoint-09786", objlist,
+                         bind_info_loc.dot(Field::bindPoint), "bindPoint (%s) not found in requirements (%s).",
+                         string_VkDataGraphPipelineSessionBindPointARM(bind_info.bindPoint), required_bindpoints.str().c_str());
+    } else {
+        if (bind_info.objectIndex > bpr_match->numObjects) {
+            skip |=
+                LogError("VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-objectIndex-09805", objlist,
+                         bind_info_loc.dot(Field::objectIndex),
+                         "(%" PRIu32 ") is greater than numObjects (%" PRIu32 ") defined for bindPoint (%s)", bind_info.objectIndex,
+                         bpr_match->numObjects, string_VkDataGraphPipelineSessionBindPointARM(bind_info.bindPoint));
+        }
+    }
+
+    /* no point continuing if the bindpoint isn't valid: either not found or the index will cause a buffer overrun later on */
+    if (skip) {
+        return true;
+    }
+
+    const auto& mem_reqs_map = session_state->MemReqsMap();
+    const auto &bound_memory_map = session_state->BoundMemoryMap();
+    if (bound_memory_map.find(bind_info.bindPoint) != bound_memory_map.end()) {
+        for (const auto &bound_mem : bound_memory_map.at(bind_info.bindPoint)) {
+            if (bound_mem.memory_state->VkHandle() == bind_info.memory) {
+                skip |= LogError(
+                    "VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-session-09785", objlist, bind_info_loc.dot(Field::bindPoint),
+                    "attempting to bind %s to %s which has already been bound to %s.", FormatHandle(bind_info.memory).c_str(),
+                    FormatHandle(session_state->Handle()).c_str(), FormatHandle(bound_mem.memory_state->Handle()).c_str());
+            }
+        }
+    }
+
+    auto mem_info = Get<vvl::DeviceMemory>(bind_info.memory);
+    ASSERT_AND_RETURN_SKIP(mem_info);
+    skip |= ValidateInsertMemoryRange(VulkanTypedHandle(bind_info.session, kVulkanObjectTypeDataGraphPipelineSessionARM), *mem_info,
+                                      bind_info.memoryOffset, bind_info_loc.dot(Field::memoryOffset));
+    if (mem_reqs_map.find(bind_info.bindPoint) != mem_reqs_map.end()) {
+        const auto &mem_reqs = mem_reqs_map.at(bind_info.bindPoint)[bind_info.objectIndex];
+        skip |= ValidateMemoryTypes(*mem_info, mem_reqs.memoryTypeBits, bind_info_loc.dot(Field::session),
+                                    "VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-memory-09788");
+        if (SafeModulo(bind_info.memoryOffset, mem_reqs.alignment) != 0) {
+            skip |= LogError("VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-memoryOffset-09789", objlist,
+                             bind_info_loc.dot(Field::memoryOffset),
+                             "(%" PRIu64 ") must be an integer multiple of the alignment member (%" PRIu64
+                             ") of the VkMemoryRequirements structure returned from a call to "
+                             "vkGetDataGraphPipelineSessionMemoryRequirementsARM with session",
+                             bind_info.memoryOffset, mem_reqs.alignment);
+        }
+        if (mem_reqs.size > (mem_info->allocate_info.allocationSize - bind_info.memoryOffset)) {
+            skip |= LogError(
+                "VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-size-09790", objlist, bind_info_loc.dot(Field::allocationSize),
+                "(%" PRIu64 ") minus memoryOffset (%" PRIu64 ") is less than VkMemoryRequirements::size (%" PRIu64 ").",
+                mem_info->allocate_info.allocationSize, bind_info.memoryOffset, mem_reqs.size);
+        }
+    }
+
+    // Validate compatible protected session and memory
+    if (!session_state->Unprotected() && mem_info->unprotected) {
+        const char *vuid = "VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-session-09791";
+        skip |= LogError(vuid, objlist, bind_info_loc.dot(Field::memory),
+                         "(%s) was not created with protected memory but the VkDataGraphPipelineSessionARM (%s) was "
+                         "set to use protected memory.",
+                         FormatHandle(bind_info.memory).c_str(), FormatHandle(bind_info.session).c_str());
+    } else if (session_state->Unprotected() && !mem_info->unprotected) {
+        const char *vuid = "VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-session-09792";
+        skip |= LogError(vuid, objlist, bind_info_loc.dot(Field::memory),
+                         "(%s) was created with protected memory but the VkDataGraphPipelineSessionARM (%s) was not "
+                         "set to use protected memory.",
+                         FormatHandle(bind_info.memory).c_str(), FormatHandle(bind_info.session).c_str());
+    }
+
+    return skip;
+}
+
+bool CoreChecks::PreCallValidateBindDataGraphPipelineSessionMemoryARM(VkDevice device, uint32_t bindInfoCount,
+                                                                      const VkBindDataGraphPipelineSessionMemoryInfoARM *pBindInfos,
+                                                                      const ErrorObject &error_obj) const {
+    bool skip = false;
+    for (uint32_t i = 0; i < bindInfoCount; i++) {
+        skip |= ValidateBindDataGraphPipelineSessionMemoryARM(pBindInfos[i], error_obj.location.dot(Field::pBindInfos, i));
     }
     return skip;
 }

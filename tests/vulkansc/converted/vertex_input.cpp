@@ -612,9 +612,20 @@ TEST_F(NegativeVertexInput, ProvokingVertexModePerPipeline) {
 }
 
 TEST_F(NegativeVertexInput, VertextBinding) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Verify if VkPipelineVertexInputStateCreateInfo matches vkCmdBindVertexBuffers");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    const char *vs_source = R"glsl(
+        #version 450
+        layout(location=0) in vec4 x;
+        layout(location=1) in vec4 y;
+        layout(location=2) in vec4 z;
+        void main(){}
+    )glsl";
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     vkt::Buffer vtx_buf(*m_device, 32, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -629,6 +640,7 @@ TEST_F(NegativeVertexInput, VertextBinding) {
     pipe.vi_ci_.pVertexBindingDescriptions = vtx_binding_des;
     pipe.vi_ci_.vertexAttributeDescriptionCount = 3;
     pipe.vi_ci_.pVertexAttributeDescriptions = vtx_attri_des;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -648,10 +660,20 @@ TEST_F(NegativeVertexInput, VertextBinding) {
 }
 
 TEST_F(NegativeVertexInput, VertextBindingNonLinear) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have Binding not be in a linear order");
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    const char *vs_source = R"glsl(
+        #version 450
+        layout(location=0) in vec4 x;
+        layout(location=1) in vec4 y;
+        layout(location=2) in vec4 z;
+        void main(){}
+    )glsl";
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     vkt::Buffer vtx_buf(*m_device, 32, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -665,6 +687,7 @@ TEST_F(NegativeVertexInput, VertextBindingNonLinear) {
     pipe.vi_ci_.pVertexBindingDescriptions = vtx_binding_des;
     pipe.vi_ci_.vertexAttributeDescriptionCount = 3;
     pipe.vi_ci_.pVertexAttributeDescriptions = vtx_attri_des;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -683,7 +706,53 @@ TEST_F(NegativeVertexInput, VertextBindingNonLinear) {
     m_command_buffer.End();
 }
 
+TEST_F(NegativeVertexInput, VertextBindingMultipleLocations) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const char *vs_source = R"glsl(
+        #version 450
+        layout(location=0) in vec4 x;
+        layout(location=1) in vec4 y;
+        layout(location=2) in vec4 z;
+        void main(){}
+    )glsl";
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    vkt::Buffer vtx_buf(*m_device, 32, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    VkVertexInputBindingDescription vtx_binding_des[2] = {{0, 0, VK_VERTEX_INPUT_RATE_VERTEX}, {1, 0, VK_VERTEX_INPUT_RATE_VERTEX}};
+
+    VkVertexInputAttributeDescription vtx_attri_des[3] = {
+        {0, 1, VK_FORMAT_R8G8B8A8_UNORM, 0}, {1, 1, VK_FORMAT_R8G8B8A8_UNORM, 0}, {2, 1, VK_FORMAT_R8G8B8A8_UNORM, 0}};
+    pipe.vi_ci_.vertexBindingDescriptionCount = 2;
+    pipe.vi_ci_.pVertexBindingDescriptions = vtx_binding_des;
+    pipe.vi_ci_.vertexAttributeDescriptionCount = 3;
+    pipe.vi_ci_.pVertexAttributeDescriptions = vtx_attri_des;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    VkDeviceSize offset = 0;
+    // Forget to update binding 1
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vtx_buf.handle(), &offset);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04007");
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeVertexInput, VertextBindingDynamicState) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test bad binding with VK_DYNAMIC_STATE_VERTEX_INPUT_EXT");
     AddRequiredExtensions(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::vertexInputDynamicState);
@@ -691,8 +760,18 @@ TEST_F(NegativeVertexInput, VertextBindingDynamicState) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
+    const char *vs_source = R"glsl(
+        #version 450
+        layout(location=1) in vec4 x;
+        layout(location=2) in vec4 y;
+        layout(location=3) in vec4 z;
+        void main(){}
+    )glsl";
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -736,6 +815,9 @@ TEST_F(NegativeVertexInput, VertextBindingDynamicState) {
 }
 
 TEST_F(NegativeVertexInput, AttributeAlignment) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Check for proper aligment of attribAddress which depends on a bound pipeline and on a bound vertex buffer");
 
     RETURN_IF_SKIP(Init());
@@ -775,7 +857,7 @@ TEST_F(NegativeVertexInput, AttributeAlignment) {
     input_attribs[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
     input_attribs[2].offset = offsetof(VboEntry, input2);
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location = 0) in vec2 input0;
         layout(location = 1) in vec4 input1;
@@ -835,10 +917,21 @@ TEST_F(NegativeVertexInput, AttributeAlignment) {
 }
 
 TEST_F(NegativeVertexInput, BindVertexOffset) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("set the pOffset in vkCmdBindVertexBuffers to 3 and use R16");
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    const char *vsSource = R"glsl(
+        #version 450
+        layout(location = 0) in float x;
+        void main(){
+           gl_Position = vec4(0);
+        }
+    )glsl";
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     vkt::Buffer vtx_buf(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -850,6 +943,7 @@ TEST_F(NegativeVertexInput, BindVertexOffset) {
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
     pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
     pipe.vi_ci_.pVertexAttributeDescriptions = &input_attribs;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -867,10 +961,21 @@ TEST_F(NegativeVertexInput, BindVertexOffset) {
 }
 
 TEST_F(NegativeVertexInput, VertexStride) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("set the Stride to 3 and use R16");
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    const char *vsSource = R"glsl(
+        #version 450
+        layout(location = 0) in float x;
+        void main(){
+           gl_Position = vec4(0);
+        }
+    )glsl";
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     vkt::Buffer vtx_buf(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -882,6 +987,7 @@ TEST_F(NegativeVertexInput, VertexStride) {
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
     pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
     pipe.vi_ci_.pVertexAttributeDescriptions = &input_attribs;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -899,15 +1005,27 @@ TEST_F(NegativeVertexInput, VertexStride) {
 }
 
 TEST_F(NegativeVertexInput, VertexStrideDynamicInput) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("set the Stride to 3 in VK_DYNAMIC_STATE_VERTEX_INPUT_EXT and use R16");
     AddRequiredExtensions(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::vertexInputDynamicState);
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
+    const char *vsSource = R"glsl(
+        #version 450
+        layout(location = 0) in float x;
+        void main(){
+           gl_Position = vec4(0);
+        }
+    )glsl";
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -939,12 +1057,23 @@ TEST_F(NegativeVertexInput, VertexStrideDynamicInput) {
 }
 
 TEST_F(NegativeVertexInput, VertexStrideDynamicStride) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("set the Stride to 3 in vkCmdBindVertexBuffers2 and use R16");
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::extendedDynamicState);
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    const char *vsSource = R"glsl(
+        #version 450
+        layout(location = 0) in float x;
+        void main(){
+           gl_Position = vec4(0);
+        }
+    )glsl";
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -958,6 +1087,7 @@ TEST_F(NegativeVertexInput, VertexStrideDynamicStride) {
     pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
     pipe.vi_ci_.pVertexAttributeDescriptions = &attributes;
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -976,12 +1106,24 @@ TEST_F(NegativeVertexInput, VertexStrideDynamicStride) {
 }
 
 TEST_F(NegativeVertexInput, VertexStrideDynamicStrideArray) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("set the Stride to 3 in vkCmdBindVertexBuffers2 and use R16");
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::extendedDynamicState);
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    const char *vsSource = R"glsl(
+        #version 450
+        layout(location = 0) in float x;
+        layout(location = 1) in float y;
+        void main(){
+           gl_Position = vec4(0);
+        }
+    )glsl";
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -995,6 +1137,7 @@ TEST_F(NegativeVertexInput, VertexStrideDynamicStrideArray) {
     pipe.vi_ci_.vertexAttributeDescriptionCount = 2;
     pipe.vi_ci_.pVertexAttributeDescriptions = attributes;
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -1014,18 +1157,30 @@ TEST_F(NegativeVertexInput, VertexStrideDynamicStrideArray) {
 }
 
 TEST_F(NegativeVertexInput, VertexStrideDoubleDynamicStride) {
+    // TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured
+    // upstream validation code
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("set the Stride to invalid, then valid");
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::vertexInputDynamicState);
     AddRequiredFeature(vkt::Feature::extendedDynamicState);
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    const char *vsSource = R"glsl(
+        #version 450
+        layout(location = 0) in float x;
+        void main(){
+           gl_Position = vec4(0);
+        }
+    )glsl";
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -1123,7 +1278,7 @@ TEST_F(NegativeVertexInput, AttributeNotProvided) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in vec4 x; /* not provided */
         void main(){
@@ -1154,7 +1309,7 @@ TEST_F(NegativeVertexInput, AttributeTypeMismatch) {
     memset(&input_attrib, 0, sizeof(input_attrib));
     input_attrib.format = VK_FORMAT_R32_SFLOAT;
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in int x; /* attrib provided float */
         void main(){
@@ -1193,7 +1348,7 @@ TEST_F(NegativeVertexInput, AttributeStructTypeFirstLocation) {
     //         layout(location = 4) vec4 x;
     //         layout(location = 6) uvec4 y;
     //     } x_struct;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical Simple
                OpEntryPoint Vertex %1 "main" %2
@@ -1249,7 +1404,7 @@ TEST_F(NegativeVertexInput, AttributeStructTypeSecondLocation) {
     //         layout(location = 4) ivec4 x;
     //         layout(location = 6) uvec4 y;
     //     } x_struct;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical Simple
                OpEntryPoint Vertex %1 "main" %2
@@ -1304,7 +1459,7 @@ TEST_F(NegativeVertexInput, AttributeStructTypeBlockLocation) {
     //         vec4 x;
     //         uvec4 y;
     //     } x_struct;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical Simple
                OpEntryPoint Vertex %1 "main" %2
@@ -1350,7 +1505,7 @@ TEST_F(NegativeVertexInput, AttributeTypeMismatchDynamic) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in int x; /* attrib provided float */
         void main(){
@@ -1404,7 +1559,7 @@ TEST_F(NegativeVertexInput, AttributeBindingConflict) {
     memset(&input_attrib, 0, sizeof(input_attrib));
     input_attrib.format = VK_FORMAT_R32_SFLOAT;
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in float x; /* attrib provided float */
         void main(){
@@ -1439,7 +1594,7 @@ TEST_F(NegativeVertexInput, Attribute64bitInputAttribute) {
         GTEST_SKIP() << "Format not supported for Vertex Buffer";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450 core
         layout(location = 0) in float pos; // 32-bit
         void main() {}
@@ -1475,7 +1630,7 @@ TEST_F(NegativeVertexInput, Attribute64bitShaderInput) {
         GTEST_SKIP() << "Format not supported for Vertex Buffer";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450 core
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
         layout(location = 0) in float64_t pos;
@@ -1512,7 +1667,7 @@ TEST_F(NegativeVertexInput, Attribute64bitUnusedComponent) {
         GTEST_SKIP() << "Format not supported for Vertex Buffer";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450 core
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
         layout(location = 0) in f64vec2 pos;
@@ -1562,7 +1717,7 @@ TEST_F(NegativeVertexInput, AttributeStructTypeBlockLocation64bit) {
     //         float64 y;
     //         ivec4 z;
     //     } x_struct;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpCapability Float64
                OpMemoryModel Logical Simple
@@ -1724,11 +1879,20 @@ TEST_F(NegativeVertexInput, BindVertexBufferNull) {
 }
 
 TEST_F(NegativeVertexInput, NoBoundVertexBuffer) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     // Even with nullDescriptor a buffer must be bound
     AddRequiredFeature(vkt::Feature::nullDescriptor);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    const char *vs_source = R"glsl(
+        #version 450
+        layout(location=0) in vec4 x;
+        void main(){}
+    )glsl";
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     // binding at index 1
@@ -1738,6 +1902,7 @@ TEST_F(NegativeVertexInput, NoBoundVertexBuffer) {
     pipe.vi_ci_.pVertexBindingDescriptions = &bindings;
     pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
     pipe.vi_ci_.pVertexAttributeDescriptions = &attributes;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -1771,7 +1936,7 @@ TEST_F(NegativeVertexInput, VertexBufferDestroyed) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     VkDeviceSize offset = 0;
     vk::CmdBindVertexBuffers(m_command_buffer, 1, 1, &buffer.handle(), &offset);
-    buffer.destroy();
+    buffer.Destroy();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-commandBuffer-recording");
     vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
@@ -1787,7 +1952,7 @@ TEST_F(NegativeVertexInput, ResetCmdSetVertexInput) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         layout(location=0) in uvec4 x;
         void main(){}
@@ -1837,7 +2002,7 @@ TEST_F(NegativeVertexInput, VertexInputRebinding) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location = 0) in float a;
         layout(location = 1) in float b;

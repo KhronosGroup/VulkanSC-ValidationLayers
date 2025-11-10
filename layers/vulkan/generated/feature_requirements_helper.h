@@ -122,6 +122,10 @@ enum class Feature {
     cooperativeVector,
     // VkPhysicalDeviceCooperativeVectorFeaturesNV
     cooperativeVectorTraining,
+    // VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR
+    indirectMemoryCopy,
+    // VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR
+    indirectMemoryToImageCopy,
     // VkPhysicalDeviceCopyMemoryIndirectFeaturesNV
     indirectCopy,
     // VkPhysicalDeviceCornerSampledImageFeaturesNV
@@ -150,6 +154,8 @@ enum class Feature {
     dataGraphUpdateAfterBind,
     // VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV
     dedicatedAllocationImageAliasing,
+    // VkPhysicalDeviceDenseGeometryFormatFeaturesAMDX
+    denseGeometryFormat,
     // VkPhysicalDeviceDepthBiasControlFeaturesEXT
     depthBiasControl,
     // VkPhysicalDeviceDepthBiasControlFeaturesEXT
@@ -536,6 +542,8 @@ enum class Feature {
     stippledSmoothLines,
     // VkPhysicalDeviceLinearColorAttachmentFeaturesNV
     linearColorAttachment,
+    // VkPhysicalDeviceMaintenance10FeaturesKHR
+    maintenance10,
     // VkPhysicalDeviceMaintenance4Features, VkPhysicalDeviceVulkan13Features
     maintenance4,
     // VkPhysicalDeviceMaintenance5Features, VkPhysicalDeviceVulkan14Features
@@ -554,7 +562,7 @@ enum class Feature {
     memoryMapRangePlaced,
     // VkPhysicalDeviceMapMemoryPlacedFeaturesEXT
     memoryUnmapReserve,
-    // VkPhysicalDeviceMemoryDecompressionFeaturesNV
+    // VkPhysicalDeviceMemoryDecompressionFeaturesEXT
     memoryDecompression,
     // VkPhysicalDeviceMemoryPriorityFeaturesEXT
     memoryPriority,
@@ -614,6 +622,8 @@ enum class Feature {
     performanceCounterQueryPools,
     // VkPhysicalDevicePipelineBinaryFeaturesKHR
     pipelineBinaries,
+    // VkPhysicalDevicePipelineCacheIncrementalModeFeaturesSEC
+    pipelineCacheIncrementalMode,
     // VkPhysicalDevicePipelineCreationCacheControlFeatures, VkPhysicalDeviceVulkan13Features
     pipelineCreationCacheControl,
     // VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR
@@ -666,7 +676,7 @@ enum class Feature {
     presentId,
     // VkPhysicalDevicePresentMeteringFeaturesNV
     presentMetering,
-    // VkPhysicalDevicePresentModeFifoLatestReadyFeaturesEXT
+    // VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR
     presentModeFifoLatestReady,
     // VkPhysicalDevicePresentWait2FeaturesKHR
     presentWait2,
@@ -750,6 +760,8 @@ enum class Feature {
     schedulingControls,
     // VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures, VkPhysicalDeviceVulkan12Features
     separateDepthStencilLayouts,
+    // VkPhysicalDeviceShader64BitIndexingFeaturesEXT
+    shader64BitIndexing,
     // VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV
     shaderFloat16VectorAtomics,
     // VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT
@@ -838,6 +850,12 @@ enum class Feature {
     shaderFloat8CooperativeMatrix,
     // VkPhysicalDeviceShaderFloatControls2Features, VkPhysicalDeviceVulkan14Features
     shaderFloatControls2,
+    // VkPhysicalDeviceShaderFmaFeaturesKHR
+    shaderFmaFloat16,
+    // VkPhysicalDeviceShaderFmaFeaturesKHR
+    shaderFmaFloat32,
+    // VkPhysicalDeviceShaderFmaFeaturesKHR
+    shaderFmaFloat64,
     // VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT
     shaderImageInt64Atomics,
     // VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT
@@ -878,6 +896,10 @@ enum class Feature {
     shaderTileImageDepthReadAccess,
     // VkPhysicalDeviceShaderTileImageFeaturesEXT
     shaderTileImageStencilReadAccess,
+    // VkPhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT
+    shaderUniformBufferUnsizedArray,
+    // VkPhysicalDeviceShaderUntypedPointersFeaturesKHR
+    shaderUntypedPointers,
     // VkPhysicalDeviceShadingRateImageFeaturesNV
     shadingRateCoarseSampleOrder,
     // VkPhysicalDeviceShadingRateImageFeaturesNV
@@ -890,7 +912,7 @@ enum class Feature {
     subpassMergeFeedback,
     // VkPhysicalDeviceSubpassShadingFeaturesHUAWEI
     subpassShading,
-    // VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT
+    // VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR
     swapchainMaintenance1,
     // VkPhysicalDeviceSynchronization2Features, VkPhysicalDeviceVulkan13Features
     synchronization2,
@@ -970,8 +992,12 @@ enum class Feature {
     videoDecodeVP9,
     // VkPhysicalDeviceVideoEncodeAV1FeaturesKHR
     videoEncodeAV1,
+    // VkPhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR
+    videoEncodeIntraRefresh,
     // VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR
     videoEncodeQuantizationMap,
+    // VkPhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE
+    videoEncodeRgbConversion,
     // VkPhysicalDeviceVideoMaintenance1FeaturesKHR
     videoMaintenance1,
     // VkPhysicalDeviceVideoMaintenance2FeaturesKHR

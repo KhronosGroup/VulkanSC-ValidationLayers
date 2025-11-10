@@ -1,6 +1,7 @@
 /* Copyright (c) 2018-2025 The Khronos Group Inc.
  * Copyright (c) 2018-2025 Valve Corporation
  * Copyright (c) 2018-2025 LunarG, Inc.
+ * Copyright (c) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,14 +26,18 @@
 
 // We pull in most the core state tracking files
 // gpuav_state_trackers.h should NOT be included by any other header file
+
 #include "state_tracker/buffer_state.h"
-#include "state_tracker/image_state.h"
 #include "state_tracker/cmd_buffer_state.h"
-#include "state_tracker/queue_state.h"
-#include "state_tracker/sampler_state.h"
-#include "state_tracker/ray_tracing_state.h"
-#include "state_tracker/shader_object_state.h"
+#include "state_tracker/image_state.h"
+#include "state_tracker/pipeline_state.h"
 #include "state_tracker/push_constant_data.h"
+#include "state_tracker/queue_state.h"
+#include "state_tracker/ray_tracing_state.h"
+#include "state_tracker/sampler_state.h"
+#include "state_tracker/shader_object_state.h"
+#include "state_tracker/tensor_state.h"
+#include "state_tracker/descriptor_mode.h"
 
 namespace gpuav {
 
@@ -43,24 +48,28 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
   public:
     struct LabelLogging {
         const std::vector<std::string> &initial_label_stack;
-        const vvl::unordered_map<uint32_t, uint32_t> &action_cmd_i_to_label_cmd_i_map;
     };
 
     using OnInstrumentionDescSetUpdate =
         stdext::inplace_function<void(CommandBufferSubState &cb, VkPipelineBindPoint bind_point,
                                       VkDescriptorBufferInfo &out_buffer_info, uint32_t &out_dst_binding),
                                  48>;
+    using OnInstrumentionDescBufferUpdate =
+        stdext::inplace_function<void(CommandBufferSubState &cb, VkPipelineBindPoint bind_point,
+                                      VkDescriptorAddressInfoEXT &out_address_info, uint32_t &out_dst_binding),
+                                 48>;
     using OnCommandBufferSubmission =
         stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, VkCommandBuffer per_submission_cb)>;
     using OnCommandBufferCompletion =
         stdext::inplace_function<bool(Validator &gpuav, CommandBufferSubState &cb,
-                                      const CommandBufferSubState::LabelLogging &label_logging, const Location &loc),
+                                      const CommandBufferSubState::LabelLogging &label_logging, const Location &submission_loc),
                                  64>;
     using OnPreCommandBufferSubmission =
         stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, VkCommandBuffer per_pre_submission_cb)>;
     using OnPostCommandBufferSubmission =
         stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, VkCommandBuffer per_post_submission_cb)>;
     std::vector<OnInstrumentionDescSetUpdate> on_instrumentation_desc_set_update_functions;
+    std::vector<OnInstrumentionDescBufferUpdate> on_instrumentation_desc_buffer_update_functions;
     std::vector<OnPreCommandBufferSubmission> on_pre_cb_submission_functions;
     std::vector<OnPostCommandBufferSubmission> on_post_cb_submission_functions;
     std::vector<OnCommandBufferCompletion> on_cb_completion_functions;
@@ -68,11 +77,11 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     vko::SharedResourcesCache shared_resources_cache;
 
     // Used to track which spot in the command buffer the error came from
-    bool max_actions_cmd_validation_reached_ = false;
     uint32_t draw_index = 0;
     uint32_t compute_index = 0;
     uint32_t trace_rays_index = 0;
-    uint32_t action_command_count = 0;
+    uint32_t GetActionCommandIndex(VkPipelineBindPoint bind_point) const;
+    void IncrementActionCommandCount(VkPipelineBindPoint bind_point);
 
     std::vector<PushConstantData> push_constant_data_chunks;
     std::array<VkPipelineLayout, vvl::BindPointCount> push_constant_latest_used_layout{};
@@ -101,31 +110,46 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
         return cmd_errors_counts_buffer_.VkHandle();
     }
 
-    void IncrementCommandCount(Validator &gpuav, VkPipelineBindPoint bind_point, const Location &loc);
-
     std::string GetDebugLabelRegion(uint32_t label_command_i, const std::vector<std::string> &initial_label_stack) const;
 
     void Destroy() final;
     void Reset(const Location &loc) final;
 
+    void RecordActionCommand(LastBound &last_bound, const Location &loc) final;
+    void UpdateLastBoundDescriptorSets(VkPipelineBindPoint bind_point, const Location &loc) final;
+
     void RecordPushConstants(VkPipelineLayout layout, VkShaderStageFlags stage_flags, uint32_t offset, uint32_t size,
                              const void *values) final;
     void ClearPushConstants() final;
 
+    void RecordEndRendering(const VkRenderingEndInfoEXT *pRenderingEndInfo) final;
+    void RecordEndRenderPass(const VkSubpassEndInfo *subpass_end_info, const Location &loc) final;
+
     vko::GpuResourcesManager gpu_resources_manager;
+
     // Using stdext::inplace_function over std::function to allocate memory in place
     using ErrorLoggerFunc =
-        stdext::inplace_function<bool(const uint32_t *error_record, const LogObjectList &objlist,
-                                      const std::vector<std::string> &initial_label_stack),
-                                 288 /*lambda storage size (bytes), large enough to store biggest error lambda*/>;
-    std::vector<ErrorLoggerFunc> per_command_error_loggers;
-    vvl::unordered_map<uint32_t, uint32_t> action_cmd_i_to_label_cmd_i_map;
+        stdext::inplace_function<bool(const uint32_t *error_record, const Location &loc_with_debug_region,
+                                      const LogObjectList &objlist),
+                                 248 /*lambda storage size (bytes), large enough to store biggest error lambda*/>;
+    struct CommandErrorLogger {
+        vvl::LocationCapture loc;
+        LogObjectList objlist;
+        ErrorLoggerFunc error_logger_func;
+        uint32_t label_cmd_i;
+    };
+    void AddCommandErrorLogger(const Location &loc, const LastBound *last_bound, ErrorLoggerFunc error_logger_func);
+    uint32_t GetErrorLoggerIndex() { return (uint32_t)command_error_loggers_.size(); }
+    const CommandErrorLogger &GetErrorLogger(uint32_t i) { return command_error_loggers_[i]; }
 
     // Buffer storing GPU-AV errors
     vko::BufferRange error_output_buffer_range_;
     // Buffer storing an error count per validated commands.
     // Used to limit the number of errors a single command can emit.
     vko::Buffer cmd_errors_counts_buffer_;
+
+    // Track which index we have bound our Descriptor Buffer in CmdBindDescriptorBuffersEXT
+    uint32_t resource_descriptor_buffer_index_;
 
   private:
     void AllocateResources(const Location &loc);
@@ -134,6 +158,7 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
 
     Validator &gpuav_;
     VkDescriptorSetLayout instrumentation_desc_set_layout_ = VK_NULL_HANDLE;
+    std::vector<CommandErrorLogger> command_error_loggers_;
 };
 
 static inline CommandBufferSubState &SubState(vvl::CommandBuffer &cb) {
@@ -294,6 +319,38 @@ static inline const AccelerationStructureKHRSubState &SubState(const vvl::Accele
     return *static_cast<const AccelerationStructureKHRSubState *>(obj.SubState(LayerObjectTypeGpuAssisted));
 }
 
+class TensorSubState : public vvl::TensorSubState {
+  public:
+    TensorSubState(vvl::Tensor &obj, DescriptorHeap &heap);
+    void Destroy() override;
+    void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
+
+    DescriptorId Id() const { return id_tracker ? id_tracker->id : 0; }
+    std::optional<DescriptorIdTracker> id_tracker;
+};
+static inline TensorSubState &SubState(vvl::Tensor &obj) {
+    return *static_cast<TensorSubState *>(obj.SubState(LayerObjectTypeGpuAssisted));
+}
+static inline const TensorSubState &SubState(const vvl::Tensor &obj) {
+    return *static_cast<const TensorSubState *>(obj.SubState(LayerObjectTypeGpuAssisted));
+}
+
+class TensorViewSubState : public vvl::TensorViewSubState {
+  public:
+    TensorViewSubState(vvl::TensorView &obj, DescriptorHeap &heap);
+    void Destroy() override;
+    void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
+
+    DescriptorId Id() const { return id_tracker ? id_tracker->id : 0; }
+    std::optional<DescriptorIdTracker> id_tracker;
+};
+static inline TensorViewSubState &SubState(vvl::TensorView &obj) {
+    return *static_cast<TensorViewSubState *>(obj.SubState(LayerObjectTypeGpuAssisted));
+}
+static inline const TensorViewSubState &SubState(const vvl::TensorView &obj) {
+    return *static_cast<const TensorViewSubState *>(obj.SubState(LayerObjectTypeGpuAssisted));
+}
+
 class ShaderObjectSubState : public vvl::ShaderObjectSubState {
   public:
     explicit ShaderObjectSubState(vvl::ShaderObject &obj);
@@ -310,6 +367,29 @@ static inline ShaderObjectSubState &SubState(vvl::ShaderObject &obj) {
 }
 static inline const ShaderObjectSubState &SubState(const vvl::ShaderObject &obj) {
     return *static_cast<const ShaderObjectSubState *>(obj.SubState(LayerObjectTypeGpuAssisted));
+}
+
+class PipelineSubState : public vvl::PipelineSubState {
+  public:
+    explicit PipelineSubState(Validator &gpuav, vvl::Pipeline &pipeline);
+
+    void Destroy() override;
+
+    VkPipelineLayout GetPipelineLayoutUnion(const Location &loc, vvl::DescriptorMode mode) const;
+
+  private:
+    // Multiple threads can record multiple commands using the same pipeline,
+    // so pipeline layout recreation has to be thread safe
+    mutable std::mutex recreated_layout_mutex{};
+    mutable VkPipelineLayout recreated_layout = VK_NULL_HANDLE;
+    Validator &gpuav_;
+};
+
+static inline PipelineSubState &SubState(vvl::Pipeline &pipeline) {
+    return *static_cast<PipelineSubState *>(pipeline.SubState(LayerObjectTypeGpuAssisted));
+}
+static inline const PipelineSubState &SubState(const vvl::Pipeline &pipeline) {
+    return *static_cast<const PipelineSubState *>(pipeline.SubState(LayerObjectTypeGpuAssisted));
 }
 
 }  // namespace gpuav

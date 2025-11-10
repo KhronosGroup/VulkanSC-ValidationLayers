@@ -14,6 +14,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
@@ -54,14 +55,12 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
     vk::DestroyShaderModule(device(), VK_NULL_HANDLE, NULL);
 
     VkCommandPool command_pool;
-    VkCommandPoolCreateInfo pool_create_info{};
-    pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    VkCommandPoolCreateInfo pool_create_info = vku::InitStructHelper();
     pool_create_info.queueFamilyIndex = m_device->graphics_queue_node_index_;
     pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     vk::CreateCommandPool(device(), &pool_create_info, nullptr, &command_pool);
     VkCommandBuffer command_buffers[3] = {};
-    VkCommandBufferAllocateInfo command_buffer_allocate_info{};
-    command_buffer_allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
     command_buffer_allocate_info.commandPool = command_pool;
     command_buffer_allocate_info.commandBufferCount = 1;
     command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -69,31 +68,19 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
     vk::FreeCommandBuffers(device(), command_pool, 3, command_buffers);
     vk::DestroyCommandPool(device(), command_pool, NULL);
 
-    VkDescriptorPoolSize ds_type_count = {};
-    ds_type_count.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    ds_type_count.descriptorCount = 1;
-
-    VkDescriptorPoolCreateInfo ds_pool_ci = {};
-    ds_pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    ds_pool_ci.pNext = NULL;
+    VkDescriptorPoolSize ds_type_count = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1};
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
     ds_pool_ci.maxSets = 1;
     ds_pool_ci.poolSizeCount = 1;
     ds_pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     ds_pool_ci.pPoolSizes = &ds_type_count;
     vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
 
-    VkDescriptorSetLayoutBinding dsl_binding = {};
-    dsl_binding.binding = 2;
-    dsl_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    dsl_binding.descriptorCount = 1;
-    dsl_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    dsl_binding.pImmutableSamplers = NULL;
-
-    const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
+    const vkt::DescriptorSetLayout ds_layout(
+        *m_device, {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
 
     VkDescriptorSet descriptor_sets[3] = {};
-    VkDescriptorSetAllocateInfo alloc_info = {};
-    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.descriptorSetCount = 1;
     alloc_info.descriptorPool = ds_pool;
     alloc_info.pSetLayouts = &ds_layout.handle();
@@ -204,7 +191,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PushConstantSet) {
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
-    char const *const vsSource = R"glsl(
+    const char *const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { uint x[4]; } constants;
         void main(){
@@ -434,6 +421,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
     swapchain_create_info.clipped = VK_FALSE;
     swapchain_create_info.oldSwapchain = 0;
 
+    // lazy way to not query
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");
     m_swapchain.Init(*m_device, swapchain_create_info);
 }
@@ -441,26 +429,14 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
 // Not supported in Vulkan SC: best practices layers
 TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetCommandPool) {
     TEST_DESCRIPTION("Destroy event that was set in a command buffer");
-
     RETURN_IF_SKIP(InitBestPracticesFramework());
-    void *pNext = nullptr;
-    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_subset_features = vku::InitStructHelper();
-    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        GetPhysicalDeviceFeatures2(portability_subset_features);
-        if (!portability_subset_features.events) {
-            GTEST_SKIP() << "VkPhysicalDevicePortabilitySubsetFeaturesKHR::events not supported";
-        }
-        pNext = &portability_subset_features;
-    }
-    RETURN_IF_SKIP(InitState(nullptr, pNext));
+    RETURN_IF_SKIP(InitState());
 
-    {
-        vkt::Event event1(*m_device);
-        m_command_buffer.Begin();
-        event1.CmdSet(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-        m_command_buffer.End();
-        m_default_queue->SubmitAndWait(m_command_buffer);
-    }
+    vkt::Event event1(*m_device);
+    m_command_buffer.Begin();
+    event1.CmdSet(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     vkt::Event event2(*m_device);
     m_command_buffer.Begin();
@@ -479,7 +455,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ShaderObjectDraw) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    static const char kVertexGlsl[] = R"glsl(
+    const char kVertexGlsl[] = R"glsl(
         #version 460
         layout(location = 0) in vec4 pos;
         void main() {

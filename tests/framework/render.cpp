@@ -507,12 +507,12 @@ void VkRenderFramework::ShutdownFramework() {
         m_device->Wait();
     }
 
-    m_command_buffer.destroy();
-    m_command_pool.destroy();
+    m_command_buffer.Destroy();
+    m_command_pool.Destroy();
 
     if (m_second_queue) {
-        m_second_command_buffer.destroy();
-        m_second_command_pool.destroy();
+        m_second_command_buffer.Destroy();
+        m_second_command_pool.Destroy();
     }
 
     delete m_vertex_buffer;
@@ -687,6 +687,11 @@ void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *crea
             queues.emplace_back(queue_with_transfer_caps);
         }
     }
+    for (vkt::Queue *queue_with_data_graph_caps : m_device->QueuesWithDataGraphCapability()) {
+        if (!vvl::Contains(queues, queue_with_data_graph_caps)) {
+            queues.emplace_back(queue_with_data_graph_caps);
+        }
+    }
     m_default_queue = queues[0];
     m_default_queue_caps = m_device->Physical().queue_properties_[m_default_queue->family_index].queueFlags;
     if (queues.size() > 1) {
@@ -735,6 +740,7 @@ void SurfaceContext::Resize(uint32_t width, uint32_t height) {
 VkResult VkRenderFramework::CreateSurface(SurfaceContext &surface_context, vkt::Surface &surface, VkInstance custom_instance) {
     const VkInstance surface_instance = (custom_instance != VK_NULL_HANDLE) ? custom_instance : instance();
     (void)surface_instance;
+    (void)surface_context;
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
     if (IsExtensionsEnabled(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)) {
         HINSTANCE window_instance = GetModuleHandle(nullptr);
@@ -909,14 +915,35 @@ SurfaceInformation VkRenderFramework::GetSwapchainInfo(const VkSurfaceKHR surfac
     return info;
 }
 
-void VkRenderFramework::InitSwapchain(VkImageUsageFlags imageUsage, VkSurfaceTransformFlagBitsKHR preTransform) {
+VkSwapchainCreateInfoKHR VkRenderFramework::GetDefaultSwapchainCreateInfo(VkSurfaceKHR surface,
+                                                                          const SurfaceInformation &surface_info,
+                                                                          VkImageUsageFlags image_usage) {
+    VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper();
+    swapchain_ci.surface = surface;
+    swapchain_ci.minImageCount = surface_info.surface_capabilities.minImageCount;
+    swapchain_ci.imageFormat = surface_info.surface_formats[0].format;
+    swapchain_ci.imageColorSpace = surface_info.surface_formats[0].colorSpace;
+    swapchain_ci.imageExtent = surface_info.surface_capabilities.minImageExtent;
+    swapchain_ci.imageArrayLayers = 1;
+    swapchain_ci.imageUsage = image_usage;
+    swapchain_ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_ci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_ci.compositeAlpha = surface_info.surface_composite_alpha;
+    swapchain_ci.presentMode = surface_info.surface_non_shared_present_mode;
+    swapchain_ci.clipped = VK_FALSE;
+    swapchain_ci.oldSwapchain = VK_NULL_HANDLE;
+    return swapchain_ci;
+}
+
+void VkRenderFramework::InitSwapchain(VkImageUsageFlags image_usage) {
     RETURN_IF_SKIP(InitSurface());
-    m_swapchain = CreateSwapchain(m_surface.Handle(), imageUsage, preTransform);
+    InitSwapchainInfo();
+    m_swapchain = CreateSwapchain(m_surface.Handle(), image_usage, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
     ASSERT_TRUE(m_swapchain.initialized());
 }
 
-vkt::Swapchain VkRenderFramework::CreateSwapchain(VkSurfaceKHR surface, VkImageUsageFlags imageUsage,
-                                                  VkSurfaceTransformFlagBitsKHR preTransform, VkSwapchainKHR oldSwapchain) {
+vkt::Swapchain VkRenderFramework::CreateSwapchain(VkSurfaceKHR surface, VkImageUsageFlags image_usage,
+                                                  VkSurfaceTransformFlagBitsKHR pre_transform, VkSwapchainKHR old_swapchain) {
     VkBool32 supported;
     vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, surface, &supported);
     if (!supported) {
@@ -924,31 +951,11 @@ vkt::Swapchain VkRenderFramework::CreateSwapchain(VkSurfaceKHR surface, VkImageU
         return vkt::Swapchain{};
     }
 
-    SurfaceInformation info = GetSwapchainInfo(surface);
-
-    // If this is being called from InitSwapchain, we need to also initialize all the VkRenderFramework
-    // data associated with the swapchain since many tests use those variables. We can do this by checking
-    // if the surface parameters address is the same as VkRenderFramework::m_surface
-    if (surface == m_surface.Handle()) {
-        InitSwapchainInfo();
-    }
-
-    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
-    swapchain_create_info.surface = surface;
-    swapchain_create_info.minImageCount = info.surface_capabilities.minImageCount;
-    swapchain_create_info.imageFormat = info.surface_formats[0].format;
-    swapchain_create_info.imageColorSpace = info.surface_formats[0].colorSpace;
-    swapchain_create_info.imageExtent = info.surface_capabilities.minImageExtent;
-    swapchain_create_info.imageArrayLayers = 1;
-    swapchain_create_info.imageUsage = imageUsage;
-    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    swapchain_create_info.preTransform = preTransform;
-    swapchain_create_info.compositeAlpha = info.surface_composite_alpha;
-    swapchain_create_info.presentMode = info.surface_non_shared_present_mode;
-    swapchain_create_info.clipped = VK_FALSE;
-    swapchain_create_info.oldSwapchain = oldSwapchain;
-
-    vkt::Swapchain swapchain(*m_device, swapchain_create_info);
+    const SurfaceInformation info = GetSwapchainInfo(surface);
+    VkSwapchainCreateInfoKHR swapchain_ci = GetDefaultSwapchainCreateInfo(surface, info, image_usage);
+    swapchain_ci.preTransform = pre_transform;
+    swapchain_ci.oldSwapchain = old_swapchain;
+    vkt::Swapchain swapchain(*m_device, swapchain_ci);
     return swapchain;
 }
 
@@ -956,7 +963,7 @@ void VkRenderFramework::DestroySwapchain() {
     if (m_device && m_device->handle() != VK_NULL_HANDLE) {
         m_device->Wait();
         if (m_swapchain.initialized()) {
-            m_swapchain.destroy();
+            m_swapchain.Destroy();
         }
     }
 }
@@ -971,6 +978,23 @@ void VkRenderFramework::SupportSurfaceResize() {
     if (!SurfaceContext::CanResize()) {
         GTEST_SKIP() << "VVL test framework does not support surface resizing on the current platform";
     }
+}
+
+void VkRenderFramework::SetPresentImageLayout(VkImage image) {
+    VkImageMemoryBarrier layout_transition = vku::InitStructHelper();
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    layout_transition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    layout_transition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    layout_transition.image = image;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    vkt::CommandBuffer cmdbuf(*m_device, m_command_pool);
+    cmdbuf.Begin();
+    vk::CmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
+                           nullptr, 1, &layout_transition);
+    cmdbuf.End();
+    m_default_queue->SubmitAndWait(cmdbuf);
 }
 
 void VkRenderFramework::InitRenderTarget() { InitRenderTarget(1); }
@@ -1115,9 +1139,9 @@ void VkRenderFramework::InitDynamicRenderTarget(VkFormat format) {
     m_renderTargets.push_back(std::move(img));
 }
 
-VkImageView VkRenderFramework::GetDynamicRenderTarget() const {
-    assert(m_framebuffer_attachments.size() == 1);
-    return m_framebuffer_attachments[0];
+VkImageView VkRenderFramework::GetDynamicRenderTarget(uint32_t idx) const {
+    assert(m_framebuffer_attachments.size() > idx);
+    return m_framebuffer_attachments[idx];
 }
 
 VkRect2D VkRenderFramework::GetRenderTargetArea() const { return {{0, 0}, {m_width, m_height}}; }
@@ -1255,6 +1279,8 @@ void VkRenderFramework::SetDefaultDynamicStatesAll(VkCommandBuffer cmdBuffer) {
     vk::CmdSetColorWriteMaskEXT(cmdBuffer, 0u, 1u, &colorWriteMask);
 }
 
+// Used by the test as a "default"
+// TODO these are poorly similar names and easy to get confused
 std::vector<uint32_t> VkRenderFramework::GLSLToSPV(VkShaderStageFlagBits stage, const char *code, const spv_target_env env) {
     std::vector<uint32_t> spv;
     GLSLtoSPV(m_device->Physical().limits_, stage, code, spv, env);

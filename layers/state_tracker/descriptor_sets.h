@@ -2,6 +2,7 @@
  * Copyright (c) 2015-2025 Valve Corporation
  * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (C) 2015-2025 Google Inc.
+ * Copyright (c) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +21,9 @@
 
 #include "state_tracker/state_object.h"
 #include "utils/hash_util.h"
+#include "utils/vk_struct_compare.h"
 #include "state_tracker/shader_stage_state.h"
+#include "containers/range.h"
 #include "containers/small_vector.h"
 #include "generated/vk_object_types.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
@@ -31,6 +34,10 @@
 class CoreChecks;
 struct DeviceExtensions;
 
+// TODO: there was a problem that global state persisted between test runs on CI machines.
+// Ideally is too rework these dictionaries so they are not global and part of state tracker.
+void ClearDescriptorSetLayoutCanonicalIdDict();
+
 namespace vvl {
 class Sampler;
 class DescriptorSet;
@@ -39,6 +46,8 @@ class CommandBuffer;
 class ImageView;
 class Buffer;
 class BufferView;
+class Tensor;
+class TensorView;
 class Pipeline;
 class AccelerationStructureNV;
 class AccelerationStructureKHR;
@@ -118,14 +127,8 @@ class DescriptorUpdateTemplate : public StateObject {
     VkDescriptorUpdateTemplate VkHandle() const { return handle_.Cast<VkDescriptorUpdateTemplate>(); };
 };
 
-// Utility structs/classes/types
-// Index range for global indices below, end is exclusive, i.e. [start,end)
-struct IndexRange {
-    IndexRange(uint32_t start_in, uint32_t end_in) : start(start_in), end(end_in) {}
-    IndexRange() = default;
-    uint32_t start;
-    uint32_t end;
-};
+// Index range for global indices below
+using IndexRange = vvl::range<uint32_t>;
 
 /*
  * DescriptorSetLayoutDef/DescriptorSetLayout classes
@@ -162,23 +165,28 @@ struct IndexRange {
  *  increments from there. So if the lowest binding# in this example had descriptorCount of
  *  10, then the GlobalStartIndex of the 2nd lowest binding# will be 10 where 0-9 are the
  *  global indices for the lowest binding#.
+ *
+ * TODO: Ideally is to define interface of DescriptorSetLayoutDef so it does store original
+ * VkDescriptorSetLayoutBinding because it can reference pImmutableSamplers specific only to a
+ * single set layout object (Def should store only shared information for equivalent set layouts).
+ * Instead we can store custom structure that does not expose pImmutableSamplers.
  */
 class DescriptorSetLayoutDef {
   public:
-    // Constructors and destructor
-    DescriptorSetLayoutDef(const VkDescriptorSetLayoutCreateInfo *p_create_info);
+    DescriptorSetLayoutDef(vvl::DeviceState &device_state, const VkDescriptorSetLayoutCreateInfo *p_create_info);
     size_t hash() const;
 
     uint32_t GetTotalDescriptorCount() const { return descriptor_count_; };
     uint32_t GetNonInlineDescriptorCount() const { return non_inline_descriptor_count_; };
     uint32_t GetDynamicDescriptorCount() const { return dynamic_descriptor_count_; };
-    bool HasImmutableSamplers() const { return has_immutable_samplers_; };
+    bool HasImmutableSamplers() const { return !immutable_sampler_create_infos_.empty(); };
     VkDescriptorSetLayoutCreateFlags GetCreateFlags() const { return flags_; }
     // For a given binding, return the number of descriptors in that binding and all successive bindings
     uint32_t GetBindingCount() const { return binding_count_; };
     // Return true if given binding is present in this layout
     bool HasBinding(const uint32_t binding) const { return binding_to_index_map_.count(binding) > 0; };
-    // Return true if binding 1 beyond given exists and has same type, stageFlags & immutable sampler use
+    // Return the index into the sorted list of bindings
+    // **NOT** the index VkDescriptorSetLayoutCreateInfo::pBindings, as we sort the bindings
     uint32_t GetIndexFromBinding(uint32_t binding) const;
     // Various Get functions that can either be passed a binding#, which will
     //  be automatically translated into the appropriate index, or the index# can be passed in directly
@@ -186,15 +194,17 @@ class DescriptorSetLayoutDef {
         assert(!bindings_.empty());
         return bindings_.empty() ? 0 : bindings_[bindings_.size() - 1].binding;
     }
+    uint32_t GetLastIndex() const {
+        assert(!bindings_.empty());
+        return (uint32_t)bindings_.size() - 1;
+    }
+
     VkDescriptorSetLayoutBinding const *GetDescriptorSetLayoutBindingPtrFromIndex(const uint32_t) const;
     VkDescriptorSetLayoutBinding const *GetDescriptorSetLayoutBindingPtrFromBinding(uint32_t binding) const {
         return GetDescriptorSetLayoutBindingPtrFromIndex(GetIndexFromBinding(binding));
     }
     const std::vector<vku::safe_VkDescriptorSetLayoutBinding> &GetBindings() const { return bindings_; }
     const VkDescriptorSetLayoutBinding *GetBindingInfoFromIndex(const uint32_t index) const { return bindings_[index].ptr(); }
-    const VkDescriptorSetLayoutBinding *GetBindingInfoFromBinding(const uint32_t binding) const {
-        return GetBindingInfoFromIndex(GetIndexFromBinding(binding));
-    }
     const std::vector<VkDescriptorBindingFlags> &GetBindingFlags() const { return binding_flags_; }
     uint32_t GetDescriptorCountFromIndex(const uint32_t) const;
     uint32_t GetDescriptorCountFromBinding(const uint32_t binding) const {
@@ -207,7 +217,9 @@ class DescriptorSetLayoutDef {
     VkDescriptorBindingFlags GetDescriptorBindingFlagsFromBinding(const uint32_t binding) const {
         return GetDescriptorBindingFlagsFromIndex(GetIndexFromBinding(binding));
     }
-    VkSampler const *GetImmutableSamplerPtrFromIndex(const uint32_t) const;
+    const std::vector<vku::safe_VkSamplerCreateInfo> &GetImmutableSamplerCreateInfosFromIndex(uint32_t index) const;
+    size_t GetImmutableSamplersCombinedHashFromIndex(uint32_t index) const;
+
     bool IsTypeMutable(const VkDescriptorType type, uint32_t binding) const;
     const std::vector<VkDescriptorType> &GetMutableTypes(uint32_t binding) const;
     std::string PrintMutableTypes(uint32_t binding) const;
@@ -228,18 +240,43 @@ class DescriptorSetLayoutDef {
 
     std::string DescribeDifference(uint32_t index, const DescriptorSetLayoutDef &other) const;
 
-  private:
-    // Only the first three data members are used for hash and equality checks, the other members are derived from them, and are
-    // used to speed up the various lookups/queries/validations
-    VkDescriptorSetLayoutCreateFlags flags_;
-    std::vector<vku::safe_VkDescriptorSetLayoutBinding> bindings_;
-    std::vector<VkDescriptorBindingFlags> binding_flags_;
-    // List of mutable types for each binding: [binding][mutable type]
-    std::vector<std::vector<VkDescriptorType>> mutable_types_;
+    std::string DescribeDescriptorBufferSizeAndOffests(VkDevice device, VkDescriptorSetLayout layout) const;
 
-    // Convenience data structures for rapid lookup of various descriptor set layout properties
-    std::set<uint32_t> non_empty_bindings_;  // Containing non-emtpy bindings in numerical order
+  private:
+    VkDescriptorSetLayoutCreateFlags flags_;
+
+    // WARNING: do not use pImmutableSamplers from these bindings (except only to compare with null)
+    // because these samplers belong to a specific set layout object (used to init this Def) and are
+    // not necessarily shared between all set layouts with this Def.
+    // If the code needs access to pImmutableSamplers then specific set layout object or
+    // VkDescriptorSetLayoutCreateInfo should be used.
+    std::vector<vku::safe_VkDescriptorSetLayoutBinding> bindings_;
+
+    std::vector<VkDescriptorBindingFlags> binding_flags_;
+
+    // The create_infos of immutable samplers: [binding][array index]
+    // The outer vector is allocated only if there is at least one binding with immutable samplers
+    // The inner vectors are empty for the bindings that do not have immutable samplers
+    std::vector<std::vector<vku::safe_VkSamplerCreateInfo>> immutable_sampler_create_infos_;
+
+    // The combined hashes (one hash per binding) of immutable samplers: [binding]
+    // The vector is allocated only if there is at least one binding with immutable samplers
+    std::vector<size_t> immutable_sampler_combined_hashes_;
+
+    struct MutableBindingCreation {
+        uint32_t original_index;  // into VkDescriptorSetLayoutCreateInfo::pBindings
+        std::vector<VkDescriptorType> types;
+    };
+    // List of mutable types for each binding: [index][mutable type]
+    // Will need to use GetIndexFromBinding() to get [index]
+    std::vector<MutableBindingCreation> mutable_bindings_;
+
+    // Containing non-emtpy bindings in numerical order
+    std::set<uint32_t> non_empty_bindings_;
+
+    // Map binding number to index in bindings_ array (sorted bindings)
     vvl::unordered_map<uint32_t, uint32_t> binding_to_index_map_;
+
     // The following map allows an non-iterative lookup of a binding from a global index...
     std::vector<IndexRange> global_index_range_;  // range is exclusive of .end
 
@@ -251,62 +288,21 @@ class DescriptorSetLayoutDef {
     uint32_t non_inline_descriptor_count_;
     uint32_t dynamic_descriptor_count_;
     BindingTypeStats binding_type_stats_;
-
-    bool has_immutable_samplers_;
 };
 
 // Canonical dictionary of DSL definitions -- independent of device or handle
 using DescriptorSetLayoutDict = hash_util::Dictionary<DescriptorSetLayoutDef, hash_util::HasHashMember<DescriptorSetLayoutDef>>;
 using DescriptorSetLayoutId = DescriptorSetLayoutDict::Id;
 
-// Compare is in header and static because hash_util KeyValueEqual need the symbol at compile time
-static inline bool operator==(const DescriptorSetLayoutDef &lhs, const DescriptorSetLayoutDef &rhs) {
-    // trivial types
-    if ((lhs.GetCreateFlags() != rhs.GetCreateFlags()) || (lhs.GetBindingFlags() != rhs.GetBindingFlags())) {
-        return false;
-    }
-    // vectors of vku::safe_VkDescriptorSetLayoutBinding structures
-    const auto &lhs_bindings = lhs.GetBindings();
-    const auto &rhs_bindings = rhs.GetBindings();
-    if (lhs_bindings.size() != rhs_bindings.size()) {
-        return false;
-    }
-    for (uint32_t i = 0; i < lhs_bindings.size(); i++) {
-        const auto &l = lhs_bindings[i];
-        const auto &r = rhs_bindings[i];
-        // For things where we are comparing with the bound pipeline, the binding will always be right, but when comparing two
-        // arbitrary layouts (ex. templates, DeviceState Generated Commands, etc) the bindings might be different
-        if (l.binding != r.binding) {
-            return false;
-        }
-        if (l.descriptorType != r.descriptorType || l.descriptorCount != r.descriptorCount || l.stageFlags != r.stageFlags) {
-            return false;
-        }
-        if (l.pImmutableSamplers != r.pImmutableSamplers) {
-            return false;
-        }
-        if (l.pImmutableSamplers) {
-            for (uint32_t s = 0; s < l.descriptorCount; s++) {
-                if (l.pImmutableSamplers[s] != r.pImmutableSamplers[s]) {
-                    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8497
-                    // This just checks pointers, but two different VkSampler handles could be created with same createInfo.
-                    // Since this is rare enough, mark as "not the same" and check later when checking for compatibility.
-                    return false;
-                }
-            }
-        }
-        // These have been sorted already so can direct compare
-        if (lhs.GetMutableTypes(i) != rhs.GetMutableTypes(i)) {
-            return false;
-        }
-    }
-    return true;
-}
+bool ImmutableSamplersAreEqual(const DescriptorSetLayoutDef &dsl_def1, const DescriptorSetLayoutDef &dsl_def2,
+                               uint32_t binding_index);
+
+bool operator==(const DescriptorSetLayoutDef &lhs, const DescriptorSetLayoutDef &rhs);
 
 class DescriptorSetLayout : public StateObject {
   public:
-    // Constructors and destructor
-    DescriptorSetLayout(const VkDescriptorSetLayoutCreateInfo *pCreateInfo, const VkDescriptorSetLayout handle);
+    DescriptorSetLayout(vvl::DeviceState &device_state, const VkDescriptorSetLayoutCreateInfo *pCreateInfo,
+                        const VkDescriptorSetLayout handle);
     virtual ~DescriptorSetLayout() { Destroy(); }
 
     bool HasBinding(const uint32_t binding) const { return layout_id_->HasBinding(binding); }
@@ -316,6 +312,7 @@ class DescriptorSetLayout : public StateObject {
     bool IsCompatible(DescriptorSetLayout const *rh_ds_layout) const;
     // Straightforward Get functions
     VkDescriptorSetLayout VkHandle() const { return handle_.Cast<VkDescriptorSetLayout>(); };
+    vku::safe_VkDescriptorSetLayoutCreateInfo GetCreateInfo() const { return desc_set_layout_ci; }
     const DescriptorSetLayoutDef *GetLayoutDef() const { return layout_id_.get(); }
     DescriptorSetLayoutId GetLayoutId() const { return layout_id_; }
     uint32_t GetTotalDescriptorCount() const { return layout_id_->GetTotalDescriptorCount(); };
@@ -328,12 +325,30 @@ class DescriptorSetLayout : public StateObject {
     // Various Get functions that can either be passed a binding#, which will
     //  be automatically translated into the appropriate index, or the index# can be passed in directly
     uint32_t GetMaxBinding() const { return layout_id_->GetMaxBinding(); }
+    uint32_t GetLastIndex() const { return layout_id_->GetLastIndex(); }
     VkDescriptorSetLayoutBinding const *GetDescriptorSetLayoutBindingPtrFromIndex(const uint32_t index) const {
-        return layout_id_->GetDescriptorSetLayoutBindingPtrFromIndex(index);
+        if (index >= GetBindingCount()) {
+            return nullptr;
+        }
+        const uint32_t binding = layout_id_->GetBindingInfoFromIndex(index)->binding;
+        const uint32_t original_index = GetOriginalIndexFromBinding(binding);
+        return desc_set_layout_ci.pBindings[original_index].ptr();
     }
     VkDescriptorSetLayoutBinding const *GetDescriptorSetLayoutBindingPtrFromBinding(uint32_t binding) const {
-        return layout_id_->GetDescriptorSetLayoutBindingPtrFromBinding(binding);
+        if (GetIndexFromBinding(binding) >= GetBindingCount()) {
+            return nullptr;
+        }
+        const uint32_t original_index = GetOriginalIndexFromBinding(binding);
+        return desc_set_layout_ci.pBindings[original_index].ptr();
     }
+    // Returns index into VkDescriptorSetLayoutCreateInfo::pBindings array for this binding.
+    uint32_t GetOriginalIndexFromBinding(uint32_t binding) const {
+        auto it = binding_to_original_index_map_.find(binding);
+        assert(it != binding_to_original_index_map_.end());
+        const uint32_t original_index = it->second;
+        return original_index;
+    }
+
     const std::vector<vku::safe_VkDescriptorSetLayoutBinding> &GetBindings() const { return layout_id_->GetBindings(); }
     uint32_t GetDescriptorCountFromIndex(const uint32_t index) const { return layout_id_->GetDescriptorCountFromIndex(index); }
     uint32_t GetDescriptorCountFromBinding(const uint32_t binding) const {
@@ -349,7 +364,10 @@ class DescriptorSetLayout : public StateObject {
         return layout_id_->GetDescriptorBindingFlagsFromBinding(binding);
     }
     VkSampler const *GetImmutableSamplerPtrFromIndex(const uint32_t index) const {
-        return layout_id_->GetImmutableSamplerPtrFromIndex(index);
+        assert(index < GetBindingCount());
+        const uint32_t binding = layout_id_->GetBindingInfoFromIndex(index)->binding;
+        const uint32_t original_index = GetOriginalIndexFromBinding(binding);
+        return desc_set_layout_ci.pBindings[original_index].pImmutableSamplers;
     }
     bool IsTypeMutable(const VkDescriptorType type, uint32_t binding) const { return layout_id_->IsTypeMutable(type, binding); }
     const std::vector<VkDescriptorType> &GetMutableTypes(uint32_t binding) const { return layout_id_->GetMutableTypes(binding); }
@@ -364,21 +382,24 @@ class DescriptorSetLayout : public StateObject {
     // Helper function to get the next valid binding for a descriptor
     uint32_t GetNextValidBinding(const uint32_t binding) const { return layout_id_->GetNextValidBinding(binding); }
     bool IsPushDescriptor() const { return layout_id_->IsPushDescriptor(); }
-    bool IsVariableDescriptorCountFromIndex(uint32_t index) const {
-        return !!(GetDescriptorBindingFlagsFromIndex(index) & VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT);
-    }
-    bool IsVariableDescriptorCount(uint32_t binding) const {
-        return IsVariableDescriptorCountFromIndex(GetIndexFromBinding(binding));
-    }
-    void SetLayoutSizeInBytes(const VkDeviceSize *layout_size_in_bytes_);
-    VkDeviceSize GetLayoutSizeInBytes() const;
+
+    VkDeviceSize GetLayoutSizeInBytes() const { return layout_size_in_bytes_; }
 
     using BindingTypeStats = DescriptorSetLayoutDef::BindingTypeStats;
     const BindingTypeStats &GetBindingTypeStats() const { return layout_id_->GetBindingTypeStats(); }
 
+    std::string DescribeDescriptorBufferSizeAndOffests(VkDevice device) const {
+        return layout_id_->DescribeDescriptorBufferSizeAndOffests(device, VkHandle());
+    }
+
   private:
     DescriptorSetLayoutId layout_id_{};
-    VkDeviceSize layout_size_in_bytes_{};
+    // according to vkGetDescriptorSetLayoutSizeEXT
+    VkDeviceSize layout_size_in_bytes_ = 0;
+    vku::safe_VkDescriptorSetLayoutCreateInfo desc_set_layout_ci{};
+
+    // Map binding number to index in desc_set_layout_ci.pBindings array (original unsorted bindings)
+    vvl::unordered_map<uint32_t, uint32_t> binding_to_original_index_map_;
 };
 
 // Slightly broader than type, each c++ "class" will has a corresponding "DescriptorClass"
@@ -391,6 +412,7 @@ enum class DescriptorClass {
     InlineUniform,          // INLINE_UNIFORM_BLOCK
     AccelerationStructure,  // ACCELERATION_STRUCTURE
     Mutable,                // MUTABLE
+    Tensor,                 // TENSOR
     Invalid
 };
 
@@ -491,6 +513,26 @@ class ImageDescriptor : public Descriptor {
     std::shared_ptr<vvl::ImageView> image_view_state_;
     VkImageLayout image_layout_{VK_IMAGE_LAYOUT_UNDEFINED};
     bool known_valid_view_ = false;
+};
+
+class TensorDescriptor : public Descriptor {
+  public:
+    TensorDescriptor() = default;
+    DescriptorClass GetClass() const override { return DescriptorClass::Tensor; }
+    void WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &update,
+                     const uint32_t index, bool is_bindless) override;
+    void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &src, bool is_bindless,
+                    VkDescriptorType type) override;
+    uint32_t GetTensorViewCount() const { return tensor_view_count_; }
+    const VkTensorViewARM *GetTensorViews() const { return tensor_views_; }
+    const vvl::TensorView *GetTensorViewState() const { return tensor_view_state_.get(); }
+    const vvl::Tensor *GetTensorState() const { return tensor_state_.get(); }
+
+  private:
+    uint32_t tensor_view_count_{0};
+    const VkTensorViewARM *tensor_views_{VK_NULL_HANDLE};
+    std::shared_ptr<vvl::Tensor> tensor_state_;
+    std::shared_ptr<vvl::TensorView> tensor_view_state_;
 };
 
 class ImageSamplerDescriptor : public ImageDescriptor {
@@ -600,6 +642,8 @@ class AccelerationStructureDescriptor : public Descriptor {
     std::shared_ptr<vvl::AccelerationStructureKHR> acc_state_;
     VkAccelerationStructureNV acc_nv_{VK_NULL_HANDLE};
     std::shared_ptr<vvl::AccelerationStructureNV> acc_state_nv_;
+    VkDeviceAddress acc_partition_nv_{0};
+    std::shared_ptr<VkDeviceAddress> acc_state_partition_nv_;
 };
 
 class MutableDescriptor : public Descriptor {
@@ -622,6 +666,8 @@ class MutableDescriptor : public Descriptor {
     VkDeviceSize GetRange() const { return range_; }
     VkDeviceSize GetEffectiveRange() const;
     std::shared_ptr<vvl::BufferView> GetSharedBufferViewState() const { return buffer_view_state_; }
+    std::shared_ptr<vvl::Tensor> GetSharedTensor() const { return tensor_state_; }
+    std::shared_ptr<vvl::TensorView> GetSharedTensorView() const { return tensor_view_state_; }
     VkAccelerationStructureKHR GetAccelerationStructureKHR() const { return acc_; }
     const vvl::AccelerationStructureKHR *GetAccelerationStructureStateKHR() const { return acc_state_.get(); }
     vvl::AccelerationStructureKHR *GetAccelerationStructureStateKHR() { return acc_state_.get(); }
@@ -637,6 +683,8 @@ class MutableDescriptor : public Descriptor {
     }
 
     void UpdateImageLayoutDrawState(vvl::CommandBuffer &cb_state) override;
+    uint32_t GetTensorViewCount() const { return tensor_view_count_; }
+    const VkTensorViewARM *GetTensorViews() const { return tensor_views_; }
 
     bool AddParent(StateObject *state_object) override;
     void RemoveParent(StateObject *state_object) override;
@@ -669,6 +717,11 @@ class MutableDescriptor : public Descriptor {
     std::shared_ptr<vvl::AccelerationStructureKHR> acc_state_;
     VkAccelerationStructureNV acc_nv_{VK_NULL_HANDLE};
     std::shared_ptr<vvl::AccelerationStructureNV> acc_state_nv_;
+    // Tensor Descriptor
+    uint32_t tensor_view_count_{0};
+    const VkTensorViewARM *tensor_views_{VK_NULL_HANDLE};
+    std::shared_ptr<vvl::TensorView> tensor_view_state_;
+    std::shared_ptr<vvl::Tensor> tensor_state_;
 };
 
 // We will want to build this map and list of layouts once in order to record in the state tracker at PostCallRecord time.
@@ -777,6 +830,7 @@ using BufferBinding = DescriptorBindingImpl<BufferDescriptor>;
 using InlineUniformBinding = DescriptorBindingImpl<InlineUniformDescriptor>;
 using AccelerationStructureBinding = DescriptorBindingImpl<AccelerationStructureDescriptor>;
 using MutableBinding = DescriptorBindingImpl<MutableDescriptor>;
+using TensorBinding = DescriptorBindingImpl<TensorDescriptor>;
 
 // Helper class to encapsulate the descriptor update template decoding logic
 struct DecodedTemplateUpdate {
@@ -1062,6 +1116,7 @@ class DescriptorSet : public StateObject, public SubStateManager<DescriptorSetSu
         InlineUniformBinding inline_uniform;
         AccelerationStructureBinding accelerator_structure;
         MutableBinding mutable_binding;
+        TensorBinding tensor_binding;
         ~AnyBinding() = delete;
     };
 
@@ -1083,7 +1138,7 @@ class DescriptorSet : public StateObject, public SubStateManager<DescriptorSetSu
     std::vector<BindingBackingStore> bindings_store_;
     std::vector<BindingPtr> bindings_;
     DeviceState *state_data_;
-    uint32_t variable_count_;
+    uint32_t variable_count_;  // zero if no variable count
     std::atomic<uint64_t> change_count_;
 
     // For a given dynamic offset index in the set, map to associated index of the descriptors in the set

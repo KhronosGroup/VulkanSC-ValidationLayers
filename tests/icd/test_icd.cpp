@@ -386,6 +386,9 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFeatures(VkPhysicalDevice phy
 #endif  // VULKANSC
 }
 
+// When using profiles, the format features are found in tests/device_profiles/max_profile.json
+//
+// Updating this function is not how to add specific format support for the "normal" case
 static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format,
                                                                     VkFormatProperties* pFormatProperties) {
     if (VK_FORMAT_UNDEFINED == format) {
@@ -672,6 +675,11 @@ static VKAPI_ATTR void VKAPI_CALL FreeMemory(VkDevice device, VkDeviceMemory mem
 }
 #endif
 
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8776
+// things like shaderGroupBaseAlignment can be as big as 64, since these values are dynamically set in the Profile JSON, we need
+// to create the large alignment possible to satisfy them all
+static constexpr size_t memory_alignment = 64;
+
 static VKAPI_ATTR VkResult VKAPI_CALL MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size,
                                                 VkMemoryMapFlags flags, void** ppData) {
     unique_lock_t lock(global_lock);
@@ -682,15 +690,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL MapMemory(VkDevice device, VkDeviceMemory 
             size = 0x10000;
     }
 
-    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8776
-    // things like shaderGroupBaseAlignment can be as big as 64, since these values are dynamically set in the Profile JSON, we need
-    // to create the large alignment possible to satisfy them all
-    static const size_t memory_alignment = 64;
-#if defined(_WIN32)
-    void* map_addr = _aligned_malloc((size_t)size, memory_alignment);
-#else
-    void* map_addr = aligned_alloc(memory_alignment, (size_t)size);
-#endif
+    void* map_addr = ::operator new((size_t)size, std::align_val_t(memory_alignment));
     mapped_memory_map[memory].push_back(map_addr);
     *ppData = map_addr;
     return VK_SUCCESS;
@@ -699,11 +699,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL MapMemory(VkDevice device, VkDeviceMemory 
 static VKAPI_ATTR void VKAPI_CALL UnmapMemory(VkDevice device, VkDeviceMemory memory) {
     unique_lock_t lock(global_lock);
     for (auto map_addr : mapped_memory_map[memory]) {
-#if defined(_WIN32)
-        _aligned_free(map_addr);
-#else
-        free(map_addr);
-#endif
+        ::operator delete(map_addr, std::align_val_t(memory_alignment));
     }
     mapped_memory_map.erase(memory);
 }
@@ -798,6 +794,13 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBuff
                                                    const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer) {
     unique_lock_t lock(global_lock);
     *pBuffer = (VkBuffer)global_unique_handle++;
+    // Some address for RTX need to be aligned to 256
+    if (pCreateInfo->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT || pCreateInfo->usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) {
+        const uint64_t rtx_alignment = current_available_address % 256;
+        if (rtx_alignment != 0) {
+            current_available_address += (256 - rtx_alignment);
+        }
+    }
     buffer_map[device][*pBuffer] = {pCreateInfo->size, current_available_address};
     current_available_address += pCreateInfo->size;
     // Always align to next 64-bit pointer
@@ -899,6 +902,40 @@ static VKAPI_ATTR VkResult VKAPI_CALL EnumerateInstanceVersion(uint32_t* pApiVer
 static VKAPI_ATTR void VKAPI_CALL GetImageMemoryRequirements2(VkDevice device, const VkImageMemoryRequirementsInfo2* pInfo,
                                                               VkMemoryRequirements2* pMemoryRequirements) {
     GetImageMemoryRequirements(device, pInfo->image, &pMemoryRequirements->memoryRequirements);
+}
+
+static VKAPI_ATTR void VKAPI_CALL GetTensorMemoryRequirementsARM(VkDevice device, const VkTensorMemoryRequirementsInfoARM* pInfo,
+                                                                 VkMemoryRequirements2* pMemoryRequirements)
+{
+    VkMemoryRequirements& memReq = pMemoryRequirements->memoryRequirements;
+    memReq.size = 1024;
+    memReq.alignment = 32;
+    // Hard-code an unsupported memory type for negative tests.
+    // 3 is arbitrary, any value in [0,5] is acceptable, see GetPhysicalDeviceMemoryProperties.
+    memReq.memoryTypeBits = 0xFFFF & ~(0x1 << 3);
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL GetDataGraphPipelineSessionBindPointRequirementsARM(
+    VkDevice device, const VkDataGraphPipelineSessionBindPointRequirementsInfoARM* pInfo, uint32_t* pBindPointRequirementCount,
+    VkDataGraphPipelineSessionBindPointRequirementARM* pBindPointRequirements) {
+    if (nullptr == pBindPointRequirements) {
+        *pBindPointRequirementCount = 1;
+    } else {
+        pBindPointRequirements->bindPoint = VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TRANSIENT_ARM;
+        pBindPointRequirements->bindPointType = VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TYPE_MEMORY_ARM;
+        pBindPointRequirements->numObjects = 1;
+    }
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR void VKAPI_CALL GetDataGraphPipelineSessionMemoryRequirementsARM(
+    VkDevice device, const VkDataGraphPipelineSessionMemoryRequirementsInfoARM* pInfo, VkMemoryRequirements2* pMemoryRequirements) {
+    VkMemoryRequirements& memReq = pMemoryRequirements->memoryRequirements;
+    memReq.size = 1024;
+    memReq.alignment = 32;
+    // Hard-code an unsupported memory type for negative tests.
+    // 3 is arbitrary, any value in [0,5] is acceptable, see GetPhysicalDeviceMemoryProperties.
+    memReq.memoryTypeBits = 0xFFFF & ~(0x1 << 3);
 }
 
 static VKAPI_ATTR void VKAPI_CALL GetBufferMemoryRequirements2(VkDevice device, const VkBufferMemoryRequirementsInfo2* pInfo,
@@ -1063,8 +1100,9 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfacePresentModesKHR(Vk
                                                                               VkPresentModeKHR* pPresentModes) {
     // Currently always say that all present modes are supported
     if (!pPresentModes) {
-        *pPresentModeCount = 6;
+        *pPresentModeCount = 7;
     } else {
+        if (*pPresentModeCount >= 7) pPresentModes[6] = VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
         if (*pPresentModeCount >= 6) pPresentModes[5] = VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR;
         if (*pPresentModeCount >= 5) pPresentModes[4] = VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR;
         if (*pPresentModeCount >= 4) pPresentModes[3] = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
@@ -1168,6 +1206,7 @@ GetVideoSessionMemoryRequirementsKHR(VkDevice device, VkVideoSessionKHR videoSes
 }
 #endif  // VULKANSC
 
+// VK_KHRONOS_PROFILES_UNKNOWN_FEATURE_VALUES in profiles can be used and future extensions can be put in here for testing
 static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFeatures2(VkPhysicalDevice physicalDevice,
                                                              VkPhysicalDeviceFeatures2* pFeatures) {
     GetPhysicalDeviceFeatures(physicalDevice, &pFeatures->features);
@@ -1238,6 +1277,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFeatures2(VkPhysicalDevice ph
 #endif  // VULKANSC
 }
 
+// VK_KHRONOS_PROFILES_UNKNOWN_FEATURE_VALUES in profiles can be used and future extensions can be put in here for testing
 static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceProperties2(VkPhysicalDevice physicalDevice,
                                                                VkPhysicalDeviceProperties2* pProperties) {
     // The only value that need to be set are those the Profile layer can't set
@@ -1431,10 +1471,13 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceProperties2(VkPhysicalDevice 
     }
 }
 
+// When using profiles, the format features are found in tests/device_profiles/max_profile.json
+//
+// Updating this function is not how to add specific format support for the "normal" case
 static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFormatProperties2(VkPhysicalDevice physicalDevice, VkFormat format,
                                                                      VkFormatProperties2* pFormatProperties) {
     GetPhysicalDeviceFormatProperties(physicalDevice, format, &pFormatProperties->formatProperties);
-    VkFormatProperties3KHR* props_3 = vku::FindStructInPNextChain<VkFormatProperties3KHR>(pFormatProperties->pNext);
+    VkFormatProperties3* props_3 = vku::FindStructInPNextChain<VkFormatProperties3>(pFormatProperties->pNext);
     if (props_3) {
         props_3->linearTilingFeatures = pFormatProperties->formatProperties.linearTilingFeatures;
         props_3->optimalTilingFeatures = pFormatProperties->formatProperties.optimalTilingFeatures;
@@ -1455,6 +1498,40 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFormatProperties2(VkPhysicalD
                 break;
         }
 #endif  // VULKANSC
+    }
+
+    if (auto* tensor_props = vku::FindStructInPNextChain<VkTensorFormatPropertiesARM>(pFormatProperties->pNext)) {
+        constexpr VkFormatFeatureFlagBits2 tensor_flags =
+            VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT |
+            VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT |
+            VK_FORMAT_FEATURE_2_TENSOR_SHADER_BIT_ARM |
+            VK_FORMAT_FEATURE_2_TENSOR_SHADER_BIT_ARM |
+            VK_FORMAT_FEATURE_2_TENSOR_IMAGE_ALIASING_BIT_ARM |
+            VK_FORMAT_FEATURE_2_TENSOR_DATA_GRAPH_BIT_ARM;
+        tensor_props->linearTilingTensorFeatures = tensor_flags;
+        tensor_props->optimalTilingTensorFeatures = tensor_flags;
+    }
+}
+
+static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceExternalTensorPropertiesARM(
+    VkPhysicalDevice physicalDevice, const VkPhysicalDeviceExternalTensorInfoARM* pExternalTensorInfo,
+    VkExternalTensorPropertiesARM* pExternalTensorProperties) {
+
+    constexpr VkExternalMemoryHandleTypeFlags supported_flags = VK_EXTERNAL_MEMORY_HANDLE_TYPE_FLAG_BITS_MAX_ENUM;
+    if (pExternalTensorInfo->handleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID) {
+        // Can't have dedicated memory with AHB
+        pExternalTensorProperties->externalMemoryProperties.externalMemoryFeatures =
+            VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT;
+        pExternalTensorProperties->externalMemoryProperties.exportFromImportedHandleTypes = pExternalTensorInfo->handleType;
+        pExternalTensorProperties->externalMemoryProperties.compatibleHandleTypes = pExternalTensorInfo->handleType;
+    } else if (pExternalTensorInfo->handleType & supported_flags) {
+        pExternalTensorProperties->externalMemoryProperties.externalMemoryFeatures = 0x7;
+        pExternalTensorProperties->externalMemoryProperties.exportFromImportedHandleTypes = supported_flags;
+        pExternalTensorProperties->externalMemoryProperties.compatibleHandleTypes = supported_flags;
+    } else {
+        pExternalTensorProperties->externalMemoryProperties.externalMemoryFeatures = 0;
+        pExternalTensorProperties->externalMemoryProperties.exportFromImportedHandleTypes = 0;
+        pExternalTensorProperties->externalMemoryProperties.compatibleHandleTypes = 0;
     }
 }
 
@@ -1482,7 +1559,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceQueueFamilyProperties2(VkPhys
         if (*pQueueFamilyPropertyCount >= 1) {
             auto props = &pQueueFamilyProperties[0].queueFamilyProperties;
             props->queueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT |
-                                VK_QUEUE_PROTECTED_BIT;
+                                VK_QUEUE_PROTECTED_BIT | VK_QUEUE_DATA_GRAPH_BIT_ARM;
             props->queueCount = 1;
             props->timestampValidBits = 16;
             props->minImageTransferGranularity = {1, 1, 1};
@@ -1656,7 +1733,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilities2KHR(V
 
 #ifndef VULKANSC
     if (auto* present_mode_compatibility =
-            vku::FindStructInPNextChain<VkSurfacePresentModeCompatibilityEXT>(pSurfaceCapabilities->pNext)) {
+            vku::FindStructInPNextChain<VkSurfacePresentModeCompatibilityKHR>(pSurfaceCapabilities->pNext)) {
         if (!present_mode_compatibility->pPresentModes) {
             present_mode_compatibility->presentModeCount = 3;
         } else {
@@ -1749,7 +1826,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL UnmapMemory2(VkDevice device, const VkMemo
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixPropertiesKHR(
     VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkCooperativeMatrixPropertiesKHR* pProperties) {
     if (!pProperties) {
-        *pPropertyCount = 2;
+        *pPropertyCount = 6;
     } else {
         // arbitrary
         pProperties[0].MSize = 16;
@@ -1764,6 +1841,30 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixProperti
 
         pProperties[1] = pProperties[0];
         pProperties[1].scope = VK_SCOPE_DEVICE_KHR;
+
+        pProperties[2] = pProperties[0];
+        pProperties[2].AType = VK_COMPONENT_TYPE_BFLOAT16_KHR;
+        pProperties[2].BType = VK_COMPONENT_TYPE_BFLOAT16_KHR;
+        pProperties[2].CType = VK_COMPONENT_TYPE_BFLOAT16_KHR;
+        pProperties[2].ResultType = VK_COMPONENT_TYPE_BFLOAT16_KHR;
+
+        pProperties[3] = pProperties[0];
+        pProperties[3].AType = VK_COMPONENT_TYPE_FLOAT8_E4M3_EXT;
+        pProperties[3].BType = VK_COMPONENT_TYPE_FLOAT8_E4M3_EXT;
+        pProperties[3].CType = VK_COMPONENT_TYPE_FLOAT8_E4M3_EXT;
+        pProperties[3].ResultType = VK_COMPONENT_TYPE_FLOAT8_E4M3_EXT;
+
+        pProperties[4] = pProperties[0];
+        pProperties[4].MSize = 8;
+        pProperties[4].NSize = 8;
+        pProperties[4].AType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[4].BType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[4].CType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[4].ResultType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+
+        pProperties[5] = pProperties[4];
+        pProperties[5].MSize = 16;
+        pProperties[5].NSize = 16;
     }
     return VK_SUCCESS;
 }
@@ -1951,6 +2052,23 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPipelineBinaryDataKHR(VkDevice device, 
     return VK_SUCCESS;
 }
 
+#endif  // VULKANSC
+
+#ifndef VULKANSC  // Vulkan SC does not support VK_NV_partitioned_acceleration_structure
+static VKAPI_ATTR void VKAPI_CALL GetPartitionedAccelerationStructuresBuildSizesNV(VkDevice device,
+                                                                                    const VkPartitionedAccelerationStructureInstancesInputNV* pInfo,
+                                                                                    VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) {
+    // value from real running test
+    pSizeInfo->accelerationStructureSize = 1062400;
+    pSizeInfo->updateScratchSize = 4;
+    pSizeInfo->buildScratchSize = 388480;
+}
+
+static VKAPI_ATTR void VKAPI_CALL GetClusterAccelerationStructureBuildSizesNV(VkDevice device, const VkClusterAccelerationStructureInputInfoNV* pInfo, VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo){
+    pSizeInfo->accelerationStructureSize = 256;
+    pSizeInfo->buildScratchSize = 256;
+    pSizeInfo->updateScratchSize = 4;
+}
 #endif  // VULKANSC
 
 }  // namespace icd

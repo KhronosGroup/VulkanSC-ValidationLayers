@@ -30,10 +30,11 @@ class Validator;
 
 // Information about how each descriptor was accessed
 struct DescriptorAccess {
-    uint32_t binding = vvl::kU32Max;       // binding number in the descriptor set
-    uint32_t index = vvl::kU32Max;         // index into descriptor array
-    uint32_t variable_id = vvl::kU32Max;   // OpVariableID
-    uint32_t action_index = vvl::kU32Max;  // Index of action command access occured
+    uint32_t binding = vvl::kNoIndex32;                      // binding number in the descriptor set
+    uint32_t index = vvl::kNoIndex32;                        // index into descriptor array
+    uint32_t variable_id = vvl::kNoIndex32;                  // OpVariableID
+    uint32_t instruction_position_offset = vvl::kNoIndex32;  // Instruction Position to map to source
+    uint32_t error_logger_i = vvl::kNoIndex32;               // Index of error logger stored in command buffer state
 };
 
 class DescriptorSetSubState : public vvl::DescriptorSetSubState {

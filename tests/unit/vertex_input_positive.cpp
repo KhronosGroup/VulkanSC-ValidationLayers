@@ -15,6 +15,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/render_pass_helper.h"
+#include "test_framework.h"
 
 class PositiveVertexInput : public VkLayerTest {};
 
@@ -35,7 +36,7 @@ TEST_F(PositiveVertexInput, AttributeMatrixType) {
         input_attribs[i].location = i;
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in mat2x4 x;
         void main(){
@@ -73,7 +74,7 @@ TEST_F(PositiveVertexInput, AttributeArrayType) {
         input_attribs[i].location = i;
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in vec4 x[2];
         void main(){
@@ -110,7 +111,7 @@ TEST_F(PositiveVertexInput, AttributeStructType) {
     //     in VertexIn {
     //         layout(location = 4) vec4 x;
     //     } x_struct;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical Simple
                OpEntryPoint Vertex %1 "main" %2
@@ -165,7 +166,7 @@ TEST_F(PositiveVertexInput, AttributeStructTypeWithArray) {
     //         layout(location = 4) vec4 y[2];
     //         layout(location = 1) vec3 x;
     //     } x_struct;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical Simple
                OpEntryPoint Vertex %1 "main" %2
@@ -219,7 +220,7 @@ TEST_F(PositiveVertexInput, AttributeStructTypeSecondLocation) {
     //         layout(location = 4) ivec4 x;
     //         layout(location = 6) uvec4 y;
     //     } x_struct;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical Simple
                OpEntryPoint Vertex %1 "main" %2
@@ -271,7 +272,7 @@ TEST_F(PositiveVertexInput, AttributeStructTypeBlockLocation) {
     //         vec4 x;
     //         uvec4 y;
     //     } x_struct;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical Simple
                OpEntryPoint Vertex %1 "main" %2
@@ -324,7 +325,7 @@ TEST_F(PositiveVertexInput, AttributeComponents) {
         input_attribs[i].location = i;
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in vec4 x;
         layout(location=1) in vec3 y1;
@@ -334,7 +335,7 @@ TEST_F(PositiveVertexInput, AttributeComponents) {
            gl_Position = x + vec4(y1, y2) + z;
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0, component=0) out float color0;
         layout(location=0, component=1) out float color1;
@@ -409,7 +410,7 @@ TEST_F(PositiveVertexInput, CreatePipeline64BitAttributes) {
     input_attribs[3].offset = 96;
     input_attribs[3].format = VK_FORMAT_R64G64B64A64_SFLOAT;
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in dmat4 x;
         void main(){
@@ -443,7 +444,7 @@ TEST_F(PositiveVertexInput, VertexAttribute64bit) {
 
     vkt::Buffer vtx_buf(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450 core
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
         layout(location = 0) in float64_t pos;
@@ -453,6 +454,37 @@ TEST_F(PositiveVertexInput, VertexAttribute64bit) {
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 0, VK_VERTEX_INPUT_RATE_VERTEX};
+    VkVertexInputAttributeDescription input_attribs = {0, 0, format, 0};
+
+    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
+    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
+    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attribs;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositiveVertexInput, VertexAttribute64bitExtraInput) {
+    TEST_DESCRIPTION("Agreed this was valid in https://gitlab.khronos.org/vulkan/vulkan/-/issues/3530");
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const VkFormat format = VK_FORMAT_R64G64B64A64_SFLOAT;
+    if ((m_device->FormatFeaturesBuffer(format) & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT) == 0) {
+        GTEST_SKIP() << "Format not supported for Vertex Buffer";
+    }
+
+    const char *vsSource = R"glsl(
+        #version 450 core
+        #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
+        layout(location = 0) in float64_t pos; // Uses only 1 of the 4 components
+        void main() {}
+    )glsl";
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    VkVertexInputBindingDescription input_binding = {0, 8, VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attribs = {0, 0, format, 0};
 
     pipe.vi_ci_.vertexBindingDescriptionCount = 1;
@@ -488,7 +520,7 @@ TEST_F(PositiveVertexInput, AttributeStructTypeBlockLocation64bit) {
     //         float64 y;
     //         ivec4 z;
     //     } x_struct;
-    char const *vsSource = R"(
+    const char *vsSource = R"(
                OpCapability Shader
                OpCapability Float64
                OpMemoryModel Logical Simple
@@ -534,7 +566,7 @@ TEST_F(PositiveVertexInput, Attribute64bitMissingComponent) {
         GTEST_SKIP() << "Format not supported for Vertex Buffer";
     }
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450 core
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
         layout(location = 0) in f64vec2 pos;
@@ -864,7 +896,7 @@ TEST_F(PositiveVertexInput, LegacyVertexAttributes) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in int x; /* attrib provided float */
         void main(){
@@ -909,14 +941,14 @@ TEST_F(PositiveVertexInput, ResetCmdSetVertexInput) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vs_source_int = R"glsl(
+    const char *vs_source_int = R"glsl(
         #version 450
         layout(location=0) in uvec4 x;
         void main(){}
     )glsl";
     VkShaderObj vs_int(this, vs_source_int, VK_SHADER_STAGE_VERTEX_BIT);
 
-    char const *vs_source_float = R"glsl(
+    const char *vs_source_float = R"glsl(
         #version 450
         layout(location=0) in vec4 x;
         void main(){}
@@ -970,7 +1002,7 @@ TEST_F(PositiveVertexInput, VertexAttributeRobustness) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         layout(location=0) in vec4 x; /* not provided */
         void main(){
@@ -992,7 +1024,7 @@ TEST_F(PositiveVertexInput, VertexAttributeRobustnessDynamic) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location = 0) in vec4 x;
         layout(location = 1) in vec4 y;
@@ -1041,7 +1073,7 @@ TEST_F(PositiveVertexInput, VertexInputRebinding) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location = 0) in float a;
 
@@ -1102,7 +1134,7 @@ TEST_F(PositiveVertexInput, UnusedInputBinding) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in vec4 x;
         layout(location=1) in vec4 y;
@@ -1145,7 +1177,7 @@ TEST_F(PositiveVertexInput, UnusedInputBindingDynamic) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in vec4 x;
         layout(location=1) in vec4 y;
@@ -1326,7 +1358,7 @@ TEST_F(PositiveVertexInput, AttributeNotProvided) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) in vec4 x; /* not provided */
         void main(){
@@ -1339,4 +1371,33 @@ TEST_F(PositiveVertexInput, AttributeNotProvided) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
+}
+
+TEST_F(PositiveVertexInput, NoInputLocation) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10771");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    // binding at index 1
+    VkVertexInputBindingDescription bindings = {1, 4, VK_VERTEX_INPUT_RATE_VERTEX};
+    // Location 1 no used, so can be ignored
+    VkVertexInputAttributeDescription attributes = {1, 1, VK_FORMAT_R8G8B8A8_UNORM, 0};
+    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
+    pipe.vi_ci_.pVertexBindingDescriptions = &bindings;
+    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.vi_ci_.pVertexAttributeDescriptions = &attributes;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    VkDeviceSize offset = 0;
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    // only bind at index 0
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &buffer.handle(), &offset);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 1);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

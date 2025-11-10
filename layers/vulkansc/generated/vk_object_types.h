@@ -39,23 +39,23 @@ typedef enum VulkanObjectType {
     kVulkanObjectTypeCommandBuffer = 8,
     kVulkanObjectTypeFence = 9,
     kVulkanObjectTypeDeviceMemory = 10,
-    kVulkanObjectTypeEvent = 11,
-    kVulkanObjectTypeQueryPool = 12,
-    kVulkanObjectTypeBufferView = 13,
-    kVulkanObjectTypeImageView = 14,
-    kVulkanObjectTypeShaderModule = 15,
-    kVulkanObjectTypePipelineCache = 16,
-    kVulkanObjectTypePipelineLayout = 17,
-    kVulkanObjectTypePipeline = 18,
-    kVulkanObjectTypeRenderPass = 19,
-    kVulkanObjectTypeDescriptorSetLayout = 20,
-    kVulkanObjectTypeSampler = 21,
-    kVulkanObjectTypeDescriptorSet = 22,
-    kVulkanObjectTypeDescriptorPool = 23,
-    kVulkanObjectTypeFramebuffer = 24,
-    kVulkanObjectTypeCommandPool = 25,
-    kVulkanObjectTypeSamplerYcbcrConversion = 26,
-    kVulkanObjectTypeDescriptorUpdateTemplate = 27,
+    kVulkanObjectTypeQueryPool = 11,
+    kVulkanObjectTypeImageView = 12,
+    kVulkanObjectTypeCommandPool = 13,
+    kVulkanObjectTypeRenderPass = 14,
+    kVulkanObjectTypeFramebuffer = 15,
+    kVulkanObjectTypeEvent = 16,
+    kVulkanObjectTypeBufferView = 17,
+    kVulkanObjectTypeShaderModule = 18,
+    kVulkanObjectTypePipelineCache = 19,
+    kVulkanObjectTypePipelineLayout = 20,
+    kVulkanObjectTypePipeline = 21,
+    kVulkanObjectTypeDescriptorSetLayout = 22,
+    kVulkanObjectTypeSampler = 23,
+    kVulkanObjectTypeDescriptorSet = 24,
+    kVulkanObjectTypeDescriptorPool = 25,
+    kVulkanObjectTypeDescriptorUpdateTemplate = 26,
+    kVulkanObjectTypeSamplerYcbcrConversion = 27,
     kVulkanObjectTypePrivateDataSlot = 28,
     kVulkanObjectTypeSurfaceKHR = 29,
     kVulkanObjectTypeSwapchainKHR = 30,
@@ -117,14 +117,20 @@ static constexpr VkObjectType ConvertVulkanObjectToCoreObject(VulkanObjectType i
             return VK_OBJECT_TYPE_FENCE;
         case kVulkanObjectTypeDeviceMemory:
             return VK_OBJECT_TYPE_DEVICE_MEMORY;
-        case kVulkanObjectTypeEvent:
-            return VK_OBJECT_TYPE_EVENT;
         case kVulkanObjectTypeQueryPool:
             return VK_OBJECT_TYPE_QUERY_POOL;
-        case kVulkanObjectTypeBufferView:
-            return VK_OBJECT_TYPE_BUFFER_VIEW;
         case kVulkanObjectTypeImageView:
             return VK_OBJECT_TYPE_IMAGE_VIEW;
+        case kVulkanObjectTypeCommandPool:
+            return VK_OBJECT_TYPE_COMMAND_POOL;
+        case kVulkanObjectTypeRenderPass:
+            return VK_OBJECT_TYPE_RENDER_PASS;
+        case kVulkanObjectTypeFramebuffer:
+            return VK_OBJECT_TYPE_FRAMEBUFFER;
+        case kVulkanObjectTypeEvent:
+            return VK_OBJECT_TYPE_EVENT;
+        case kVulkanObjectTypeBufferView:
+            return VK_OBJECT_TYPE_BUFFER_VIEW;
         case kVulkanObjectTypeShaderModule:
             return VK_OBJECT_TYPE_SHADER_MODULE;
         case kVulkanObjectTypePipelineCache:
@@ -133,8 +139,6 @@ static constexpr VkObjectType ConvertVulkanObjectToCoreObject(VulkanObjectType i
             return VK_OBJECT_TYPE_PIPELINE_LAYOUT;
         case kVulkanObjectTypePipeline:
             return VK_OBJECT_TYPE_PIPELINE;
-        case kVulkanObjectTypeRenderPass:
-            return VK_OBJECT_TYPE_RENDER_PASS;
         case kVulkanObjectTypeDescriptorSetLayout:
             return VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT;
         case kVulkanObjectTypeSampler:
@@ -143,14 +147,10 @@ static constexpr VkObjectType ConvertVulkanObjectToCoreObject(VulkanObjectType i
             return VK_OBJECT_TYPE_DESCRIPTOR_SET;
         case kVulkanObjectTypeDescriptorPool:
             return VK_OBJECT_TYPE_DESCRIPTOR_POOL;
-        case kVulkanObjectTypeFramebuffer:
-            return VK_OBJECT_TYPE_FRAMEBUFFER;
-        case kVulkanObjectTypeCommandPool:
-            return VK_OBJECT_TYPE_COMMAND_POOL;
-        case kVulkanObjectTypeSamplerYcbcrConversion:
-            return VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION;
         case kVulkanObjectTypeDescriptorUpdateTemplate:
             return VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE;
+        case kVulkanObjectTypeSamplerYcbcrConversion:
+            return VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION;
         case kVulkanObjectTypePrivateDataSlot:
             return VK_OBJECT_TYPE_PRIVATE_DATA_SLOT;
         case kVulkanObjectTypeSurfaceKHR:
@@ -241,14 +241,20 @@ static constexpr VulkanObjectType ConvertCoreObjectToVulkanObject(VkObjectType v
             return kVulkanObjectTypeFence;
         case VK_OBJECT_TYPE_DEVICE_MEMORY:
             return kVulkanObjectTypeDeviceMemory;
-        case VK_OBJECT_TYPE_EVENT:
-            return kVulkanObjectTypeEvent;
         case VK_OBJECT_TYPE_QUERY_POOL:
             return kVulkanObjectTypeQueryPool;
-        case VK_OBJECT_TYPE_BUFFER_VIEW:
-            return kVulkanObjectTypeBufferView;
         case VK_OBJECT_TYPE_IMAGE_VIEW:
             return kVulkanObjectTypeImageView;
+        case VK_OBJECT_TYPE_COMMAND_POOL:
+            return kVulkanObjectTypeCommandPool;
+        case VK_OBJECT_TYPE_RENDER_PASS:
+            return kVulkanObjectTypeRenderPass;
+        case VK_OBJECT_TYPE_FRAMEBUFFER:
+            return kVulkanObjectTypeFramebuffer;
+        case VK_OBJECT_TYPE_EVENT:
+            return kVulkanObjectTypeEvent;
+        case VK_OBJECT_TYPE_BUFFER_VIEW:
+            return kVulkanObjectTypeBufferView;
         case VK_OBJECT_TYPE_SHADER_MODULE:
             return kVulkanObjectTypeShaderModule;
         case VK_OBJECT_TYPE_PIPELINE_CACHE:
@@ -257,8 +263,6 @@ static constexpr VulkanObjectType ConvertCoreObjectToVulkanObject(VkObjectType v
             return kVulkanObjectTypePipelineLayout;
         case VK_OBJECT_TYPE_PIPELINE:
             return kVulkanObjectTypePipeline;
-        case VK_OBJECT_TYPE_RENDER_PASS:
-            return kVulkanObjectTypeRenderPass;
         case VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT:
             return kVulkanObjectTypeDescriptorSetLayout;
         case VK_OBJECT_TYPE_SAMPLER:
@@ -267,14 +271,10 @@ static constexpr VulkanObjectType ConvertCoreObjectToVulkanObject(VkObjectType v
             return kVulkanObjectTypeDescriptorSet;
         case VK_OBJECT_TYPE_DESCRIPTOR_POOL:
             return kVulkanObjectTypeDescriptorPool;
-        case VK_OBJECT_TYPE_FRAMEBUFFER:
-            return kVulkanObjectTypeFramebuffer;
-        case VK_OBJECT_TYPE_COMMAND_POOL:
-            return kVulkanObjectTypeCommandPool;
-        case VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION:
-            return kVulkanObjectTypeSamplerYcbcrConversion;
         case VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE:
             return kVulkanObjectTypeDescriptorUpdateTemplate;
+        case VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION:
+            return kVulkanObjectTypeSamplerYcbcrConversion;
         case VK_OBJECT_TYPE_PRIVATE_DATA_SLOT:
             return kVulkanObjectTypePrivateDataSlot;
         case VK_OBJECT_TYPE_SURFACE_KHR:
@@ -365,14 +365,20 @@ static constexpr VkDebugReportObjectTypeEXT ConvertCoreObjectToDebugReportObject
             return VK_DEBUG_REPORT_OBJECT_TYPE_FENCE_EXT;
         case VK_OBJECT_TYPE_DEVICE_MEMORY:
             return VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT;
-        case VK_OBJECT_TYPE_EVENT:
-            return VK_DEBUG_REPORT_OBJECT_TYPE_EVENT_EXT;
         case VK_OBJECT_TYPE_QUERY_POOL:
             return VK_DEBUG_REPORT_OBJECT_TYPE_QUERY_POOL_EXT;
-        case VK_OBJECT_TYPE_BUFFER_VIEW:
-            return VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_VIEW_EXT;
         case VK_OBJECT_TYPE_IMAGE_VIEW:
             return VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT;
+        case VK_OBJECT_TYPE_COMMAND_POOL:
+            return VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT;
+        case VK_OBJECT_TYPE_RENDER_PASS:
+            return VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT;
+        case VK_OBJECT_TYPE_FRAMEBUFFER:
+            return VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT;
+        case VK_OBJECT_TYPE_EVENT:
+            return VK_DEBUG_REPORT_OBJECT_TYPE_EVENT_EXT;
+        case VK_OBJECT_TYPE_BUFFER_VIEW:
+            return VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_VIEW_EXT;
         case VK_OBJECT_TYPE_SHADER_MODULE:
             return VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT;
         case VK_OBJECT_TYPE_PIPELINE_CACHE:
@@ -381,8 +387,6 @@ static constexpr VkDebugReportObjectTypeEXT ConvertCoreObjectToDebugReportObject
             return VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT;
         case VK_OBJECT_TYPE_PIPELINE:
             return VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT;
-        case VK_OBJECT_TYPE_RENDER_PASS:
-            return VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT;
         case VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT:
             return VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT;
         case VK_OBJECT_TYPE_SAMPLER:
@@ -391,14 +395,10 @@ static constexpr VkDebugReportObjectTypeEXT ConvertCoreObjectToDebugReportObject
             return VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT;
         case VK_OBJECT_TYPE_DESCRIPTOR_POOL:
             return VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_POOL_EXT;
-        case VK_OBJECT_TYPE_FRAMEBUFFER:
-            return VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT;
-        case VK_OBJECT_TYPE_COMMAND_POOL:
-            return VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT;
-        case VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION:
-            return VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION_EXT;
         case VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE:
             return VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_EXT;
+        case VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION:
+            return VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION_EXT;
         case VK_OBJECT_TYPE_SURFACE_KHR:
             return VK_DEBUG_REPORT_OBJECT_TYPE_SURFACE_KHR_EXT;
         case VK_OBJECT_TYPE_SWAPCHAIN_KHR:
@@ -454,14 +454,20 @@ static constexpr VulkanObjectType ConvertDebugReportObjectToVulkanObject(VkDebug
             return kVulkanObjectTypeFence;
         case VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT:
             return kVulkanObjectTypeDeviceMemory;
-        case VK_DEBUG_REPORT_OBJECT_TYPE_EVENT_EXT:
-            return kVulkanObjectTypeEvent;
         case VK_DEBUG_REPORT_OBJECT_TYPE_QUERY_POOL_EXT:
             return kVulkanObjectTypeQueryPool;
-        case VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_VIEW_EXT:
-            return kVulkanObjectTypeBufferView;
         case VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT:
             return kVulkanObjectTypeImageView;
+        case VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT:
+            return kVulkanObjectTypeCommandPool;
+        case VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT:
+            return kVulkanObjectTypeRenderPass;
+        case VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT:
+            return kVulkanObjectTypeFramebuffer;
+        case VK_DEBUG_REPORT_OBJECT_TYPE_EVENT_EXT:
+            return kVulkanObjectTypeEvent;
+        case VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_VIEW_EXT:
+            return kVulkanObjectTypeBufferView;
         case VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT:
             return kVulkanObjectTypeShaderModule;
         case VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_CACHE_EXT:
@@ -470,8 +476,6 @@ static constexpr VulkanObjectType ConvertDebugReportObjectToVulkanObject(VkDebug
             return kVulkanObjectTypePipelineLayout;
         case VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT:
             return kVulkanObjectTypePipeline;
-        case VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT:
-            return kVulkanObjectTypeRenderPass;
         case VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT:
             return kVulkanObjectTypeDescriptorSetLayout;
         case VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_EXT:
@@ -480,14 +484,10 @@ static constexpr VulkanObjectType ConvertDebugReportObjectToVulkanObject(VkDebug
             return kVulkanObjectTypeDescriptorSet;
         case VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_POOL_EXT:
             return kVulkanObjectTypeDescriptorPool;
-        case VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT:
-            return kVulkanObjectTypeFramebuffer;
-        case VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT:
-            return kVulkanObjectTypeCommandPool;
-        case VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION_EXT:
-            return kVulkanObjectTypeSamplerYcbcrConversion;
         case VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_EXT:
             return kVulkanObjectTypeDescriptorUpdateTemplate;
+        case VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION_EXT:
+            return kVulkanObjectTypeSamplerYcbcrConversion;
         case VK_DEBUG_REPORT_OBJECT_TYPE_SURFACE_KHR_EXT:
             return kVulkanObjectTypeSurfaceKHR;
         case VK_DEBUG_REPORT_OBJECT_TYPE_SWAPCHAIN_KHR_EXT:
@@ -696,18 +696,6 @@ struct VulkanObjectTypeInfo<kVulkanObjectTypeDeviceMemory> {
 };
 
 template <>
-struct VkHandleInfo<VkEvent> {
-    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeEvent;
-    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_EVENT_EXT;
-    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_EVENT;
-    static const char* Typename() { return "VkEvent"; }
-};
-template <>
-struct VulkanObjectTypeInfo<kVulkanObjectTypeEvent> {
-    typedef VkEvent Type;
-};
-
-template <>
 struct VkHandleInfo<VkQueryPool> {
     static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeQueryPool;
     static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_QUERY_POOL_EXT;
@@ -720,18 +708,6 @@ struct VulkanObjectTypeInfo<kVulkanObjectTypeQueryPool> {
 };
 
 template <>
-struct VkHandleInfo<VkBufferView> {
-    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeBufferView;
-    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_VIEW_EXT;
-    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_BUFFER_VIEW;
-    static const char* Typename() { return "VkBufferView"; }
-};
-template <>
-struct VulkanObjectTypeInfo<kVulkanObjectTypeBufferView> {
-    typedef VkBufferView Type;
-};
-
-template <>
 struct VkHandleInfo<VkImageView> {
     static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeImageView;
     static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT;
@@ -741,6 +717,66 @@ struct VkHandleInfo<VkImageView> {
 template <>
 struct VulkanObjectTypeInfo<kVulkanObjectTypeImageView> {
     typedef VkImageView Type;
+};
+
+template <>
+struct VkHandleInfo<VkCommandPool> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeCommandPool;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_COMMAND_POOL;
+    static const char* Typename() { return "VkCommandPool"; }
+};
+template <>
+struct VulkanObjectTypeInfo<kVulkanObjectTypeCommandPool> {
+    typedef VkCommandPool Type;
+};
+
+template <>
+struct VkHandleInfo<VkRenderPass> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeRenderPass;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_RENDER_PASS;
+    static const char* Typename() { return "VkRenderPass"; }
+};
+template <>
+struct VulkanObjectTypeInfo<kVulkanObjectTypeRenderPass> {
+    typedef VkRenderPass Type;
+};
+
+template <>
+struct VkHandleInfo<VkFramebuffer> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeFramebuffer;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_FRAMEBUFFER;
+    static const char* Typename() { return "VkFramebuffer"; }
+};
+template <>
+struct VulkanObjectTypeInfo<kVulkanObjectTypeFramebuffer> {
+    typedef VkFramebuffer Type;
+};
+
+template <>
+struct VkHandleInfo<VkEvent> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeEvent;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_EVENT_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_EVENT;
+    static const char* Typename() { return "VkEvent"; }
+};
+template <>
+struct VulkanObjectTypeInfo<kVulkanObjectTypeEvent> {
+    typedef VkEvent Type;
+};
+
+template <>
+struct VkHandleInfo<VkBufferView> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeBufferView;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_VIEW_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_BUFFER_VIEW;
+    static const char* Typename() { return "VkBufferView"; }
+};
+template <>
+struct VulkanObjectTypeInfo<kVulkanObjectTypeBufferView> {
+    typedef VkBufferView Type;
 };
 
 template <>
@@ -792,18 +828,6 @@ struct VulkanObjectTypeInfo<kVulkanObjectTypePipeline> {
 };
 
 template <>
-struct VkHandleInfo<VkRenderPass> {
-    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeRenderPass;
-    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT;
-    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_RENDER_PASS;
-    static const char* Typename() { return "VkRenderPass"; }
-};
-template <>
-struct VulkanObjectTypeInfo<kVulkanObjectTypeRenderPass> {
-    typedef VkRenderPass Type;
-};
-
-template <>
 struct VkHandleInfo<VkDescriptorSetLayout> {
     static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeDescriptorSetLayout;
     static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT;
@@ -852,27 +876,15 @@ struct VulkanObjectTypeInfo<kVulkanObjectTypeDescriptorPool> {
 };
 
 template <>
-struct VkHandleInfo<VkFramebuffer> {
-    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeFramebuffer;
-    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT;
-    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_FRAMEBUFFER;
-    static const char* Typename() { return "VkFramebuffer"; }
+struct VkHandleInfo<VkDescriptorUpdateTemplate> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeDescriptorUpdateTemplate;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE;
+    static const char* Typename() { return "VkDescriptorUpdateTemplate"; }
 };
 template <>
-struct VulkanObjectTypeInfo<kVulkanObjectTypeFramebuffer> {
-    typedef VkFramebuffer Type;
-};
-
-template <>
-struct VkHandleInfo<VkCommandPool> {
-    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeCommandPool;
-    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT;
-    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_COMMAND_POOL;
-    static const char* Typename() { return "VkCommandPool"; }
-};
-template <>
-struct VulkanObjectTypeInfo<kVulkanObjectTypeCommandPool> {
-    typedef VkCommandPool Type;
+struct VulkanObjectTypeInfo<kVulkanObjectTypeDescriptorUpdateTemplate> {
+    typedef VkDescriptorUpdateTemplate Type;
 };
 
 template <>
@@ -885,18 +897,6 @@ struct VkHandleInfo<VkSamplerYcbcrConversion> {
 template <>
 struct VulkanObjectTypeInfo<kVulkanObjectTypeSamplerYcbcrConversion> {
     typedef VkSamplerYcbcrConversion Type;
-};
-
-template <>
-struct VkHandleInfo<VkDescriptorUpdateTemplate> {
-    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeDescriptorUpdateTemplate;
-    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_EXT;
-    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE;
-    static const char* Typename() { return "VkDescriptorUpdateTemplate"; }
-};
-template <>
-struct VulkanObjectTypeInfo<kVulkanObjectTypeDescriptorUpdateTemplate> {
-    typedef VkDescriptorUpdateTemplate Type;
 };
 
 template <>

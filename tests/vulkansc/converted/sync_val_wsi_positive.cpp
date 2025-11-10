@@ -19,6 +19,7 @@
  */
 
 #include "../framework/sync_val_tests.h"
+#include <vulkan/utility/vk_format_utils.h>
 #include <thread>
 
 struct PositiveSyncValWsi : public VkSyncValTest {};
@@ -238,30 +239,6 @@ TEST_F(PositiveSyncValWsi, ThreadedSubmitAndFenceWaitAndPresent) {
     thread.join();
 }
 
-// TODO: make this a shared function, since WSI tests also use it
-static void SetImageLayoutPresentSrc(vkt::Queue &queue, vkt::Device &device, VkImage image) {
-    vkt::CommandPool pool(device, device.graphics_queue_node_index_);
-    vkt::CommandBuffer cmd_buf(device, pool);
-
-    cmd_buf.Begin();
-    VkImageMemoryBarrier layout_barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                                        nullptr,
-                                        0,
-                                        VK_ACCESS_MEMORY_READ_BIT,
-                                        VK_IMAGE_LAYOUT_UNDEFINED,
-                                        VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                                        VK_QUEUE_FAMILY_IGNORED,
-                                        VK_QUEUE_FAMILY_IGNORED,
-                                        image,
-                                        {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}};
-
-    vk::CmdPipelineBarrier(cmd_buf.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &layout_barrier);
-    cmd_buf.End();
-    queue.Submit(cmd_buf);
-    queue.Wait();
-}
-
 TEST_F(PositiveSyncValWsi, WaitForFencesWithPresentBatches) {
     TEST_DESCRIPTION("Check that WaitForFences applies tagged waits to present batches");
     AddSurfaceExtension();
@@ -269,7 +246,7 @@ TEST_F(PositiveSyncValWsi, WaitForFencesWithPresentBatches) {
     RETURN_IF_SKIP(InitSwapchain());
     const auto swapchain_images = m_swapchain.GetImages();
     for (auto image : swapchain_images) {
-        SetImageLayoutPresentSrc(*m_default_queue, *m_device, image);
+        SetPresentImageLayout(image);
     }
 
     vkt::Semaphore acquire_semaphore(*m_device);
@@ -341,7 +318,7 @@ TEST_F(PositiveSyncValWsi, RecreateBuffer) {
     std::vector<vkt::Buffer> dst_buffers(swapchain_images.size());
 
     for (VkImage image : swapchain_images) {
-        SetImageLayoutPresentSrc(*m_default_queue, *m_device, image);
+        SetPresentImageLayout(image);
     }
     for (size_t i = 0; i < swapchain_images.size(); i++) {
         acquire_fences.emplace_back(*m_device);
@@ -360,11 +337,11 @@ TEST_F(PositiveSyncValWsi, RecreateBuffer) {
         current_fence.Reset();
 
         auto &src_buffer = src_buffers[image_index];
-        src_buffer.destroy();
+        src_buffer.Destroy();
         src_buffer = vkt::Buffer(*m_device, 1024, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
         auto &dst_buffer = dst_buffers[image_index];
-        dst_buffer.destroy();
+        dst_buffer.Destroy();
         dst_buffer = vkt::Buffer(*m_device, 1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
         auto &command_buffer = command_buffers[image_index];
@@ -403,7 +380,7 @@ TEST_F(PositiveSyncValWsi, RecreateImage) {
     std::vector<vkt::Image> dst_images(swapchain_images.size());
 
     for (auto image : swapchain_images) {
-        SetImageLayoutPresentSrc(*m_default_queue, *m_device, image);
+        SetPresentImageLayout(image);
     }
     for (size_t i = 0; i < swapchain_images.size(); i++) {
         acquire_fences.emplace_back(*m_device);
@@ -422,7 +399,7 @@ TEST_F(PositiveSyncValWsi, RecreateImage) {
         current_fence.Reset();
 
         auto &dst_image = dst_images[image_index];
-        dst_image.destroy();
+        dst_image.Destroy();
         dst_image = vkt::Image(*m_device, width, height, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
         VkBufferImageCopy region = {};
@@ -450,5 +427,666 @@ TEST_F(PositiveSyncValWsi, RecreateImage) {
         m_default_queue->Present(m_swapchain, image_index, submit_semaphore);
         std::swap(acquire_fences[image_index], current_fence);
     }
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, ResyncWithSwapchain) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10586
+    // Semaphore wait should not introduce unsynchronized swapchain accesses from internal
+    // queue access contexts if those acceses were properly synchronized.
+    TEST_DESCRIPTION("Try to introduce unsynchronized swapchain accesses after proper swapchain synchronization");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddSurfaceExtension();
+    AddRequiredFeature(vkt::Feature::synchronization2);
+
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSwapchain(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
+
+    const auto swapchain_images = m_swapchain.GetImages();
+    if (swapchain_images.size() != 2) {
+        GTEST_SKIP() << "The test requires swapchain with 2 images";
+    }
+    for (auto image : swapchain_images) {
+        SetPresentImageLayout(image);
+    }
+    const VkImage swapchain_image0 = swapchain_images[0];
+
+    vkt::Semaphore acquire_semaphore0(*m_device);
+    vkt::Semaphore acquire_semaphore1(*m_device);
+    vkt::Semaphore acquire_semaphore2(*m_device);
+    vkt::Semaphore submit_semaphore0(*m_device);
+    vkt::Semaphore submit_semaphore1(*m_device);
+
+    // This semaphore is signaled when swapchain still uses image0
+    vkt::Semaphore semaphore(*m_device);
+
+    VkImageMemoryBarrier2 transition_swapchain_image0 = vku::InitStructHelper();
+    transition_swapchain_image0.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    transition_swapchain_image0.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    transition_swapchain_image0.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition_swapchain_image0.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transition_swapchain_image0.image = swapchain_image0;
+    transition_swapchain_image0.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    const SurfaceInformation info = GetSwapchainInfo(m_surface.Handle());
+    const uint32_t width = info.surface_capabilities.minImageExtent.width;
+    const uint32_t height = info.surface_capabilities.minImageExtent.height;
+    const uint32_t format_size = vkuFormatTexelBlockSize(info.surface_formats[0].format);
+    vkt::Buffer buffer(*m_device, width * height * format_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    VkBufferImageCopy copy_region{};
+    copy_region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy_region.imageExtent = {width, height, 1};
+
+    // Frame 0
+    uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore0, kWaitTimeout);
+    if (image_index != 0) {
+        GTEST_SKIP() << "This test requires the first acquired image index is 0";
+    }
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore0), vkt::Signal(submit_semaphore0));
+    m_default_queue->Present(m_swapchain, image_index, submit_semaphore0);
+
+    // Signal semaphore when swapchain image0 can still be in use by the swapchain.
+    // If we immediately synchronize with this semaphore image0 can still be in use.
+    // If at first we synchronize with swapchain image0 and only then wait on this
+    // semaphore (maybe redundantly), then it changes nothing, image0 remains synchronized
+    // and it is safe to access it. This test recreates a regression scenario when binary
+    // semaphore wait imported unsynchronized swapchain accesses even though swapchain
+    // accesses were already synchronized.
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Signal(semaphore));
+
+    // Frame 1
+    image_index = m_swapchain.AcquireNextImage(acquire_semaphore1, kWaitTimeout);
+    if (image_index != 1) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the second acquired image index is 1";
+    }
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore1), vkt::Signal(submit_semaphore1));
+    m_default_queue->Present(m_swapchain, image_index, submit_semaphore1);
+
+    // Frame 2. Re-acquire image0 that was presented in Frame0
+    image_index = m_swapchain.AcquireNextImage(acquire_semaphore2, kWaitTimeout);
+    if (image_index != 0) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the third acquired image index is 0";
+    }
+
+    // Explanation of what the following sequence does.
+    // Waiting on acquire_semaphore2 imports synchronized swapchain image0 accesses into queue context.
+    // The important point is that imported accesses are synchronized due to acquire semaphore wait
+    // In the next step we import image0 layout transition accesses from command buffer and this replaces
+    // synchronized swapchain accesses with image layout write accesses. Then Wait() synchronized all
+    // accesses on default queue. In our case this removes layout transition accesses from queue context
+    // (queue context gets empty).
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(transition_swapchain_image0);
+    m_command_buffer.End();
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(acquire_semaphore2));
+    // QueueWaitIdle filters synchronized swapchain accesses across queue contexts (including context associated with 'semaphore')
+    m_default_queue->Wait();
+
+    // The second sequence starts by importing accesses associated with semaphore wait (from queue context
+    // where this semaphore was signaled). Because this semaphore was signaled when swapchain image0
+    // accesses were not synchronized yet, there is a danger (with buggy implementation) that those
+    // unsynchronized accesses can be imported into queue context and they will hazard with subsequent copy
+    // operation. The goal of this test is to check that implementation correctly handles this.
+    // Please note, it is important the previous sequence clears queue context by doing Wait(). If queue context
+    // is not cleared and, for example, still contains layout transition accesses, then even in the case of
+    // regression the buggy unsynchronized accesses won't overwrite layout transition accesses (the latter have
+    // newer tags), so without Wait() the test won't be able to detect regression.
+    m_command_buffer.Begin();
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer, swapchain_image0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
+    m_command_buffer.End();
+    // Test semaphore wait does not import unsynchronized swapchain accesses
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(semaphore));
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, ResyncWithSwapchain2) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10586
+    // This test is a variation of PositiveSyncValWsi.ResyncWithSwapchain that uses DeviceWaitIdle instead of QueueWaitIdle.
+    // Check comments in ResyncWithSwapchain for additional details.
+    TEST_DESCRIPTION("Try to introduce unsynchronized swapchain accesses after proper swapchain synchronization");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddSurfaceExtension();
+    AddRequiredFeature(vkt::Feature::synchronization2);
+
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSwapchain(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
+
+    const auto swapchain_images = m_swapchain.GetImages();
+    if (swapchain_images.size() != 2) {
+        GTEST_SKIP() << "The test requires swapchain with 2 images";
+    }
+    for (auto image : swapchain_images) {
+        SetPresentImageLayout(image);
+    }
+    const VkImage swapchain_image0 = swapchain_images[0];
+
+    vkt::Semaphore acquire_semaphore0(*m_device);
+    vkt::Semaphore acquire_semaphore1(*m_device);
+    vkt::Semaphore acquire_semaphore2(*m_device);
+    vkt::Semaphore submit_semaphore0(*m_device);
+    vkt::Semaphore submit_semaphore1(*m_device);
+
+    // This semaphore is signaled when swapchain still uses image0
+    vkt::Semaphore semaphore(*m_device);
+
+    VkImageMemoryBarrier2 transition_swapchain_image0 = vku::InitStructHelper();
+    transition_swapchain_image0.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    transition_swapchain_image0.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    transition_swapchain_image0.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition_swapchain_image0.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transition_swapchain_image0.image = swapchain_image0;
+    transition_swapchain_image0.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    const SurfaceInformation info = GetSwapchainInfo(m_surface.Handle());
+    const uint32_t width = info.surface_capabilities.minImageExtent.width;
+    const uint32_t height = info.surface_capabilities.minImageExtent.height;
+    const uint32_t format_size = vkuFormatTexelBlockSize(info.surface_formats[0].format);
+    vkt::Buffer buffer(*m_device, width * height * format_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    VkBufferImageCopy copy_region{};
+    copy_region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy_region.imageExtent = {width, height, 1};
+
+    // Frame 0
+    uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore0, kWaitTimeout);
+    if (image_index != 0) {
+        GTEST_SKIP() << "This test requires the first acquired image index is 0";
+    }
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore0), vkt::Signal(submit_semaphore0));
+    m_default_queue->Present(m_swapchain, image_index, submit_semaphore0);
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Signal(semaphore));
+    // Frame 1
+    image_index = m_swapchain.AcquireNextImage(acquire_semaphore1, kWaitTimeout);
+    if (image_index != 1) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the second acquired image index is 1";
+    }
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore1), vkt::Signal(submit_semaphore1));
+    m_default_queue->Present(m_swapchain, image_index, submit_semaphore1);
+    // Frame 2. Re-acquire image0 that was presented in Frame0
+    image_index = m_swapchain.AcquireNextImage(acquire_semaphore2, kWaitTimeout);
+    if (image_index != 0) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the third acquired image index is 0";
+    }
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(transition_swapchain_image0);
+    m_command_buffer.End();
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(acquire_semaphore2));
+    // DeviceWaitIdle filters synchronized swapchain accesses across queue contexts
+    m_device->Wait();
+
+    m_command_buffer.Begin();
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer, swapchain_image0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
+    m_command_buffer.End();
+    // Test semaphore wait does not import unsynchronized swapchain accesses
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(semaphore));
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, ResyncWithSwapchain3) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10586
+    // This test is a variation of PositiveSyncValWsi.ResyncWithSwapchain that uses timeline semaphore to sync queue.
+    // Check comments in ResyncWithSwapchain for additional details.
+    TEST_DESCRIPTION("Try to introduce unsynchronized swapchain accesses after proper swapchain synchronization");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddSurfaceExtension();
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSwapchain(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
+
+    const auto swapchain_images = m_swapchain.GetImages();
+    if (swapchain_images.size() != 2) {
+        GTEST_SKIP() << "The test requires swapchain with 2 images";
+    }
+    for (auto image : swapchain_images) {
+        SetPresentImageLayout(image);
+    }
+    const VkImage swapchain_image0 = swapchain_images[0];
+
+    vkt::Semaphore acquire_semaphore0(*m_device);
+    vkt::Semaphore acquire_semaphore1(*m_device);
+    vkt::Semaphore acquire_semaphore2(*m_device);
+    vkt::Semaphore submit_semaphore0(*m_device);
+    vkt::Semaphore submit_semaphore1(*m_device);
+
+    vkt::Semaphore semaphore(*m_device);
+    vkt::Semaphore timeline(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+
+    VkImageMemoryBarrier2 transition_swapchain_image0 = vku::InitStructHelper();
+    transition_swapchain_image0.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    transition_swapchain_image0.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    transition_swapchain_image0.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition_swapchain_image0.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transition_swapchain_image0.image = swapchain_image0;
+    transition_swapchain_image0.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    const SurfaceInformation info = GetSwapchainInfo(m_surface.Handle());
+    const uint32_t width = info.surface_capabilities.minImageExtent.width;
+    const uint32_t height = info.surface_capabilities.minImageExtent.height;
+    const uint32_t format_size = vkuFormatTexelBlockSize(info.surface_formats[0].format);
+    vkt::Buffer buffer(*m_device, width * height * format_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    VkBufferImageCopy copy_region{};
+    copy_region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy_region.imageExtent = {width, height, 1};
+
+    // Frame 0
+    uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore0, kWaitTimeout);
+    if (image_index != 0) {
+        GTEST_SKIP() << "This test requires the first acquired image index is 0";
+    }
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore0), vkt::Signal(submit_semaphore0));
+    m_default_queue->Present(m_swapchain, image_index, submit_semaphore0);
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Signal(semaphore));
+    // Frame 1
+    image_index = m_swapchain.AcquireNextImage(acquire_semaphore1, kWaitTimeout);
+    if (image_index != 1) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the second acquired image index is 1";
+    }
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore1), vkt::Signal(submit_semaphore1));
+    m_default_queue->Present(m_swapchain, image_index, submit_semaphore1);
+    // Frame 2. Re-acquire image0 that was presented in Frame0
+    image_index = m_swapchain.AcquireNextImage(acquire_semaphore2, kWaitTimeout);
+    if (image_index != 0) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the third acquired image index is 0";
+    }
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(transition_swapchain_image0);
+    m_command_buffer.End();
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(acquire_semaphore2), vkt::TimelineSignal(timeline, 1));
+    // WaitSemaphores filters synchronized swapchain accesses across queue contexts
+    timeline.Wait(1, kWaitTimeout);
+
+    m_command_buffer.Begin();
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer, swapchain_image0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
+    m_command_buffer.End();
+    // Test semaphore wait does not import unsynchronized swapchain accesses
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(semaphore));
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, ResyncWithSwapchain4) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10586
+    // This test is a variation of PositiveSyncValWsi.ResyncWithSwapchain.
+    // This scenario synchronizes with 2 swapchain images.
+    // We need a swapchain with 3 images in order to acquire 2 images without blocking.
+    TEST_DESCRIPTION("Try to introduce unsynchronized swapchain accesses after proper swapchain synchronization");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddSurfaceExtension();
+    AddRequiredFeature(vkt::Feature::synchronization2);
+
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSurface());
+
+    const SurfaceInformation surface_info = GetSwapchainInfo(m_surface.Handle());
+    if (surface_info.surface_capabilities.minImageCount > 3 || surface_info.surface_capabilities.maxImageCount < 3) {
+        GTEST_SKIP() << "Surface must support swapchains with 3 images";
+    }
+
+    VkSwapchainCreateInfoKHR swapchain_ci = GetDefaultSwapchainCreateInfo(
+        m_surface.Handle(), surface_info, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    swapchain_ci.minImageCount = 3;
+    vkt::Swapchain swapchain(*m_device, swapchain_ci);
+
+    const auto swapchain_images = swapchain.GetImages();
+    if (swapchain_images.size() != 3) {
+        GTEST_SKIP() << "The test requires swapchain with 3 images";
+    }
+    for (auto image : swapchain_images) {
+        SetPresentImageLayout(image);
+    }
+    const VkImage swapchain_image0 = swapchain_images[0];
+
+    vkt::Semaphore acquire_semaphore0(*m_device);
+    vkt::Semaphore acquire_semaphore1(*m_device);
+    vkt::Semaphore acquire_semaphore2(*m_device);
+    vkt::Semaphore acquire_semaphore3(*m_device);
+    vkt::Semaphore acquire_semaphore4(*m_device);
+    vkt::Semaphore submit_semaphore0(*m_device);
+    vkt::Semaphore submit_semaphore1(*m_device);
+    vkt::Semaphore submit_semaphore2(*m_device);
+
+    // This semaphore is signaled when swapchain still uses image0
+    vkt::Semaphore semaphore(*m_device);
+
+    VkImageMemoryBarrier2 transition_swapchain_image = vku::InitStructHelper();
+    transition_swapchain_image.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    transition_swapchain_image.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    transition_swapchain_image.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition_swapchain_image.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transition_swapchain_image.image = swapchain_image0;
+    transition_swapchain_image.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    const uint32_t width = surface_info.surface_capabilities.minImageExtent.width;
+    const uint32_t height = surface_info.surface_capabilities.minImageExtent.height;
+    const uint32_t format_size = vkuFormatTexelBlockSize(surface_info.surface_formats[0].format);
+    vkt::Buffer buffer(*m_device, width * height * format_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    VkBufferImageCopy copy_region{};
+    copy_region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy_region.imageExtent = {width, height, 1};
+
+    // Frame 0
+    uint32_t image_index = swapchain.AcquireNextImage(acquire_semaphore0, kWaitTimeout);
+    if (image_index != 0) {
+        GTEST_SKIP() << "This test requires the first acquired image index is 0";
+    }
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore0), vkt::Signal(submit_semaphore0));
+    m_default_queue->Present(swapchain, image_index, submit_semaphore0);
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Signal(semaphore));
+
+    // Frame 1
+    image_index = swapchain.AcquireNextImage(acquire_semaphore1, kWaitTimeout);
+    if (image_index != 1) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the second acquired image index is 1";
+    }
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore1), vkt::Signal(submit_semaphore1));
+    m_default_queue->Present(swapchain, image_index, submit_semaphore1);
+
+    // Frame 2
+    image_index = swapchain.AcquireNextImage(acquire_semaphore2, kWaitTimeout);
+    if (image_index != 2) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the third acquired image index is 2";
+    }
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore2), vkt::Signal(submit_semaphore2));
+    m_default_queue->Present(swapchain, image_index, submit_semaphore2);
+
+    // Frame 3. Re-acquire image0 that was presented in Frame0.
+    // Also re-acquire image1 that was presented in Frame1.
+    image_index = swapchain.AcquireNextImage(acquire_semaphore3, kWaitTimeout);
+    if (image_index != 0) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the fourth acquired image index is 0";
+    }
+
+    uint32_t image_index2 = swapchain.AcquireNextImage(acquire_semaphore4, kWaitTimeout);
+    if (image_index2 != 1) {
+        m_default_queue->Wait();
+        GTEST_SKIP() << "This test requires the fifth acquired image index is 1";
+    }
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(transition_swapchain_image);
+    m_command_buffer.End();
+    // Import accesses from two swapchain images before applying command buffer accesses
+    // (layout transition of the first image). Test that implementation properly tracks
+    // multiple synchronized swapchain accesses (image0 and image1) accross all queue contexts
+    // where these accesses are registered.
+    m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore3));
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(acquire_semaphore4));
+    // QueueWaitIdle filters synchronized swapchain accesses across queue contexts
+    m_default_queue->Wait();
+
+    m_command_buffer.Begin();
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer, swapchain_image0, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
+    m_command_buffer.End();
+    // Without proper tracking of multiple synchronized accesses the buggy implementation might remember only
+    // the last one (image1 accesses synced by acquire_semaphore4) and can forget about image0 accesses synced
+    // by acquire_semaphore3. By waiting on 'semaphore' that was signaled after image0 presentation we test
+    // that imlementation remembers that image0 accesses were already synced and does not import them as
+    // unsynchronized accesses (in that case they will hazard with command buffer copy operation).
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(semaphore));
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, PresentWithPrimaryLayoutTransitions) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddSurfaceExtension();
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    vkt::Semaphore acquire_semaphore(*m_device);
+    vkt::Semaphore submit_semaphore(*m_device);
+    const auto swapchain_images = m_swapchain.GetImages();
+    const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+
+    VkImageMemoryBarrier2 layout_transition_write = vku::InitStructHelper();
+    layout_transition_write.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition_write.srcAccessMask = VK_ACCESS_2_NONE;
+    layout_transition_write.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition_write.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    layout_transition_write.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition_write.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    layout_transition_write.image = swapchain_images[image_index];
+    layout_transition_write.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkImageMemoryBarrier2 layout_transition_present = vku::InitStructHelper();
+    layout_transition_present.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition_present.srcAccessMask = VK_ACCESS_2_NONE;
+    layout_transition_present.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition_present.dstAccessMask = VK_ACCESS_2_NONE;
+    layout_transition_present.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    layout_transition_present.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    layout_transition_present.image = swapchain_images[image_index];
+    layout_transition_present.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(layout_transition_write);
+    m_command_buffer.Barrier(layout_transition_present);
+    m_command_buffer.End();
+
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(acquire_semaphore, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT),
+                             vkt::Signal(submit_semaphore, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT));
+    m_default_queue->Present(m_swapchain, image_index, submit_semaphore);
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, PresentWithSecondaryLayoutTransitions) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10693
+    TEST_DESCRIPTION("Test propagation of layout transition barriers in the context of submit time validation (ExecuteCommands)");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddSurfaceExtension();
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    vkt::Semaphore acquire_semaphore(*m_device);
+    vkt::Semaphore submit_semaphore(*m_device);
+    const auto swapchain_images = m_swapchain.GetImages();
+    const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+
+    VkImageMemoryBarrier2 layout_transition_write = vku::InitStructHelper();
+    layout_transition_write.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition_write.srcAccessMask = VK_ACCESS_2_NONE;
+    layout_transition_write.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition_write.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    layout_transition_write.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition_write.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    layout_transition_write.image = swapchain_images[image_index];
+    layout_transition_write.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkImageMemoryBarrier2 layout_transition_present = vku::InitStructHelper();
+    layout_transition_present.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition_present.srcAccessMask = VK_ACCESS_2_NONE;
+    layout_transition_present.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition_present.dstAccessMask = VK_ACCESS_2_NONE;
+    layout_transition_present.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    layout_transition_present.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    layout_transition_present.image = swapchain_images[image_index];
+    layout_transition_present.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    vkt::CommandBuffer cmd_barrier_write(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    cmd_barrier_write.Begin();
+    cmd_barrier_write.Barrier(layout_transition_write);
+    cmd_barrier_write.End();
+
+    vkt::CommandBuffer cmd_barrier_present(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    cmd_barrier_present.Begin();
+    cmd_barrier_present.Barrier(layout_transition_present);
+    cmd_barrier_present.End();
+
+    m_command_buffer.Begin();
+    m_command_buffer.ExecuteCommands(cmd_barrier_write);
+    m_command_buffer.ExecuteCommands(cmd_barrier_present);
+    m_command_buffer.End();
+
+    m_default_queue->Submit2(m_command_buffer, vkt::Wait(acquire_semaphore, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT),
+                             vkt::Signal(submit_semaphore, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT));
+    m_default_queue->Present(m_swapchain, image_index, submit_semaphore);
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, BindSwapchainImage) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9787
+    TEST_DESCRIPTION("Bind custom swapchain images. Do not retrieve images using GetSwapchainImagesKHR");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    const uint32_t image_count = m_swapchain.GetImageCount();
+    if (image_count < 2) {
+        GTEST_SKIP() << "The test requires swapchain with at least 2 images";
+    }
+
+    VkImageSwapchainCreateInfoKHR image_swapchain_ci = vku::InitStructHelper();
+    image_swapchain_ci.swapchain = m_swapchain;
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.pNext = &image_swapchain_ci;
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = m_surface_formats[0].format;
+    image_ci.extent.width = m_surface_capabilities.minImageExtent.width;
+    image_ci.extent.height = m_surface_capabilities.minImageExtent.height;
+    image_ci.extent.depth = 1;
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    std::vector<vkt::Image> images;
+    for (uint32_t i = 0; i < image_count; i++) {
+        images.emplace_back(*m_device, image_ci, vkt::no_mem);
+
+        VkBindImageMemorySwapchainInfoKHR bind_swapchain_info = vku::InitStructHelper();
+        bind_swapchain_info.swapchain = m_swapchain;
+        bind_swapchain_info.imageIndex = i;
+
+        VkBindImageMemoryInfo bind_info = vku::InitStructHelper(&bind_swapchain_info);
+        bind_info.image = images.back();
+
+        vk::BindImageMemory2(device(), 1, &bind_info);
+
+        images.back().SetLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    }
+
+    vkt::Semaphore acquire_semaphore0(*m_device);
+    vkt::Semaphore submit_semaphore0(*m_device);
+
+    vkt::Semaphore acquire_semaphore1(*m_device);
+    vkt::Semaphore submit_semaphore1(*m_device);
+
+    const uint32_t image_index0 = m_swapchain.AcquireNextImage(acquire_semaphore0, kWaitTimeout);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore0), vkt::Signal(submit_semaphore0));
+    m_default_queue->Present(m_swapchain, image_index0, submit_semaphore0);
+
+    const uint32_t image_index1 = m_swapchain.AcquireNextImage(acquire_semaphore1, kWaitTimeout);
+    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore1), vkt::Signal(submit_semaphore1));
+    m_default_queue->Present(m_swapchain, image_index1, submit_semaphore1);
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, BindSwapchainImage2) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9787
+    TEST_DESCRIPTION("Bind custom swapchain images. Do not retrieve images using GetSwapchainImagesKHR");
+
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddSurfaceExtension();
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    const uint32_t image_count = m_swapchain.GetImageCount();
+    if (image_count < 2) {
+        GTEST_SKIP() << "The test requires swapchain with at least 2 images";
+    }
+
+    VkImageSwapchainCreateInfoKHR image_swapchain_ci = vku::InitStructHelper();
+    image_swapchain_ci.swapchain = m_swapchain;
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.pNext = &image_swapchain_ci;
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = m_surface_formats[0].format;
+    image_ci.extent.width = m_surface_capabilities.minImageExtent.width;
+    image_ci.extent.height = m_surface_capabilities.minImageExtent.height;
+    image_ci.extent.depth = 1;
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    std::vector<vkt::Image> images;
+    for (uint32_t i = 0; i < image_count; i++) {
+        images.emplace_back(*m_device, image_ci, vkt::no_mem);
+
+        VkBindImageMemorySwapchainInfoKHR bind_swapchain_info = vku::InitStructHelper();
+        bind_swapchain_info.swapchain = m_swapchain;
+        bind_swapchain_info.imageIndex = i;
+
+        VkBindImageMemoryInfo bind_info = vku::InitStructHelper(&bind_swapchain_info);
+        bind_info.image = images.back();
+
+        vk::BindImageMemory2(device(), 1, &bind_info);
+    }
+
+    vkt::Semaphore acquire_semaphore0(*m_device);
+    vkt::Semaphore submit_semaphore0(*m_device);
+    vkt::CommandBuffer command_buffer0(*m_device, m_command_pool);
+
+    vkt::Semaphore acquire_semaphore1(*m_device);
+    vkt::Semaphore submit_semaphore1(*m_device);
+    vkt::CommandBuffer command_buffer1(*m_device, m_command_pool);
+
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    layout_transition.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    command_buffer0.Begin();
+    layout_transition.image = images[0];
+    command_buffer0.Barrier(layout_transition);
+    command_buffer0.End();
+
+    const uint32_t image_index0 = m_swapchain.AcquireNextImage(acquire_semaphore0, kWaitTimeout);
+    m_default_queue->Submit2(command_buffer0, vkt::Wait(acquire_semaphore0), vkt::Signal(submit_semaphore0));
+    m_default_queue->Present(m_swapchain, image_index0, submit_semaphore0);
+
+    command_buffer1.Begin();
+    layout_transition.image = images[1];
+    command_buffer1.Barrier(layout_transition);
+    command_buffer1.End();
+
+    const uint32_t image_index1 = m_swapchain.AcquireNextImage(acquire_semaphore1, kWaitTimeout);
+    m_default_queue->Submit2(command_buffer1, vkt::Wait(acquire_semaphore1), vkt::Signal(submit_semaphore1));
+    m_default_queue->Present(m_swapchain, image_index1, submit_semaphore1);
+
     m_default_queue->Wait();
 }

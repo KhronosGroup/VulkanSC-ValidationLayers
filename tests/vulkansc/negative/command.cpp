@@ -99,7 +99,7 @@ TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
     // Allocate some command buffers and try to allocate more than remaining
     for (uint32_t i = 0; i < max_cmd_buffers; ++i) {
         alloc_info.commandBufferCount = 1;
-        tmp_cmd_buffers[i].init(*m_device, alloc_info);
+        tmp_cmd_buffers[i].Init(*m_device, alloc_info);
         avail_cmd_buffers--;
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandBufferAllocateInfo-commandPool-05006");
@@ -112,7 +112,7 @@ TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
     for (uint32_t i = 0; i < max_cmd_buffers / 4; ++i) {
         uint32_t cmd_buffers_to_free = i * 4;
         for (uint32_t j = 0; j < cmd_buffers_to_free; ++j) {
-            tmp_cmd_buffers[j].destroy();
+            tmp_cmd_buffers[j].Destroy();
             avail_cmd_buffers++;
         }
 
@@ -123,7 +123,7 @@ TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
 
         for (uint32_t j = 0; j < cmd_buffers_to_free; ++j) {
             alloc_info.commandBufferCount = 1;
-            tmp_cmd_buffers[j].init(*m_device, alloc_info);
+            tmp_cmd_buffers[j].Init(*m_device, alloc_info);
             avail_cmd_buffers--;
         }
     }

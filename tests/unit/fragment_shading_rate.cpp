@@ -229,7 +229,7 @@ TEST_F(NegativeFragmentShadingRate, PrimitiveFragmentShadingRateWriteMultiViewpo
     }
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         #extension GL_EXT_fragment_shading_rate : enable
         void main() {
@@ -287,8 +287,7 @@ TEST_F(NegativeFragmentShadingRate, FragmentDensityMapReferences) {
 
     auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(&rpfdmi, 0u, 1u, &attach, 1u, &subpass, 0u, nullptr);
 
-    TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false, "VUID-VkRenderPassCreateInfo-fragmentDensityMapAttachment-06471",
-                         nullptr);
+    CreateRenderPassTest(rpci, false, "VUID-VkRenderPassCreateInfo-fragmentDensityMapAttachment-06471", nullptr);
 
     // Set wrong VkImageLayout
     ref = {0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL};
@@ -296,8 +295,8 @@ TEST_F(NegativeFragmentShadingRate, FragmentDensityMapReferences) {
     rpfdmi = vku::InitStruct<VkRenderPassFragmentDensityMapCreateInfoEXT>(nullptr, ref);
     rpci = vku::InitStruct<VkRenderPassCreateInfo>(&rpfdmi, 0u, 1u, &attach, 1u, &subpass, 0u, nullptr);
 
-    TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false,
-                         "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02549", nullptr);
+    CreateRenderPassTest(rpci, false, "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02549",
+                         nullptr);
 
     // Set wrong load operation
     attach = {0,
@@ -315,8 +314,8 @@ TEST_F(NegativeFragmentShadingRate, FragmentDensityMapReferences) {
     rpfdmi = vku::InitStruct<VkRenderPassFragmentDensityMapCreateInfoEXT>(nullptr, ref);
     rpci = vku::InitStruct<VkRenderPassCreateInfo>(&rpfdmi, 0u, 1u, &attach, 1u, &subpass, 0u, nullptr);
 
-    TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false,
-                         "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02550", nullptr);
+    CreateRenderPassTest(rpci, false, "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02550",
+                         nullptr);
 
     // Set wrong store operation
     attach = {0,
@@ -334,8 +333,8 @@ TEST_F(NegativeFragmentShadingRate, FragmentDensityMapReferences) {
     rpfdmi = vku::InitStruct<VkRenderPassFragmentDensityMapCreateInfoEXT>(nullptr, ref);
     rpci = vku::InitStruct<VkRenderPassCreateInfo>(&rpfdmi, 0u, 1u, &attach, 1u, &subpass, 0u, nullptr);
 
-    TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false,
-                         "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02551", nullptr);
+    CreateRenderPassTest(rpci, false, "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02551",
+                         nullptr);
 }
 
 TEST_F(NegativeFragmentShadingRate, FragmentDensityMapDuplicateReferences) {
@@ -394,8 +393,8 @@ TEST_F(NegativeFragmentShadingRate, FragmentDensityMapDuplicateReferences) {
         auto rpfdmi = vku::InitStruct<VkRenderPassFragmentDensityMapCreateInfoEXT>(nullptr, ref_fdm);
         auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(&rpfdmi, 0u, 5u, attachments, 1u, &subpass, 0u, nullptr);
 
-        TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false,
-                             "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02548", nullptr);
+        CreateRenderPassTest(rpci, false, "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02548",
+                             nullptr);
     }
 
     {
@@ -406,8 +405,8 @@ TEST_F(NegativeFragmentShadingRate, FragmentDensityMapDuplicateReferences) {
         auto rpfdmi = vku::InitStruct<VkRenderPassFragmentDensityMapCreateInfoEXT>(nullptr, ref_fdm);
         auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(&rpfdmi, 0u, 5u, attachments, 1u, &subpass, 0u, nullptr);
 
-        TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false,
-                             "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02548", nullptr);
+        CreateRenderPassTest(rpci, false, "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02548",
+                             nullptr);
     }
 
     {
@@ -418,8 +417,8 @@ TEST_F(NegativeFragmentShadingRate, FragmentDensityMapDuplicateReferences) {
         auto rpfdmi = vku::InitStruct<VkRenderPassFragmentDensityMapCreateInfoEXT>(nullptr, ref_fdm);
         auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(&rpfdmi, 0u, 5u, attachments, 1u, &subpass, 0u, nullptr);
 
-        TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false,
-                             "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02548", nullptr);
+        CreateRenderPassTest(rpci, false, "VUID-VkRenderPassFragmentDensityMapCreateInfoEXT-fragmentDensityMapAttachment-02548",
+                             nullptr);
     }
 }
 
@@ -820,12 +819,12 @@ TEST_F(NegativeFragmentShadingRate, FramebufferDimensions) {
     auto image_view_ci = image.BasicViewCreatInfo();
     image_view_ci.subresourceRange.layerCount = 2;
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    const auto imageView = vkt::ImageView(*m_device, image_view_ci);
+    vkt::ImageView image_view(*m_device, image_view_ci);
 
     VkFramebufferCreateInfo fb_info = vku::InitStructHelper();
     fb_info.renderPass = rp;
     fb_info.attachmentCount = 1;
-    fb_info.pAttachments = &imageView.handle();
+    fb_info.pAttachments = &image_view.handle();
     fb_info.width = fsr_properties.minFragmentShadingRateAttachmentTexelSize.width * 2;
     fb_info.height = fsr_properties.minFragmentShadingRateAttachmentTexelSize.height;
     fb_info.layers = 1;
@@ -838,13 +837,13 @@ TEST_F(NegativeFragmentShadingRate, FramebufferDimensions) {
 
     fb_info.height = fsr_properties.minFragmentShadingRateAttachmentTexelSize.height * 2;
     m_errorMonitor->SetDesiredError("VUID-VkFramebufferCreateInfo-flags-04540");
-    fb.init(*m_device, fb_info);
+    fb.Init(*m_device, fb_info);
     m_errorMonitor->VerifyFound();
     fb_info.height = fsr_properties.minFragmentShadingRateAttachmentTexelSize.height;
 
     fb_info.layers = 3;
     m_errorMonitor->SetDesiredError("VUID-VkFramebufferCreateInfo-flags-04538");
-    fb.init(*m_device, fb_info);
+    fb.Init(*m_device, fb_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -876,12 +875,12 @@ TEST_F(NegativeFragmentShadingRate, FramebufferDimensionsMultiview) {
     auto image_view_ci = image.BasicViewCreatInfo();
     image_view_ci.subresourceRange.layerCount = 2;
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    const auto imageView = vkt::ImageView(*m_device, image_view_ci);
+    vkt::ImageView image_view(*m_device, image_view_ci);
 
     VkFramebufferCreateInfo fb_info = vku::InitStructHelper();
     fb_info.renderPass = rp;
     fb_info.attachmentCount = 1;
-    fb_info.pAttachments = &imageView.handle();
+    fb_info.pAttachments = &image_view.handle();
     fb_info.width = fsr_properties.minFragmentShadingRateAttachmentTexelSize.width;
     fb_info.height = fsr_properties.minFragmentShadingRateAttachmentTexelSize.height;
     fb_info.layers = 1;
@@ -929,6 +928,7 @@ TEST_F(NegativeFragmentShadingRate, Attachments) {
     VkRenderPass rp;
 
     rpci.flags = VK_RENDER_PASS_CREATE_TRANSFORM_BIT_QCOM;
+    // skip stateless so we can test core checks
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo2-flags-parameter");
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo2-flags-04521");
     vk::CreateRenderPass2KHR(device(), &rpci, NULL, &rp);
@@ -1388,7 +1388,7 @@ TEST_F(NegativeFragmentShadingRate, PrimitiveWriteMultiViewportLimit) {
 
     // Test PrimitiveShadingRate writes with multiple viewports
     {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_fragment_shading_rate : enable
             void main() {
@@ -1418,12 +1418,12 @@ TEST_F(NegativeFragmentShadingRate, PrimitiveWriteMultiViewportLimit) {
 
     // Test PrimitiveShadingRate writes with ViewportIndex writes in a geometry shader
     if (features2.features.geometryShader) {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             void main() {}
         )glsl";
 
-        static char const *gsSource = R"glsl(
+        const char *gsSource = R"glsl(
             #version 450
             #extension GL_EXT_fragment_shading_rate : enable
             layout (points) in;
@@ -1453,7 +1453,7 @@ TEST_F(NegativeFragmentShadingRate, PrimitiveWriteMultiViewportLimit) {
 
     // Test PrimitiveShadingRate writes with ViewportIndex writes in a vertex shader
     if (vil_extension) {
-        char const *vsSource = R"glsl(
+        const char *vsSource = R"glsl(
             #version 450
             #extension GL_EXT_fragment_shading_rate : enable
             #extension GL_ARB_shader_viewport_layer_array : enable
@@ -1477,12 +1477,12 @@ TEST_F(NegativeFragmentShadingRate, PrimitiveWriteMultiViewportLimit) {
     if (va2_extension) {
         // Test PrimitiveShadingRate writes with ViewportIndex writes in a geometry shader
         if (features2.features.geometryShader) {
-            char const *vsSource = R"glsl(
+            const char *vsSource = R"glsl(
                 #version 450
                 void main() {}
             )glsl";
 
-            static char const *gsSource = R"glsl(
+            const char *gsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_fragment_shading_rate : enable
                 #extension GL_NV_viewport_array2 : enable
@@ -1513,7 +1513,7 @@ TEST_F(NegativeFragmentShadingRate, PrimitiveWriteMultiViewportLimit) {
 
         // Test PrimitiveShadingRate writes with ViewportIndex writes in a vertex shader
         if (vil_extension) {
-            char const *vsSource = R"glsl(
+            const char *vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_fragment_shading_rate : enable
                 #extension GL_NV_viewport_array2 : enable
@@ -1978,7 +1978,7 @@ TEST_F(NegativeFragmentShadingRate, FragmentDensityMapOffsetEndRenderingMismatch
     fdm_offset_end_info.pFragmentDensityOffsets = &offset;
     VkRenderingEndInfoEXT rendering_end_info = vku::InitStructHelper(&fdm_offset_end_info);
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdEndRendering2EXT-None-10610");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndRendering2KHR-None-10610");
     vk::CmdEndRendering2EXT(m_command_buffer, &rendering_end_info);
     m_errorMonitor->VerifyFound();
 }
@@ -2823,8 +2823,7 @@ TEST_F(NegativeFragmentShadingRate, ShadingRateImageNV) {
     vkt::ImageView view(*m_device, ivci);
 
     // Test pipeline creation
-    VkPipelineViewportShadingRateImageStateCreateInfoNV vsrisci = {
-        VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_SHADING_RATE_IMAGE_STATE_CREATE_INFO_NV};
+    VkPipelineViewportShadingRateImageStateCreateInfoNV vsrisci = vku::InitStructHelper();
 
     VkViewport viewport = {0.0f, 0.0f, 64.0f, 64.0f, 0.0f, 1.0f};
     VkViewport viewports[20] = {viewport, viewport};
@@ -2948,8 +2947,7 @@ TEST_F(NegativeFragmentShadingRate, ShadingRateImageNV) {
         VkCoarseSampleOrderCustomNV sampOrdGood = {VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_1X2_PIXELS_NV, 2, 1 * 2 * 2,
                                                    &locations[0]};
 
-        VkPipelineViewportCoarseSampleOrderStateCreateInfoNV csosci = {
-            VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_COARSE_SAMPLE_ORDER_STATE_CREATE_INFO_NV};
+        VkPipelineViewportCoarseSampleOrderStateCreateInfoNV csosci = vku::InitStructHelper();
         csosci.sampleOrderType = VK_COARSE_SAMPLE_ORDER_TYPE_CUSTOM_NV;
         csosci.customSampleOrderCount = 1;
 
@@ -3024,8 +3022,7 @@ TEST_F(NegativeFragmentShadingRate, ShadingRateImageNVViewportCount) {
     vkt::Image image(*m_device, image_create_info, vkt::set_layout);
     vkt::ImageView view = image.CreateView();
 
-    VkPipelineViewportShadingRateImageStateCreateInfoNV vsrisci = {
-        VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_SHADING_RATE_IMAGE_STATE_CREATE_INFO_NV};
+    VkPipelineViewportShadingRateImageStateCreateInfoNV vsrisci = vku::InitStructHelper();
 
     VkViewport viewport = {0.0f, 0.0f, 64.0f, 64.0f, 0.0f, 1.0f};
     VkViewport viewports[20] = {viewport, viewport};
@@ -3120,7 +3117,7 @@ TEST_F(NegativeFragmentShadingRate, ImageMaxLimitsEXT) {
     image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VkImageFormatProperties img_limits;
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &image_ci, &img_limits));
+    ASSERT_EQ(VK_SUCCESS, GetImageFormatProps(Gpu(), image_ci, img_limits));
 
     image_ci.extent = {dev_limits.maxFramebufferWidth + 1, 64, 1};
     if (dev_limits.maxFramebufferWidth + 1 > img_limits.maxExtent.width) {
@@ -3687,8 +3684,10 @@ TEST_F(NegativeFragmentShadingRate, MaxFragmentDensityMapLayersDraw) {
     pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
     pipe.CreateGraphicsPipeline();
 
-    vkt::Image color_image(*m_device, 32, 32, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    vkt::ImageView color_image_view = color_image.CreateView();
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 2, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image color_image(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView color_image_view = color_image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, VK_REMAINING_ARRAY_LAYERS);
+
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     color_attachment.imageView = color_image_view;
@@ -3708,4 +3707,18 @@ TEST_F(NegativeFragmentShadingRate, MaxFragmentDensityMapLayersDraw) {
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRendering();
     m_command_buffer.End();
+}
+
+TEST_F(NegativeFragmentShadingRate, InvalidPNext) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
+    RETURN_IF_SKIP(Init());
+
+    uint32_t count = 1u;
+    VkPhysicalDeviceFragmentShadingRateKHR fsr = vku::InitStructHelper();
+    fsr.pNext = (void *)0x200000002;  // invalid
+    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceFragmentShadingRateKHR-pNext-pNext");
+    vk::GetPhysicalDeviceFragmentShadingRatesKHR(gpu_, &count, &fsr);
+    m_errorMonitor->VerifyFound();
 }

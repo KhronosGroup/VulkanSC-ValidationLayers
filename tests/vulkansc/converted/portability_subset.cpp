@@ -317,7 +317,8 @@ TEST_F(NegativePortabilitySubset, VertexAttributes) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativePortabilitySubset, RasterizationState) {
+// TODO - Needs someone to look into Topology issues
+TEST_F(NegativePortabilitySubset, DISABLED_RasterizationState) {
     TEST_DESCRIPTION("Portability: CreateGraphicsPipelines - VUID 04458");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
@@ -459,11 +460,7 @@ TEST_F(VkPortabilitySubsetTest, DISABLED_UpdateDescriptorSets) {
     auto image_view_create_info = image.BasicViewCreatInfo();
     vkt::ImageView view(*m_device, image_view_create_info);
 
-    VkDescriptorImageInfo img_info = {};
-    img_info.sampler = sampler;
-    img_info.imageView = view;
-    img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
+    VkDescriptorImageInfo img_info = {sampler, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
     VkWriteDescriptorSet descriptor_writes[2] = {};
     descriptor_writes[0] = vku::InitStructHelper();
     descriptor_writes[0].dstSet = descriptor_set.set_;
@@ -508,7 +505,7 @@ TEST_F(VkPortabilitySubsetTest, DISABLED_ShaderValidation) {
 
     // Attempt to use isolines in the TES shader when not available
     {
-        static const char *tes_source = R"glsl(
+        const char *tes_source = R"glsl(
             #version 450
             layout(isolines, equal_spacing, cw) in;
             void main() {
@@ -524,7 +521,7 @@ TEST_F(VkPortabilitySubsetTest, DISABLED_ShaderValidation) {
 
     // Attempt to use point_mode in the TES shader when not available
     {
-        static const char *tes_source = R"glsl(
+        const char *tes_source = R"glsl(
             #version 450
             layout(triangles, point_mode) in;
             void main() {
@@ -545,7 +542,7 @@ TEST_F(VkPortabilitySubsetTest, DISABLED_ShaderValidation) {
 
     // Attempt to use interpolation functions when not supported
     {
-        static const char *vs_source = R"glsl(
+        const char *vs_source = R"glsl(
             #version 450
             layout(location = 0) out vec4 c;
             void main() {
@@ -555,7 +552,7 @@ TEST_F(VkPortabilitySubsetTest, DISABLED_ShaderValidation) {
         )glsl";
         VkShaderObj vs_obj(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
-        static const char *fs_source = R"glsl(
+        const char *fs_source = R"glsl(
             #version 450
             layout(location = 0) in vec4 c;
             layout(location = 0) out vec4 frag_out;

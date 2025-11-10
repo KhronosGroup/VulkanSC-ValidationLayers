@@ -260,7 +260,7 @@ TEST_F(NegativeExternalMemorySync, BufferMemoryWithUnsupportedHandleType) {
     VkResult result = buffer.Memory().TryInit(*m_device, alloc_info);
     if (result != VK_SUCCESS) {
         GTEST_SKIP() << "vkAllocateMemory failed (probably due to unsupported handle type). Unable to reach vkBindBufferMemory to "
-                        "run valdiation";
+                        "run validation";
     }
 
     m_errorMonitor->SetDesiredError("VUID-VkExportMemoryAllocateInfo-handleTypes-09860");
@@ -470,19 +470,19 @@ TEST_F(NegativeExternalMemorySync, ExportBufferHandleType) {
     VkMemoryRequirements buffer_mem_reqs = mem_reqs2.memoryRequirements;
     const auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer_mem_reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                                                     &export_memory_info);
-    const auto memory = vkt::DeviceMemory(*m_device, alloc_info);
+    vkt::DeviceMemory memory(*m_device, alloc_info);
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkBindBufferMemory-buffer-01444");  // required dedicated
     m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-memory-02726");
     if (memory_dedicated_requirements.requiresDedicatedAllocation) {
         m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-buffer-01444");
     }
-    vk::BindBufferMemory(device(), buffer, memory.handle(), 0);
+    vk::BindBufferMemory(device(), buffer, memory, 0);
     m_errorMonitor->VerifyFound();
 
     VkBindBufferMemoryInfo bind_buffer_info = vku::InitStructHelper();
     bind_buffer_info.buffer = buffer;
-    bind_buffer_info.memory = memory.handle();
+    bind_buffer_info.memory = memory;
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkBindBufferMemory-buffer-01444");  // required dedicated
     m_errorMonitor->SetDesiredError("VUID-VkBindBufferMemoryInfo-memory-02726");
@@ -1269,15 +1269,14 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHandleType) {
 
     // Add dedicated allocation info to pNext chain if required
     VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
-    dedicated_info.buffer = buffer_export.handle();
+    dedicated_info.buffer = buffer_export;
 
     if (buffer_dedicated_allocation) {
         export_info.pNext = &dedicated_info;
     }
 
     // Allocate memory to be exported
-    vkt::DeviceMemory memory_buffer_export;
-    memory_buffer_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_buffer_export(*m_device, alloc_info);
 
     // Bind exported memory
     buffer_export.BindMemory(memory_buffer_export, 0);
@@ -1339,11 +1338,11 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHandleType) {
     // Export memory to fd
     VkMemoryGetFdInfoKHR mgfi_buffer = vku::InitStructHelper();
     mgfi_buffer.handleType = handle_type;
-    mgfi_buffer.memory = memory_buffer_export.handle();
+    mgfi_buffer.memory = memory_buffer_export;
 
     VkMemoryGetFdInfoKHR mgfi_image = vku::InitStructHelper();
     mgfi_image.handleType = handle_type;
-    mgfi_image.memory = image_export.Memory().handle();
+    mgfi_image.memory = image_export.Memory();
 
     int fd_buffer;
     int fd_image;
@@ -1365,8 +1364,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHandleType) {
     if constexpr (handle_type == VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT) {
         alloc_info.allocationSize = buffer_export_reqs.size;
     }
-    vkt::DeviceMemory memory_buffer_import;
-    memory_buffer_import.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_buffer_import(*m_device, alloc_info);
     ASSERT_TRUE(memory_buffer_import.initialized());
 
     VkMemoryRequirements image_import_reqs = image_import.MemoryRequirements();
@@ -1378,17 +1376,16 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHandleType) {
     if constexpr (handle_type == VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT) {
         alloc_info.allocationSize = image_export.MemoryRequirements().size;
     }
-    vkt::DeviceMemory memory_image_import;
-    memory_image_import.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_image_import(*m_device, alloc_info);
 
     // Bind imported memory with different handleType
     m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-memory-02985");
-    vk::BindBufferMemory(device(), buffer_import.handle(), memory_buffer_import.handle(), 0);
+    vk::BindBufferMemory(device(), buffer_import, memory_buffer_import, 0);
     m_errorMonitor->VerifyFound();
 
     VkBindBufferMemoryInfo bind_buffer_info = vku::InitStructHelper();
-    bind_buffer_info.buffer = buffer_import.handle();
-    bind_buffer_info.memory = memory_buffer_import.handle();
+    bind_buffer_info.buffer = buffer_import;
+    bind_buffer_info.memory = memory_buffer_import;
     bind_buffer_info.memoryOffset = 0;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindBufferMemoryInfo-memory-02985");
@@ -1401,12 +1398,12 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHandleType) {
     if (image_dedicated_allocation) {
         m_errorMonitor->SetDesiredError("VUID-vkBindImageMemory-image-01445");
     }
-    vk::BindImageMemory(device(), image_import.handle(), memory_image_import.handle(), 0);
+    vk::BindImageMemory(device(), image_import, memory_image_import, 0);
     m_errorMonitor->VerifyFound();
 
     VkBindImageMemoryInfo bind_image_info = vku::InitStructHelper();
-    bind_image_info.image = image_import.handle();
-    bind_image_info.memory = memory_image_import.handle();
+    bind_image_info.image = image_import;
+    bind_image_info.memory = memory_image_import;
     bind_image_info.memoryOffset = 0;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindImageMemoryInfo-memory-02989");
@@ -1644,8 +1641,7 @@ TEST_F(NegativeExternalMemorySync, GetMemoryFdHandle) {
         VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
         alloc_info.allocationSize = 32;
         alloc_info.memoryTypeIndex = 0;
-        vkt::DeviceMemory memory;
-        memory.init(*m_device, alloc_info);
+        vkt::DeviceMemory memory(*m_device, alloc_info);
 
         VkMemoryGetFdInfoKHR get_handle_info = vku::InitStructHelper();
         get_handle_info.memory = memory;
@@ -1663,8 +1659,7 @@ TEST_F(NegativeExternalMemorySync, GetMemoryFdHandle) {
         VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&export_info);
         alloc_info.allocationSize = 1024;
         alloc_info.memoryTypeIndex = 0;
-        vkt::DeviceMemory memory;
-        memory.init(*m_device, alloc_info);
+        vkt::DeviceMemory memory(*m_device, alloc_info);
 
         VkMemoryGetFdInfoKHR get_handle_info = vku::InitStructHelper();
         get_handle_info.memory = memory;
@@ -1683,8 +1678,7 @@ TEST_F(NegativeExternalMemorySync, GetMemoryFdHandle) {
         alloc_info.allocationSize = 1024;
         alloc_info.memoryTypeIndex = 0;
 
-        vkt::DeviceMemory memory;
-        memory.init(*m_device, alloc_info);
+        vkt::DeviceMemory memory(*m_device, alloc_info);
         VkMemoryGetFdInfoKHR get_handle_info = vku::InitStructHelper();
         get_handle_info.memory = memory;
         get_handle_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT;
@@ -1739,7 +1733,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryFromFdHandle) {
         auto export_info = vku::InitStruct<VkExportMemoryAllocateInfo>(dedicated_allocation ? &dedicated_info : nullptr);
         export_info.handleTypes = handle_type;
         auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
-        memory.init(*m_device, alloc_info);
+        memory.Init(*m_device, alloc_info);
         buffer.BindMemory(memory, 0);
         payload_size = alloc_info.allocationSize;
         payload_memory_type = alloc_info.memoryTypeIndex;
@@ -1781,8 +1775,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryFromFdHandle) {
     {
         alloc_info_with_import.allocationSize = payload_size;
         alloc_info_with_import.memoryTypeIndex = payload_memory_type;
-        vkt::DeviceMemory successfully_imported_memory;
-        successfully_imported_memory.init(*m_device, alloc_info_with_import);
+        vkt::DeviceMemory successfully_imported_memory(*m_device, alloc_info_with_import);
     }
 }
 
@@ -1801,8 +1794,7 @@ TEST_F(NegativeExternalMemorySync, GetMemoryWin32Handle) {
         VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
         alloc_info.allocationSize = 32;
         alloc_info.memoryTypeIndex = 0;
-        vkt::DeviceMemory memory;
-        memory.init(*m_device, alloc_info);
+        vkt::DeviceMemory memory(*m_device, alloc_info);
 
         VkMemoryGetWin32HandleInfoKHR get_handle_info = vku::InitStructHelper();
         get_handle_info.memory = memory;
@@ -1820,8 +1812,7 @@ TEST_F(NegativeExternalMemorySync, GetMemoryWin32Handle) {
         VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&export_info);
         alloc_info.allocationSize = 1024;
         alloc_info.memoryTypeIndex = 0;
-        vkt::DeviceMemory memory;
-        memory.init(*m_device, alloc_info);
+        vkt::DeviceMemory memory(*m_device, alloc_info);
 
         VkMemoryGetWin32HandleInfoKHR get_handle_info = vku::InitStructHelper();
         get_handle_info.memory = memory;
@@ -1840,8 +1831,7 @@ TEST_F(NegativeExternalMemorySync, GetMemoryWin32Handle) {
         alloc_info.allocationSize = 1024;
         alloc_info.memoryTypeIndex = 0;
 
-        vkt::DeviceMemory memory;
-        memory.init(*m_device, alloc_info);
+        vkt::DeviceMemory memory(*m_device, alloc_info);
         VkMemoryGetWin32HandleInfoKHR get_handle_info = vku::InitStructHelper();
         get_handle_info.memory = memory;
         get_handle_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
@@ -1898,7 +1888,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryFromWin32Handle) {
         auto export_info = vku::InitStruct<VkExportMemoryAllocateInfo>(dedicated_allocation ? &dedicated_info : nullptr);
         export_info.handleTypes = handle_type;
         auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(), 0, &export_info);
-        memory.init(*m_device, alloc_info);
+        memory.Init(*m_device, alloc_info);
         image.BindMemory(memory, 0);
         payload_size = alloc_info.allocationSize;
         payload_memory_type = alloc_info.memoryTypeIndex;
@@ -2188,11 +2178,10 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryWin32ImageNoDedicated) {
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(), 0, &export_info);
 
-    vkt::DeviceMemory memory_export;
-    memory_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
 
     VkMemoryGetWin32HandleInfoKHR get_handle_info = vku::InitStructHelper();
-    get_handle_info.memory = memory_export.handle();
+    get_handle_info.memory = memory_export;
     get_handle_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 
     HANDLE handle = NULL;
@@ -2243,11 +2232,10 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryWin32BufferDifferentDedicated) {
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
-    vkt::DeviceMemory memory_export;
-    memory_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
 
     VkMemoryGetWin32HandleInfoKHR get_handle_info = vku::InitStructHelper();
-    get_handle_info.memory = memory_export.handle();
+    get_handle_info.memory = memory_export;
     get_handle_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 
     HANDLE handle = NULL;
@@ -2299,8 +2287,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryWin32BufferSupport) {
     VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&export_info);
     alloc_info.allocationSize = 4096;
     alloc_info.memoryTypeIndex = 0;
-    vkt::DeviceMemory memory;
-    memory.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory(*m_device, alloc_info);
 
     HANDLE handle = NULL;
     VkMemoryGetWin32HandleInfoKHR get_handle_info = vku::InitStructHelper();
@@ -2315,8 +2302,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryWin32BufferSupport) {
     VkMemoryAllocateInfo alloc_info_with_import = vku::InitStructHelper(&import_info);
     alloc_info_with_import.allocationSize = 4096;
     alloc_info_with_import.memoryTypeIndex = 0;
-    vkt::DeviceMemory imported_memory;
-    imported_memory.init(*m_device, alloc_info_with_import);
+    vkt::DeviceMemory imported_memory(*m_device, alloc_info_with_import);
 
     VkExternalMemoryBufferCreateInfo external_buffer_info = vku::InitStructHelper();
     external_buffer_info.handleTypes = handle_type;
@@ -2389,11 +2375,10 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryFdBufferNoDedicated) {
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
-    vkt::DeviceMemory memory_export;
-    memory_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
 
     VkMemoryGetFdInfoKHR mgfi = vku::InitStructHelper();
-    mgfi.memory = memory_export.handle();
+    mgfi.memory = memory_export;
     mgfi.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
     int fd;
@@ -2449,11 +2434,10 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryFdBufferDifferentDedicated) {
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
-    vkt::DeviceMemory memory_export;
-    memory_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
 
     VkMemoryGetFdInfoKHR mgfi = vku::InitStructHelper();
-    mgfi.memory = memory_export.handle();
+    mgfi.memory = memory_export;
     mgfi.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
     int fd;
@@ -2596,8 +2580,6 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryFdImageSupport) {
     m_errorMonitor->VerifyFound();
 }
 
-// Because of aligned_alloc
-#if defined(__linux__) && !defined(__ANDROID__)
 TEST_F(NegativeExternalMemorySync, GetMemoryHostHandleType) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
@@ -2607,7 +2589,7 @@ TEST_F(NegativeExternalMemorySync, GetMemoryHostHandleType) {
     GetPhysicalDeviceProperties2(memory_host_props);
 
     VkDeviceSize alloc_size = memory_host_props.minImportedHostPointerAlignment;
-    void *host_memory = aligned_alloc(alloc_size, alloc_size);
+    void* host_memory = ::operator new((size_t)alloc_size, std::align_val_t(alloc_size));
     if (!host_memory) {
         GTEST_SKIP() << "Can't allocate host memory";
     }
@@ -2617,7 +2599,7 @@ TEST_F(NegativeExternalMemorySync, GetMemoryHostHandleType) {
     vk::GetMemoryHostPointerPropertiesEXT(*m_device, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT, host_memory,
                                           &host_pointer_props);
     m_errorMonitor->VerifyFound();
-    free(host_memory);
+    ::operator delete(host_memory, std::align_val_t(alloc_size));
 }
 
 TEST_F(NegativeExternalMemorySync, GetMemoryHostAlignment) {
@@ -2630,13 +2612,13 @@ TEST_F(NegativeExternalMemorySync, GetMemoryHostAlignment) {
 
     VkDeviceSize alloc_size = memory_host_props.minImportedHostPointerAlignment;
     VkDeviceSize bad_alloc_size = alloc_size / 4;
-    void *host_memory = aligned_alloc(bad_alloc_size, alloc_size);
+    void *host_memory = ::operator new((size_t)bad_alloc_size, std::align_val_t(alloc_size));
     if (!host_memory) {
         GTEST_SKIP() << "Can't allocate host memory";
     }
     const VkDeviceSize host_pointer = reinterpret_cast<VkDeviceSize>(host_memory);
     if (host_pointer % alloc_size == 0) {
-        free(host_memory);
+        ::operator delete(host_memory, std::align_val_t(bad_alloc_size));
         GTEST_SKIP() << "Can't create misaligned memory";  // when using ASAN
     }
     VkMemoryHostPointerPropertiesEXT host_pointer_props = vku::InitStructHelper();
@@ -2644,7 +2626,7 @@ TEST_F(NegativeExternalMemorySync, GetMemoryHostAlignment) {
     vk::GetMemoryHostPointerPropertiesEXT(*m_device, VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT, host_memory,
                                           &host_pointer_props);
     m_errorMonitor->VerifyFound();
-    free(host_memory);
+    ::operator delete(host_memory, std::align_val_t(bad_alloc_size));
 }
 
 TEST_F(NegativeExternalMemorySync, ImportMemoryHostDedicated) {
@@ -2657,7 +2639,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHostDedicated) {
     GetPhysicalDeviceProperties2(memory_host_props);
 
     VkDeviceSize alloc_size = memory_host_props.minImportedHostPointerAlignment;
-    void *host_memory = aligned_alloc(alloc_size, alloc_size);
+    void *host_memory = ::operator new((size_t)alloc_size, std::align_val_t(alloc_size));
     if (!host_memory) {
         GTEST_SKIP() << "Can't allocate host memory";
     }
@@ -2680,7 +2662,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHostDedicated) {
     VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&import_info);
     alloc_info.allocationSize = alloc_size;
     if (!m_device->Physical().SetMemoryType(host_pointer_props.memoryTypeBits, &alloc_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
-        free(host_memory);
+        ::operator delete(host_memory, std::align_val_t(alloc_size));
         GTEST_SKIP() << "Failed to set memory type.";
     }
 
@@ -2689,7 +2671,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHostDedicated) {
     vk::AllocateMemory(*m_device, &alloc_info, nullptr, &device_memory);
     m_errorMonitor->VerifyFound();
 
-    free(host_memory);
+    ::operator delete(host_memory, std::align_val_t(alloc_size));
 }
 
 TEST_F(NegativeExternalMemorySync, ImportMemoryHostMemoryIndex) {
@@ -2702,7 +2684,7 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHostMemoryIndex) {
     GetPhysicalDeviceProperties2(memory_host_props);
 
     VkDeviceSize alloc_size = memory_host_props.minImportedHostPointerAlignment;
-    void *host_memory = aligned_alloc(alloc_size, alloc_size);
+    void *host_memory = ::operator new((size_t)alloc_size, std::align_val_t(alloc_size));
     if (!host_memory) {
         GTEST_SKIP() << "Can't allocate host memory";
     }
@@ -2722,16 +2704,15 @@ TEST_F(NegativeExternalMemorySync, ImportMemoryHostMemoryIndex) {
         ((1 << m_device->Physical().memory_properties_.memoryTypeCount) - 1) & ~host_pointer_props.memoryTypeBits;
     bool found_type = m_device->Physical().SetMemoryType(unsupported_mem_type, &alloc_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     if (unsupported_mem_type == 0 || !found_type) {
-        free(host_memory);
+        ::operator delete(host_memory, std::align_val_t(alloc_size));
         GTEST_SKIP() << "Failed to find unsupported memory type.";
     }
     m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-memoryTypeIndex-01744");
     vkt::DeviceMemory memory_import(*m_device, alloc_info);
     m_errorMonitor->VerifyFound();
 
-    free(host_memory);
+    ::operator delete(host_memory, std::align_val_t(alloc_size));
 }
-#endif
 
 #ifdef VK_USE_PLATFORM_METAL_EXT
 TEST_F(NegativeExternalMemorySync, ExportMetalObjects) {
@@ -2870,12 +2851,11 @@ TEST_F(NegativeExternalMemorySync, ExportMetalObjects) {
     export_metal_object_create_info.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_TEXTURE_BIT_EXT;
     ici.pNext = &export_metal_object_create_info;
     vkt::Image export_image_obj(*m_device, ici);
-    vkt::BufferView export_buffer_view;
     buff_view_ci.pNext = &export_metal_object_create_info;
-    export_buffer_view.init(*m_device, buff_view_ci);
+    vkt::BufferView export_buffer_view(*m_device, buff_view_ci);
     VkExportMetalTextureInfoEXT metal_texture_info = vku::InitStructHelper();
-    metal_texture_info.bufferView = export_buffer_view.handle();
-    metal_texture_info.image = export_image_obj.handle();
+    metal_texture_info.bufferView = export_buffer_view;
+    metal_texture_info.image = export_image_obj;
     metal_texture_info.plane = VK_IMAGE_ASPECT_PLANE_0_BIT;
     export_metal_objects_info.pNext = &metal_texture_info;
 
@@ -2894,24 +2874,23 @@ TEST_F(NegativeExternalMemorySync, ExportMetalObjects) {
     metal_texture_info.image = VK_NULL_HANDLE;
     auto image_view_ci = image_obj.BasicViewCreatInfo();
     vkt::ImageView image_view_no_struct(*m_device, image_view_ci);
-    metal_texture_info.imageView = image_view_no_struct.handle();
+    metal_texture_info.imageView = image_view_no_struct;
     // ImageView not created with struct in pNext
     m_errorMonitor->SetDesiredError("VUID-VkExportMetalObjectsInfoEXT-pNext-06796");
     vk::ExportMetalObjectsEXT(*m_device, &export_metal_objects_info);
     m_errorMonitor->VerifyFound();
 
     buff_view_ci.pNext = nullptr;
-    vkt::BufferView buffer_view_no_struct;
-    buffer_view_no_struct.init(*m_device, buff_view_ci);
+    vkt::BufferView buffer_view_no_struct(*m_device, buff_view_ci);
     metal_texture_info.imageView = VK_NULL_HANDLE;
-    metal_texture_info.bufferView = buffer_view_no_struct.handle();
+    metal_texture_info.bufferView = buffer_view_no_struct;
     // BufferView not created with struct in pNext
     m_errorMonitor->SetDesiredError("VUID-VkExportMetalObjectsInfoEXT-pNext-06797");
     vk::ExportMetalObjectsEXT(*m_device, &export_metal_objects_info);
     m_errorMonitor->VerifyFound();
 
     metal_texture_info.bufferView = VK_NULL_HANDLE;
-    metal_texture_info.image = export_image_obj.handle();
+    metal_texture_info.image = export_image_obj;
     metal_texture_info.plane = VK_IMAGE_ASPECT_COLOR_BIT;
     // metal_texture_info.plane not plane 0, 1 or 2
     m_errorMonitor->SetDesiredError("VUID-VkExportMetalObjectsInfoEXT-pNext-06798");
@@ -2921,7 +2900,7 @@ TEST_F(NegativeExternalMemorySync, ExportMetalObjects) {
     ici.format = VK_FORMAT_B8G8R8A8_UNORM;
     vkt::Image single_plane_export_image_obj(*m_device, ici);
     metal_texture_info.plane = VK_IMAGE_ASPECT_PLANE_1_BIT;
-    metal_texture_info.image = single_plane_export_image_obj.handle();
+    metal_texture_info.image = single_plane_export_image_obj;
     // metal_texture_info.plane not plane_0 for single plane image
     m_errorMonitor->SetDesiredError("VUID-VkExportMetalObjectsInfoEXT-pNext-06799");
     vk::ExportMetalObjectsEXT(*m_device, &export_metal_objects_info);
@@ -2931,7 +2910,7 @@ TEST_F(NegativeExternalMemorySync, ExportMetalObjects) {
     export_metal_object_create_info.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_TEXTURE_BIT_EXT;
     vkt::ImageView single_plane_export_image_view(*m_device, image_view_ci);
     metal_texture_info.image = VK_NULL_HANDLE;
-    metal_texture_info.imageView = single_plane_export_image_view.handle();
+    metal_texture_info.imageView = single_plane_export_image_view;
     // metal_texture_info.plane not plane_0 for single plane imageView
     m_errorMonitor->SetDesiredError("VUID-VkExportMetalObjectsInfoEXT-pNext-06801");
     vk::ExportMetalObjectsEXT(*m_device, &export_metal_objects_info);
@@ -2953,9 +2932,8 @@ TEST_F(NegativeExternalMemorySync, ExportMetalObjects) {
     m_errorMonitor->VerifyFound();
 
     sem_info.pNext = nullptr;
-    vkt::Semaphore semaphore_no_struct;
-    semaphore_no_struct.init(*m_device, sem_info);
-    metal_shared_event_info.semaphore = semaphore_no_struct.handle();
+    vkt::Semaphore semaphore_no_struct(*m_device, sem_info);
+    metal_shared_event_info.semaphore = semaphore_no_struct;
     export_metal_objects_info.pNext = &metal_shared_event_info;
     // Semaphore not created with struct in pNext
     m_errorMonitor->SetDesiredError("VUID-VkExportMetalObjectsInfoEXT-pNext-06805");
@@ -2965,7 +2943,7 @@ TEST_F(NegativeExternalMemorySync, ExportMetalObjects) {
     if (portability_features.events) {
         event_info.pNext = nullptr;
         vkt::Event event_no_struct(*m_device, event_info);
-        metal_shared_event_info.event = event_no_struct.handle();
+        metal_shared_event_info.event = event_no_struct;
         metal_shared_event_info.semaphore = VK_NULL_HANDLE;
         // Event not created with struct in pNext
         m_errorMonitor->SetDesiredError("VUID-VkExportMetalObjectsInfoEXT-pNext-06806");
@@ -2985,7 +2963,7 @@ TEST_F(NegativeExternalMemorySync, ExportMetalObjects) {
 
         metal_texture_info.bufferView = VK_NULL_HANDLE;
         metal_texture_info.imageView = VK_NULL_HANDLE;
-        metal_texture_info.image = mp_image_obj.handle();
+        metal_texture_info.image = mp_image_obj;
         metal_texture_info.plane = VK_IMAGE_ASPECT_PLANE_2_BIT;
         export_metal_objects_info.pNext = &metal_texture_info;
         m_errorMonitor->SetDesiredError("VUID-VkExportMetalObjectsInfoEXT-pNext-06800");
@@ -3011,12 +2989,12 @@ TEST_F(NegativeExternalMemorySync, ExportMetalObjects) {
             VkSamplerYcbcrConversionInfo ycbcr_info = vku::InitStructHelper();
             ycbcr_info.conversion = conversion;
             ycbcr_info.pNext = &export_metal_object_create_info;
-            ivci.image = mp_image_obj.handle();
+            ivci.image = mp_image_obj;
             ivci.format = mp_format;
             ivci.pNext = &ycbcr_info;
             vkt::ImageView mp_image_view(*m_device, ivci);
             metal_texture_info.image = VK_NULL_HANDLE;
-            metal_texture_info.imageView = mp_image_view.handle();
+            metal_texture_info.imageView = mp_image_view;
             m_errorMonitor->SetDesiredError("VUID-VkExportMetalObjectsInfoEXT-pNext-06802");
             vk::ExportMetalObjectsEXT(*m_device, &export_metal_objects_info);
             m_errorMonitor->VerifyFound();
@@ -3064,11 +3042,10 @@ TEST_F(NegativeExternalMemorySync, ZeroInitializeFeature) {
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
-    vkt::DeviceMemory memory_export;
-    memory_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
 
     VkMemoryGetFdInfoKHR mgfi = vku::InitStructHelper();
-    mgfi.memory = memory_export.handle();
+    mgfi.memory = memory_export;
     mgfi.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
     int fd;

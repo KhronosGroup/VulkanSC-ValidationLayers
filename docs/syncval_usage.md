@@ -17,7 +17,7 @@ Requests for additional checks can be requested by creating a [Github issue](htt
 
 ## Enabling Synchronization Validation
 
-Synchronization Validation is just a [normal layer setting](https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/main/docs/settings.md) that can be turned on. 
+Synchronization Validation is just a [normal layer setting](https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/main/docs/settings.md) that can be turned on.
 
 The main 3 ways to turn on Sync
 
@@ -47,7 +47,7 @@ set VK_LAYER_VALIDATE_SYNC=1
 export VK_LAYER_VALIDATE_SYNC=1
 
 # Android
-adb setprop debug.vulkan.khronos_validation.validate_sync=1
+adb shell setprop debug.vulkan.khronos_validation.validate_sync=1
 ```
 
 [Additional configuration settings](https://vulkan.lunarg.com/doc/sdk/latest/windows/khronos_validation_layer.html) will all share the `VK_LAYER_SYNCVAL_`/`khronos_validation.syncval_*` prefix namespace.
@@ -175,12 +175,12 @@ The error message usually includes the following:
 
 Unlike core validation error messages, where each message is identified by a VUID, synchronization validation primarily detects a single type of error: a race condition between two memory accesses. There are limitless ways to produce a race condition (combinations of command pairs and different synchronization methods), which is why race condition scenarios are not identified by VUIDs.
 
-To suppress or filter synchronization validation error messages, one can use the optional `Extra properties` section. Extra properties contain key-value pairs that help identify the error message and are presented in a more structured format compared to the main error message, making parsing easier. 
+To suppress or filter synchronization validation error messages, one can use the optional `Extra properties` section. Extra properties contain key-value pairs that help identify the error message and are presented in a more structured format compared to the main error message, making parsing easier.
 
 One of the benefits of parsing `Extra properties` rather than the main error message is that the former is more stable and changes less frequently. This creates a nice separation: on one side, we can take every opportunity to improve the error message wording while keeping the Extra properties values unchanged in most cases, so suppression and filtering logic does not need to be updated.
 
 Example of error message with extra properties enabled:
-> vkQueueSubmit(): WRITE_AFTER_WRITE hazard detected. vkCmdEndRenderPass (from VkCommandBuffer  submitted on the current VkQueue ) writes to resource, which was previously written by vkCmdClearColorImage (from VkCommandBuffer  submitted on VkQueue ). 
+> vkQueueSubmit(): WRITE_AFTER_WRITE hazard detected. vkCmdEndRenderPass (from VkCommandBuffer  submitted on the current VkQueue ) writes to resource, which was previously written by vkCmdClearColorImage (from VkCommandBuffer  submitted on VkQueue ).
 >
 >The current synchronization allows VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT accesses at VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, but to prevent this hazard, it must allow VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT accesses at VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT.
 ```

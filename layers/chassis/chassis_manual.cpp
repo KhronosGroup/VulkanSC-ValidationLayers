@@ -239,6 +239,8 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
 
     OutputLayerStatusInfo(instance_dispatch.get());
     InstanceExtensionWhitelist(instance_dispatch.get(), pCreateInfo, *pInstance);
+    instance_dispatch->FindSupportedExtensions();
+
     // save a raw pointer since the unique_ptr will be invalidate by the move() below
     auto* id = instance_dispatch.get();
     vvl::dispatch::SetData(*pInstance, std::move(instance_dispatch));
@@ -248,6 +250,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
             continue;
         }
         vo->PostCallRecordCreateInstance(pCreateInfo, pAllocator, pInstance, record_obj);
+        vo->CopyExtensions();
     }
 
     DeactivateInstanceDebugCallbacks(id->debug_report);
@@ -364,9 +367,21 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
     }
 
     VkResult result = fpCreateDevice(gpu, reinterpret_cast<VkDeviceCreateInfo*>(&modified_create_info), pAllocator, pDevice);
+
     if (result != VK_SUCCESS) {
+        // From https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10472
+        // While it is not invalid to have unsupported features, we use this time to help the developer bisect what they added that
+        // caused the error from the driver
+        //
+        // Note that VK_ERROR_EXTENSION_NOT_PRESENT will be validated and reported in the Vulkan-Loader
+        if (result == VK_ERROR_FEATURE_NOT_PRESENT) {
+            instance_dispatch->ReportErrorFeatureNotPresent(gpu, *modified_create_info.ptr());
+        }
+
+        // If not successful, don't keep going as things will likely crash
         return result;
     }
+
     record_obj.result = result;
     device_dispatch->device = *pDevice;
 
@@ -402,6 +417,15 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
         }
         vo->FinishDeviceSetup(modified_create_info.ptr(), record_obj.location);
     }
+
+    // Clear global dictionary that stores canonical ids of descriptor set layouts.
+    //
+    // NOTE: we also have the following global dicts related to pipeline layout that do not cause
+    // troubles yet, but in case of issues or part of effort of removing globals they should be considered:
+    //   pipeline_layout_set_layouts_dict
+    //   pipeline_layout_compat_dict
+    //   push_constant_ranges_dict
+    ClearDescriptorSetLayoutCanonicalIdDict();
 
     return result;
 }
@@ -730,6 +754,62 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateRayTracingPipelinesKHR(VkDevice device, VkD
     return result;
 }
 
+// This API saves some core_validation pipeline state state on the stack for performance purposes
+VKAPI_ATTR VkResult VKAPI_CALL CreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                           VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                           const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                                           const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines) {
+    VVL_ZoneScoped;
+
+    auto device_dispatch = vvl::dispatch::GetData(device);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkCreateDataGraphPipelinesARM, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+
+    PipelineStates pipeline_states;
+    chassis::CreateDataGraphPipelinesARM chassis_state(pCreateInfos);
+
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const auto& vo : device_dispatch->object_dispatch) {
+            auto lock = vo->ReadLock();
+            skip |= vo->PreCallValidateCreateDataGraphPipelinesARM(device, deferredOperation, pipelineCache, createInfoCount,
+                                                                   pCreateInfos, pAllocator, pPipelines, error_obj,
+                                                                   pipeline_states, chassis_state);
+            if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
+    }
+
+    RecordObject record_obj(vvl::Func::vkCreateDataGraphPipelinesARM);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (auto& vo : device_dispatch->object_dispatch) {
+            auto lock = vo->WriteLock();
+            vo->PreCallRecordCreateDataGraphPipelinesARM(device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos,
+                                                         pAllocator, pPipelines, record_obj, pipeline_states,
+                                                         chassis_state);
+        }
+    }
+
+    VkResult result;
+    {
+        VVL_ZoneScopedN("Dispatch");
+        result = device_dispatch->CreateDataGraphPipelinesARM(device, deferredOperation, pipelineCache, createInfoCount,
+                                                              chassis_state.pCreateInfos, pAllocator, pPipelines);
+    }
+    record_obj.result = result;
+
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (auto& vo : device_dispatch->object_dispatch) {
+            auto lock = vo->WriteLock();
+            vo->PostCallRecordCreateDataGraphPipelinesARM(device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos,
+                                                          pAllocator, pPipelines, record_obj, pipeline_states,
+                                                          chassis_state);
+        }
+    }
+    return result;
+}
+
 // This API needs the ability to modify a down-chain parameter
 VKAPI_ATTR VkResult VKAPI_CALL CreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo,
                                                     const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout) {
@@ -1037,7 +1117,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBufferCreat
     }
 
     chassis::CreateBuffer chassis_state{};
-    chassis_state.modified_create_info = *pCreateInfo;
+    chassis_state.create_info_copy = pCreateInfo;
 
     RecordObject record_obj(vvl::Func::vkCreateBuffer);
     {
@@ -1054,7 +1134,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBufferCreat
     VkResult result;
     {
         VVL_ZoneScopedN("Dispatch_CreateBuffer");
-        result = device_dispatch->CreateBuffer(device, &chassis_state.modified_create_info, pAllocator, pBuffer);
+        result = device_dispatch->CreateBuffer(device, chassis_state.create_info_copy, pAllocator, pBuffer);
     }
     record_obj.result = result;
 
@@ -1065,7 +1145,8 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBufferCreat
                 continue;
             }
             auto lock = vo->WriteLock();
-            vo->PostCallRecordCreateBuffer(device, pCreateInfo, pAllocator, pBuffer, record_obj);
+            // If we don't pass into PostCallRecord, CoreCheck may give false positives when using GPU-AV
+            vo->PostCallRecordCreateBuffer(device, chassis_state.create_info_copy, pAllocator, pBuffer, record_obj);
         }
     }
     return result;
@@ -1240,7 +1321,7 @@ VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceToolPropertiesEXT(VkPhysicalDevi
     if (original_pToolProperties != nullptr) {
         pToolProperties = original_pToolProperties;
     }
-    assert(*pToolCount != std::numeric_limits<uint32_t>::max());
+    assert(*pToolCount != vvl::kU32Max);
     (*pToolCount)++;
 
     for (auto& vo : instance_dispatch->object_dispatch) {
@@ -1289,7 +1370,7 @@ VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceToolProperties(VkPhysicalDevice 
     if (original_pToolProperties != nullptr) {
         pToolProperties = original_pToolProperties;
     }
-    assert(*pToolCount != std::numeric_limits<uint32_t>::max());
+    assert(*pToolCount != vvl::kU32Max);
     (*pToolCount)++;
 
     for (auto& vo : instance_dispatch->object_dispatch) {
@@ -1299,6 +1380,58 @@ VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceToolProperties(VkPhysicalDevice 
         vo->PostCallRecordGetPhysicalDeviceToolProperties(physicalDevice, pToolCount, pToolProperties, record_obj);
     }
     return result;
+}
+
+VKAPI_ATTR void VKAPI_CALL CmdBindDescriptorBuffersEXT(VkCommandBuffer commandBuffer, uint32_t bufferCount,
+                                                       const VkDescriptorBufferBindingInfoEXT* pBindingInfos) {
+    VVL_ZoneScoped;
+
+    auto device_dispatch = vvl::dispatch::GetData(commandBuffer);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkCmdBindDescriptorBuffersEXT,
+                          VulkanTypedHandle(commandBuffer, kVulkanObjectTypeCommandBuffer));
+    {
+        VVL_ZoneScopedN("PreCallValidate_vkCmdBindDescriptorBuffersEXT");
+        for (const auto& vo : device_dispatch->intercept_vectors[InterceptIdPreCallValidateCmdBindDescriptorBuffersEXT]) {
+            if (!vo) {
+                continue;
+            }
+            auto lock = vo->ReadLock();
+            skip |= vo->PreCallValidateCmdBindDescriptorBuffersEXT(commandBuffer, bufferCount, pBindingInfos, error_obj);
+            if (skip) return;
+        }
+    }
+
+    chassis::CmdBindDescriptorBuffers chassis_state(bufferCount, pBindingInfos);
+
+    RecordObject record_obj(vvl::Func::vkCmdBindDescriptorBuffersEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord_vkCmdBindDescriptorBuffersEXT");
+        for (auto& vo : device_dispatch->object_dispatch) {
+            if (!vo) {
+                continue;
+            }
+            auto lock = vo->WriteLock();
+            vo->PreCallRecordCmdBindDescriptorBuffersEXT(commandBuffer, bufferCount, pBindingInfos, record_obj, chassis_state);
+        }
+    }
+
+    // Only done in GPU-AV
+    const uint32_t modified_count = (uint32_t)chassis_state.modified_binding_infos.size();
+    {
+        VVL_ZoneScopedN("Dispatch_vkCmdBindDescriptorBuffersEXT");
+        device_dispatch->CmdBindDescriptorBuffersEXT(commandBuffer, modified_count, chassis_state.pBindInfos);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord_vkCmdBindDescriptorBuffersEXT");
+        for (auto& vo : device_dispatch->intercept_vectors[InterceptIdPostCallRecordCmdBindDescriptorBuffersEXT]) {
+            if (!vo) {
+                continue;
+            }
+            auto lock = vo->WriteLock();
+            vo->PostCallRecordCmdBindDescriptorBuffersEXT(commandBuffer, modified_count, chassis_state.pBindInfos, record_obj);
+        }
+    }
 }
 
 // ValidationCache APIs do not dispatch

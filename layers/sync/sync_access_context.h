@@ -32,6 +32,8 @@ class VideoPictureResource;
 class VideoSession;
 }  // namespace vvl
 
+namespace syncval {
+
 bool SimpleBinding(const vvl::Bindable &bindable);
 VkDeviceSize ResourceBaseAddress(const vvl::Buffer &buffer);
 
@@ -94,89 +96,73 @@ bool ForEachEntryInRangesUntil(const RangeMap &map, RangeGen &range_gen, Action 
     return false;
 }
 
-struct NoopBarrierAction {
-    explicit NoopBarrierAction() {}
-    void operator()(ResourceAccessState *access) const {}
-    const bool layout_transition = false;
+// This functor changes layout of access map as part of infill_update_range traversal:
+//    * infills gaps within a specified input range (only for layout transition use case)
+//    * if existing ranges intersect begin/end of the input range then existing ranges are split
+//
+// Besides layout changes this functor does not update access state.
+// The subsequent functors that will run over the same input range will have a guarantee that access
+// map structure won't be modified, so they can collect persistent references to access states.
+//
+// NOTE: notice, when this functor is used for not layout transtiion barrier it is not a noop: yes,
+//  Infill operation is used only for layout transition, but infill_update_range can additionally
+//  perform up to two splits if input range intersects access map existing ranges.
+struct ApplyMarkupFunctor {
+    ApplyMarkupFunctor(bool layout_transition) : layout_transition(layout_transition) {}
+
+    using Iterator = AccessMap::iterator;
+    Iterator Infill(AccessMap *accesses, const Iterator &pos_hint, const AccessRange &range) const {
+        if (!layout_transition) {
+            return pos_hint;
+        }
+        AccessState default_state;
+        auto inserted = accesses->insert(pos_hint, std::make_pair(range, default_state));
+        return inserted;
+    }
+    void operator()(const Iterator &pos) const {}
+    const bool layout_transition;
 };
 
-// This functor applies a collection of barriers, updating the "pending state" in each touched memory range, and optionally
-// resolves the pending state. Suitable for processing Global memory barriers, or Subpass Barriers when the "final" barrier
-// of a collection is known/present.
-template <typename BarrierOp, typename OpVector = std::vector<BarrierOp>>
-class ApplyBarrierOpsFunctor {
-  public:
-    using Iterator = ResourceAccessRangeMap::iterator;
-    // Only called with a gap, and pos at the lower_bound(range)
-    inline Iterator Infill(ResourceAccessRangeMap *accesses, const Iterator &pos, const ResourceAccessRange &range) const {
-        if (!infill_default_) {
-            return pos;
+// This functor populates PendingBarriers with the results of independent barrier appication (pending barriers).
+// After this functor finished its work then PendingBarriers::Apply() can be used to update the access states.
+struct CollectBarriersFunctor {
+    CollectBarriersFunctor(const BarrierScope &barrier_scope, const SyncBarrier &barrier, bool layout_transition,
+                           uint32_t layout_transition_handle_index, PendingBarriers &pending_barriers)
+        : barrier_scope(barrier_scope),
+          barrier(barrier),
+          layout_transition(layout_transition),
+          layout_transition_handle_index(layout_transition_handle_index),
+          pending_barriers(pending_barriers) {
+        // Suppress layout transition during submit time application.
+        // It add write access but this is necessary only during recording.
+        if (barrier_scope.scope_queue != kQueueIdInvalid) {
+            this->layout_transition = false;
+            this->layout_transition_handle_index = vvl::kNoIndex32;
         }
-        ResourceAccessState default_state;
-        auto inserted = accesses->insert(pos, std::make_pair(range, default_state));
-        return inserted;
+    }
+
+    using Iterator = AccessMap::iterator;
+    Iterator Infill(AccessMap *accesses, const Iterator &pos_hint, const AccessRange &range) const {
+        assert(!layout_transition);  // MarkupFunctor infills gaps for layout transtion, so we should never get here in that case
+        return pos_hint;
     }
 
     void operator()(const Iterator &pos) const {
-        auto &access_state = pos->second;
-        for (const auto &op : barrier_ops_) {
-            op(&access_state);
-        }
-
-        if (resolve_) {
-            // If this is the last (or only) batch, we can do the pending resolve as the last step in this operation to avoid
-            // another walk
-            access_state.ApplyPendingBarriers(tag_);
-        }
+        AccessState &access_state = pos->second;
+        access_state.CollectPendingBarriers(barrier_scope, barrier, layout_transition, layout_transition_handle_index,
+                                            pending_barriers);
     }
 
-    // A valid tag is required IFF layout_transition is true, as transitions are write ops
-    ApplyBarrierOpsFunctor(bool resolve, typename OpVector::size_type size_hint, ResourceUsageTag tag)
-        : resolve_(resolve), infill_default_(false), barrier_ops_(), tag_(tag) {
-        barrier_ops_.reserve(size_hint);
-    }
-    void EmplaceBack(const BarrierOp &op) {
-        barrier_ops_.emplace_back(op);
-        infill_default_ |= op.layout_transition;
-    }
-
-  private:
-    bool resolve_;
-    bool infill_default_;
-    OpVector barrier_ops_;
-    const ResourceUsageTag tag_;
-};
-
-// This functor applies a single barrier, updating the "pending state" in each touched memory range, but does not
-// resolve the pendinging state. Suitable for processing Image and Buffer barriers from PipelineBarriers or Events
-template <typename BarrierOp>
-class ApplyBarrierFunctor : public ApplyBarrierOpsFunctor<BarrierOp, small_vector<BarrierOp, 1>> {
-    using Base = ApplyBarrierOpsFunctor<BarrierOp, small_vector<BarrierOp, 1>>;
-
-  public:
-    ApplyBarrierFunctor(const BarrierOp &barrier_op) : Base(false, 1, kInvalidTag) { Base::EmplaceBack(barrier_op); }
-};
-
-// This functor resolves the pendinging state.
-class ResolvePendingBarrierFunctor : public ApplyBarrierOpsFunctor<NoopBarrierAction, small_vector<NoopBarrierAction, 1>> {
-    using Base = ApplyBarrierOpsFunctor<NoopBarrierAction, small_vector<NoopBarrierAction, 1>>;
-
-  public:
-    ResolvePendingBarrierFunctor(ResourceUsageTag tag) : Base(true, 0, tag) {}
-};
-
-struct ApplySubpassTransitionBarriersAction {
-    explicit ApplySubpassTransitionBarriersAction(const std::vector<SyncBarrier> &barriers_) : barriers(barriers_) {}
-    void operator()(ResourceAccessState *access) const {
-        assert(access);
-        access->ApplyBarriers(barriers, true);
-    }
-    const std::vector<SyncBarrier> &barriers;
+    const BarrierScope barrier_scope;
+    const SyncBarrier barrier;
+    bool layout_transition;
+    uint32_t layout_transition_handle_index;
+    PendingBarriers &pending_barriers;
 };
 
 struct QueueTagOffsetBarrierAction {
     QueueTagOffsetBarrierAction(QueueId qid, ResourceUsageTag offset) : queue_id(qid), tag_offset(offset) {}
-    void operator()(ResourceAccessState *access) const {
+    void operator()(AccessState *access) const {
         access->OffsetTag(tag_offset);
         access->SetQueueId(queue_id);
     };
@@ -186,41 +172,35 @@ struct QueueTagOffsetBarrierAction {
 
 struct ApplyTrackbackStackAction {
     explicit ApplyTrackbackStackAction(const std::vector<SyncBarrier> &barriers_,
-                                       const ResourceAccessStateFunction *previous_barrier_ = nullptr)
+                                       const AccessStateFunction *previous_barrier_ = nullptr)
         : barriers(barriers_), previous_barrier(previous_barrier_) {}
-    void operator()(ResourceAccessState *access) const {
+    void operator()(AccessState *access) const {
         assert(access);
-        assert(!access->HasPendingState());
-        access->ApplyBarriers(barriers, false);
-        // NOTE: We can use invalid tag, as these barriers do no include layout transitions (would assert in SetWrite)
-        access->ApplyPendingBarriers(kInvalidTag);
+        ApplyBarriers(*access, barriers);
         if (previous_barrier) {
             assert(bool(*previous_barrier));
             (*previous_barrier)(access);
         }
     }
     const std::vector<SyncBarrier> &barriers;
-    const ResourceAccessStateFunction *previous_barrier;
+    const AccessStateFunction *previous_barrier;
 };
 
-template <typename SubpassNode>
+class AccessContext;
+
 struct SubpassBarrierTrackback {
     std::vector<SyncBarrier> barriers;
-    const SubpassNode *source_subpass = nullptr;
+    const AccessContext *source_subpass = nullptr;
     SubpassBarrierTrackback() = default;
-    SubpassBarrierTrackback(const SubpassBarrierTrackback &) = default;
-    SubpassBarrierTrackback(const SubpassNode *source_subpass_, VkQueueFlags queue_flags_,
-                            const std::vector<const VkSubpassDependency2 *> &subpass_dependencies_)
-        : barriers(), source_subpass(source_subpass_) {
-        barriers.reserve(subpass_dependencies_.size());
-        for (const VkSubpassDependency2 *dependency : subpass_dependencies_) {
+    SubpassBarrierTrackback(const AccessContext *source_subpass, VkQueueFlags queue_flags,
+                            const std::vector<const VkSubpassDependency2 *> &subpass_dependencies)
+        : source_subpass(source_subpass) {
+        barriers.reserve(subpass_dependencies.size());
+        for (const VkSubpassDependency2 *dependency : subpass_dependencies) {
             assert(dependency);
-            barriers.emplace_back(queue_flags_, *dependency);
+            barriers.emplace_back(queue_flags, *dependency);
         }
     }
-    SubpassBarrierTrackback(const SubpassNode *source_subpass_, const SyncBarrier &barrier_)
-        : barriers(1, barrier_), source_subpass(source_subpass_) {}
-    SubpassBarrierTrackback &operator=(const SubpassBarrierTrackback &) = default;
 };
 
 class AttachmentViewGen {
@@ -241,18 +221,59 @@ class AttachmentViewGen {
 
 using AttachmentViewGenVector = std::vector<AttachmentViewGen>;
 
+// Provides ordering among all first accesses in the AccessContext.
+// This accelerates the search of the first accesses that intersect a given tag range.
+struct SortedFirstAccesses {
+    void Init(const AccessMap &finalized_access_map);
+    void Clear();
+
+    // Access objects with first accesses that cover only single tag.
+    // This is a separate case because it allows to quickly find a range
+    // of such first accesses that belong to a given tag range.
+    struct SingleTag {
+        // The only tag referenced by the first accesses of the access object
+        ResourceUsageTag tag{};
+        const AccessMap::value_type *p_key_value = nullptr;
+    };
+    std::vector<SingleTag> sorted_single_tags;
+
+    // Access objects with first accesses that cover more than one tag
+    struct MultiTag {
+        // range.begin: tag of the first first_access.
+        // range.end: tag of the last first_access plus one.
+        ResourceUsageRange range;
+        const AccessMap::value_type *p_key_value = nullptr;
+    };
+    std::vector<MultiTag> sorted_multi_tags;
+
+    // Ranged-for loop iterator helpers
+    struct SingleTagRange {
+        const std::vector<SingleTag> &sorted_single_tags;
+        const ResourceUsageRange tag_range;
+        std::vector<SingleTag>::const_iterator begin();
+        std::vector<SingleTag>::const_iterator end();
+    };
+    SingleTagRange IterateSingleTagFirstAccesses(const ResourceUsageRange &tag_range) const;
+
+    struct MultiTagRange {
+        const std::vector<MultiTag> &sorted_multi_tags;
+        const ResourceUsageRange tag_range;
+        std::vector<MultiTag>::const_iterator begin();
+        std::vector<MultiTag>::const_iterator end();
+    };
+    MultiTagRange IterateMultiTagFirstAccesses(const ResourceUsageRange &tag_range) const;
+};
+
 class AccessContext {
   public:
-    using ScopeMap = ResourceAccessRangeMap;
+    using ScopeMap = AccessMap;
     enum DetectOptions : uint32_t {
         kDetectPrevious = 1U << 0,
         kDetectAsync = 1U << 1,
         kDetectAll = (kDetectPrevious | kDetectAsync)
     };
 
-    using TrackBack = SubpassBarrierTrackback<AccessContext>;
-
-    HazardResult DetectHazard(const vvl::Buffer &buffer, SyncAccessIndex access_index, const ResourceAccessRange &range) const;
+    HazardResult DetectHazard(const vvl::Buffer &buffer, SyncAccessIndex access_index, const AccessRange &range) const;
     HazardResult DetectHazard(const vvl::Image &image, SyncAccessIndex current_usage,
                               const VkImageSubresourceRange &subresource_range, bool is_depth_sliced) const;
     HazardResult DetectHazard(const vvl::ImageView &image_view, SyncAccessIndex current_usage) const;
@@ -276,36 +297,27 @@ class AccessContext {
                                           DetectOptions options) const;
     HazardResult DetectImageBarrierHazard(const vvl::Image &image, VkPipelineStageFlags2 src_exec_scope,
                                           const SyncAccessFlags &src_access_scope, const VkImageSubresourceRange &subresource_range,
-                                          DetectOptions options) const;
-    HazardResult DetectSubpassTransitionHazard(const TrackBack &track_back, const AttachmentViewGen &attach_view) const;
+                                          bool is_depth_sliced, DetectOptions options) const;
+    HazardResult DetectSubpassTransitionHazard(const SubpassBarrierTrackback &track_back,
+                                               const AttachmentViewGen &attach_view) const;
 
     HazardResult DetectFirstUseHazard(QueueId queue_id, const ResourceUsageRange &tag_range,
                                       const AccessContext &access_context) const;
+    HazardResult DetectMarkerHazard(const vvl::Buffer &buffer, const AccessRange &range) const;
 
-    const TrackBack &GetDstExternalTrackBack() const { return dst_external_; }
-    void Reset() {
-        prev_.clear();
-        prev_by_subpass_.clear();
-        async_.clear();
-        src_external_ = nullptr;
-        dst_external_ = TrackBack();
-        start_tag_ = ResourceUsageTag();
-        access_state_map_.clear();
-    }
+    const SubpassBarrierTrackback &GetDstExternalTrackBack() const { return dst_external_; }
 
     void ResolvePreviousAccesses();
     void ResolveFromContext(const AccessContext &from);
 
     template <typename ResolveOp>
-    void ResolveFromContext(ResolveOp &&resolve_op, const AccessContext &from_context,
-                            const ResourceAccessState *infill_state = nullptr, bool recur_to_infill = false);
+    void ResolveFromContext(ResolveOp &&resolve_op, const AccessContext &from_context);
     template <typename ResolveOp>
     void ResolveFromContext(ResolveOp &&resolve_op, const AccessContext &from_context,
-                            subresource_adapter::ImageRangeGenerator range_gen, const ResourceAccessState *infill_state = nullptr,
-                            bool recur_to_infill = false);
+                            subresource_adapter::ImageRangeGenerator range_gen, bool infill = false, bool recur_to_infill = false);
 
     void UpdateAccessState(const vvl::Buffer &buffer, SyncAccessIndex current_usage, SyncOrdering ordering_rule,
-                           const ResourceAccessRange &range, ResourceUsageTagEx tag_ex);
+                           const AccessRange &range, ResourceUsageTagEx tag_ex, SyncFlags flags = 0);
     void UpdateAccessState(const vvl::Image &image, SyncAccessIndex current_usage, SyncOrdering ordering_rule,
                            const VkImageSubresourceRange &subresource_range, const ResourceUsageTag &tag);
     void UpdateAccessState(const vvl::Image &image, SyncAccessIndex current_usage, SyncOrdering ordering_rule,
@@ -323,27 +335,29 @@ class AccessContext {
                            ResourceUsageTagEx tag_ex, SyncFlags flags = 0);
     void UpdateAccessState(const vvl::VideoSession &vs_state, const vvl::VideoPictureResource &resource,
                            SyncAccessIndex current_usage, ResourceUsageTag tag);
-    void ResolveChildContexts(const std::vector<AccessContext> &contexts);
+    void ResolveChildContexts(vvl::span<AccessContext> subpass_contexts);
 
     void ImportAsyncContexts(const AccessContext &from);
     void ClearAsyncContexts() { async_.clear(); }
-    template <typename Action>
-    void ApplyUpdateAction(const AttachmentViewGen &view_gen, AttachmentViewGen::Gen gen_type, const Action &action);
-    template <typename Action>
-    void ApplyToContext(const Action &barrier_action);
 
-    AccessContext(uint32_t subpass, VkQueueFlags queue_flags, const std::vector<SubpassDependencyGraphNode> &dependencies,
-                  const std::vector<AccessContext> &contexts, const AccessContext *external_context);
+    AccessContext() = default;
 
-    AccessContext() { Reset(); }
-    AccessContext(const AccessContext &copy_from) = default;
-    void Trim();
+    // Disable implicit copy operations and rely on explicit InitFrom.
+    // AccessContext is a heavy object and there must be no possibility of an accidental copy.
+    // Copy operations must be searchable (InitFrom function).
+    AccessContext(const AccessContext &other) = delete;
+    AccessContext &operator=(const AccessContext &) = delete;
+
+    void InitFrom(uint32_t subpass, VkQueueFlags queue_flags, const std::vector<SubpassDependencyGraphNode> &dependencies,
+                  const AccessContext *contexts, const AccessContext *external_context);
+    void InitFrom(const AccessContext &other);
+    void Reset();
+
     void TrimAndClearFirstAccess();
     void AddReferencedTags(ResourceUsageTagSet &referenced) const;
 
-    ResourceAccessRangeMap &GetAccessStateMap() { return access_state_map_; }
-    const ResourceAccessRangeMap &GetAccessStateMap() const { return access_state_map_; }
-    const TrackBack *GetTrackBackFromSubpass(uint32_t subpass) const {
+    const AccessMap &GetAccessMap() const { return access_state_map_; }
+    const SubpassBarrierTrackback *GetTrackBackFromSubpass(uint32_t subpass) const {
         if (subpass == VK_SUBPASS_EXTERNAL) {
             return src_external_;
         } else {
@@ -355,10 +369,6 @@ class AccessContext {
     void SetStartTag(ResourceUsageTag tag) { start_tag_ = tag; }
     ResourceUsageTag StartTag() const { return start_tag_; }
 
-    template <typename Action>
-    void ForAll(Action &&action);
-    template <typename Action>
-    void ConstForAll(Action &&action) const;
     template <typename Predicate>
     void EraseIf(Predicate &&pred);
 
@@ -381,16 +391,21 @@ class AccessContext {
         QueueId queue_id_;
     };
 
+    template <typename Action>
+    void UpdateMemoryAccessRangeState(Action &action, const AccessRange &range);
+
     template <typename Action, typename RangeGen>
     void UpdateMemoryAccessState(const Action &action, RangeGen &range_gen);
 
-  private:
-    template <typename Action>
-    static void UpdateMemoryAccessRangeState(ResourceAccessRangeMap &accesses, Action &action, const ResourceAccessRange &range);
+    // Called when all accesses are recorded. This can be used for preprocessing
+    // or caching purposes. After finalization, it is save to keep persistent
+    // references to individual accesses (until context is destroyed).
+    void Finalize();
 
+  private:
     struct UpdateMemoryAccessStateFunctor {
-        using Iterator = ResourceAccessRangeMap::iterator;
-        Iterator Infill(ResourceAccessRangeMap *accesses, const Iterator &pos, const ResourceAccessRange &range) const;
+        using Iterator = AccessMap::iterator;
+        Iterator Infill(AccessMap *accesses, const Iterator &pos_hint, const AccessRange &range) const;
         void operator()(const Iterator &pos) const;
         UpdateMemoryAccessStateFunctor(const AccessContext &context_, SyncAccessIndex usage_, SyncOrdering ordering_rule_,
                                        ResourceUsageTagEx tag_ex, SyncFlags flags = 0)
@@ -403,21 +418,21 @@ class AccessContext {
     };
 
     // Follow the context previous to access the access state, supporting "lazy" import into the context. Not intended for
-    // subpass layout transition, as the pending state handling is more complex
+    // subpass layout transition, as the pending state handling is more complex (TODO: check if previous statement is
+    // still true after pending barriers rework).
     // TODO: See if returning the lower_bound would be useful from a performance POV -- look at the lower_bound overhead
     // Would need to add a "hint" overload to parallel_iterator::invalidate_[AB] call, if so.
-    void ResolvePreviousAccess(const ResourceAccessRange &range, ResourceAccessRangeMap *descent_map,
-                               const ResourceAccessState *infill_state,
-                               const ResourceAccessStateFunction *previous_barrier = nullptr) const;
+    void ResolvePreviousAccess(const AccessRange &range, AccessMap *descent_map, bool infill,
+                               const AccessStateFunction *previous_barrier = nullptr) const;
     template <typename BarrierAction>
-    void ResolvePreviousAccessStack(const ResourceAccessRange &range, ResourceAccessRangeMap *descent_map,
-                                    const ResourceAccessState *infill_state, const BarrierAction &previous_barrie) const;
+    void ResolvePreviousAccessStack(const AccessRange &range, AccessMap *descent_map, bool infill,
+                                    const BarrierAction &previous_barrie) const;
     template <typename BarrierAction>
-    void ResolveAccessRange(const ResourceAccessRange &range, BarrierAction &barrier_action, ResourceAccessRangeMap *resolve_map,
-                            const ResourceAccessState *infill_state, bool recur_to_infill = true) const;
+    void ResolveAccessRange(const AccessRange &range, BarrierAction &barrier_action, AccessMap *resolve_map, bool infill,
+                            bool recur_to_infill = true) const;
 
     template <typename Detector>
-    HazardResult DetectHazardRange(Detector &detector, const ResourceAccessRange &range, DetectOptions options) const;
+    HazardResult DetectHazardRange(Detector &detector, const AccessRange &range, DetectOptions options) const;
     template <typename Detector, typename RangeGen>
     HazardResult DetectHazardGeneratedRanges(Detector &detector, RangeGen &range_gen, DetectOptions options) const;
     template <typename Detector, typename RangeGen>
@@ -437,35 +452,44 @@ class AccessContext {
                               bool is_depth_sliced, DetectOptions options) const;
 
     template <typename Detector>
-    HazardResult DetectHazardOneRange(Detector &detector, bool detect_prev, ResourceAccessRangeMap::const_iterator &pos,
-                                      const ResourceAccessRangeMap::const_iterator &the_end,
-                                      const ResourceAccessRange &range) const;
+    HazardResult DetectHazardOneRange(Detector &detector, bool detect_prev, AccessMap::const_iterator &pos,
+                                      const AccessMap::const_iterator &the_end, const AccessRange &range) const;
 
     template <typename Detector, typename RangeGen>
     HazardResult DetectAsyncHazard(const Detector &detector, const RangeGen &const_range_gen, ResourceUsageTag async_tag,
                                    QueueId async_queue_id) const;
 
-    template <typename NormalizeOp>
-    void Trim(NormalizeOp &&normalize);
-
     template <typename Detector>
-    HazardResult DetectPreviousHazard(Detector &detector, const ResourceAccessRange &range) const;
+    HazardResult DetectPreviousHazard(Detector &detector, const AccessRange &range) const;
 
-    ResourceAccessRangeMap access_state_map_;
-    std::vector<TrackBack> prev_;
-    std::vector<TrackBack *> prev_by_subpass_;
+  private:
+    AccessMap access_state_map_;
+
+    std::vector<SubpassBarrierTrackback> prev_;
+    std::vector<SubpassBarrierTrackback *> prev_by_subpass_;
+
     // These contexts *must* have the same lifespan as this context, or be cleared, before the referenced contexts can expire
     std::vector<AsyncReference> async_;
-    TrackBack *src_external_;
-    TrackBack dst_external_;
-    ResourceUsageTag start_tag_;
+
+    SubpassBarrierTrackback *src_external_ = nullptr;
+    SubpassBarrierTrackback dst_external_;
+    ResourceUsageTag start_tag_ = 0;
+
+    // True if access map won't be modified anymore.
+    // NOTE: In the current implementation we mark only command buffer contexts as finalized.
+    // TODO: mark other contexts as finalized too if needed.
+    bool finalized_ = false;
+
+    // Provides ordering of the context's first accesses based on tag values.
+    // Only available for finalized contexts.
+    SortedFirstAccesses sorted_first_accesses_;
 };
 
 // The semantics of the InfillUpdateOps of infill_update_range are slightly different than for the UpdateMemoryAccessState Action
 // operations, as this simplifies the generic traversal.  So we wrap them in a semantics Adapter to get the same effect.
 template <typename Action>
 struct ActionToOpsAdapter {
-    using Map = ResourceAccessRangeMap;
+    using Map = AccessMap;
     using Range = typename Map::key_type;
     using Iterator = typename Map::iterator;
     using IndexType = typename Map::index_type;
@@ -487,30 +511,19 @@ struct ActionToOpsAdapter {
 };
 
 template <typename Action>
-void AccessContext::ApplyToContext(const Action &barrier_action) {
-    // Note: Barriers do *not* cross context boundaries, applying to accessess within.... (at least for renderpass subpasses)
-    UpdateMemoryAccessRangeState(access_state_map_, barrier_action, kFullRange);
-}
-
-template <typename Action>
-void AccessContext::UpdateMemoryAccessRangeState(ResourceAccessRangeMap &accesses, Action &action,
-                                                 const ResourceAccessRange &range) {
+void AccessContext::UpdateMemoryAccessRangeState(Action &action, const AccessRange &range) {
+    assert(!finalized_);
     ActionToOpsAdapter<Action> ops{action};
-    infill_update_range(accesses, range, ops);
+    infill_update_range(access_state_map_, range, ops);
 }
 
 template <typename Action, typename RangeGen>
 void AccessContext::UpdateMemoryAccessState(const Action &action, RangeGen &range_gen) {
+    assert(!finalized_);
     ActionToOpsAdapter<Action> ops{action};
-    infill_update_rangegen(access_state_map_, range_gen, ops);
-}
-
-template <typename Action>
-void AccessContext::ApplyUpdateAction(const AttachmentViewGen &view_gen, AttachmentViewGen::Gen gen_type, const Action &action) {
-    const std::optional<ImageRangeGen> &ref_range_gen = view_gen.GetRangeGen(gen_type);
-    if (ref_range_gen) {
-        ImageRangeGen range_gen(*ref_range_gen);
-        UpdateMemoryAccessState(action, range_gen);
+    auto pos = access_state_map_.lower_bound(*range_gen);
+    for (; range_gen->non_empty(); ++range_gen) {
+        pos = infill_update_range(access_state_map_, pos, *range_gen, ops);
     }
 }
 
@@ -519,7 +532,7 @@ template <typename Detector, typename RangeGen>
 HazardResult AccessContext::DetectAsyncHazard(const Detector &detector, const RangeGen &const_range_gen, ResourceUsageTag async_tag,
                                               QueueId async_queue_id) const {
     using RangeType = typename RangeGen::RangeType;
-    using ConstIterator = ResourceAccessRangeMap::const_iterator;
+    using ConstIterator = AccessMap::const_iterator;
     RangeGen range_gen(const_range_gen);
 
     HazardResult hazard;
@@ -540,11 +553,10 @@ HazardResult AccessContext::DetectAsyncHazard(const Detector &detector, const Ra
 }
 
 template <typename Detector>
-HazardResult AccessContext::DetectHazardOneRange(Detector &detector, bool detect_prev, ResourceAccessRangeMap::const_iterator &pos,
-                                                 const ResourceAccessRangeMap::const_iterator &the_end,
-                                                 const ResourceAccessRange &range) const {
+HazardResult AccessContext::DetectHazardOneRange(Detector &detector, bool detect_prev, AccessMap::const_iterator &pos,
+                                                 const AccessMap::const_iterator &the_end, const AccessRange &range) const {
     HazardResult hazard;
-    ResourceAccessRange gap = {range.begin, range.begin};
+    AccessRange gap = {range.begin, range.begin};
 
     while (pos != the_end && pos->first.begin < range.end) {
         // Cover any leading gap, or gap between entries
@@ -577,24 +589,41 @@ HazardResult AccessContext::DetectHazardOneRange(Detector &detector, bool detect
     return hazard;
 }
 
+// A wrapper for a single range with the same semantics as other non-trivial range generators
+template <typename KeyType>
+class SingleRangeGenerator {
+  public:
+    using RangeType = KeyType;
+    SingleRangeGenerator(const KeyType &range) : current_(range) {}
+    const KeyType &operator*() const { return current_; }
+    const KeyType *operator->() const { return &current_; }
+    SingleRangeGenerator &operator++() {
+        current_ = KeyType();  // just one real range
+        return *this;
+    }
+
+  private:
+    SingleRangeGenerator() = default;
+    KeyType current_;
+};
+
 template <typename Detector>
-HazardResult AccessContext::DetectHazardRange(Detector &detector, const ResourceAccessRange &range, DetectOptions options) const {
+HazardResult AccessContext::DetectHazardRange(Detector &detector, const AccessRange &range, DetectOptions options) const {
     SingleRangeGenerator range_gen(range);
     return DetectHazardGeneratedRanges(detector, range_gen, options);
 }
 
 template <typename BarrierAction>
-void AccessContext::ResolveAccessRange(const ResourceAccessRange &range, BarrierAction &barrier_action,
-                                       ResourceAccessRangeMap *resolve_map, const ResourceAccessState *infill_state,
+void AccessContext::ResolveAccessRange(const AccessRange &range, BarrierAction &barrier_action, AccessMap *resolve_map, bool infill,
                                        bool recur_to_infill) const {
     if (!range.non_empty()) return;
 
-    ResourceRangeMergeIterator current(*resolve_map, access_state_map_, range.begin);
+    RangeMergeIterator current(*resolve_map, access_state_map_, range.begin);
     while (current->range.non_empty() && range.includes(current->range.begin)) {
         const auto current_range = current->range & range;
         if (current->pos_B->valid) {
             const auto &src_pos = current->pos_B->lower_bound;
-            ResourceAccessState access(src_pos->second);  // intentional copy
+            AccessState access(src_pos->second);  // intentional copy
             barrier_action(&access);
             if (current->pos_A->valid) {
                 const auto trimmed = sparse_container::split(current->pos_A->lower_bound, *resolve_map, current_range);
@@ -607,7 +636,7 @@ void AccessContext::ResolveAccessRange(const ResourceAccessRange &range, Barrier
         } else {
             // we have to descend to fill this gap
             if (recur_to_infill) {
-                ResourceAccessRange recurrence_range = current_range;
+                AccessRange recurrence_range = current_range;
                 // The current context is empty for the current range, so recur to fill the gap.
                 // Since we will be recurring back up the DAG, expand the gap descent to cover the full range for which B
                 // is not valid, to minimize that recurrence
@@ -618,7 +647,7 @@ void AccessContext::ResolveAccessRange(const ResourceAccessRange &range, Barrier
                     // Recur only over the range until B becomes valid (within the limits of range).
                     recurrence_range.end = std::min(range.end, current->pos_B->lower_bound->first.begin);
                 }
-                ResolvePreviousAccessStack(recurrence_range, resolve_map, infill_state, barrier_action);
+                ResolvePreviousAccessStack(recurrence_range, resolve_map, infill, barrier_action);
 
                 // Given that there could be gaps we need to seek carefully to not repeatedly search the same gaps in the next
                 // iterator of the outer while.
@@ -629,9 +658,9 @@ void AccessContext::ResolveAccessRange(const ResourceAccessRange &range, Barrier
                 const auto seek_to = recurrence_range.end - 1;  // The subtraction is safe as range can't be empty (loop condition)
                 current.invalidate_A();                         // Changes current->range
                 current.seek(seek_to);
-            } else if (!current->pos_A->valid && infill_state) {
+            } else if (!current->pos_A->valid && infill) {
                 // If we didn't find anything in the current range, and we aren't reccuring... we infill if required
-                auto inserted = resolve_map->insert(current->pos_A->lower_bound, std::make_pair(current->range, *infill_state));
+                auto inserted = resolve_map->insert(current->pos_A->lower_bound, std::make_pair(current->range, AccessState{}));
                 current.invalidate_A(inserted);  // Update the parallel iterator to point at the correct segment after insert
             }
         }
@@ -642,8 +671,8 @@ void AccessContext::ResolveAccessRange(const ResourceAccessRange &range, Barrier
 
     // Infill if range goes passed both the current and resolve map prior contents
     if (recur_to_infill && (current->range.end < range.end)) {
-        ResourceAccessRange trailing_fill_range = {current->range.end, range.end};
-        ResolvePreviousAccessStack<BarrierAction>(trailing_fill_range, resolve_map, infill_state, barrier_action);
+        AccessRange trailing_fill_range = {current->range.end, range.end};
+        ResolvePreviousAccessStack<BarrierAction>(trailing_fill_range, resolve_map, infill, barrier_action);
     }
 }
 
@@ -666,7 +695,7 @@ HazardResult AccessContext::DetectHazardGeneratedRanges(Detector &detector, Rang
     const bool detect_prev = (static_cast<uint32_t>(options) & DetectOptions::kDetectPrevious) != 0;
 
     using RangeType = typename RangeGen::RangeType;
-    using ConstIterator = ResourceAccessRangeMap::const_iterator;
+    using ConstIterator = AccessMap::const_iterator;
     auto do_detect_hazard_range = [this, &detector, &hazard, detect_prev](const RangeType &range, const ConstIterator &end,
                                                                           ConstIterator &pos) {
         hazard = DetectHazardOneRange(detector, detect_prev, pos, end, range);
@@ -679,9 +708,9 @@ HazardResult AccessContext::DetectHazardGeneratedRanges(Detector &detector, Rang
 }
 
 template <typename Detector>
-HazardResult AccessContext::DetectPreviousHazard(Detector &detector, const ResourceAccessRange &range) const {
-    ResourceAccessRangeMap descent_map;
-    ResolvePreviousAccess(range, &descent_map, nullptr);
+HazardResult AccessContext::DetectPreviousHazard(Detector &detector, const AccessRange &range) const {
+    AccessMap descent_map;
+    ResolvePreviousAccess(range, &descent_map, false);
 
     for (auto prev = descent_map.begin(); prev != descent_map.end(); ++prev) {
         HazardResult hazard = detector.Detect(prev);
@@ -694,14 +723,15 @@ HazardResult AccessContext::DetectPreviousHazard(Detector &detector, const Resou
 
 template <typename Predicate>
 void AccessContext::EraseIf(Predicate &&pred) {
+    assert(!finalized_);
     // Note: Don't forward, we don't want r-values moved, since we're going to make multiple calls.
     vvl::EraseIf(access_state_map_, pred);
 }
 
 template <typename ResolveOp>
-void AccessContext::ResolveFromContext(ResolveOp &&resolve_op, const AccessContext &from_context,
-                                       const ResourceAccessState *infill_state, bool recur_to_infill) {
-    from_context.ResolveAccessRange(kFullRange, resolve_op, &access_state_map_, infill_state, recur_to_infill);
+void AccessContext::ResolveFromContext(ResolveOp &&resolve_op, const AccessContext &from_context) {
+    assert(!finalized_);
+    from_context.ResolveAccessRange(kFullRange, resolve_op, &access_state_map_, false, false);
 }
 
 // TODO: ImageRangeGenerator is a huge object. Here we make a copy. There is at least one place where it is
@@ -710,17 +740,18 @@ void AccessContext::ResolveFromContext(ResolveOp &&resolve_op, const AccessConte
 // the latter is a bounus).
 template <typename ResolveOp>
 void AccessContext::ResolveFromContext(ResolveOp &&resolve_op, const AccessContext &from_context,
-                                       subresource_adapter::ImageRangeGenerator range_gen, const ResourceAccessState *infill_state,
-                                       bool recur_to_infill) {
+                                       subresource_adapter::ImageRangeGenerator range_gen, bool infill, bool recur_to_infill) {
+    assert(!finalized_);
     for (; range_gen->non_empty(); ++range_gen) {
-        from_context.ResolveAccessRange(*range_gen, resolve_op, &access_state_map_, infill_state, recur_to_infill);
+        from_context.ResolveAccessRange(*range_gen, resolve_op, &access_state_map_, infill, recur_to_infill);
     }
 }
 
 template <typename BarrierAction>
-void AccessContext::ResolvePreviousAccessStack(const ResourceAccessRange &range, ResourceAccessRangeMap *descent_map,
-                                               const ResourceAccessState *infill_state,
+void AccessContext::ResolvePreviousAccessStack(const AccessRange &range, AccessMap *descent_map, bool infill,
                                                const BarrierAction &previous_barrier) const {
-    ResourceAccessStateFunction stacked_barrier(std::ref(previous_barrier));
-    ResolvePreviousAccess(range, descent_map, infill_state, &stacked_barrier);
+    AccessStateFunction stacked_barrier(std::ref(previous_barrier));
+    ResolvePreviousAccess(range, descent_map, infill, &stacked_barrier);
 }
+
+}  // namespace syncval

@@ -47,7 +47,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, MixingProtectedResources) {
         GTEST_SKIP() << "Memory type not found";
     }
     vkt::DeviceMemory memory_image_protected(*m_device, alloc_info);
-    vk::BindImageMemory(device(), image_protected, memory_image_protected.handle(), 0);
+    vk::BindImageMemory(device(), image_protected, memory_image_protected, 0);
     image_protected.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView image_view_protected = image_protected.CreateView();
 
@@ -74,7 +74,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, MixingProtectedResources) {
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -113,7 +113,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageBindingPartiallyBound) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
 
@@ -171,6 +171,136 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageBindingPartiallyBound) {
     vk::DeviceWaitIdle(*m_device);
 }
 
+TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageBindingPartiallyBoundDescriptorBuffer) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7677");
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+
+    const char *csSource = R"glsl(
+        #version 460
+        #extension GL_EXT_samplerless_texture_functions : require
+
+        layout(set = 0, binding = 0) uniform texture2D float_textures[2];
+        layout(set = 0, binding = 0) uniform utexture2D uint_textures[2];
+        layout(set = 0, binding = 1) buffer output_buffer {
+            uint index;
+            vec4 data;
+        };
+
+        void main() {
+            const vec4 value = texelFetch(float_textures[index], ivec2(0), 0);
+            const uint mask = texelFetch(uint_textures[index + 1], ivec2(0), 0).x;
+            data = mask > 0 ? value : vec4(0.0);
+        }
+    )glsl";
+
+    const VkDescriptorSetLayoutBinding bindings[2] = {{0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, VK_SHADER_STAGE_ALL, nullptr},
+                                                      {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+
+    const VkDescriptorBindingFlags ds_binding_flags[2] = {VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT, 0u};
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo flags_create_info = vku::InitStructHelper();
+    flags_create_info.bindingCount = 2u;
+    flags_create_info.pBindingFlags = ds_binding_flags;
+
+    VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper(&flags_create_info);
+    ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    ds_layout_ci.bindingCount = 2u;
+    ds_layout_ci.pBindings = bindings;
+    vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&ds_layout});
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cp_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.CreateComputePipeline();
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                                                  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Image float_image(*m_device, image_ci);
+    float_image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::ImageView float_image_view = float_image.CreateView();
+
+    image_ci.format = VK_FORMAT_R8G8B8A8_UINT;
+    vkt::Image uint_image(*m_device, image_ci);
+    uint_image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::ImageView uint_image_view = uint_image.CreateView();
+
+    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    struct Payload {
+        uint32_t index;
+        uint32_t padding[3];
+        float data[4];
+    };
+    Payload *payload = (Payload *)buffer.Memory().Map();
+    payload->index = 0;
+
+    vkt::Buffer descriptor_buffer(*m_device, 4096, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
+
+    uint8_t *descriptor_data = reinterpret_cast<uint8_t *>(descriptor_buffer.Memory().Map());
+
+    VkDeviceSize image_offset = ds_layout.GetDescriptorBufferBindingOffset(0);
+    VkDeviceSize buffer_offset = ds_layout.GetDescriptorBufferBindingOffset(1);
+
+    vkt::DescriptorGetInfo float_image_get_info(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_NULL_HANDLE, float_image_view,
+                                                VK_IMAGE_LAYOUT_GENERAL);
+    vk::GetDescriptorEXT(*m_device, float_image_get_info, descriptor_buffer_properties.sampledImageDescriptorSize,
+                         descriptor_data + image_offset);
+
+    vkt::DescriptorGetInfo uint_image_get_info(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_NULL_HANDLE, uint_image_view,
+                                               VK_IMAGE_LAYOUT_GENERAL);
+    vk::GetDescriptorEXT(*m_device, uint_image_get_info, descriptor_buffer_properties.sampledImageDescriptorSize,
+                         descriptor_data + image_offset + descriptor_buffer_properties.sampledImageDescriptorSize);
+
+    vkt::DescriptorGetInfo buffer_get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer, sizeof(Payload));
+    vk::GetDescriptorEXT(*m_device, buffer_get_info, descriptor_buffer_properties.storageBufferDescriptorSize,
+                         descriptor_data + buffer_offset);
+
+    VkDescriptorBufferBindingInfoEXT buffer_binding_info = vku::InitStructHelper();
+    buffer_binding_info.address = descriptor_buffer.Address();
+    buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+
+    VkClearColorValue float_clear;
+    float_clear.float32[0] = 0.2f;
+    float_clear.float32[1] = 0.4f;
+    float_clear.float32[2] = 0.6f;
+    float_clear.float32[3] = 0.8f;
+    VkClearColorValue uint_clear;
+    uint_clear.uint32[0] = 1u;
+    uint_clear.uint32[1] = 0u;
+    uint_clear.uint32[2] = 1u;
+    uint_clear.uint32[3] = 0u;
+    VkImageSubresourceRange subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u};
+
+    m_command_buffer.Begin();
+    vk::CmdClearColorImage(m_command_buffer, float_image, VK_IMAGE_LAYOUT_GENERAL, &float_clear, 1u, &subresource_range);
+    vk::CmdClearColorImage(m_command_buffer, uint_image, VK_IMAGE_LAYOUT_GENERAL, &uint_clear, 1u, &subresource_range);
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &buffer_binding_info);
+    uint32_t buffer_index = 0u;
+    VkDeviceSize offset = 0u;
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0u, 1u,
+                                         &buffer_index, &offset);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    for (uint32_t i = 0; i < 4; ++i) {
+        ASSERT_EQ(float_clear.float32[i], payload->data[i]);
+    }
+}
+
 TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageBindingRuntimeArray) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7677");
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
@@ -179,7 +309,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageBindingRuntimeArray) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : enable
         #extension GL_EXT_samplerless_texture_functions : require
@@ -218,10 +348,10 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageBindingRuntimeArray) {
     uint32_t *data = (uint32_t *)buffer.Memory().Map();
     *data = 0;
 
-    pipe.descriptor_set_.WriteDescriptorImageInfo(0, float_image_view.handle(), VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                                                   VK_IMAGE_LAYOUT_GENERAL, 0);
-    pipe.descriptor_set_.WriteDescriptorImageInfo(0, uint_image_view.handle(), VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                                                   VK_IMAGE_LAYOUT_GENERAL, 1);
+    pipe.descriptor_set_.WriteDescriptorImageInfo(0, float_image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                                  VK_IMAGE_LAYOUT_GENERAL, 0);
+    pipe.descriptor_set_.WriteDescriptorImageInfo(0, uint_image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                                  VK_IMAGE_LAYOUT_GENERAL, 1);
     pipe.descriptor_set_.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipe.descriptor_set_.UpdateDescriptorSets();
 
@@ -242,7 +372,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageMultisample) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
 
@@ -299,7 +429,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageMultisampleDescriptorSets) 
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
         layout(set = 0, binding = 0) uniform texture2D BaseTexture;
@@ -310,7 +440,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageMultisampleDescriptorSets) 
         }
     )glsl";
 
-    char const *cs_source_ms = R"glsl(
+    const char *cs_source_ms = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
         layout(set = 0, binding = 0) uniform texture2DMS BaseTextureMS;
@@ -382,7 +512,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageMultisampleDescriptorSetsPa
     AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
         layout(set = 0, binding = 0) uniform texture2D BaseTexture;
@@ -392,7 +522,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageMultisampleDescriptorSetsPa
             dummy = texture(sampler2D(BaseTexture, BaseTextureSampler), vec2(0));
         }
     )glsl";
-    char const *cs_source_ms = R"glsl(
+    const char *cs_source_ms = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
         layout(set = 0, binding = 0) uniform texture2DMS BaseTextureMS;
@@ -474,7 +604,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageMultisampleDispatches) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
 
@@ -487,7 +617,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, AliasImageMultisampleDispatches) {
         }
     )glsl";
 
-    char const *cs_source_ms = R"glsl(
+    const char *cs_source_ms = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
 
@@ -594,7 +724,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, NonMultisampleMismatchWithPipeline) {
     descriptor_set.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         // mySampler[0] is bad
         // mySampler[1] is good
@@ -653,7 +783,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, SharedDescriptorDifferentOpVariableId
     descriptor_set.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *cs_source0 = R"glsl(
+    const char *cs_source0 = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set=0, binding=0) uniform sampler2D sample_array[];
@@ -672,7 +802,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, SharedDescriptorDifferentOpVariableId
 
     // This is the same shader as above, but the goal is to make sure the OpVariable ID are different as the descriptor is being
     // aliased
-    char const *cs_source1 = R"(
+    const char *cs_source1 = R"(
                OpCapability Shader
                OpCapability RuntimeDescriptorArray
                OpMemoryModel Logical GLSL450
@@ -740,93 +870,35 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, SharedDescriptorDifferentOpVariableId
 }
 
 TEST_F(PositiveGpuAVDescriptorPostProcess, DescriptorIndexingSlang) {
+    RETURN_IF_SKIP(CheckSlangSupport());
+
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    // [[vk::binding(0, 0)]]
-    // Texture2D texture[];
-    // [[vk::binding(1, 0)]]
-    // SamplerState sampler;
-    //
-    // struct StorageBuffer {
-    //     uint data; // Will be zero
-    //     float4 color;
-    // };
-    //
-    // [[vk::binding(2, 0)]]
-    // RWStructuredBuffer<StorageBuffer> storageBuffer;
-    //
-    // [shader("compute")]
-    // void main() {
-    //     uint dataIndex = storageBuffer[0].data;
-    //     float4 sampledColor = texture[dataIndex].SampleLevel(sampler, float2(0), 0);
-    //     storageBuffer[0].color = sampledColor;
-    // }
-    char const *cs_source = R"(
-               OpCapability RuntimeDescriptorArray
-               OpCapability Shader
-               OpExtension "SPV_KHR_storage_buffer_storage_class"
-               OpMemoryModel Logical GLSL450
-               OpEntryPoint GLCompute %main "main" %storageBuffer %texture %sampler
-               OpExecutionMode %main LocalSize 1 1 1
-               OpMemberDecorate %StorageBuffer_std430 0 Offset 0
-               OpMemberDecorate %StorageBuffer_std430 1 Offset 16
-               OpDecorate %_runtimearr_StorageBuffer_std430 ArrayStride 32
-               OpDecorate %RWStructuredBuffer Block
-               OpMemberDecorate %RWStructuredBuffer 0 Offset 0
-               OpDecorate %storageBuffer Binding 2
-               OpDecorate %storageBuffer DescriptorSet 0
-               OpDecorate %texture Binding 0
-               OpDecorate %texture DescriptorSet 0
-               OpDecorate %sampler Binding 1
-               OpDecorate %sampler DescriptorSet 0
-       %void = OpTypeVoid
-          %3 = OpTypeFunction %void
-        %int = OpTypeInt 32 1
-      %int_0 = OpConstant %int 0
-       %uint = OpTypeInt 32 0
-      %float = OpTypeFloat 32
-    %v4float = OpTypeVector %float 4
-%StorageBuffer_std430 = OpTypeStruct %uint %v4float
-%_ptr_StorageBuffer_StorageBuffer_std430 = OpTypePointer StorageBuffer %StorageBuffer_std430
-%_runtimearr_StorageBuffer_std430 = OpTypeRuntimeArray %StorageBuffer_std430
-%RWStructuredBuffer = OpTypeStruct %_runtimearr_StorageBuffer_std430
-%_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
-%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
-         %21 = OpTypeImage %float 2D 2 0 0 1 Unknown
-%_runtimearr_21 = OpTypeRuntimeArray %21
-%_ptr_UniformConstant__runtimearr_21 = OpTypePointer UniformConstant %_runtimearr_21
-%_ptr_UniformConstant_21 = OpTypePointer UniformConstant %21
-    %v2float = OpTypeVector %float 2
-         %32 = OpTypeSampler
-%_ptr_UniformConstant_32 = OpTypePointer UniformConstant %32
-         %36 = OpTypeSampledImage %21
-    %float_0 = OpConstant %float 0
-      %int_1 = OpConstant %int 1
-%_ptr_StorageBuffer_v4float = OpTypePointer StorageBuffer %v4float
-%storageBuffer = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer
-    %texture = OpVariable %_ptr_UniformConstant__runtimearr_21 UniformConstant
-    %sampler = OpVariable %_ptr_UniformConstant_32 UniformConstant
-         %47 = OpConstantComposite %v2float %float_0 %float_0
-       %main = OpFunction %void None %3
-          %4 = OpLabel
-         %12 = OpAccessChain %_ptr_StorageBuffer_StorageBuffer_std430 %storageBuffer %int_0 %int_0
-         %18 = OpAccessChain %_ptr_StorageBuffer_uint %12 %int_0
-  %dataIndex = OpLoad %uint %18
-         %25 = OpAccessChain %_ptr_UniformConstant_21 %texture %dataIndex
-         %31 = OpLoad %21 %25
-         %33 = OpLoad %32 %sampler
-%sampledImage = OpSampledImage %36 %31 %33
-    %sampled = OpImageSampleExplicitLod %v4float %sampledImage %47 Lod %float_0
-         %41 = OpAccessChain %_ptr_StorageBuffer_StorageBuffer_std430 %storageBuffer %int_0 %int_0
-         %44 = OpAccessChain %_ptr_StorageBuffer_v4float %41 %int_1
-               OpStore %44 %sampled
-               OpReturn
-               OpFunctionEnd
-    )";
+    const char *slang_shader = R"slang(
+        [[vk::binding(0, 0)]]
+        Texture2D texture[];
+        [[vk::binding(1, 0)]]
+        SamplerState sampler;
+
+        struct StorageBuffer {
+            uint data; // Will be zero
+            float4 color;
+        };
+
+        [[vk::binding(2, 0)]]
+        RWStructuredBuffer<StorageBuffer> storageBuffer;
+
+        [shader("compute")]
+        void main() {
+            uint dataIndex = storageBuffer[0].data;
+            float4 sampledColor = texture[dataIndex].SampleLevel(sampler, float2(0), 0);
+            storageBuffer[0].color = sampledColor;
+        }
+    )slang";
 
     vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
     uint32_t *buffer_ptr = (uint32_t *)buffer.Memory().Map();
@@ -850,7 +922,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, DescriptorIndexingSlang) {
     descriptor_set.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(this, slang_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG);
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
@@ -870,7 +942,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, ZeroBindingDescriptor) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : enable
         layout(set = 1, binding = 0) uniform texture2D textures[2];
@@ -919,7 +991,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, ZeroBindingDescriptor) {
     pipe1.CreateComputePipeline();
 
     CreateComputePipelineHelper pipe2(*this);
-    pipe2.cp_ci_.layout = pipeline_layout2.handle();
+    pipe2.cp_ci_.layout = pipeline_layout2;
     pipe2.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe2.CreateComputePipeline();
 
@@ -961,7 +1033,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, ImageViewArrayAliasBinding) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : require
         // Using descriptor aliasing: same binding for sampler2D and sampler2DArray.
@@ -1025,7 +1097,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, DISABLED_VariableIdClash) {
     InitRenderTarget();
 
     // layout(set=0, binding=0) uniform sampler2D vertexSampler;
-    char const *vs_source = R"(
+    const char *vs_source = R"(
                 OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Vertex %main "main" %vertexSampler %vertices %_ %gl_VertexIndex %unused
@@ -1102,7 +1174,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, DISABLED_VariableIdClash) {
     )";
 
     // layout(set=0, binding=1) uniform sampler3D fragmentSampler;
-    char const *fs_source = R"(
+    const char *fs_source = R"(
                    OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Fragment %main "main" %fragmentSampler %color %unused
@@ -1185,7 +1257,7 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, BranchConditonalPostDominate) {
     RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
     RETURN_IF_SKIP(InitState());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0, std430) buffer SSBO {
             uint a;
@@ -1237,6 +1309,173 @@ TEST_F(PositiveGpuAVDescriptorPostProcess, BranchConditonalPostDominate) {
     m_command_buffer.Begin();
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
                               &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVDescriptorPostProcess, AliasDepthSamplers) {
+    TEST_DESCRIPTION("Same binding used for normal and depth samplers");
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    char const *cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_nonuniform_qualifier : require
+
+        layout(set = 0, binding = 0) buffer SSBO {
+            uint a; // 0
+            uint b; // 1
+            vec4 result;
+        };
+        layout(set = 0, binding = 1) uniform texture2D tex[];
+        layout(set = 0, binding = 2) uniform sampler s[];
+        layout(set = 0, binding = 2) uniform samplerShadow ds[];
+
+        void main() {
+            vec4 texture_color = texture(sampler2D(tex[a], ds[a]), vec2(0));
+            float shadow_factor = textureLod(sampler2DShadow(tex[b], s[b]), vec3(0), 0.0f);
+
+            result = texture_color * shadow_factor;
+        }
+    )glsl";
+
+    OneOffDescriptorSet descriptor_set(m_device, {
+                                                     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                     {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, VK_SHADER_STAGE_ALL, nullptr},
+                                                     {2, VK_DESCRIPTOR_TYPE_SAMPLER, 2, VK_SHADER_STAGE_ALL, nullptr},
+                                                 });
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    uint32_t *buffer_ptr = (uint32_t *)buffer.Memory().Map();
+    buffer_ptr[0] = 0;
+    buffer_ptr[1] = 1;
+
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+    vkt::Sampler sampler_depth(*m_device, SafeSaneSamplerCreateInfo());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView image_view = image.CreateView();
+
+    image_ci.format = FindSupportedDepthStencilFormat(Gpu());
+    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    vkt::Image image_depth(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView image_view_depth = image_depth.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorImageInfo(1, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
+    descriptor_set.WriteDescriptorImageInfo(1, image_view_depth, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
+    descriptor_set.WriteDescriptorImageInfo(2, VK_NULL_HANDLE, sampler, VK_DESCRIPTOR_TYPE_SAMPLER, VK_IMAGE_LAYOUT_UNDEFINED, 0);
+    descriptor_set.WriteDescriptorImageInfo(2, VK_NULL_HANDLE, sampler_depth, VK_DESCRIPTOR_TYPE_SAMPLER, VK_IMAGE_LAYOUT_UNDEFINED,
+                                            1);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVDescriptorPostProcess, AliasDepthSamplersSlang) {
+    TEST_DESCRIPTION("Same binding used for normal and depth samplers");
+    RETURN_IF_SKIP(CheckSlangSupport());
+    AddRequiredExtensions(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::computeDerivativeGroupQuads);
+    AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    char const *cs_source = R"slang(
+        struct SSBO {
+            uint a;
+            uint b;
+            float4 result;
+        };
+
+        RWStructuredBuffer<SSBO> g_ssbo : register(u0, space0);
+
+        Texture2D g_textures[] : register(t1, space0);
+        SamplerState g_samplers[] : register(s2, space0);
+        SamplerComparisonState g_shadowSamplers[] : register(s2, space0);
+
+        [shader("compute")]
+        [numthreads(2, 2, 1)]
+        void main() {
+            uint a = g_ssbo[0].a;
+            uint b = g_ssbo[0].b;
+
+            float4 texture_color = g_textures[a].Sample(
+                g_samplers[a],
+                float2(0.0f, 0.0f)
+            );
+
+            float shadow_factor = g_textures[b].SampleCmpLevelZero(
+                g_shadowSamplers[b],
+                float2(0.0f, 0.0f),
+                0.0f
+            );
+
+            g_ssbo[0].result = texture_color * shadow_factor;
+            g_ssbo[0].result = texture_color;
+        }
+    )slang";
+
+    OneOffDescriptorSet descriptor_set(m_device, {
+                                                     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                     {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, VK_SHADER_STAGE_ALL, nullptr},
+                                                     {2, VK_DESCRIPTOR_TYPE_SAMPLER, 2, VK_SHADER_STAGE_ALL, nullptr},
+                                                 });
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    uint32_t *buffer_ptr = (uint32_t *)buffer.Memory().Map();
+    buffer_ptr[0] = 0;
+    buffer_ptr[1] = 1;
+
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+    vkt::Sampler sampler_depth(*m_device, SafeSaneSamplerCreateInfo());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView image_view = image.CreateView();
+
+    image_ci.format = FindSupportedDepthStencilFormat(Gpu());
+    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    vkt::Image image_depth(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView image_view_depth = image_depth.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorImageInfo(1, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
+    descriptor_set.WriteDescriptorImageInfo(1, image_view_depth, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
+    descriptor_set.WriteDescriptorImageInfo(2, VK_NULL_HANDLE, sampler, VK_DESCRIPTOR_TYPE_SAMPLER, VK_IMAGE_LAYOUT_UNDEFINED, 0);
+    descriptor_set.WriteDescriptorImageInfo(2, VK_NULL_HANDLE, sampler_depth, VK_DESCRIPTOR_TYPE_SAMPLER, VK_IMAGE_LAYOUT_UNDEFINED,
+                                            1);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_SLANG);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();

@@ -41,9 +41,6 @@ void DebugPrintfTests::InitDebugPrintfFramework(void *p_next, bool reserve_slot)
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
-    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        GTEST_SKIP() << "Currently disabled for Portability";
-    }
 }
 
 class NegativeDebugPrintf : public DebugPrintfTests {
@@ -72,7 +69,7 @@ void NegativeDebugPrintf::BasicComputeTest(const char *shader, const char *messa
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Float) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -85,7 +82,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntUnsigned) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -98,7 +95,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntUnsigned) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntUnsignedUnderflow) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -111,7 +108,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntUnsignedUnderflow) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntSignedOverflow) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -124,7 +121,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntSignedOverflow) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_TwoFloats) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -137,7 +134,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_TwoFloats) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatPrecision) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -150,7 +147,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatPrecision) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_TextBeforeAndAfter) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -163,7 +160,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_TextBeforeAndAfter) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntOctal) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -176,7 +173,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntOctal) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntOctalNegative) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -189,7 +186,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntOctalNegative) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntNegative) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -202,7 +199,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntNegative) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVector2) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -215,7 +212,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVector2) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVector3) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -228,7 +225,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVector3) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVector4) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -241,7 +238,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVector4) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorPrecision) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -254,7 +251,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorPrecision) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorPrecisionZeroPad) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -267,7 +264,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorPrecisionZeroPad) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorZeroPad) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -280,7 +277,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorZeroPad) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorScientificNotation) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -293,7 +290,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorScientificNotation) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntVector) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -306,7 +303,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntVector) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntVectorUnsigned) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -319,7 +316,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntVectorUnsigned) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntVectorHex) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -332,7 +329,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntVectorHex) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntVectorZeroPad) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -345,7 +342,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntVectorZeroPad) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_ScientificNotation) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -358,7 +355,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ScientificNotation) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_ScientificNotationPrecision) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -371,7 +368,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ScientificNotationPrecision) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatShortest) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -385,7 +382,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatShortest) {
 // TODO - This prints out  0x1.921cacp+1 vs 0x1.921cac0000000p+1 depending on Windows or not
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_FloatHex) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -398,7 +395,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_FloatHex) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatHexPrecision) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -412,7 +409,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatHexPrecision) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -427,7 +424,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64Vector) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -443,7 +440,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64Vector) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64Hex) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -458,7 +455,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64Hex) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64VectorHex) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -475,7 +472,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64VectorHex) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_Int64VectorHexPrecision) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -491,7 +488,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_Int64VectorHexPrecision) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64VectorDecimal) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -507,7 +504,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64VectorDecimal) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Float64) {
     AddRequiredFeature(vkt::Feature::shaderFloat64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
@@ -523,7 +520,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float64) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Float64Vector) {
     AddRequiredFeature(vkt::Feature::shaderFloat64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
@@ -539,7 +536,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float64Vector) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Float64VectorPrecision) {
     AddRequiredFeature(vkt::Feature::shaderFloat64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
@@ -557,7 +554,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatMix) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
     AddRequiredFeature(vkt::Feature::shaderFloat64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
@@ -576,7 +573,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatMix) {
 TEST_F(NegativeDebugPrintf, DISABLED_Float16) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
@@ -593,7 +590,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float16) {
 TEST_F(NegativeDebugPrintf, DISABLED_Float16Vector) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
@@ -610,7 +607,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float16Vector) {
 TEST_F(NegativeDebugPrintf, DISABLED_Float16Precision) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
@@ -626,7 +623,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float16Precision) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int16) {
     AddRequiredFeature(vkt::Feature::shaderInt16);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -642,7 +639,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int16) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int16Vector) {
     AddRequiredFeature(vkt::Feature::shaderInt16);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -660,7 +657,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int16Vector) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int16Hex) {
     AddRequiredFeature(vkt::Feature::shaderInt16);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -677,7 +674,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int16Hex) {
 TEST_F(NegativeDebugPrintf, DISABLED_Int8) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt8);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -694,7 +691,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int8) {
 TEST_F(NegativeDebugPrintf, DISABLED_Int8Vector) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt8);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -713,7 +710,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int8Vector) {
 TEST_F(NegativeDebugPrintf, DISABLED_Int8Hex) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt8);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -728,7 +725,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int8Hex) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_BoolAsHex) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -742,7 +739,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BoolAsHex) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_BoolVector) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -762,7 +759,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BoolVector) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_BoolNonConstant) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -779,7 +776,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BoolNonConstant) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int32Before) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -795,7 +792,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int32Before) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int32After) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -812,7 +809,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int32After) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64Before) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -831,7 +828,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64Before) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64After) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -849,7 +846,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64After) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64Signed) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -867,7 +864,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64Signed) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64SignedMix) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -883,7 +880,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64SignedMix) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FunctionParam) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         int foo(int x, int y) {
@@ -906,7 +903,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Pointers) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_buffer_reference : enable
@@ -965,7 +962,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Empty) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -995,7 +992,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultipleFunctions) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         int data = 0;
@@ -1044,7 +1041,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Fragment) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -1090,7 +1087,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_HLSL) {
     //         printf("launchIndex %v2d", launchIndex);
     //    }
     // }
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
          %29 = OpExtInstImport "NonSemantic.DebugPrintf"
@@ -1172,7 +1169,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultiDraw) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer_in, 0, sizeof(uint32_t));
     descriptor_set.UpdateDescriptorSets();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform ufoo {
@@ -1265,7 +1262,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShadersNV) {
     RETURN_IF_SKIP(InitState(nullptr, &mesh_shader_features));
     InitRenderTarget();
 
-    static const char taskShaderText[] = R"glsl(
+    const char taskShaderText[] = R"glsl(
         #version 460
         #extension GL_NV_mesh_shader : enable
         #extension GL_EXT_debug_printf : enable
@@ -1279,7 +1276,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShadersNV) {
         }
         )glsl";
 
-    static const char meshShaderText[] = R"glsl(
+    const char meshShaderText[] = R"glsl(
         #version 450
         #extension GL_NV_mesh_shader : require
         #extension GL_EXT_debug_printf : enable
@@ -1436,7 +1433,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskIndirect) {
         }
     )glsl";
 
-    char const *mesh_source = R"glsl(
+    const char *mesh_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         #extension GL_EXT_debug_printf : enable
@@ -1455,7 +1452,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskIndirect) {
         }
     )glsl";
 
-    char const *frag_source = R"glsl(
+    const char *frag_source = R"glsl(
         #version 460
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 uFragColor;
@@ -1520,7 +1517,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer_in, 0, sizeof(uint32_t));
     descriptor_set.UpdateDescriptorSets();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform ufoo {
@@ -1584,7 +1581,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    std::vector<char const *> messages;
+    std::vector<const char *> messages;
     messages.emplace_back("Here are two float values 1.000000, 3.141500");
     messages.emplace_back("Here's a smaller float value 3.14");
     messages.emplace_back("Here's an integer -135 with text before and after it");
@@ -1631,7 +1628,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLMultiDraw) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer_in, 0, sizeof(uint32_t));
     descriptor_set.UpdateDescriptorSets();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform ufoo {
@@ -1716,7 +1713,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLInt64) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer_in, 0, sizeof(uint32_t));
     descriptor_set.UpdateDescriptorSets();
 
-    char const *shader_source_int64 = R"glsl(
+    const char *shader_source_int64 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -1812,7 +1809,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragment) {
 
     const std::array<VkDescriptorSet, 2> desc_sets = {vertex_set.set_, fragment_set.set_};
 
-    static const char vert_shader[] = R"glsl(
+    const char vert_shader[] = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) readonly buffer Input { uint u_buffer[]; } v_in; // texel_buffer[4]
@@ -1830,7 +1827,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragment) {
         }
     )glsl";
 
-    static const char frag_shader[] = R"glsl(
+    const char frag_shader[] = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 1, binding = 0) readonly buffer Input { uint u_buffer[]; } f_in; // texel_buffer[4]
@@ -1908,7 +1905,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragmentIndependentSets) {
     vertex_input_lib.InitVertexInputLibInfo();
     vertex_input_lib.CreateGraphicsPipeline(false);
 
-    static const char vertshader[] = R"glsl(
+    const char vertshader[] = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) readonly buffer Input { uint u_buffer[]; } v_in; // texel_buffer[4]
@@ -1937,7 +1934,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragmentIndependentSets) {
     pre_raster_lib.gp_ci_.layout = pipeline_layout_vs;
     pre_raster_lib.CreateGraphicsPipeline(false);
 
-    static const char frag_shader[] = R"glsl(
+    const char frag_shader[] = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 1, binding = 0) readonly buffer Input { uint u_buffer[]; } f_in; // texel_buffer[4]
@@ -1999,7 +1996,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectsGraphics) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2034,7 +2031,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjects) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2085,7 +2082,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectsInt64) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -2126,7 +2123,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectsMultiDraw) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2201,7 +2198,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaderObjects) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    static const char *taskShaderText = R"glsl(
+    const char *taskShaderText = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require // Requires SPIR-V 1.5 (Vulkan 1.2)
         #extension GL_EXT_debug_printf : enable
@@ -2212,7 +2209,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaderObjects) {
         }
     )glsl";
 
-    static const char *meshShaderText = R"glsl(
+    const char *meshShaderText = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require // Requires SPIR-V 1.5 (Vulkan 1.2)
         #extension GL_EXT_debug_printf : enable
@@ -2250,7 +2247,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_VertexFragmentSeparateShader) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    static const char vert_shader[] = R"glsl(
+    const char vert_shader[] = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -2260,7 +2257,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_VertexFragmentSeparateShader) {
             gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
         }
     )glsl";
-    static const char frag_shader[] = R"glsl(
+    const char frag_shader[] = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -2419,7 +2416,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectFragment) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2457,7 +2454,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectCompute) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2494,8 +2491,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_SetupErrorVersion) {
     features.pDisabledValidationFeatures = disables;
     RETURN_IF_SKIP(InitFramework(&features));
 
-    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        GTEST_SKIP() << "Currently disabled for Portability";
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
 
     m_errorMonitor->SetDesiredError("requires Vulkan 1.1 or later");
@@ -2506,7 +2503,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_SetupErrorVersion) {
 
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2534,7 +2531,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_LocalSizeId) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
          %30 = OpExtInstImport "NonSemantic.DebugPrintf"
@@ -2619,7 +2616,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Maintenance5) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2628,8 +2625,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Maintenance5) {
         }
     )glsl";
 
-    std::vector<uint32_t> shader;
-    GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_COMPUTE_BIT, shader_source, shader);
+    std::vector<uint32_t> shader = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, shader_source);
 
     VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
     module_create_info.pCode = shader.data();
@@ -2663,7 +2659,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineReserved) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2733,7 +2729,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2802,7 +2798,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineGraphics) {
     InitRenderTarget();
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2880,7 +2876,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineGPL) {
     InitRenderTarget();
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2949,7 +2945,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsShaderObjectReserved) 
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3020,7 +3016,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsShaderObjectNotReserve
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3092,7 +3088,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectMultiCreate) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         vec2 vertices[3];
@@ -3105,7 +3101,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectMultiCreate) {
         }
     )glsl";
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3158,7 +3154,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectBoundDescriptor) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer SSBO { uint x; };
@@ -3196,7 +3192,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectUnusedBoundDescriptor) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer SSBO { uint x; };
@@ -3235,7 +3231,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_OverflowBuffer) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -3265,7 +3261,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_OverflowBufferLoop) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -3304,7 +3300,7 @@ void NegativeDebugPrintf::BasicFormattingTest(const char *shader, bool warning) 
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoVectorSize) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3316,7 +3312,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoVectorSize) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedLargeVectorSize) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3329,7 +3325,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedLargeVectorSize) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedSmallVectorSize) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3342,7 +3338,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedSmallVectorSize) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoSpecifier1) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3354,7 +3350,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoSpecifier1) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoSpecifier2) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3366,7 +3362,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoSpecifier2) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown1) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3378,7 +3374,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown1) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown2) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3390,7 +3386,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown2) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown3) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3402,7 +3398,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown3) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedExtraArguments) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3414,7 +3410,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedExtraArguments) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoModifiers) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3426,7 +3422,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoModifiers) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedIsloatedPercent) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3438,7 +3434,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedIsloatedPercent) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotEnoughArguments) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3450,7 +3446,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotEnoughArguments) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoArguments) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3462,7 +3458,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoArguments) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotVectorArg) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3475,7 +3471,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotVectorArg) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotVectorParam) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3488,7 +3484,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotVectorParam) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorSmall) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3500,7 +3496,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorSmall) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorLarge) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3512,7 +3508,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorLarge) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloat1) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3525,7 +3521,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloat1) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloat2) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3538,7 +3534,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloat2) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloatVector1) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3551,7 +3547,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloatVector1) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloatVector2) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3565,7 +3561,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloatVector2) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Int1) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3580,7 +3576,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Int1) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Int2) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3595,7 +3591,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Int2) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64IntVector1) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3611,7 +3607,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64IntVector1) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64IntVector2) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3626,7 +3622,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64IntVector2) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Bool) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3640,7 +3636,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Bool) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedEmptyString) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3652,7 +3648,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedEmptyString) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNewLine) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3665,7 +3661,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNewLine) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorNewLine) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3678,7 +3674,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorNewLine) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedPointer) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_buffer_reference : enable
@@ -3699,7 +3695,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedPointer) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotPointer) {
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3750,7 +3746,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DualPipelines) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3794,7 +3790,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DualCommandBufferHalfPrint) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3839,7 +3835,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DualCommandBufferBothPrint) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(push_constant) uniform PushConstants { int x; } pc;
@@ -3893,7 +3889,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DualCommandBufferEmpty) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3941,7 +3937,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DispatchIndirect) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3976,7 +3972,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DispatchBase) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4006,7 +4002,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexed) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
     #version 450
         #extension GL_EXT_debug_printf : enable
         vec2 vertices[3];
@@ -4018,7 +4014,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexed) {
             debugPrintfEXT("gl_VertexIndex %u\n", gl_VertexIndex);
         }
     )glsl";
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -4060,7 +4056,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexedIndirect) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -4110,7 +4106,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndirectCount) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -4161,7 +4157,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexedIndirectCount) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -4235,7 +4231,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceGeneratedCommandsCompute) {
     command_layout_ci.pTokens = &token;
     vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4327,7 +4323,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceGeneratedCommandsGraphics) {
     command_layout_ci.pTokens = &token;
     vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
 
-    char const *vs_source = R"glsl(
+    const char *vs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4432,21 +4428,21 @@ TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_DeviceGeneratedCommandsIES) {
     command_layout_ci.pTokens = tokens;
     vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
 
-    char const *shader_source_1 = R"glsl(
+    const char *shader_source_1 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
             debugPrintfEXT("Init Pipeline\n");
         }
     )glsl";
-    char const *shader_source_2 = R"glsl(
+    const char *shader_source_2 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
             debugPrintfEXT("IndirectExecutionSet Pipeline 1\n");
         }
     )glsl";
-    char const *shader_source_3 = R"glsl(
+    const char *shader_source_3 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4533,7 +4529,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultipleComputePasses) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source_1 = R"glsl(
+    const char *shader_source_1 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(binding = 0, set = 0) uniform UBO {
@@ -4543,7 +4539,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultipleComputePasses) {
             debugPrintfEXT("float x == %f", x);
         }
     )glsl";
-    char const *shader_source_2 = R"glsl(
+    const char *shader_source_2 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4587,7 +4583,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_SpecConstant) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(constant_id = 0) const uint value = 22; // default
@@ -4638,7 +4634,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_InlineUniformBlock) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform UBO0 { uint ubo_0; };
@@ -4707,7 +4703,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_StorageBufferLength) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_scalar_block_layout : enable
@@ -4776,7 +4772,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_StorageBufferLengthUpdateAfterBind) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_scalar_block_layout : enable
@@ -4836,7 +4832,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_PushDescriptor) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform Push {
@@ -4898,7 +4894,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorTemplates) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform UBO {
@@ -4963,7 +4959,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_PushDescriptorTemplates) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform UBO {
@@ -5029,7 +5025,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DuplicateMessageLimit) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -5070,7 +5066,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DuplicateMessageLimitExplicit) {
     RETURN_IF_SKIP(InitDebugPrintfFramework(&layer_settings_create_info));
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -5101,19 +5097,17 @@ TEST_F(NegativeDebugPrintf, DISABLED_DuplicateMessageLimitExplicit) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBuffer) {
-    TEST_DESCRIPTION("Currently we don't support Descriptor Buffers, so this test makes sure we don't crash trying to use them");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::descriptorBuffer);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
-    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
 
-    vkt::Buffer buffer_data(*m_device, 16, 0, vkt::device_address);
+    vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
     uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
@@ -5127,28 +5121,16 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBuffer) {
     pipe_layout_ci.pSetLayouts = &ds_layout.handle();
     vkt::PipelineLayout pipeline_layout(*m_device, pipe_layout_ci);
 
-    VkDeviceSize ds_layout_size = 0;
-    vk::GetDescriptorSetLayoutSizeEXT(device(), ds_layout, &ds_layout_size);
-
+    VkDeviceSize ds_layout_size = ds_layout.GetDescriptorBufferSize();
     ds_layout_size = Align(ds_layout_size, descriptor_buffer_properties.descriptorBufferOffsetAlignment);
-
     vkt::Buffer descriptor_buffer(*m_device, ds_layout_size, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
                                   vkt::device_address);
 
-    VkDescriptorAddressInfoEXT addr_info = vku::InitStructHelper();
-    addr_info.address = buffer_data.Address();
-    addr_info.range = 16;
-    addr_info.format = VK_FORMAT_UNDEFINED;
-
-    VkDescriptorGetInfoEXT buffer_descriptor_info = vku::InitStructHelper();
-    buffer_descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    buffer_descriptor_info.data.pStorageBuffer = &addr_info;
-
+    vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer_data, 16);
     void *mapped_descriptor_data = descriptor_buffer.Memory().Map();
-    vk::GetDescriptorEXT(device(), &buffer_descriptor_info, descriptor_buffer_properties.storageBufferDescriptorSize,
-                         mapped_descriptor_data);
+    vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
 
-    char const *cs_source = R"glsl(
+    const char *cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -5184,8 +5166,696 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBuffer) {
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    // TODO - When descriptor buffer is supported, this will be result
-    // m_errorMonitor->SetDesiredInfo("c == 20");
+    m_errorMonitor->SetDesiredInfo("c == 20");
     m_default_queue->SubmitAndWait(m_command_buffer);
-    // m_errorMonitor->VerifyFound();
+    m_errorMonitor->VerifyFound();
+
+    // One more time, but bind prior the pipeline
+    data[0] = 4;
+    data[1] = 6;
+    data[2] = 1;
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &descriptor_buffer_binding_info);
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &buffer_index,
+                                         &buffer_offset);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredInfo("c == 10");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferGPL) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::fragmentStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+
+    vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    data[0] = 8;
+    data[1] = 12;
+    data[2] = 1;
+
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    vkt::DescriptorSetLayout ds_layout(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+
+    VkPipelineLayoutCreateInfo pipe_layout_ci = vku::InitStructHelper();
+    pipe_layout_ci.setLayoutCount = 1;
+    pipe_layout_ci.pSetLayouts = &ds_layout.handle();
+    vkt::PipelineLayout pipeline_layout(*m_device, pipe_layout_ci);
+
+    VkDeviceSize ds_layout_size = ds_layout.GetDescriptorBufferSize();
+    ds_layout_size = Align(ds_layout_size, descriptor_buffer_properties.descriptorBufferOffsetAlignment);
+    vkt::Buffer descriptor_buffer(*m_device, ds_layout_size, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
+                                  vkt::device_address);
+
+    vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer_data, 16);
+    void *mapped_descriptor_data = descriptor_buffer.Memory().Map();
+    vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
+
+    const char *fs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout (set = 0, binding = 0) buffer SSBO_0 {
+            uint a;
+            uint b;
+            uint c;
+        };
+
+        void main() {
+            c = a + b;
+            if (gl_FragCoord.x > 10 && gl_FragCoord.x < 11 && gl_FragCoord.y > 10 && gl_FragCoord.y < 11) {
+                debugPrintfEXT("c == %u\n", c);
+            }
+        }
+    )glsl";
+
+    CreatePipelineHelper vertex_input_lib(*this);
+    vertex_input_lib.InitVertexInputLibInfo();
+    vertex_input_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper pre_raster_lib(*this);
+    {
+        const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexDrawPassthroughGlsl);
+        vkt::GraphicsPipelineLibraryStage vs_stage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
+        pre_raster_lib.InitPreRasterLibInfo(&vs_stage.stage_ci);
+        pre_raster_lib.gp_ci_.layout = pipeline_layout;
+        pre_raster_lib.CreateGraphicsPipeline(false);
+    }
+
+    CreatePipelineHelper frag_shader_lib(*this);
+    {
+        const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fs_source);
+        vkt::GraphicsPipelineLibraryStage fs_stage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+        frag_shader_lib.InitFragmentLibInfo(&fs_stage.stage_ci);
+        frag_shader_lib.gp_ci_.layout = pipeline_layout;
+        frag_shader_lib.CreateGraphicsPipeline(false);
+    }
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo();
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    VkPipeline libraries[4] = {
+        vertex_input_lib,
+        pre_raster_lib,
+        frag_shader_lib,
+        frag_out_lib,
+    };
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = size32(libraries);
+    link_info.pLibraries = libraries;
+
+    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
+    exe_pipe_ci.layout = pipeline_layout;
+    exe_pipe_ci.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+
+    m_command_buffer.Begin();
+
+    VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
+    descriptor_buffer_binding_info.address = descriptor_buffer.Address();
+    descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &descriptor_buffer_binding_info);
+
+    uint32_t buffer_index = 0;
+    VkDeviceSize buffer_offset = 0;
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &buffer_index,
+                                         &buffer_offset);
+
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("c == 20");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferShaderObject) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+
+    vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    data[0] = 8;
+    data[1] = 12;
+    data[2] = 1;
+
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    vkt::DescriptorSetLayout ds_layout(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+
+    VkPipelineLayoutCreateInfo pipe_layout_ci = vku::InitStructHelper();
+    pipe_layout_ci.setLayoutCount = 1;
+    pipe_layout_ci.pSetLayouts = &ds_layout.handle();
+    vkt::PipelineLayout pipeline_layout(*m_device, pipe_layout_ci);
+
+    VkDeviceSize ds_layout_size = ds_layout.GetDescriptorBufferSize();
+    ds_layout_size = Align(ds_layout_size, descriptor_buffer_properties.descriptorBufferOffsetAlignment);
+    vkt::Buffer descriptor_buffer(*m_device, ds_layout_size, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
+                                  vkt::device_address);
+
+    vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer_data, 16);
+    void *mapped_descriptor_data = descriptor_buffer.Memory().Map();
+    vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
+
+    const char *cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout (set = 0, binding = 0) buffer SSBO_0 {
+            uint a;
+            uint b;
+            uint c;
+        };
+
+        void main() {
+            c = a + b;
+            debugPrintfEXT("c == %u\n", c);
+        }
+    )glsl";
+
+    const vkt::Shader cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
+                         &ds_layout.handle());
+
+    m_command_buffer.Begin();
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
+    vk::CmdBindShadersEXT(m_command_buffer, 1, stages, &cs.handle());
+
+    VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
+    descriptor_buffer_binding_info.address = descriptor_buffer.Address();
+    descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &descriptor_buffer_binding_info);
+
+    uint32_t buffer_index = 0;
+    VkDeviceSize buffer_offset = 0;
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &buffer_index,
+                                         &buffer_offset);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    m_errorMonitor->SetDesiredInfo("c == 20");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferPushConstantOnly) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    vkt::DescriptorSetLayout ds_layout(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+
+    VkPushConstantRange pc_range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t)};
+    VkPipelineLayoutCreateInfo pipe_layout_ci = vku::InitStructHelper();
+    pipe_layout_ci.pushConstantRangeCount = 1;
+    pipe_layout_ci.pPushConstantRanges = &pc_range;
+    pipe_layout_ci.setLayoutCount = 1;
+    pipe_layout_ci.pSetLayouts = &ds_layout.handle();
+    vkt::PipelineLayout pipeline_layout(*m_device, pipe_layout_ci);
+
+    const char *cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout(push_constant) uniform PushConstants {
+            int x;
+        } pc;
+        void main() {
+            debugPrintfEXT("int == %u", pc.x);
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cp_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    uint32_t data = 4;
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &data);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("int == 4");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferMixClassic) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+
+    const char *cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout (set = 0, binding = 0) buffer SSBO_0 {
+            uint a;
+            uint b;
+            uint c;
+        };
+
+        void main() {
+            c = a + b;
+            debugPrintfEXT("c == %u\n", c);
+        }
+    )glsl";
+
+    vkt::Buffer buffer_data(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    data[0] = 8;
+    data[1] = 12;
+    data[2] = 1;
+    data[4] = 3;  // 16 byte ofset
+    data[5] = 7;
+    data[6] = 1;
+
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    vkt::DescriptorSetLayout ds_layout_db(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+
+    VkPipelineLayoutCreateInfo pipe_layout_ci = vku::InitStructHelper();
+    pipe_layout_ci.setLayoutCount = 1;
+    pipe_layout_ci.pSetLayouts = &ds_layout_db.handle();
+    vkt::PipelineLayout pipeline_layout_db(*m_device, pipe_layout_ci);
+
+    VkDeviceSize ds_layout_size = ds_layout_db.GetDescriptorBufferSize();
+    ds_layout_size = Align(ds_layout_size, descriptor_buffer_properties.descriptorBufferOffsetAlignment);
+    vkt::Buffer descriptor_buffer(*m_device, ds_layout_size, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
+                                  vkt::device_address);
+    vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer_data, 16);
+    void *mapped_descriptor_data = descriptor_buffer.Memory().Map();
+    vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
+
+    CreateComputePipelineHelper pipe_db(*this);
+    pipe_db.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe_db.cp_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    pipe_db.cp_ci_.layout = pipeline_layout_db;
+    pipe_db.CreateComputePipeline();
+
+    // Classic
+    vkt::DescriptorSetLayout ds_layout_classic(*m_device, binding);
+    OneOffDescriptorSet ds_classic(m_device, {
+                                                 {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                             });
+    vkt::PipelineLayout pipeline_layout_classic(*m_device, {&ds_classic.layout_});
+    ds_classic.WriteDescriptorBufferInfo(0, buffer_data, 16, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    ds_classic.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe_classic(*this);
+    pipe_classic.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe_classic.cp_ci_.layout = pipeline_layout_classic;
+    pipe_classic.CreateComputePipeline();
+
+    VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
+    descriptor_buffer_binding_info.address = descriptor_buffer.Address();
+    descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+    uint32_t buffer_index = 0;
+    VkDeviceSize buffer_offset = 0;
+
+    m_command_buffer.Begin();
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_classic);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_classic, 0, 1, &ds_classic.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_db);
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &descriptor_buffer_binding_info);
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_db, 0, 1, &buffer_index,
+                                         &buffer_offset);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_classic);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_classic, 0, 1, &ds_classic.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_db);
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &descriptor_buffer_binding_info);
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_db, 0, 1, &buffer_index,
+                                         &buffer_offset);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("c == 20", 2);
+    m_errorMonitor->SetDesiredInfo("c == 10", 2);
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferMultipleCommandBuffers) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+
+    vkt::Buffer buffer1_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    vkt::Buffer buffer2_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    uint32_t *data = (uint32_t *)buffer1_data.Memory().Map();
+    data[0] = 8;
+    data[1] = 12;
+    data[2] = 1;
+    data = (uint32_t *)buffer2_data.Memory().Map();
+    data[0] = 7;
+    data[1] = 3;
+    data[2] = 1;
+
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    vkt::DescriptorSetLayout ds_layout(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+
+    VkPipelineLayoutCreateInfo pipe_layout_ci = vku::InitStructHelper();
+    pipe_layout_ci.setLayoutCount = 1;
+    pipe_layout_ci.pSetLayouts = &ds_layout.handle();
+    vkt::PipelineLayout pipeline_layout(*m_device, pipe_layout_ci);
+
+    VkDeviceSize ds_layout_size = ds_layout.GetDescriptorBufferSize();
+    ds_layout_size = Align(ds_layout_size, descriptor_buffer_properties.descriptorBufferOffsetAlignment);
+    vkt::Buffer descriptor_buffer(*m_device, ds_layout_size * 2, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
+                                  vkt::device_address);
+
+    uint8_t *mapped_descriptor_data = (uint8_t *)descriptor_buffer.Memory().Map();
+    {
+        vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer1_data, 16);
+        vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
+    }
+    {
+        vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer2_data, 16);
+        vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize,
+                             mapped_descriptor_data + ds_layout_size);
+    }
+
+    const char *cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout (set = 0, binding = 0) buffer SSBO_0 {
+            uint a;
+            uint b;
+            uint c;
+        };
+
+        void main() {
+            c = a + b;
+            debugPrintfEXT("c == %u\n", c);
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cp_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
+    descriptor_buffer_binding_info.address = descriptor_buffer.Address();
+    descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+    uint32_t buffer_index = 0;
+    VkDeviceSize buffer_offset = 0;
+
+    vkt::CommandBuffer cb0(*m_device, m_command_pool);
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
+
+    cb0.Begin();
+    vk::CmdBindPipeline(cb0, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorBuffersEXT(cb0, 1, &descriptor_buffer_binding_info);
+    vk::CmdSetDescriptorBufferOffsetsEXT(cb0, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &buffer_index, &buffer_offset);
+    vk::CmdDispatch(cb0, 1, 1, 1);
+    cb0.End();
+    cb1.Begin();
+    vk::CmdBindPipeline(cb1, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorBuffersEXT(cb1, 1, &descriptor_buffer_binding_info);
+    buffer_offset = ds_layout_size;
+    vk::CmdSetDescriptorBufferOffsetsEXT(cb1, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &buffer_index, &buffer_offset);
+    vk::CmdDispatch(cb1, 1, 1, 1);
+    cb1.End();
+
+    m_errorMonitor->SetDesiredInfo("c == 20");
+    m_errorMonitor->SetDesiredInfo("c == 10");
+    m_default_queue->Submit({cb0, cb1});
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DrawMeshTasksIndirectCountEXT) {
+    TEST_DESCRIPTION("Test debug printf in mesh shaders.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    AddRequiredFeature(vkt::Feature::shaderDrawParameters);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+    InitRenderTarget();
+
+    const char *mesh_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : enable
+        #extension GL_EXT_debug_printf : enable
+        layout(triangles, max_vertices = 3, max_primitives = 1) out;
+
+        void main() {
+            debugPrintfEXT("gl_DrawID = %d\n", gl_DrawID);
+            SetMeshOutputsEXT(3, 1);
+            gl_MeshVerticesEXT[0].gl_Position = vec4(0);
+            gl_PrimitiveTriangleIndicesEXT[0] =  uvec3(0, 1, 2);
+        }
+    )glsl";
+
+    const auto mesh_code = GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, mesh_source, SPV_ENV_VULKAN_1_2);
+
+    VkShaderCreateInfoEXT mesh_ci = vku::InitStructHelper();
+    mesh_ci.flags = VK_SHADER_CREATE_NO_TASK_SHADER_BIT_EXT;
+    mesh_ci.stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+    mesh_ci.nextStage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    mesh_ci.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    mesh_ci.codeSize = mesh_code.size() * sizeof(mesh_code[0]);
+    mesh_ci.pCode = mesh_code.data();
+    mesh_ci.pName = "main";
+    const vkt::Shader mesh(*m_device, mesh_ci);
+    const vkt::Shader frag(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl, SPV_ENV_VULKAN_1_2));
+
+    vkt::Buffer count_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
+    uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
+    *count_ptr = 1;
+
+    vkt::Buffer draw_buffer(*m_device, sizeof(VkDrawMeshTasksIndirectCommandEXT), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                            kHostVisibleMemProps);
+    auto *draw_ptr = static_cast<VkDrawMeshTasksIndirectCommandEXT *>(draw_buffer.Memory().Map());
+    draw_ptr->groupCountX = 1;
+    draw_ptr->groupCountY = 1;
+    draw_ptr->groupCountZ = 1;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_MESH_BIT_EXT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    const VkShaderEXT shaders[] = {VK_NULL_HANDLE, mesh, frag};
+    vk::CmdBindShadersEXT(m_command_buffer, 3u, stages, shaders);
+    vk::CmdDrawMeshTasksIndirectCountEXT(m_command_buffer, draw_buffer, 0u, count_buffer, 0u, 1u,
+                                         sizeof(VkDrawMeshTasksIndirectCommandEXT));
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("gl_DrawID = 0");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DisableShaderValidation) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::fragmentStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    VkLayerSettingEXT layer_settings[2] = {{OBJECT_LAYER_NAME, "check_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse},
+                                           {OBJECT_LAYER_NAME, "printf_enable", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue}};
+    VkLayerSettingsCreateInfoEXT layer_setting_ci = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 2, layer_settings};
+    RETURN_IF_SKIP(InitFramework(&layer_setting_ci));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    const char *frag_shader = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout(set = 0, binding = 0) buffer SSBO {
+            uint x; // something to trigger pipeline validation
+        };
+        void main() {
+            uint myValue = 42;
+            x = myValue;
+            // only will print once
+            if (gl_FragCoord.x > 10 && gl_FragCoord.x < 11 && gl_FragCoord.y > 10 && gl_FragCoord.y < 12) {
+                debugPrintfEXT("myValue == %u", myValue);
+            }
+        }
+    )glsl";
+
+    OneOffDescriptorSet ds(m_device, {
+                                         {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+                                     });
+    vkt::PipelineLayout pipeline_layout(*m_device, {&ds.layout_});
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    ds.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    ds.UpdateDescriptorSets();
+
+    VkShaderObj vs(this, kVertexDrawPassthroughGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, frag_shader, VK_SHADER_STAGE_FRAGMENT_BIT);
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.layout = pipeline_layout;
+    pipe.CreateGraphicsPipeline();
+
+    vkt::SimpleGPL pipe_gpl(*this, pipeline_layout, kVertexDrawPassthroughGlsl, frag_shader);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &ds.set_, 0, nullptr);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_gpl);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("myValue == 42");  // normal
+    m_errorMonitor->SetDesiredInfo("myValue == 42");  // gpl
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DisableShaderValidationShaderObject) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    VkLayerSettingEXT layer_settings[2] = {{OBJECT_LAYER_NAME, "check_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse},
+                                           {OBJECT_LAYER_NAME, "printf_enable", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue}};
+    VkLayerSettingsCreateInfoEXT layer_setting_ci = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 2, layer_settings};
+    RETURN_IF_SKIP(InitFramework(&layer_setting_ci));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    OneOffDescriptorSet ds(m_device, {
+                                         {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                     });
+    vkt::PipelineLayout pipeline_layout(*m_device, {&ds.layout_});
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    ds.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    ds.UpdateDescriptorSets();
+
+    const char *shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout(set = 0, binding = 0) buffer SSBO {
+            uint x; // something to trigger pipeline validation
+        };
+        void main() {
+            uint myValue = 42;
+            x = myValue;
+            debugPrintfEXT("myValue == %u", myValue);
+        }
+    )glsl";
+
+    const vkt::Shader cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, shader_source),
+                         &ds.layout_.handle());
+
+    m_command_buffer.Begin();
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
+    vk::CmdBindShadersEXT(m_command_buffer, 1, stages, &cs.handle());
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &ds.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("myValue == 42");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_MidCommandBuffer) {
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    // Make sure doing everything inside the command buffer is still ok
+    m_command_buffer.Begin();
+
+    const char *shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        void main() {
+            float myfloat = 3.1415f;
+            debugPrintfEXT("float == %f", myfloat);
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.CreateComputePipeline();
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("float == 3.141500");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
 }

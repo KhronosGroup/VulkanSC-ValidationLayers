@@ -41,33 +41,36 @@ static inline bool FormatHasFullThroughputBlendingArm(VkFormat format) {
     }
 }
 
-bool BestPractices::ValidateMultisampledBlendingArm(const VkGraphicsPipelineCreateInfo& create_info,
-                                                    const Location& create_info_loc) const {
+bool BestPractices::ValidateMultisampledBlendingArm(const vvl::Pipeline& pipeline, const Location& create_info_loc) const {
     bool skip = false;
 
-    if (!create_info.pColorBlendState || !create_info.pMultisampleState ||
-        create_info.pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT ||
-        create_info.pMultisampleState->sampleShadingEnable) {
+    const auto* color_blend_state = pipeline.ColorBlendState();
+    const auto* ms_state = pipeline.MultisampleState();
+    if (!color_blend_state || !ms_state || ms_state->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT ||
+        ms_state->sampleShadingEnable) {
         return skip;
     }
 
-    auto rp_state = Get<vvl::RenderPass>(create_info.renderPass);
-    if (!rp_state) return skip;
+    auto rp_state = Get<vvl::RenderPass>(pipeline.GraphicsCreateInfo().renderPass);
+    if (!rp_state) {
+        return skip;
+    }
 
-    const auto& subpass = rp_state->create_info.pSubpasses[create_info.subpass];
+    const auto& subpass = rp_state->create_info.pSubpasses[pipeline.Subpass()];
 
     // According to spec, pColorBlendState must be ignored if subpass does not have color attachments.
-    uint32_t num_color_attachments = std::min(subpass.colorAttachmentCount, create_info.pColorBlendState->attachmentCount);
+    uint32_t num_color_attachments = std::min(subpass.colorAttachmentCount, color_blend_state->attachmentCount);
 
     for (uint32_t j = 0; j < num_color_attachments; j++) {
-        const auto& blend_att = create_info.pColorBlendState->pAttachments[j];
+        const auto& blend_att = color_blend_state->pAttachments[j];
         uint32_t att = subpass.pColorAttachments[j].attachment;
 
         if (att != VK_ATTACHMENT_UNUSED && blend_att.blendEnable && blend_att.colorWriteMask) {
             if (!FormatHasFullThroughputBlendingArm(rp_state->create_info.pAttachments[att].format)) {
                 skip |= LogPerformanceWarning("BestPractices-Arm-vkCreatePipelines-multisampled-blending", device, create_info_loc,
                                               "%s Pipeline is multisampled and "
-                                              "color attachment #%u makes use "
+                                              "color attachment %" PRIu32
+                                              " makes use "
                                               "of a format which cannot be blended at full throughput when using MSAA.",
                                               VendorSpecificTag(kBPVendorArm), j);
             }
@@ -94,26 +97,29 @@ void BestPractices::ManualPostCallRecordCreateComputePipelines(VkDevice device, 
 bool BestPractices::ValidateCreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo& create_info, const vvl::Pipeline& pipeline,
                                                    const Location create_info_loc) const {
     bool skip = false;
-    if (!(pipeline.active_shaders & VK_SHADER_STAGE_MESH_BIT_EXT) && create_info.pVertexInputState) {
-        const auto& vertex_input = *create_info.pVertexInputState;
+
+    const auto* vertex_input = pipeline.InputState();
+    if (!(pipeline.active_shaders & VK_SHADER_STAGE_MESH_BIT_EXT) && vertex_input) {
         uint32_t count = 0;
-        for (uint32_t j = 0; j < vertex_input.vertexBindingDescriptionCount; j++) {
-            if (vertex_input.pVertexBindingDescriptions[j].inputRate == VK_VERTEX_INPUT_RATE_INSTANCE) {
+        for (uint32_t j = 0; j < vertex_input->vertexBindingDescriptionCount; j++) {
+            if (vertex_input->pVertexBindingDescriptions[j].inputRate == VK_VERTEX_INPUT_RATE_INSTANCE) {
                 count++;
             }
         }
         if (count > kMaxInstancedVertexBuffers) {
-            skip |= LogPerformanceWarning(
-                "BestPractices-vkCreateGraphicsPipelines-too-many-instanced-vertex-buffers", device, create_info_loc,
-                "The pipeline is using %u instanced vertex buffers (current limit: %u), but this can be inefficient on the "
-                "GPU. If using instanced vertex attributes prefer interleaving them in a single buffer.",
-                count, kMaxInstancedVertexBuffers);
+            skip |= LogPerformanceWarning("BestPractices-vkCreateGraphicsPipelines-too-many-instanced-vertex-buffers", device,
+                                          create_info_loc,
+                                          "The pipeline is using %" PRIu32 " instanced vertex buffers (current limit: %" PRIu32
+                                          "), but this can be inefficient on the "
+                                          "GPU. If using instanced vertex attributes prefer interleaving them in a single buffer.",
+                                          count, kMaxInstancedVertexBuffers);
         }
     }
 
-    if ((create_info.pRasterizationState) && (create_info.pRasterizationState->depthBiasEnable) &&
-        (create_info.pRasterizationState->depthBiasConstantFactor == 0.0f) &&
-        (create_info.pRasterizationState->depthBiasSlopeFactor == 0.0f) && VendorCheckEnabled(kBPVendorArm)) {
+    const auto* raster_state = pipeline.RasterizationState();
+
+    if (raster_state && raster_state->depthBiasEnable && raster_state->depthBiasConstantFactor == 0.0f &&
+        raster_state->depthBiasSlopeFactor == 0.0f && VendorCheckEnabled(kBPVendorArm)) {
         skip |=
             LogPerformanceWarning("BestPractices-Arm-vkCreatePipelines-depthbias-zero", device, create_info_loc,
                                   "%s This vkCreateGraphicsPipelines call is created with depthBiasEnable set to true "
@@ -135,12 +141,14 @@ bool BestPractices::ValidateCreateGraphicsPipeline(const VkGraphicsPipelineCreat
     }
 
     if (VendorCheckEnabled(kBPVendorArm)) {
-        skip |= ValidateMultisampledBlendingArm(create_info, create_info_loc);
+        skip |= ValidateMultisampledBlendingArm(pipeline, create_info_loc);
     }
 
     if (VendorCheckEnabled(kBPVendorAMD)) {
-        if (create_info.pInputAssemblyState && create_info.pInputAssemblyState->primitiveRestartEnable) {
-            skip |= LogPerformanceWarning("BestPractices-AMD-CreatePipelines-AvoidPrimitiveRestart", device, create_info_loc,
+        const auto* ia_state = pipeline.InputAssemblyState();
+        if (ia_state && ia_state->primitiveRestartEnable) {
+            skip |= LogPerformanceWarning("BestPractices-AMD-CreatePipelines-AvoidPrimitiveRestart", device,
+                                          create_info_loc.dot(Field::pInputAssemblyState).dot(Field::primitiveRestartEnable),
                                           "%s Use of primitive restart is not recommended", VendorSpecificTag(kBPVendorAMD));
         }
 
@@ -197,48 +205,6 @@ bool BestPractices::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
     }
 
     return skip;
-}
-
-static std::vector<bp_state::AttachmentInfo> GetAttachmentAccess(vvl::Pipeline& pipe_state) {
-    std::vector<bp_state::AttachmentInfo> result;
-    auto rp = pipe_state.RenderPassState();
-    if (!rp || rp->UsesDynamicRendering()) {
-        return result;
-    }
-    const auto& create_info = pipe_state.GraphicsCreateInfo();
-    const auto& subpass = rp->create_info.pSubpasses[create_info.subpass];
-
-    // NOTE: see PIPELINE_LAYOUT and vku::safe_VkGraphicsPipelineCreateInfo constructors. pColorBlendState and pDepthStencilState
-    // are only non-null if they are enabled.
-    if (create_info.pColorBlendState && !(pipe_state.ignore_color_attachments)) {
-        // According to spec, pColorBlendState must be ignored if subpass does not have color attachments.
-        uint32_t num_color_attachments = std::min(subpass.colorAttachmentCount, create_info.pColorBlendState->attachmentCount);
-        for (uint32_t j = 0; j < num_color_attachments; j++) {
-            if (create_info.pColorBlendState->pAttachments[j].colorWriteMask != 0) {
-                uint32_t attachment = subpass.pColorAttachments[j].attachment;
-                if (attachment != VK_ATTACHMENT_UNUSED) {
-                    result.emplace_back(attachment, VK_IMAGE_ASPECT_COLOR_BIT);
-                }
-            }
-        }
-    }
-
-    if (create_info.pDepthStencilState &&
-        (create_info.pDepthStencilState->depthTestEnable || create_info.pDepthStencilState->depthBoundsTestEnable ||
-         create_info.pDepthStencilState->stencilTestEnable)) {
-        uint32_t attachment = subpass.pDepthStencilAttachment ? subpass.pDepthStencilAttachment->attachment : VK_ATTACHMENT_UNUSED;
-        if (attachment != VK_ATTACHMENT_UNUSED) {
-            VkImageAspectFlags aspects = 0;
-            if (create_info.pDepthStencilState->depthTestEnable || create_info.pDepthStencilState->depthBoundsTestEnable) {
-                aspects |= VK_IMAGE_ASPECT_DEPTH_BIT;
-            }
-            if (create_info.pDepthStencilState->stencilTestEnable) {
-                aspects |= VK_IMAGE_ASPECT_STENCIL_BIT;
-            }
-            result.emplace_back(attachment, aspects);
-        }
-    }
-    return result;
 }
 
 void BestPractices::ManualPostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
@@ -369,92 +335,6 @@ bool BestPractices::ValidateComputeShaderAmd(const spirv::Module& module_state, 
     }
 
     return skip;
-}
-
-void BestPractices::PostCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
-                                                  VkPipeline pipeline, const RecordObject& record_obj) {
-    // AMD best practice
-    PipelineUsedInFrame(pipeline);
-
-    if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_GRAPHICS) {
-        // check for depth/blend state tracking
-        if (auto pipeline_state = Get<vvl::Pipeline>(pipeline)) {
-            auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-            auto& sub_state = bp_state::SubState(*cb_state);
-            auto& render_pass_state = sub_state.render_pass_state;
-
-            render_pass_state.nextDrawTouchesAttachments = GetAttachmentAccess(*pipeline_state);
-            render_pass_state.drawTouchAttachments = true;
-
-            const auto* blend_state = pipeline_state->ColorBlendState();
-            const auto* stencil_state = pipeline_state->DepthStencilState();
-
-            if (blend_state && !(pipeline_state->ignore_color_attachments)) {
-                // assume the pipeline is depth-only unless any of the attachments have color writes enabled
-                render_pass_state.depthOnly = true;
-                for (size_t i = 0; i < blend_state->attachmentCount; i++) {
-                    if (blend_state->pAttachments[i].colorWriteMask != 0) {
-                        render_pass_state.depthOnly = false;
-                    }
-                }
-            }
-
-            // check for depth value usage
-            render_pass_state.depthEqualComparison = false;
-
-            if (stencil_state && stencil_state->depthTestEnable) {
-                switch (stencil_state->depthCompareOp) {
-                    case VK_COMPARE_OP_EQUAL:
-                    case VK_COMPARE_OP_GREATER_OR_EQUAL:
-                    case VK_COMPARE_OP_LESS_OR_EQUAL:
-                        render_pass_state.depthEqualComparison = true;
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-                using TessGeometryMeshState = bp_state::CommandBufferStateNV::TessGeometryMesh::State;
-                auto& tgm = sub_state.nv.tess_geometry_mesh;
-
-                // Make sure the message is only signaled once per command buffer
-                tgm.threshold_signaled = tgm.num_switches >= kNumBindPipelineTessGeometryMeshSwitchesThresholdNVIDIA;
-
-                // Track pipeline switches with tessellation, geometry, and/or mesh shaders enabled, and disabled
-                auto tgm_stages = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT |
-                                  VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT;
-                auto new_tgm_state = (pipeline_state->active_shaders & tgm_stages) != 0 ? TessGeometryMeshState::Enabled
-                                                                                        : TessGeometryMeshState::Disabled;
-                if (tgm.state != new_tgm_state && tgm.state != TessGeometryMeshState::Unknown) {
-                    tgm.num_switches++;
-                }
-                tgm.state = new_tgm_state;
-
-                // Track depthTestEnable and depthCompareOp
-                auto& pipeline_create_info = pipeline_state->GraphicsCreateInfo();
-                auto depth_stencil_state = pipeline_create_info.pDepthStencilState;
-                auto dynamic_state = pipeline_create_info.pDynamicState;
-                if (depth_stencil_state && dynamic_state) {
-                    auto dynamic_state_begin = dynamic_state->pDynamicStates;
-                    auto dynamic_state_end = dynamic_state->pDynamicStates + dynamic_state->dynamicStateCount;
-
-                    const bool dynamic_depth_test_enable =
-                        std::find(dynamic_state_begin, dynamic_state_end, VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE) != dynamic_state_end;
-                    const bool dynamic_depth_func =
-                        std::find(dynamic_state_begin, dynamic_state_end, VK_DYNAMIC_STATE_DEPTH_COMPARE_OP) != dynamic_state_end;
-
-                    if (!dynamic_depth_test_enable) {
-                        RecordSetDepthTestState(sub_state, sub_state.nv.depth_compare_op,
-                                                depth_stencil_state->depthTestEnable != VK_FALSE);
-                    }
-                    if (!dynamic_depth_func) {
-                        RecordSetDepthTestState(sub_state, depth_stencil_state->depthCompareOp, sub_state.nv.depth_test_enable);
-                    }
-                }
-            }
-        }
-    }
 }
 
 void BestPractices::PreCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,

@@ -29,8 +29,7 @@ TEST_F(PositiveExternalMemorySync, GetMemoryFdHandle) {
     alloc_info.allocationSize = 1024;
     alloc_info.memoryTypeIndex = 0;
 
-    vkt::DeviceMemory memory;
-    memory.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory(*m_device, alloc_info);
     VkMemoryGetFdInfoKHR get_handle_info = vku::InitStructHelper();
     get_handle_info.memory = memory;
     get_handle_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
@@ -73,11 +72,10 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
-    vkt::DeviceMemory memory_export;
-    memory_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
 
     VkMemoryGetFdInfoKHR mgfi = vku::InitStructHelper();
-    mgfi.memory = memory_export.handle();
+    mgfi.memory = memory_export;
     mgfi.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
     int fd;
@@ -91,8 +89,6 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
     vkt::DeviceMemory memory_import(*m_device, alloc_info);
 }
 
-// Because of aligned_alloc
-#if defined(__linux__) && !defined(__ANDROID__)
 TEST_F(PositiveExternalMemorySync, ImportMemoryHost) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
@@ -102,7 +98,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryHost) {
     GetPhysicalDeviceProperties2(memory_host_props);
 
     VkDeviceSize alloc_size = memory_host_props.minImportedHostPointerAlignment;
-    void* host_memory = aligned_alloc(alloc_size, alloc_size);
+    void *host_memory = ::operator new((size_t)alloc_size, std::align_val_t(alloc_size));
     if (!host_memory) {
         GTEST_SKIP() << "Can't allocate host memory";
     }
@@ -123,14 +119,13 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryHost) {
     VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&import_info);
     alloc_info.allocationSize = alloc_size;
     if (!m_device->Physical().SetMemoryType(host_pointer_props.memoryTypeBits, &alloc_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
-        free(host_memory);
+        ::operator delete(host_memory, std::align_val_t(alloc_size));
         GTEST_SKIP() << "Failed to set memory type.";
     }
     vkt::DeviceMemory memory_import(*m_device, alloc_info);
 
-    free(host_memory);
+    ::operator delete(host_memory, std::align_val_t(alloc_size));
 }
-#endif
 
 TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     TEST_DESCRIPTION("Perform a copy through a pair of buffers linked by external memory");
@@ -152,7 +147,7 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     // Check for import/export capability
     VkPhysicalDeviceExternalBufferInfoKHR ebi = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO_KHR, nullptr, 0,
                                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, handle_type};
-    VkExternalBufferPropertiesKHR ebp = {VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES_KHR, nullptr, {0, 0, 0}};
+    VkExternalBufferPropertiesKHR ebp = vku::InitStructHelper();
     vk::GetPhysicalDeviceExternalBufferPropertiesKHR(Gpu(), &ebi, &ebp);
     if (!(ebp.externalMemoryProperties.compatibleHandleTypes & handle_type) ||
         !(ebp.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT) ||
@@ -242,13 +237,13 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     // Copy from input buffer to output buffer through the exported/imported memory
     m_command_buffer.Begin();
     VkBufferCopy copy_info = {0, 0, buffer_size};
-    vk::CmdCopyBuffer(m_command_buffer, buffer_input.handle(), buffer_export.handle(), 1, &copy_info);
+    vk::CmdCopyBuffer(m_command_buffer, buffer_input, buffer_export, 1, &copy_info);
     // Insert memory barrier to guarantee copy order
     VkMemoryBarrier mem_barrier = {VK_STRUCTURE_TYPE_MEMORY_BARRIER, nullptr, VK_ACCESS_TRANSFER_WRITE_BIT,
                                    VK_ACCESS_TRANSFER_READ_BIT};
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &mem_barrier, 0,
                            nullptr, 0, nullptr);
-    vk::CmdCopyBuffer(m_command_buffer, buffer_import.handle(), buffer_output.handle(), 1, &copy_info);
+    vk::CmdCopyBuffer(m_command_buffer, buffer_import, buffer_output, 1, &copy_info);
     m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
 }
@@ -529,11 +524,10 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryWin32BufferDifferentDedicated) {
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
-    vkt::DeviceMemory memory_export;
-    memory_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
 
     VkMemoryGetWin32HandleInfoKHR get_handle_info = vku::InitStructHelper();
-    get_handle_info.memory = memory_export.handle();
+    get_handle_info.memory = memory_export;
     get_handle_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 
     HANDLE handle = NULL;
@@ -615,11 +609,10 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFdBufferDifferentDedicated) {
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
-    vkt::DeviceMemory memory_export;
-    memory_export.init(*m_device, alloc_info);
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
 
     VkMemoryGetFdInfoKHR mgfi = vku::InitStructHelper();
-    mgfi.memory = memory_export.handle();
+    mgfi.memory = memory_export;
     mgfi.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
     int fd;

@@ -17,8 +17,6 @@
 #pragma once
 
 #include <cassert>
-#include <cstdlib>
-#include <cstring>
 #include <vector>
 
 #include "state_tracker/state_object.h"
@@ -54,7 +52,6 @@ struct ShaderObject : public StateObject, public SubStateManager<ShaderObjectSub
 
     VkShaderEXT VkHandle() const { return handle_.Cast<VkShaderEXT>(); }
     bool IsGraphicsShaderState() const { return create_info.stage != VK_SHADER_STAGE_COMPUTE_BIT; };
-    VkPrimitiveTopology GetTopology() const;
 };
 
 class ShaderObjectSubState {

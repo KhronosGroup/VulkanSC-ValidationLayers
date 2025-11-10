@@ -25,6 +25,7 @@
 #include <cmath>
 #include "state_tracker/image_state.h"
 #include "generated/dispatch_functions.h"
+#include "utils/image_utils.h"
 
 namespace subresource_adapter {
 Subresource::Subresource(const RangeEncoder& encoder, const VkImageSubresource& subres)
@@ -429,14 +430,9 @@ void ImageRangeEncoder::Decode(const VkImageSubresource& subres, const IndexType
     out_offset.x = static_cast<int32_t>(static_cast<double>(decode) / texel_sizes_[LowerBoundFromMask(subres.aspectMask)]);
 }
 
-
 inline VkImageSubresourceRange GetRemaining(const VkImageSubresourceRange& full_range, VkImageSubresourceRange subres_range) {
-    if (subres_range.levelCount == VK_REMAINING_MIP_LEVELS) {
-        subres_range.levelCount = full_range.levelCount - subres_range.baseMipLevel;
-    }
-    if (subres_range.layerCount == VK_REMAINING_ARRAY_LAYERS) {
-        subres_range.layerCount = full_range.layerCount - subres_range.baseArrayLayer;
-    }
+    subres_range.levelCount = GetEffectiveLevelCount(subres_range, full_range.levelCount);
+    subres_range.layerCount = GetEffectiveLayerCount(subres_range, full_range.layerCount);
     return subres_range;
 }
 inline bool CoversAllLayers(const VkImageSubresourceRange& full_range, VkImageSubresourceRange subres_range) {
@@ -445,7 +441,7 @@ inline bool CoversAllLayers(const VkImageSubresourceRange& full_range, VkImageSu
 static bool SubresourceRangeIsEmpty(const VkImageSubresourceRange& range) {
     return (0 == range.aspectMask) || (0 == range.levelCount) || (0 == range.layerCount);
 }
-static bool ExtentIsEmpty(const VkExtent3D& extent) { return (0 == extent.width) || (0 == extent.height) || (0 == extent.width); }
+static bool ExtentIsEmpty(const VkExtent3D& extent) { return (0 == extent.width) || (0 == extent.height) || (0 == extent.depth); }
 
 VkOffset3D ImageRangeGenerator::GetOffset(uint32_t aspect_index) const {
     // Return the effective offset taking into account the multiplane extent divisor

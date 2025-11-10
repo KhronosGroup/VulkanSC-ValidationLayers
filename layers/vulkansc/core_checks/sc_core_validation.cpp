@@ -534,7 +534,7 @@ bool Instance::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, cons
 
         // We have to set up temporary device info for stateless SPIR-V validation
         const vvl::StatelessDeviceData stateless_device_data(dispatch_instance_, physicalDevice, pCreateInfo);
-        stateless::SpirvValidator stateless_spirv_validator(debug_report, stateless_device_data);
+        stateless::SpirvValidator stateless_spirv_validator(dispatch_instance_->debug_report, stateless_device_data, false);
 
         while (object_reservation_info != nullptr) {
             const Location object_reservation_info_loc = create_info_loc.pNext(Struct::VkDeviceObjectReservationCreateInfo);

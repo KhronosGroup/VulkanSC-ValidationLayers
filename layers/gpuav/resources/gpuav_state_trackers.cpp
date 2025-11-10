@@ -15,15 +15,20 @@
  * limitations under the License.
  */
 
+#include <vulkan/vulkan_core.h>
+#include "generated/dispatch_functions.h"
 #include "gpuav/resources/gpuav_state_trackers.h"
-
+#include "gpuav/descriptor_validation/gpuav_descriptor_validation.h"
+#include "gpuav/instrumentation/gpuav_instrumentation.h"
 #include "gpuav/shaders/gpuav_shaders_constants.h"
 #include "gpuav/core/gpuav.h"
 #include "gpuav/core/gpuav_constants.h"
 #include "gpuav/shaders/gpuav_error_header.h"
 #include "gpuav/resources/gpuav_vulkan_objects.h"
+#include "gpuav/validation_cmd/gpuav_draw.h"
 
 #include "profiling/profiling.h"
+#include "state_tracker/last_bound_state.h"
 
 namespace gpuav {
 
@@ -54,7 +59,7 @@ void CommandBufferSubState::AllocateResources(const Location &loc) {
 
     // Error output buffer
     {
-        error_output_buffer_range_ = gpu_resources_manager.GetHostVisibleBufferRange(glsl::kErrorBufferByteSize);
+        error_output_buffer_range_ = gpu_resources_manager.GetHostCoherentBufferRange(glsl::kErrorBufferByteSize);
         if (error_output_buffer_range_.buffer == VK_NULL_HANDLE) {
             return;
         }
@@ -83,6 +88,16 @@ void CommandBufferSubState::AllocateResources(const Location &loc) {
 
         cmd_errors_counts_buffer_.Clear();
     }
+}
+
+// Common logic after any draw/dispatch/traceRays
+void CommandBufferSubState::RecordActionCommand(LastBound &last_bound, const Location &) {
+    PostCallSetupShaderInstrumentationResources(gpuav_, *this, last_bound);
+    IncrementActionCommandCount(last_bound.bind_point);
+}
+
+void CommandBufferSubState::UpdateLastBoundDescriptorSets(VkPipelineBindPoint bind_point, const Location &loc) {
+    descriptor::UpdateBoundDescriptors(gpuav_, *this, bind_point, loc);
 }
 
 void CommandBufferSubState::Destroy() { ResetCBState(true); }
@@ -129,12 +144,31 @@ void CommandBufferSubState::ClearPushConstants() {
     push_constant_latest_used_layout.fill(VK_NULL_HANDLE);
 }
 
+void CommandBufferSubState::RecordEndRendering(const VkRenderingEndInfoEXT *) { valcmd::FlushValidationCmds(gpuav_, *this); }
+
+void CommandBufferSubState::RecordEndRenderPass(const VkSubpassEndInfo *, const Location &) {
+    valcmd::FlushValidationCmds(gpuav_, *this);
+}
+
+// For things like vkCmdCopyImage there is no "last bound" as not shaders are attached to it
+void CommandBufferSubState::AddCommandErrorLogger(const Location &loc, const LastBound *last_bound,
+                                                  ErrorLoggerFunc error_logger_func) {
+    if (command_error_loggers_.size() == cst::invalid_index_command) {
+        return;
+    }
+
+    const uint32_t label_command_i =
+        base.GetLabelCommands().empty() ? vvl::kNoIndex32 : uint32_t(base.GetLabelCommands().size() - 1);
+    command_error_loggers_.emplace_back(CommandBufferSubState::CommandErrorLogger{
+        loc, last_bound ? last_bound->cb_state.GetObjectList(last_bound->bind_point) : LogObjectList{VkHandle()},
+        std::move(error_logger_func), label_command_i});
+}
+
 void CommandBufferSubState::ResetCBState(bool should_destroy) {
     // Free or return to cache GPU resources
 
-    max_actions_cmd_validation_reached_ = false;
-
     on_instrumentation_desc_set_update_functions.clear();
+    on_instrumentation_desc_buffer_update_functions.clear();
     on_cb_completion_functions.clear();
     on_post_cb_submission_functions.clear();
     on_pre_cb_submission_functions.clear();
@@ -145,7 +179,7 @@ void CommandBufferSubState::ResetCBState(bool should_destroy) {
     } else {
         gpu_resources_manager.ReturnResources();
     }
-    per_command_error_loggers.clear();
+    command_error_loggers_.clear();
 
     if (should_destroy && instrumentation_desc_set_layout_ != VK_NULL_HANDLE) {
         DispatchDestroyDescriptorSetLayout(gpuav_.device, instrumentation_desc_set_layout_, nullptr);
@@ -160,38 +194,45 @@ void CommandBufferSubState::ResetCBState(bool should_destroy) {
     draw_index = 0;
     compute_index = 0;
     trace_rays_index = 0;
-    action_command_count = 0;
+
+    resource_descriptor_buffer_index_ = 0;
 
     ClearPushConstants();
 }
 
-void CommandBufferSubState::IncrementCommandCount(Validator &gpuav, VkPipelineBindPoint bind_point, const Location &loc) {
-    action_command_count++;
-    if (action_command_count >= glsl::kMaxActionsPerCommandBuffer) {
-        if (action_command_count == glsl::kMaxActionsPerCommandBuffer) {
-            gpuav.LogWarning("GPU-AV::Max action per command buffer reached", VkHandle(), loc,
-                             "Reached maximum validation commands count for command buffer ( %" PRIu32
-                             " ). No more draw/dispatch/trace rays commands will be validated inside this command buffer.",
-                             glsl::kMaxActionsPerCommandBuffer);
-        }
-        max_actions_cmd_validation_reached_ = true;
-    }
+void CommandBufferSubState::IncrementActionCommandCount(VkPipelineBindPoint bind_point) {
     if (bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS) {
         draw_index++;
+        if (draw_index > cst::invalid_index_command) {
+            draw_index = cst::invalid_index_command;
+        }
     } else if (bind_point == VK_PIPELINE_BIND_POINT_COMPUTE) {
         compute_index++;
+        if (compute_index > cst::invalid_index_command) {
+            compute_index = cst::invalid_index_command;
+        }
     } else if (bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
         trace_rays_index++;
+        if (trace_rays_index > cst::invalid_index_command) {
+            trace_rays_index = cst::invalid_index_command;
+        }
     }
+}
+
+uint32_t CommandBufferSubState::GetActionCommandIndex(VkPipelineBindPoint bind_point) const {
+    return (bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS)          ? draw_index
+           : (bind_point == VK_PIPELINE_BIND_POINT_COMPUTE)         ? compute_index
+           : (bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) ? trace_rays_index
+                                                                    : 0;
 }
 
 std::string CommandBufferSubState::GetDebugLabelRegion(uint32_t label_command_i,
                                                        const std::vector<std::string> &initial_label_stack) const {
     std::string debug_region_name;
-    if (label_command_i != vvl::kU32Max) {
+    if (label_command_i != vvl::kNoIndex32) {
         debug_region_name = base.GetDebugRegionName(base.GetLabelCommands(), label_command_i, initial_label_stack);
     } else {
-        // label_command_i == vvl::kU32Max => when the instrumented command was recorded,
+        // label_command_i == vvl::kNoIndex32 => when the instrumented command was recorded,
         // no debug label region was yet opened in the corresponding command buffer,
         // but still a region might have been started in another previously submitted
         // command buffer. So just compute region name from initial_label_stack.
@@ -307,11 +348,26 @@ void CommandBufferSubState::OnCompletion(VkQueue queue, const std::vector<std::s
             assert(record_size == glsl::kErrorRecordSize);
 
             while (record_size > 0 && (error_record_ptr + record_size) <= error_records_end) {
-                const uint32_t error_logger_i = error_record_ptr[glsl::kHeaderActionIdOffset] & glsl::kCommandResourceIdMask;
-                assert(error_logger_i < per_command_error_loggers.size());
-                auto &error_logger = per_command_error_loggers[error_logger_i];
-                const LogObjectList objlist(queue, VkHandle());
-                error_logger(error_record_ptr, objlist, initial_label_stack);
+                const uint32_t error_logger_i =
+                    error_record_ptr[glsl::kHeaderActionIdErrorLoggerIdOffset] & glsl::kErrorLoggerIdMask;
+
+                assert(error_logger_i < cst::indices_count);
+                if (error_logger_i == cst::invalid_index_command) {
+                    const LogObjectList objlist(queue, VkHandle());
+                    gpuav_.LogError(
+                        "GPUAV-Overflow-Unknown", queue, loc,
+                        "An error was detected, but after internal limit of %" PRIu32
+                        " draw/dispatch/traceRays in a command buffer, we are unable to track which validation error occured.",
+                        cst::indices_count);
+                } else {
+                    // normal case
+                    CommandErrorLogger &error_logger = command_error_loggers_[error_logger_i];
+                    const LogObjectList objlist(queue, error_logger.objlist);
+
+                    std::string debug_region_name = GetDebugLabelRegion(error_logger.label_cmd_i, initial_label_stack);
+                    Location loc_with_debug_region(error_logger.loc.Get(), debug_region_name);
+                    error_logger.error_logger_func(error_record_ptr, loc_with_debug_region, objlist);
+                }
 
                 // Next record
                 error_record_ptr += record_size;
@@ -334,7 +390,7 @@ void CommandBufferSubState::OnCompletion(VkQueue queue, const std::vector<std::s
     }
 
     bool success = true;
-    LabelLogging label_logging = {initial_label_stack, action_cmd_i_to_label_cmd_i_map};
+    LabelLogging label_logging = {initial_label_stack};
     for (auto &on_cb_completion_func : on_cb_completion_functions) {
         success = on_cb_completion_func(gpuav_, *this, label_logging, loc);
         if (!success) {
@@ -588,6 +644,90 @@ void AccelerationStructureKHRSubState::NotifyInvalidate(const vvl::StateObject::
     id_tracker.reset();
 }
 
+TensorSubState::TensorSubState(vvl::Tensor &obj, DescriptorHeap &heap)
+    : vvl::TensorSubState(obj), id_tracker(std::in_place, heap, obj.Handle()) {}
+
+void TensorSubState::Destroy() { id_tracker.reset(); }
+
+void TensorSubState::NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) { id_tracker.reset(); }
+
+TensorViewSubState::TensorViewSubState(vvl::TensorView &obj, DescriptorHeap &heap)
+    : vvl::TensorViewSubState(obj), id_tracker(std::in_place, heap, obj.Handle()) {}
+
+void TensorViewSubState::Destroy() { id_tracker.reset(); }
+
+void TensorViewSubState::NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) { id_tracker.reset(); }
+
 ShaderObjectSubState::ShaderObjectSubState(vvl::ShaderObject &obj) : vvl::ShaderObjectSubState(obj) {}
+
+PipelineSubState::PipelineSubState(Validator &gpuav, vvl::Pipeline &pipeline) : vvl::PipelineSubState(pipeline), gpuav_(gpuav) {}
+
+VkPipelineLayout PipelineSubState::GetPipelineLayoutUnion(const Location &loc, vvl::DescriptorMode mode) const {
+    std::unique_lock<std::mutex> recreated_layout_lock(recreated_layout_mutex);
+    if (recreated_layout != VK_NULL_HANDLE) {
+        return recreated_layout;
+    }
+
+    const std::shared_ptr<const vvl::PipelineLayout> pipeline_layout_state = base.PipelineLayoutState();
+    assert(pipeline_layout_state->set_layouts.size() <= gpuav_.instrumentation_desc_set_bind_index_);
+    if (pipeline_layout_state->set_layouts.size() > gpuav_.instrumentation_desc_set_bind_index_) {
+        gpuav_.InternalError(LogObjectList(base.VkHandle()), loc,
+                             "Trying to recreate a pipeline layout with no room for the instrumentation descriptor set.");
+        return VK_NULL_HANDLE;
+    }
+
+    std::vector<VkDescriptorSetLayout> set_layout_handles;
+    set_layout_handles.reserve(gpuav_.instrumentation_desc_set_bind_index_ + 1);
+    std::vector<size_t> recreated_desc_set_layouts_indices;
+
+    for (size_t set_layout_i = 0; set_layout_i < pipeline_layout_state->set_layouts.size(); ++set_layout_i) {
+        const auto &set_layout = pipeline_layout_state->set_layouts[set_layout_i];
+        if (!set_layout) {
+            set_layout_handles.emplace_back(VK_NULL_HANDLE);
+        } else {
+            VkDescriptorSetLayout recreated_desc_set_layout = VK_NULL_HANDLE;
+
+            const VkResult result = DispatchCreateDescriptorSetLayout(gpuav_.device, set_layout->GetCreateInfo().ptr(), nullptr,
+                                                                      &recreated_desc_set_layout);
+            (void)result;
+            assert(result == VK_SUCCESS);
+
+            set_layout_handles.emplace_back(recreated_desc_set_layout);
+            recreated_desc_set_layouts_indices.emplace_back(set_layout_i);
+        }
+    }
+
+    for (size_t i = set_layout_handles.size(); i < gpuav_.instrumentation_desc_set_bind_index_; ++i) {
+        set_layout_handles.emplace_back(gpuav_.dummy_desc_layout_[mode]);
+    }
+    set_layout_handles.emplace_back(gpuav_.GetInstrumentationDescriptorSetLayout(mode));
+
+    VkPipelineLayoutCreateInfo pipeline_layout_ci = vku::InitStructHelper();
+    pipeline_layout_ci.flags = pipeline_layout_state->create_flags;
+    pipeline_layout_ci.setLayoutCount = uint32_t(set_layout_handles.size());
+    pipeline_layout_ci.pSetLayouts = set_layout_handles.data();
+    if (pipeline_layout_state->push_constant_ranges_layout) {
+        pipeline_layout_ci.pushConstantRangeCount = uint32_t(pipeline_layout_state->push_constant_ranges_layout->size());
+        pipeline_layout_ci.pPushConstantRanges = pipeline_layout_state->push_constant_ranges_layout->data();
+    }
+
+    const VkResult result = DispatchCreatePipelineLayout(gpuav_.device, &pipeline_layout_ci, nullptr, &recreated_layout);
+    (void)result;
+    assert(result == VK_SUCCESS);
+
+    for (size_t i : recreated_desc_set_layouts_indices) {
+        DispatchDestroyDescriptorSetLayout(gpuav_.device, set_layout_handles[i], nullptr);
+    }
+
+    return recreated_layout;
+}
+
+void PipelineSubState::Destroy() {
+    std::unique_lock<std::mutex> recreated_layout_lock(recreated_layout_mutex);
+    if (recreated_layout != VK_NULL_HANDLE) {
+        DispatchDestroyPipelineLayout(gpuav_.device, recreated_layout, nullptr);
+        recreated_layout = VK_NULL_HANDLE;
+    }
+}
 
 }  // namespace gpuav

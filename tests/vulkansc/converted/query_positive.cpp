@@ -251,13 +251,13 @@ TEST_F(PositiveQuery, QueryAndCopySecondaryCommandBuffers) {
         VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
         begin_info.pInheritanceInfo = &hinfo;
         secondary_buffer.Begin(&begin_info);
-        vk::CmdResetQueryPool(secondary_buffer.handle(), query_pool, 0, 1);
-        vk::CmdWriteTimestamp(secondary_buffer.handle(), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, query_pool, 0);
+        vk::CmdResetQueryPool(secondary_buffer, query_pool, 0, 1);
+        vk::CmdWriteTimestamp(secondary_buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, query_pool, 0);
         secondary_buffer.End();
 
         primary_buffer.Begin();
-        vk::CmdExecuteCommands(primary_buffer.handle(), 1, &secondary_buffer.handle());
-        vk::CmdCopyQueryPoolResults(primary_buffer.handle(), query_pool, 0, 1, buffer, 0, 0, VK_QUERY_RESULT_WAIT_BIT);
+        vk::CmdExecuteCommands(primary_buffer, 1, &secondary_buffer.handle());
+        vk::CmdCopyQueryPoolResults(primary_buffer, query_pool, 0, 1, buffer, 0, 0, VK_QUERY_RESULT_WAIT_BIT);
         primary_buffer.End();
     }
 
@@ -460,19 +460,19 @@ TEST_F(PositiveQuery, PerformanceQueries) {
     vkt::CommandBuffer cmd_buffer(*m_device, m_command_pool);
 
     auto acquire_profiling_lock_info = vku::InitStruct<VkAcquireProfilingLockInfoKHR>();
-    acquire_profiling_lock_info.timeout = std::numeric_limits<uint64_t>::max();
+    acquire_profiling_lock_info.timeout = vvl::kU64Max;
 
     vk::AcquireProfilingLockKHR(*m_device, &acquire_profiling_lock_info);
 
     VkCommandBufferBeginInfo info = vku::InitStructHelper();
     cmd_buffer.Begin(&info);
 
-    vk::CmdBeginQuery(cmd_buffer.handle(), query_pool, 0u, 0u);
+    vk::CmdBeginQuery(cmd_buffer, query_pool, 0u, 0u);
 
-    vk::CmdPipelineBarrier(cmd_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u,
-                           nullptr, 0u, nullptr, 0u, nullptr);
+    vk::CmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, nullptr,
+                           0u, nullptr, 0u, nullptr);
 
-    vk::CmdEndQuery(cmd_buffer.handle(), query_pool, 0u);
+    vk::CmdEndQuery(cmd_buffer, query_pool, 0u);
 
     cmd_buffer.End();
 
@@ -521,7 +521,7 @@ TEST_F(PositiveQuery, ReuseSecondaryWithQueryCommand) {
 
     vkt::CommandBuffer secondary_buffer(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     secondary_buffer.Begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
-    vk::CmdWriteTimestamp(secondary_buffer.handle(), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, query_pool, 0);
+    vk::CmdWriteTimestamp(secondary_buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, query_pool, 0);
     secondary_buffer.End();
 
     m_command_buffer.Begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
@@ -584,19 +584,19 @@ TEST_F(PositiveQuery, PerformanceCountersWithoutEnumeration) {
     vkt::CommandBuffer cmd_buffer(*m_device, m_command_pool);
 
     auto acquire_profiling_lock_info = vku::InitStruct<VkAcquireProfilingLockInfoKHR>();
-    acquire_profiling_lock_info.timeout = std::numeric_limits<uint64_t>::max();
+    acquire_profiling_lock_info.timeout = vvl::kU64Max;
 
     vk::AcquireProfilingLockKHR(*m_device, &acquire_profiling_lock_info);
 
     VkCommandBufferBeginInfo info = vku::InitStructHelper();
     cmd_buffer.Begin(&info);
 
-    vk::CmdBeginQuery(cmd_buffer.handle(), query_pool, 0u, 0u);
+    vk::CmdBeginQuery(cmd_buffer, query_pool, 0u, 0u);
 
-    vk::CmdPipelineBarrier(cmd_buffer.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u,
-                           nullptr, 0u, nullptr, 0u, nullptr);
+    vk::CmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, nullptr,
+                           0u, nullptr, 0u, nullptr);
 
-    vk::CmdEndQuery(cmd_buffer.handle(), query_pool, 0u);
+    vk::CmdEndQuery(cmd_buffer, query_pool, 0u);
 
     cmd_buffer.End();
 
@@ -631,10 +631,32 @@ TEST_F(PositiveQuery, QueryPoolResetBit) {
     vkt::QueryPool query_pool(*m_device, qpci);
 
     m_command_buffer.Begin();
-    vk::CmdBeginQuery(m_command_buffer.handle(), query_pool.handle(), 0, 0);
-    vk::CmdEndQuery(m_command_buffer.handle(), query_pool.handle(), 0);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0, 0);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
+}
+
+TEST_F(PositiveQuery, QueryPoolResultsStride) {
+    AddRequiredFeature(vkt::Feature::pipelineStatisticsQuery);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkQueryPoolCreateInfo qpci = vkt::QueryPool::CreateInfo(VK_QUERY_TYPE_PIPELINE_STATISTICS, 1u);
+    qpci.pipelineStatistics = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT;
+    vkt::QueryPool query_pool(*m_device, qpci);
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 1u);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    uint32_t data_space[2];
+    vk::GetQueryPoolResults(*m_device, query_pool, 0u, 1u, sizeof(uint32_t) * 2, data_space, 0u,
+                            VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
 }

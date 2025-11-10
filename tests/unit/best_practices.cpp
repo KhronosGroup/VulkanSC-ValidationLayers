@@ -49,10 +49,8 @@ TEST_F(VkBestPracticesLayerTest, ReturnCodes) {
     RETURN_IF_SKIP(InitSwapchain());
 
     // Attempt to force an invalid return code for an unsupported format
-    VkImageFormatProperties2 image_format_prop = {};
-    image_format_prop.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
-    VkPhysicalDeviceImageFormatInfo2 image_format_info = {};
-    image_format_info.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
+    VkImageFormatProperties2 image_format_prop = vku::InitStructHelper();
+    VkPhysicalDeviceImageFormatInfo2 image_format_info = vku::InitStructHelper();
     image_format_info.format = VK_FORMAT_R32G32B32_SFLOAT;
     image_format_info.tiling = VK_IMAGE_TILING_LINEAR;
     image_format_info.type = VK_IMAGE_TYPE_3D;
@@ -154,16 +152,12 @@ TEST_F(VkBestPracticesLayerTest, UseDeprecatedDeviceExtensions) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
 
     VkDevice local_device;
-    VkDeviceCreateInfo dev_info = {};
-    VkDeviceQueueCreateInfo queue_info = {};
-    queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queue_info.pNext = NULL;
+    VkDeviceCreateInfo dev_info = vku::InitStructHelper();
+    VkDeviceQueueCreateInfo queue_info = vku::InitStructHelper();
     queue_info.queueFamilyIndex = 0;
     queue_info.queueCount = 1;
     float qp = 1;
     queue_info.pQueuePriorities = &qp;
-    dev_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    dev_info.pNext = nullptr;
     dev_info.queueCreateInfoCount = 1;
     dev_info.pQueueCreateInfos = &queue_info;
     dev_info.enabledLayerCount = 0;
@@ -185,16 +179,12 @@ TEST_F(VkBestPracticesLayerTest, SpecialUseExtensions) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
 
     VkDevice local_device;
-    VkDeviceCreateInfo dev_info = {};
-    VkDeviceQueueCreateInfo queue_info = {};
-    queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queue_info.pNext = NULL;
+    VkDeviceCreateInfo dev_info = vku::InitStructHelper();
+    VkDeviceQueueCreateInfo queue_info = vku::InitStructHelper();
     queue_info.queueFamilyIndex = 0;
     queue_info.queueCount = 1;
     float qp = 1;
     queue_info.pQueuePriorities = &qp;
-    dev_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    dev_info.pNext = nullptr;
     dev_info.queueCreateInfoCount = 1;
     dev_info.pQueueCreateInfos = &queue_info;
     dev_info.enabledLayerCount = 0;
@@ -247,9 +237,9 @@ TEST_F(VkBestPracticesLayerTest, CmdClearAttachmentTestSecondary) {
 
     vkt::CommandBuffer secondary_full_clear(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     vkt::CommandBuffer secondary_small_clear(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    VkCommandBufferBeginInfo begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    VkCommandBufferInheritanceInfo inherit_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO};
+    VkCommandBufferInheritanceInfo inherit_info = vku::InitStructHelper();
     begin_info.pInheritanceInfo = &inherit_info;
     inherit_info.subpass = 0;
     inherit_info.renderPass = m_renderPassBeginInfo.renderPass;
@@ -385,9 +375,8 @@ TEST_F(VkBestPracticesLayerTest, SmallDedicatedAllocation) {
     // Create a small image with a dedicated allocation
     vkt::Image image(*m_device, image_info, vkt::no_mem);
 
-    vkt::DeviceMemory mem;
-    mem.init(*m_device,
-             vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
+    vkt::DeviceMemory mem(*m_device, vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(),
+                                                                             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
     vk::BindImageMemory(device(), image, mem, 0);
 
     m_errorMonitor->VerifyFound();
@@ -411,8 +400,7 @@ TEST_F(VkBestPracticesLayerTest, MSImageRequiresMemory) {
 
     VkSubpassDescription sd{};
 
-    VkRenderPassCreateInfo rp_info{};
-    rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
     rp_info.attachmentCount = 1;
     rp_info.pAttachments = &attachment;
     rp_info.subpassCount = 1;
@@ -426,16 +414,8 @@ TEST_F(VkBestPracticesLayerTest, MSImageRequiresMemory) {
 
 TEST_F(VkBestPracticesLayerTest, AttachmentShouldNotBeTransient) {
     TEST_DESCRIPTION("Test for non-lazy multisampled images");
-
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
-
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
-                                         "BestPractices-vkCreateFramebuffer-attachment-should-not-be-transient");
-
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkBindImageMemory-small-dedicated-allocation");
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkBindImageMemory-non-lazy-transient-image");
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-AMD-vkImage-AvoidGeneral");
 
     VkAttachmentDescription attachment{};
     attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -459,8 +439,9 @@ TEST_F(VkBestPracticesLayerTest, AttachmentShouldNotBeTransient) {
     vkt::Image image(*m_device, image_info, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView();
 
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
+                                         "BestPractices-vkCreateFramebuffer-attachment-should-not-be-transient");
     vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), 1920, 1080);
-
     m_errorMonitor->VerifyFound();
 }
 
@@ -500,8 +481,7 @@ TEST_F(VkBestPracticesLayerTest, TooManyInstancedVertexBuffers) {
     attributes[1].location = 1;
     attributes[1].format = VK_FORMAT_R32_SFLOAT;
 
-    VkPipelineVertexInputStateCreateInfo vi_state_ci{};
-    vi_state_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    VkPipelineVertexInputStateCreateInfo vi_state_ci = vku::InitStructHelper();
     vi_state_ci.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
     vi_state_ci.pVertexBindingDescriptions = bindings.data();
     vi_state_ci.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributes.size());
@@ -639,9 +619,9 @@ TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoadSecondary) {
     m_command_buffer.EndRenderPass();
 
     // Try the same thing, but now with secondary command buffers.
-    VkCommandBufferBeginInfo begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    VkCommandBufferInheritanceInfo inherit_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO};
+    VkCommandBufferInheritanceInfo inherit_info = vku::InitStructHelper();
     begin_info.pInheritanceInfo = &inherit_info;
     inherit_info.subpass = 0;
     inherit_info.renderPass = rp;
@@ -701,8 +681,6 @@ TEST_F(VkBestPracticesLayerTest, TripleBufferingTest) {
     AddSurfaceExtension();
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
-                                         "BestPractices-vkCreateSwapchainKHR-suboptimal-swapchain-image-count");
     RETURN_IF_SKIP(InitSurface());
     InitSwapchainInfo();
 
@@ -726,9 +704,7 @@ TEST_F(VkBestPracticesLayerTest, TripleBufferingTest) {
     VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
-    VkSwapchainCreateInfoKHR swapchain_create_info = {};
-    swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapchain_create_info.pNext = 0;
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = m_surface.Handle();
     swapchain_create_info.minImageCount = 2;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -743,10 +719,14 @@ TEST_F(VkBestPracticesLayerTest, TripleBufferingTest) {
     swapchain_create_info.clipped = VK_FALSE;
     swapchain_create_info.oldSwapchain = 0;
 
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
+                                         "BestPractices-vkCreateSwapchainKHR-suboptimal-swapchain-image-count");
+    // skip core checks
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");
     m_swapchain.Init(*m_device, swapchain_create_info);
     m_errorMonitor->VerifyFound();
 
+    // Lazy way to not query
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");
     swapchain_create_info.minImageCount = 3;
     m_swapchain.Init(*m_device, swapchain_create_info);
@@ -769,9 +749,7 @@ TEST_F(VkBestPracticesLayerTest, SwapchainCreationTest) {
     VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
-    VkSwapchainCreateInfoKHR swapchain_create_info = {};
-    swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapchain_create_info.pNext = 0;
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = m_surface.Handle();
     swapchain_create_info.minImageCount = 3;
     swapchain_create_info.imageArrayLayers = 1;
@@ -807,14 +785,14 @@ TEST_F(VkBestPracticesLayerTest, SwapchainCreationTest) {
 
     // present mode might not be supported
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-01281");
-
+    // Lazy way to not query
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");
     m_swapchain.Init(*m_device, swapchain_create_info);
     m_errorMonitor->VerifyFound();
 
-    swapchain_create_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-
+    // Lazy way to not query
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");
+    swapchain_create_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
     m_swapchain.Init(*m_device, swapchain_create_info);
 }
 
@@ -843,7 +821,7 @@ TEST_F(VkBestPracticesLayerTest, ExpectedQueryDetails) {
 
     queue_family_props2.resize(queue_count);
     for (uint32_t i = 0; i < queue_count; i++) {
-        queue_family_props2[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+        queue_family_props2[i] = vku::InitStructHelper();
     }
     vk::GetPhysicalDeviceQueueFamilyProperties2(phys_device_obj, &queue_count, queue_family_props2.data());
 
@@ -888,9 +866,7 @@ TEST_F(VkBestPracticesLayerTest, MissingQueryDetails) {
     }
 
     VkPhysicalDeviceFeatures all_features{};
-    VkDeviceCreateInfo device_ci = {};
-    device_ci.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    device_ci.pNext = nullptr;
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
     device_ci.queueCreateInfoCount = create_queue_infos.size();
     device_ci.pQueueCreateInfos = create_queue_infos.data();
     device_ci.enabledLayerCount = 0;
@@ -912,7 +888,7 @@ TEST_F(VkBestPracticesLayerTest, CreatePipelineVsFsTypeMismatchArraySize) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
+    const char *vsSource = R"glsl(
         #version 450
         layout(location=0) out float x[2];
         void main(){
@@ -920,7 +896,7 @@ TEST_F(VkBestPracticesLayerTest, CreatePipelineVsFsTypeMismatchArraySize) {
            gl_Position = vec4(1);
         }
     )glsl";
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(location=0) in float x[1];
         layout(location=0) out vec4 color;
@@ -1066,7 +1042,7 @@ TEST_F(VkBestPracticesLayerTest, TransitionFromUndefinedToReadOnly) {
 
     vk::CmdClearColorImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
 
-    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-pImageMemoryBarriers-02820");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-pImageMemoryBarriers-02820");  // skip core checks
     m_errorMonitor->SetDesiredWarning("BestPractices-ImageMemoryBarrier-TransitionUndefinedToReadOnly");
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
                            0, nullptr, 1, &img_barrier);
@@ -1077,16 +1053,12 @@ TEST_F(VkBestPracticesLayerTest, TransitionFromUndefinedToReadOnly) {
 
 TEST_F(VkBestPracticesLayerTest, OverAllocateFromDescriptorPool) {
     TEST_DESCRIPTION("Attempt to allocate more sets and descriptors than descriptor pool has available.");
-
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    VkDescriptorPoolSize ds_type_count = {};
-    ds_type_count.type = VK_DESCRIPTOR_TYPE_SAMPLER;
-    ds_type_count.descriptorCount = 8;
-
+    VkDescriptorPoolSize ds_type_count = {VK_DESCRIPTOR_TYPE_SAMPLER, 8};
     VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
     ds_pool_ci.flags = 0;
     ds_pool_ci.maxSets = 3;
@@ -1094,15 +1066,7 @@ TEST_F(VkBestPracticesLayerTest, OverAllocateFromDescriptorPool) {
     ds_pool_ci.pPoolSizes = &ds_type_count;
 
     vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
-
-    VkDescriptorSetLayoutBinding dsl_binding_samp = {};
-    dsl_binding_samp.binding = 0;
-    dsl_binding_samp.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-    dsl_binding_samp.descriptorCount = 1;
-    dsl_binding_samp.stageFlags = VK_SHADER_STAGE_ALL;
-    dsl_binding_samp.pImmutableSamplers = NULL;
-
-    const vkt::DescriptorSetLayout ds_layout_samp(*m_device, {dsl_binding_samp});
+    const vkt::DescriptorSetLayout ds_layout_samp(*m_device, {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr});
 
     // Try to allocate 2 sets when pool only has 1 set
     VkDescriptorSet descriptor_sets[4];
@@ -1119,16 +1083,12 @@ TEST_F(VkBestPracticesLayerTest, OverAllocateFromDescriptorPool) {
 
 TEST_F(VkBestPracticesLayerTest, OverAllocateTypeFromDescriptorPool) {
     TEST_DESCRIPTION("Attempt to allocate more sets and descriptors than descriptor pool has available.");
-
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    VkDescriptorPoolSize ds_type_count = {};
-    ds_type_count.type = VK_DESCRIPTOR_TYPE_SAMPLER;
-    ds_type_count.descriptorCount = 3;
-
+    VkDescriptorPoolSize ds_type_count = {VK_DESCRIPTOR_TYPE_SAMPLER, 3};
     VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
     ds_pool_ci.flags = 0;
     ds_pool_ci.maxSets = 4;
@@ -1137,14 +1097,7 @@ TEST_F(VkBestPracticesLayerTest, OverAllocateTypeFromDescriptorPool) {
 
     vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
 
-    VkDescriptorSetLayoutBinding dsl_binding_samp = {};
-    dsl_binding_samp.binding = 0;
-    dsl_binding_samp.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-    dsl_binding_samp.descriptorCount = 1;
-    dsl_binding_samp.stageFlags = VK_SHADER_STAGE_ALL;
-    dsl_binding_samp.pImmutableSamplers = NULL;
-
-    const vkt::DescriptorSetLayout ds_layout_samp(*m_device, {dsl_binding_samp});
+    const vkt::DescriptorSetLayout ds_layout_samp(*m_device, {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr});
 
     // Try to allocate 2 sets when pool only has 1 set
     VkDescriptorSet descriptor_sets[4];
@@ -1675,7 +1628,7 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
 
         img_barrier2.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
         img_barrier2.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageMemoryBarrier2-dstAccessMask-03903");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageMemoryBarrier2-dstAccessMask-03903");  // skip core checks
         m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
         m_command_buffer.BarrierKHR(img_barrier2);
         m_errorMonitor->VerifyFound();
@@ -1683,7 +1636,7 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
         // make sure bits above UINT32_MAX are detected
         img_barrier2.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         img_barrier2.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
-        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageMemoryBarrier2-dstAccessMask-03907");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageMemoryBarrier2-dstAccessMask-03907");  // skip core checks
         m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
         m_command_buffer.BarrierKHR(img_barrier2);
         m_errorMonitor->VerifyFound();
@@ -1729,8 +1682,8 @@ TEST_F(VkBestPracticesLayerTest, NoCreateSwapchainPresentModes) {
 
     RETURN_IF_SKIP(InitState());
     RETURN_IF_SKIP(InitSurface());
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");
-    m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateSwapchainKHR-no-VkSwapchainPresentModesCreateInfoEXT-provided");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");  // skip core checks
+    m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateSwapchainKHR-no-VkSwapchainPresentModesCreateInfoKHR-provided");
     m_swapchain = CreateSwapchain(m_surface.Handle(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
     m_errorMonitor->VerifyFound();
 }
@@ -1838,7 +1791,7 @@ TEST_F(VkBestPracticesLayerTest, PartialPushConstantSetEnd) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *const vsSource = R"glsl(
+    const char *const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { uint x[2]; } constants;
         void main(){
@@ -1880,7 +1833,7 @@ TEST_F(VkBestPracticesLayerTest, PartialPushConstantSetMiddle) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *const vsSource = R"glsl(
+    const char *const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo {
             uint a; // set
@@ -2134,7 +2087,7 @@ TEST_F(VkBestPracticesLayerTest, PartialPushConstantSetEndCompute) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *const csSource = R"glsl(
+    const char *const csSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { uint x[2]; } constants;
         layout(set = 0, binding = 0) buffer bar { vec4 r; } res;
@@ -2286,20 +2239,13 @@ TEST_F(VkBestPracticesLayerTest, MutableDescriptors) {
     RETURN_IF_SKIP(InitBestPractices());
     VkDescriptorType descriptor_types[] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER};
 
-    VkMutableDescriptorTypeListEXT mutable_descriptor_type_lists[2] = {};
-    mutable_descriptor_type_lists[0].descriptorTypeCount = 1;
-    mutable_descriptor_type_lists[0].pDescriptorTypes = &descriptor_types[0];
-    mutable_descriptor_type_lists[1].descriptorTypeCount = 1;
-    mutable_descriptor_type_lists[1].pDescriptorTypes = &descriptor_types[1];
+    VkMutableDescriptorTypeListEXT mutable_descriptor_type_lists[2] = {{1, &descriptor_types[0]}, {1, &descriptor_types[1]}};
 
     VkMutableDescriptorTypeCreateInfoEXT mdtci = vku::InitStructHelper();
     mdtci.mutableDescriptorTypeListCount = 2;
     mdtci.pMutableDescriptorTypeLists = mutable_descriptor_type_lists;
 
-    VkDescriptorPoolSize pool_size = {};
-    pool_size.type = VK_DESCRIPTOR_TYPE_MUTABLE_EXT;
-    pool_size.descriptorCount = 4;
-
+    VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_MUTABLE_EXT, 4};
     VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper(&mdtci);
     ds_pool_ci.maxSets = 2;
     ds_pool_ci.poolSizeCount = 1;

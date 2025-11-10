@@ -2,6 +2,7 @@
  * Copyright (c) 2015-2025 Valve Corporation
  * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (C) 2015-2025 Google Inc.
+ * Copyright (c) 2025 Arm Limited.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -22,11 +23,12 @@
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/vulkan_core.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
-
-#include "state_tracker/state_tracker.h"
+#include "containers/custom_containers.h"
+#include "state_tracker/data_graph_pipeline_session_state.h"
 #include "state_tracker/shader_stage_state.h"
 #include "state_tracker/image_state.h"
 #include "state_tracker/buffer_state.h"
+#include "state_tracker/tensor_state.h"
 #include "state_tracker/device_state.h"
 #include "state_tracker/queue_state.h"
 #include "state_tracker/descriptor_sets.h"
@@ -37,6 +39,7 @@
 #include "state_tracker/shader_object_state.h"
 #include "state_tracker/device_generated_commands_state.h"
 #include "state_tracker/wsi_state.h"
+#include "state_tracker/descriptor_mode.h"
 #include "chassis/chassis_modification_state.h"
 #include "spirv-tools/optimizer.hpp"
 
@@ -47,6 +50,15 @@
 #include "chassis/chassis.h"
 
 namespace vvl {
+
+DeviceState::DeviceState(vvl::dispatch::Device *dev, InstanceState *instance)
+    : BaseClass(dev, instance, LayerObjectTypeStateTracker),
+      instance_state(instance),
+      special_supported(dev->stateless_device_data.special_supported) {
+    physical_device_state = instance_state->Get<vvl::PhysicalDevice>(physical_device).get();
+    physical_device_state->has_maintenance9 = dev->stateless_device_data.special_supported.has_maintenance9;
+}
+
 DeviceState::~DeviceState() { DestroyObjectMaps(); }
 
 void DeviceState::AddProxy(DeviceProxy &proxy) { proxies.emplace(proxy.container_type, proxy); }
@@ -139,8 +151,8 @@ std::vector<std::shared_ptr<const ImageView>> DeviceState::GetAttachmentViews(co
 // Android-specific validation that uses types defined only with VK_USE_PLATFORM_ANDROID_KHR
 // This could also move into a seperate core_validation_android.cpp file... ?
 
-VkFormatFeatureFlags2KHR DeviceState::GetExternalFormatFeaturesANDROID(const void *pNext) const {
-    VkFormatFeatureFlags2KHR format_features = 0;
+VkFormatFeatureFlags2 DeviceState::GetExternalFormatFeaturesANDROID(const void *pNext) const {
+    VkFormatFeatureFlags2 format_features = 0;
     const uint64_t external_format = GetExternalFormat(pNext);
     if ((0 != external_format)) {
         // VUID 01894 will catch if not found in map
@@ -167,7 +179,7 @@ void DeviceState::PostCallRecordGetAndroidHardwareBufferPropertiesANDROID(VkDevi
         auto ahb_format_props = vku::FindStructInPNextChain<VkAndroidHardwareBufferFormatPropertiesANDROID>(pProperties->pNext);
         if (ahb_format_props) {
             external_format = ahb_format_props->externalFormat;
-            ahb_ext_formats_map.insert(external_format, static_cast<VkFormatFeatureFlags2KHR>(ahb_format_props->formatFeatures));
+            ahb_ext_formats_map.insert(external_format, static_cast<VkFormatFeatureFlags2>(ahb_format_props->formatFeatures));
         }
     }
 
@@ -193,7 +205,7 @@ void DeviceState::PostCallRecordGetAndroidHardwareBufferPropertiesANDROID(VkDevi
 
 #else
 
-VkFormatFeatureFlags2KHR DeviceState::GetExternalFormatFeaturesANDROID(const void *pNext) const {
+VkFormatFeatureFlags2 DeviceState::GetExternalFormatFeaturesANDROID(const void *pNext) const {
     (void)pNext;
     return 0;
 }
@@ -209,7 +221,7 @@ VkFormatFeatureFlags2 InstanceState::GetImageFormatFeatures(VkPhysicalDevice phy
     // if format is AHB external format then the features are already set
     if (has_format_feature2) {
         VkDrmFormatModifierPropertiesList2EXT fmt_drm_props = vku::InitStructHelper();
-        auto fmt_props_3 = vku::InitStruct<VkFormatProperties3KHR>(has_drm_modifiers ? &fmt_drm_props : nullptr);
+        auto fmt_props_3 = vku::InitStruct<VkFormatProperties3>(has_drm_modifiers ? &fmt_drm_props : nullptr);
         VkFormatProperties2 fmt_props_2 = vku::InitStructHelper(&fmt_props_3);
 
         DispatchGetPhysicalDeviceFormatProperties2Helper(api_version, physical_device, format, &fmt_props_2);
@@ -286,7 +298,7 @@ void DeviceState::PostCallRecordCreateImage(VkDevice device, const VkImageCreate
     if (record_obj.result != VK_SUCCESS) {
         return;
     }
-    VkFormatFeatureFlags2KHR format_features = 0;
+    VkFormatFeatureFlags2 format_features = 0;
     if (IsExtEnabled(extensions.vk_android_external_memory_android_hardware_buffer)) {
         format_features = GetExternalFormatFeaturesANDROID(pCreateInfo->pNext);
     }
@@ -306,23 +318,39 @@ void DeviceState::PreCallRecordDestroyImage(VkDevice device, VkImage image, cons
 void DeviceState::PostCallRecordCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
                                                    const VkClearColorValue *pColor, uint32_t rangeCount,
                                                    const VkImageSubresourceRange *pRanges, const RecordObject &record_obj) {
-    if (disabled[command_buffer_state]) return;
-
-    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    if (cb_state) {
-        cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(image));
+    if (disabled[command_buffer_state]) {
+        return;
     }
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    auto image_state = Get<Image>(image);
+    ASSERT_AND_RETURN(image_state);
+    cb_state->AddChild(image_state);
+
+    cb_state->RecordClearColorImage(*image_state, imageLayout, pColor, rangeCount, pRanges, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
                                                           const VkClearDepthStencilValue *pDepthStencil, uint32_t rangeCount,
                                                           const VkImageSubresourceRange *pRanges, const RecordObject &record_obj) {
-    if (disabled[command_buffer_state]) return;
-
-    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    if (cb_state) {
-        cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(image));
+    if (disabled[command_buffer_state]) {
+        return;
     }
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    auto image_state = Get<Image>(image);
+    ASSERT_AND_RETURN(image_state);
+    cb_state->AddChild(image_state);
+
+    cb_state->RecordClearDepthStencilImage(*image_state, imageLayout, pDepthStencil, rangeCount, pRanges, record_obj.location);
+}
+
+void DeviceState::PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
+                                                    const VkClearAttachment *pAttachments, uint32_t rectCount,
+                                                    const VkClearRect *pRects, const RecordObject &record_obj) {
+    if (disabled[command_buffer_state]) {
+        return;
+    }
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    cb_state->RecordClearAttachments(attachmentCount, pAttachments, rectCount, pRects, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
@@ -331,7 +359,13 @@ void DeviceState::PostCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkIm
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(srcImage), Get<Image>(dstImage));
+    auto src_image_state = Get<Image>(srcImage);
+    auto dst_image_state = Get<Image>(dstImage);
+    ASSERT_AND_RETURN(src_image_state && dst_image_state);
+    cb_state->AddChild(src_image_state);
+    cb_state->AddChild(dst_image_state);
+    cb_state->RecordCopyImage(*src_image_state, *dst_image_state, srcImageLayout, dstImageLayout, regionCount, pRegions,
+                              record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdCopyImage2KHR(VkCommandBuffer commandBuffer, const VkCopyImageInfo2KHR *pCopyImageInfo,
@@ -344,8 +378,13 @@ void DeviceState::PostCallRecordCmdCopyImage2(VkCommandBuffer commandBuffer, con
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(pCopyImageInfo->srcImage),
-                                Get<Image>(pCopyImageInfo->dstImage));
+    auto src_image_state = Get<Image>(pCopyImageInfo->srcImage);
+    auto dst_image_state = Get<Image>(pCopyImageInfo->dstImage);
+    ASSERT_AND_RETURN(src_image_state && dst_image_state);
+    cb_state->AddChild(src_image_state);
+    cb_state->AddChild(dst_image_state);
+    cb_state->RecordCopyImage2(*src_image_state, *dst_image_state, pCopyImageInfo->srcImageLayout, pCopyImageInfo->dstImageLayout,
+                               pCopyImageInfo->regionCount, pCopyImageInfo->pRegions, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
@@ -354,7 +393,13 @@ void DeviceState::PostCallRecordCmdResolveImage(VkCommandBuffer commandBuffer, V
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(srcImage), Get<Image>(dstImage));
+    auto src_image_state = Get<Image>(srcImage);
+    auto dst_image_state = Get<Image>(dstImage);
+    ASSERT_AND_RETURN(src_image_state && dst_image_state);
+    cb_state->AddChild(src_image_state);
+    cb_state->AddChild(dst_image_state);
+
+    cb_state->RecordResolveImage(*src_image_state, *dst_image_state, regionCount, pRegions, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdResolveImage2KHR(VkCommandBuffer commandBuffer, const VkResolveImageInfo2KHR *pResolveImageInfo,
@@ -367,8 +412,14 @@ void DeviceState::PostCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer, 
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(pResolveImageInfo->srcImage),
-                                Get<Image>(pResolveImageInfo->dstImage));
+    auto src_image_state = Get<Image>(pResolveImageInfo->srcImage);
+    auto dst_image_state = Get<Image>(pResolveImageInfo->dstImage);
+    ASSERT_AND_RETURN(src_image_state && dst_image_state);
+    cb_state->AddChild(src_image_state);
+    cb_state->AddChild(dst_image_state);
+
+    cb_state->RecordResolveImage2(*src_image_state, *dst_image_state, pResolveImageInfo->regionCount, pResolveImageInfo->pRegions,
+                                  record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
@@ -377,7 +428,14 @@ void DeviceState::PostCallRecordCmdBlitImage(VkCommandBuffer commandBuffer, VkIm
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(srcImage), Get<Image>(dstImage));
+    auto src_image_state = Get<Image>(srcImage);
+    auto dst_image_state = Get<Image>(dstImage);
+    ASSERT_AND_RETURN(src_image_state && dst_image_state);
+    cb_state->AddChild(src_image_state);
+    cb_state->AddChild(dst_image_state);
+
+    cb_state->RecordBlitImage(*src_image_state, *dst_image_state, srcImageLayout, dstImageLayout, regionCount, pRegions,
+                              record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdBlitImage2KHR(VkCommandBuffer commandBuffer, const VkBlitImageInfo2KHR *pBlitImageInfo,
@@ -390,8 +448,14 @@ void DeviceState::PostCallRecordCmdBlitImage2(VkCommandBuffer commandBuffer, con
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(pBlitImageInfo->srcImage),
-                                Get<Image>(pBlitImageInfo->dstImage));
+    auto src_image_state = Get<Image>(pBlitImageInfo->srcImage);
+    auto dst_image_state = Get<Image>(pBlitImageInfo->dstImage);
+    ASSERT_AND_RETURN(src_image_state && dst_image_state);
+    cb_state->AddChild(src_image_state);
+    cb_state->AddChild(dst_image_state);
+
+    cb_state->RecordBlitImage2(*src_image_state, *dst_image_state, pBlitImageInfo->srcImageLayout, pBlitImageInfo->dstImageLayout,
+                               pBlitImageInfo->regionCount, pBlitImageInfo->pRegions, record_obj.location);
 }
 
 struct BufferAddressInfillUpdateOps {
@@ -421,18 +485,27 @@ std::shared_ptr<Buffer> DeviceState::CreateBufferState(VkBuffer handle, const Vk
     return std::make_shared<Buffer>(*this, handle, create_info);
 }
 
-void DeviceState::PreCallRecordCreateBuffer(VkDevice device, const VkBufferCreateInfo *pCreateInfo,
-                                            const VkAllocationCallbacks *pAllocator, VkBuffer *pBuffer,
-                                            const RecordObject &record_obj, chassis::CreateBuffer &chassis_state) {
-    if (pCreateInfo->usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) {
-        // When it comes to validation acceleration memory overlaps, it is much faster to
-        // work on device address ranges directly, but for that to be possible,
-        // buffers used to back acceleration structures must have been created with the
-        // VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT usage flag
-        // => Enforce it.
-        // Doing so will not modify VVL state tracking, and if the application forgot to set
-        // this flag, it will still be detected.
-        chassis_state.modified_create_info.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+std::shared_ptr<vvl::Tensor> DeviceState::CreateTensorState(VkTensorARM handle, const VkTensorCreateInfoARM *create_info) {
+    return std::make_shared<vvl::Tensor>(*this, handle, create_info);
+}
+
+void DeviceState::PostCallRecordCreateTensorARM(VkDevice device, const VkTensorCreateInfoARM *pCreateInfo,
+                                                const VkAllocationCallbacks *pAllocator, VkTensorARM *pTensor,
+                                                const RecordObject &record_obj) {
+    if (record_obj.result != VK_SUCCESS) return;
+    std::shared_ptr<vvl::Tensor> tensor_state = CreateTensorState(*pTensor, pCreateInfo);
+    Add(std::move(tensor_state));
+}
+
+void DeviceState::PostCallRecordBindTensorMemoryARM(VkDevice device, uint32_t bindInfoCount,
+                                                    const VkBindTensorMemoryInfoARM *pBindInfos, const RecordObject &record_obj) {
+    if (VK_SUCCESS != record_obj.result) return;
+    for (uint32_t i = 0; i < bindInfoCount; i++) {
+        auto tensor_state = Get<vvl::Tensor>(pBindInfos[i].tensor);
+        auto mem_info = Get<vvl::DeviceMemory>(pBindInfos[i].memory);
+        ASSERT_AND_RETURN(tensor_state && mem_info);
+        tensor_state->BindMemory(tensor_state.get(), mem_info, pBindInfos[i].memoryOffset, 0u,
+                                 tensor_state->MemReqs()->memoryRequirements.size);
     }
 }
 
@@ -455,26 +528,14 @@ void DeviceState::PostCallRecordCreateBuffer(VkDevice device, const VkBufferCrea
         sparse_container::infill_update_range(buffer_address_map_, address_range, ops);
     }
 
-    const VkBufferUsageFlags2 descriptor_buffer_usages =
-        VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_2_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
+    RecordCreateDescriptorBuffer(*buffer_state, *pCreateInfo);
 
-    if ((buffer_state->usage & descriptor_buffer_usages) != 0) {
-        descriptorBufferAddressSpaceSize += pCreateInfo->size;
-
-        if ((buffer_state->usage & VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT) != 0) {
-            resourceDescriptorBufferAddressSpaceSize += pCreateInfo->size;
-        }
-
-        if ((buffer_state->usage & VK_BUFFER_USAGE_2_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT) != 0) {
-            samplerDescriptorBufferAddressSpaceSize += pCreateInfo->size;
-        }
-    }
     Add(std::move(buffer_state));
 }
 
 std::shared_ptr<BufferView> DeviceState::CreateBufferViewState(const std::shared_ptr<Buffer> &buffer, VkBufferView handle,
                                                                const VkBufferViewCreateInfo *create_info,
-                                                               VkFormatFeatureFlags2KHR format_features) {
+                                                               VkFormatFeatureFlags2 format_features) {
     return std::make_shared<BufferView>(buffer, handle, create_info, format_features);
 }
 
@@ -486,9 +547,9 @@ void DeviceState::PostCallRecordCreateBufferView(VkDevice device, const VkBuffer
     }
     auto buffer_state = Get<Buffer>(pCreateInfo->buffer);
 
-    VkFormatFeatureFlags2KHR buffer_features;
+    VkFormatFeatureFlags2 buffer_features;
     if (special_supported.vk_khr_format_feature_flags2) {
-        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props_2 = vku::InitStructHelper(&fmt_props_3);
         DispatchGetPhysicalDeviceFormatProperties2Helper(api_version, physical_device, pCreateInfo->format, &fmt_props_2);
         buffer_features = fmt_props_3.bufferFeatures | fmt_props_2.formatProperties.bufferFeatures;
@@ -501,11 +562,42 @@ void DeviceState::PostCallRecordCreateBufferView(VkDevice device, const VkBuffer
     Add(CreateBufferViewState(buffer_state, *pView, pCreateInfo, buffer_features));
 }
 
+std::shared_ptr<vvl::DataGraphPipelineSession> DeviceState::CreateDataGraphPipelineSessionState(
+    VkDataGraphPipelineSessionARM handle, const VkDataGraphPipelineSessionCreateInfoARM *pCreateInfo) {
+    return std::make_shared<vvl::DataGraphPipelineSession>(*this, handle, pCreateInfo);
+}
+
+void DeviceState::PostCallRecordCreateDataGraphPipelineSessionARM(
+    VkDevice device, const VkDataGraphPipelineSessionCreateInfoARM *pCreateInfo, const VkAllocationCallbacks *pAllocator,
+    VkDataGraphPipelineSessionARM *pSession, const RecordObject &record_obj) {
+    if (record_obj.result != VK_SUCCESS) return;
+    std::shared_ptr<vvl::DataGraphPipelineSession> pipeline_session_state =
+        CreateDataGraphPipelineSessionState(*pSession, pCreateInfo);
+    Add(std::move(pipeline_session_state));
+}
+
+void DeviceState::PostCallRecordBindDataGraphPipelineSessionMemoryARM(
+    VkDevice device, uint32_t bindInfoCount, const VkBindDataGraphPipelineSessionMemoryInfoARM *pBindInfos,
+    const RecordObject &record_obj) {
+    if (VK_SUCCESS != record_obj.result) {
+        return;
+    }
+    for (uint32_t i = 0; i < bindInfoCount; i++) {
+        auto &bind_info = pBindInfos[i];
+        auto session_state = Get<vvl::DataGraphPipelineSession>(bind_info.session);
+        if (session_state) {
+            auto mem_info = std::shared_ptr<vvl::DeviceMemory>(Get<vvl::DeviceMemory>(bind_info.memory));
+            vvl::MemoryBinding binding = { mem_info, bind_info.memoryOffset, 0 };
+            session_state->AddBoundMemory(bind_info.bindPoint, binding);
+        }
+    }
+}
+
 std::shared_ptr<ImageView> DeviceState::CreateImageViewState(const std::shared_ptr<Image> &image_state, VkImageView handle,
                                                              const VkImageViewCreateInfo *create_info,
-                                                             VkFormatFeatureFlags2KHR format_features,
+                                                             VkFormatFeatureFlags2 format_features,
                                                              const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props) {
-    return std::make_shared<ImageView>(image_state, handle, create_info, format_features, cubic_props);
+    return std::make_shared<ImageView>(*this, image_state, handle, create_info, format_features, cubic_props);
 }
 
 void DeviceState::PostCallRecordCreateImageView(VkDevice device, const VkImageViewCreateInfo *pCreateInfo,
@@ -517,7 +609,7 @@ void DeviceState::PostCallRecordCreateImageView(VkDevice device, const VkImageVi
     auto image_state = Get<Image>(pCreateInfo->image);
     ASSERT_AND_RETURN(image_state);
 
-    VkFormatFeatureFlags2KHR format_features = 0;
+    VkFormatFeatureFlags2 format_features = 0;
     if (image_state->HasAHBFormat() == true) {
         // The ImageView uses same Image's format feature since they share same AHB
         format_features = image_state->format_features;
@@ -555,7 +647,40 @@ void DeviceState::PostCallRecordCmdCopyBuffer(VkCommandBuffer commandBuffer, VkB
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Buffer>(srcBuffer), Get<Buffer>(dstBuffer));
+    auto src_buffer_state = Get<Buffer>(srcBuffer);
+    auto dst_buffer_state = Get<Buffer>(dstBuffer);
+    ASSERT_AND_RETURN(src_buffer_state && dst_buffer_state);
+    cb_state->AddChild(src_buffer_state);
+    cb_state->AddChild(dst_buffer_state);
+    cb_state->RecordCopyBuffer(*src_buffer_state, *dst_buffer_state, regionCount, pRegions, record_obj.location);
+}
+
+void DeviceState::PostCallRecordCmdCopyTensorARM(VkCommandBuffer commandBuffer, const VkCopyTensorInfoARM *pCopyTensorInfo,
+                                                 const RecordObject &record_obj) {
+    if (disabled[command_buffer_state]) return;
+
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    auto src_tensor_state = Get<Tensor>(pCopyTensorInfo->srcTensor);
+    auto dst_tensor_state = Get<Tensor>(pCopyTensorInfo->dstTensor);
+    ASSERT_AND_RETURN(src_tensor_state && dst_tensor_state);
+    cb_state->AddChild(src_tensor_state);
+    cb_state->AddChild(dst_tensor_state);
+}
+
+std::shared_ptr<vvl::TensorView> DeviceState::CreateTensorViewState(const std::shared_ptr<vvl::Tensor> &tensor,
+                                                                    VkTensorViewARM handle,
+                                                                    const VkTensorViewCreateInfoARM *pCreateInfo) {
+    return std::make_shared<vvl::TensorView>(tensor, handle, pCreateInfo);
+}
+
+void DeviceState::PostCallRecordCreateTensorViewARM(VkDevice device, const VkTensorViewCreateInfoARM *pCreateInfo,
+                                                    const VkAllocationCallbacks *pAllocator, VkTensorViewARM *pView,
+                                                    const RecordObject &record_obj) {
+    if (record_obj.result != VK_SUCCESS) return;
+
+    auto tensor_state = Get<vvl::Tensor>(pCreateInfo->tensor);
+    ASSERT_AND_RETURN(tensor_state);
+    Add(CreateTensorViewState(tensor_state, *pView, pCreateInfo));
 }
 
 void DeviceState::PostCallRecordCmdCopyBuffer2KHR(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2KHR *pCopyBufferInfo,
@@ -568,8 +693,13 @@ void DeviceState::PostCallRecordCmdCopyBuffer2(VkCommandBuffer commandBuffer, co
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Buffer>(pCopyBufferInfo->srcBuffer),
-                                Get<Buffer>(pCopyBufferInfo->dstBuffer));
+    auto src_buffer_state = Get<Buffer>(pCopyBufferInfo->srcBuffer);
+    auto dst_buffer_state = Get<Buffer>(pCopyBufferInfo->dstBuffer);
+    ASSERT_AND_RETURN(src_buffer_state && dst_buffer_state);
+    cb_state->AddChild(src_buffer_state);
+    cb_state->AddChild(dst_buffer_state);
+    cb_state->RecordCopyBuffer2(*src_buffer_state, *dst_buffer_state, pCopyBufferInfo->regionCount, pCopyBufferInfo->pRegions,
+                                record_obj.location);
 }
 
 void DeviceState::PreCallRecordDestroyImageView(VkDevice device, VkImageView imageView, const VkAllocationCallbacks *pAllocator,
@@ -582,20 +712,7 @@ void DeviceState::PreCallRecordDestroyBuffer(VkDevice device, VkBuffer buffer, c
     if (auto buffer_state = Get<Buffer>(buffer)) {
         WriteLockGuard guard(buffer_address_lock_);
 
-        const VkBufferUsageFlags2 descriptor_buffer_usages =
-            VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_2_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
-
-        if ((buffer_state->usage & descriptor_buffer_usages) != 0) {
-            descriptorBufferAddressSpaceSize -= buffer_state->create_info.size;
-
-            if (buffer_state->usage & VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT) {
-                resourceDescriptorBufferAddressSpaceSize -= buffer_state->create_info.size;
-            }
-
-            if (buffer_state->usage & VK_BUFFER_USAGE_2_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT) {
-                samplerDescriptorBufferAddressSpaceSize -= buffer_state->create_info.size;
-            }
-        }
+        RecordDestoryDescriptorBuffer(*buffer_state);
 
         if (buffer_state->deviceAddress != 0) {
             const auto address_range = buffer_state->DeviceAddressRange();
@@ -631,12 +748,48 @@ void DeviceState::PreCallRecordDestroyBufferView(VkDevice device, VkBufferView b
     Destroy<BufferView>(bufferView);
 }
 
+static constexpr VkBufferUsageFlags2 kDescriptorBufferUsages =
+    VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_2_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
+
+void DeviceState::RecordCreateDescriptorBuffer(const vvl::Buffer &buffer_state, const VkBufferCreateInfo &create_info) {
+    if ((buffer_state.usage & kDescriptorBufferUsages) != 0) {
+        const VkDeviceSize size = create_info.size;
+        descriptor_buffer_address_space.all += size;
+
+        if ((buffer_state.usage & VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT) != 0) {
+            descriptor_buffer_address_space.resource += size;
+        }
+
+        if ((buffer_state.usage & VK_BUFFER_USAGE_2_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT) != 0) {
+            descriptor_buffer_address_space.sampler += size;
+        }
+    }
+}
+
+void DeviceState::RecordDestoryDescriptorBuffer(const vvl::Buffer &buffer_state) {
+    if ((buffer_state.usage & kDescriptorBufferUsages) != 0) {
+        const VkDeviceSize size = buffer_state.create_info.size;
+        descriptor_buffer_address_space.all -= size;
+
+        if (buffer_state.usage & VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT) {
+            descriptor_buffer_address_space.resource -= size;
+        }
+
+        if (buffer_state.usage & VK_BUFFER_USAGE_2_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT) {
+            descriptor_buffer_address_space.sampler -= size;
+        }
+    }
+}
+
 void DeviceState::PostCallRecordCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
                                               VkDeviceSize size, uint32_t data, const RecordObject &record_obj) {
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Buffer>(dstBuffer));
+    auto buffer_state = Get<Buffer>(dstBuffer);
+    ASSERT_AND_RETURN(buffer_state);
+    cb_state->AddChild(buffer_state);
+    cb_state->RecordFillBuffer(*buffer_state, dstOffset, size, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
@@ -645,8 +798,14 @@ void DeviceState::PostCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBuff
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    auto src_image_state = Get<Image>(srcImage);
+    auto dst_buffer_state = Get<Buffer>(dstBuffer);
+    ASSERT_AND_RETURN(src_image_state && dst_buffer_state);
+    cb_state->AddChild(src_image_state);
+    cb_state->AddChild(dst_buffer_state);
 
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(srcImage), Get<Buffer>(dstBuffer));
+    cb_state->RecordCopyImageToBuffer(*src_image_state, *dst_buffer_state, srcImageLayout, regionCount, pRegions,
+                                      record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdCopyImageToBuffer2KHR(VkCommandBuffer commandBuffer,
@@ -661,8 +820,14 @@ void DeviceState::PostCallRecordCmdCopyImageToBuffer2(VkCommandBuffer commandBuf
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Image>(pCopyImageToBufferInfo->srcImage),
-                                Get<Buffer>(pCopyImageToBufferInfo->dstBuffer));
+    auto src_image_state = Get<Image>(pCopyImageToBufferInfo->srcImage);
+    auto dst_buffer_state = Get<Buffer>(pCopyImageToBufferInfo->dstBuffer);
+    ASSERT_AND_RETURN(src_image_state && dst_buffer_state);
+    cb_state->AddChild(src_image_state);
+    cb_state->AddChild(dst_buffer_state);
+
+    cb_state->RecordCopyImageToBuffer2(*src_image_state, *dst_buffer_state, pCopyImageToBufferInfo->srcImageLayout,
+                                       pCopyImageToBufferInfo->regionCount, pCopyImageToBufferInfo->pRegions, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
@@ -671,7 +836,14 @@ void DeviceState::PostCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBuff
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Buffer>(srcBuffer), Get<Image>(dstImage));
+    auto src_buffer_state = Get<Buffer>(srcBuffer);
+    auto dst_image_state = Get<Image>(dstImage);
+    ASSERT_AND_RETURN(src_buffer_state && dst_image_state);
+    cb_state->AddChild(src_buffer_state);
+    cb_state->AddChild(dst_image_state);
+
+    cb_state->RecordCopyBufferToImage(*src_buffer_state, *dst_image_state, dstImageLayout, regionCount, pRegions,
+                                      record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdCopyBufferToImage2KHR(VkCommandBuffer commandBuffer,
@@ -686,19 +858,25 @@ void DeviceState::PostCallRecordCmdCopyBufferToImage2(VkCommandBuffer commandBuf
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Buffer>(pCopyBufferToImageInfo->srcBuffer),
-                                Get<Image>(pCopyBufferToImageInfo->dstImage));
+    auto src_buffer_state = Get<Buffer>(pCopyBufferToImageInfo->srcBuffer);
+    auto dst_image_state = Get<Image>(pCopyBufferToImageInfo->dstImage);
+    ASSERT_AND_RETURN(src_buffer_state && dst_image_state);
+    cb_state->AddChild(src_buffer_state);
+    cb_state->AddChild(dst_image_state);
+
+    cb_state->RecordCopyBufferToImage2(*src_buffer_state, *dst_image_state, pCopyBufferToImageInfo->dstImageLayout,
+                                       pCopyBufferToImageInfo->regionCount, pCopyBufferToImageInfo->pRegions, record_obj.location);
 }
 
 // Gets union of all features defined by Potential Format Features
 // except, does not handle the external format case for AHB as that only can be used for sampled images
-VkFormatFeatureFlags2KHR DeviceState::GetPotentialFormatFeatures(VkFormat format) const {
-    VkFormatFeatureFlags2KHR format_features = 0;
+VkFormatFeatureFlags2 DeviceState::GetPotentialFormatFeatures(VkFormat format) const {
+    VkFormatFeatureFlags2 format_features = 0;
 
     if (format != VK_FORMAT_UNDEFINED) {
         if (special_supported.vk_khr_format_feature_flags2) {
             VkDrmFormatModifierPropertiesList2EXT fmt_drm_props = vku::InitStructHelper();
-            auto fmt_props_3 = vku::InitStruct<VkFormatProperties3KHR>(
+            auto fmt_props_3 = vku::InitStruct<VkFormatProperties3>(
                 IsExtEnabled(extensions.vk_ext_image_drm_format_modifier) ? &fmt_drm_props : nullptr);
             VkFormatProperties2 fmt_props_2 = vku::InitStructHelper(&fmt_props_3);
 
@@ -774,8 +952,7 @@ void DeviceState::FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const
         uint32_t num_queue_families = 0;
         DispatchGetPhysicalDeviceQueueFamilyProperties(physical_device, &num_queue_families, nullptr);
         std::vector<VkQueueFamilyProperties> queue_family_properties_list(num_queue_families);
-        DispatchGetPhysicalDeviceQueueFamilyProperties(physical_device, &num_queue_families,
-                                                                       queue_family_properties_list.data());
+        DispatchGetPhysicalDeviceQueueFamilyProperties(physical_device, &num_queue_families, queue_family_properties_list.data());
 
         for (uint32_t i = 0; i < pCreateInfo->queueCreateInfoCount; ++i) {
             const VkDeviceQueueCreateInfo &queue_create_info = pCreateInfo->pQueueCreateInfos[i];
@@ -1166,6 +1343,12 @@ void DeviceState::PostCallRecordAllocateMemory(VkDevice device, const VkMemoryAl
 
             dedicated_binding.emplace(dedicated->image, image_state->create_info);
         }
+        if (const auto dedicated_tensor =
+                vku::FindStructInPNextChain<VkMemoryDedicatedAllocateInfoTensorARM>(pAllocateInfo->pNext)) {
+            auto tensor_state = Get<vvl::Tensor>(dedicated_tensor->tensor);
+            ASSERT_AND_RETURN(tensor_state);
+            dedicated_binding.emplace(dedicated_tensor->tensor, tensor_state->create_info);
+        }
     }
     if (const auto import_memory_fd_info = vku::FindStructInPNextChain<VkImportMemoryFdInfoKHR>(pAllocateInfo->pNext)) {
         // Successful import operation transfers POSIX handle ownership to the driver.
@@ -1261,7 +1444,7 @@ void DeviceState::PreCallRecordQueueBindSparse(VkQueue queue, uint32_t bindInfoC
                 }
             }
         }
-        auto* timeline_info = vku::FindStructInPNextChain<VkTimelineSemaphoreSubmitInfo>(bind_info.pNext);
+        auto *timeline_info = vku::FindStructInPNextChain<VkTimelineSemaphoreSubmitInfo>(bind_info.pNext);
         Location submit_loc = record_obj.location.dot(Struct::VkBindSparseInfo, Field::pBindInfo, bind_idx);
         QueueSubmission submission(submit_loc);
         for (uint32_t i = 0; i < bind_info.waitSemaphoreCount; ++i) {
@@ -1428,8 +1611,7 @@ void DeviceState::RecordGetDeviceQueueState(uint32_t queue_family_index, uint32_
         uint32_t num_queue_families = 0;
         DispatchGetPhysicalDeviceQueueFamilyProperties(physical_device, &num_queue_families, nullptr);
         std::vector<VkQueueFamilyProperties> queue_family_properties_list(num_queue_families);
-        DispatchGetPhysicalDeviceQueueFamilyProperties(physical_device, &num_queue_families,
-                                                                       queue_family_properties_list.data());
+        DispatchGetPhysicalDeviceQueueFamilyProperties(physical_device, &num_queue_families, queue_family_properties_list.data());
 
         Add(CreateQueue(queue, queue_family_index, queue_index, flags, queue_family_properties_list[queue_family_index]));
     }
@@ -1455,7 +1637,7 @@ void DeviceState::PostCallRecordQueueWaitIdle(VkQueue queue, const RecordObject 
 
         // Reset semaphore's in-use-by-swapchain state.
         // Only for pre-swapchain-maintenance1 code. New code should realy on presentation fence.
-        if (!IsExtEnabled(extensions.vk_ext_swapchain_maintenance1)) {
+        if (!IsExtEnabled(extensions.vk_khr_swapchain_maintenance1) && !IsExtEnabled(extensions.vk_ext_swapchain_maintenance1)) {
             if (queue_state->is_used_for_presentation) {
                 for (const auto &entry : semaphore_map_.snapshot()) {
                     const std::shared_ptr<vvl::Semaphore> &semaphore_state = entry.second;
@@ -1493,7 +1675,7 @@ void DeviceState::PostCallRecordDeviceWaitIdle(VkDevice device, const RecordObje
     }
     // Reset semaphore's in-use-by-swapchain state.
     // Only for pre-swapchain-maintenance1 code. New code should rely on the presentation fence.
-    if (!IsExtEnabled(extensions.vk_ext_swapchain_maintenance1)) {
+    if (!IsExtEnabled(extensions.vk_khr_swapchain_maintenance1) && !IsExtEnabled(extensions.vk_ext_swapchain_maintenance1)) {
         for (const auto &entry : semaphore_map_.snapshot()) {
             const std::shared_ptr<vvl::Semaphore> &semaphore_state = entry.second;
             semaphore_state->ClearSwapchainWaitInfo();
@@ -1599,7 +1781,7 @@ void DeviceState::PostCallRecordCmdBindShadersEXT(VkCommandBuffer commandBuffer,
 
         // We use this to mark any previous pipeline bounds are invalidated now
         // vkspec.html#shaders-objects-pipeline-interaction
-        cb_state->BindPipeline(ConvertStageToVvlBindPoint(pStages[i]), nullptr);
+        cb_state->BindLastBoundPipeline(ConvertStageToVvlBindPoint(pStages[i]), nullptr);
     }
 }
 
@@ -1800,7 +1982,7 @@ bool DeviceState::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipe
             // The rasterization_enabled is our way to hint to vvl::RenderPass to ignore a possible VkPipelineRenderingCreateInfo
             // that contains bad pointers (when using GPL)
             const bool has_fragment_output_state =
-                Pipeline::ContainsSubState(*this, create_info, VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT);
+                Pipeline::ContainsLibraryState(*this, create_info, VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT);
             const bool rasterization_enabled =
                 has_fragment_output_state && Pipeline::EnablesRasterizationStates(*this, create_info);
 
@@ -1870,11 +2052,10 @@ void DeviceState::PostCallRecordCreateComputePipelines(VkDevice device, VkPipeli
 }
 
 // TODO - Add tests and pass down StatelessData
-std::shared_ptr<Pipeline> DeviceState::CreateRayTracingPipelineState(const VkRayTracingPipelineCreateInfoNV *create_info,
+std::shared_ptr<Pipeline> DeviceState::CreateRayTracingPipelineStateNV(const VkRayTracingPipelineCreateInfoNV *create_info,
                                                                      std::shared_ptr<const PipelineCache> pipeline_cache,
-                                                                     std::shared_ptr<const PipelineLayout> &&layout,
-                                                                     spirv::StatelessData *stateless_data) const {
-    return std::make_shared<Pipeline>(*this, create_info, std::move(pipeline_cache), std::move(layout), stateless_data);
+                                                                     std::shared_ptr<const PipelineLayout> &&layout) const {
+    return std::make_shared<Pipeline>(*this, create_info, std::move(pipeline_cache), std::move(layout));
 }
 
 // PreCallValidate used here to have a single global spot to build the vvl::Pipeline object so we can use it right away
@@ -1887,7 +2068,7 @@ bool DeviceState::PreCallValidateCreateRayTracingPipelinesNV(VkDevice device, Vk
     for (uint32_t i = 0; i < count; i++) {
         // Create and initialize internal tracking data structure
         pipeline_states.push_back(
-            CreateRayTracingPipelineState(&pCreateInfos[i], pipeline_cache, Get<PipelineLayout>(pCreateInfos[i].layout), nullptr));
+            CreateRayTracingPipelineStateNV(&pCreateInfos[i], pipeline_cache, Get<PipelineLayout>(pCreateInfos[i].layout)));
     }
     return false;
 }
@@ -1909,11 +2090,11 @@ void DeviceState::PostCallRecordCreateRayTracingPipelinesNV(VkDevice device, VkP
 }
 
 // TODO - Add tests and pass down StatelessData
-std::shared_ptr<Pipeline> DeviceState::CreateRayTracingPipelineState(const VkRayTracingPipelineCreateInfoKHR *create_info,
+std::shared_ptr<Pipeline> DeviceState::CreateRayTracingPipelineStateKHR(const VkRayTracingPipelineCreateInfoKHR *create_info,
                                                                      std::shared_ptr<const PipelineCache> pipeline_cache,
                                                                      std::shared_ptr<const PipelineLayout> &&layout,
-                                                                     spirv::StatelessData *stateless_data) const {
-    return std::make_shared<Pipeline>(*this, create_info, std::move(pipeline_cache), std::move(layout), stateless_data);
+                                                                     std::vector<spirv::StatelessData> &stateless_data) const {
+    return std::make_shared<Pipeline>(*this, create_info, std::move(pipeline_cache), std::move(layout), &stateless_data);
 }
 
 // PreCallValidate used here to have a single global spot to build the vvl::Pipeline object so we can use it right away
@@ -1928,7 +2109,7 @@ bool DeviceState::PreCallValidateCreateRayTracingPipelinesKHR(VkDevice device, V
     for (uint32_t i = 0; i < count; i++) {
         // Create and initialize internal tracking data structure
         pipeline_states.push_back(
-            CreateRayTracingPipelineState(&pCreateInfos[i], pipeline_cache, Get<PipelineLayout>(pCreateInfos[i].layout), nullptr));
+           CreateRayTracingPipelineStateKHR(&pCreateInfos[i], pipeline_cache, Get<PipelineLayout>(pCreateInfos[i].layout), chassis_state.stateless_data));
     }
     return false;
 }
@@ -1951,7 +2132,7 @@ void DeviceState::PostCallRecordCreateRayTracingPipelinesKHR(VkDevice device, Vk
             Add(std::move(pipeline_states[i]));
         }
     } else {
-        // Deferred creation: pipelines will be considered created once the defferedOperation object
+        // Deferred creation: pipelines will be considered created once the deferredOperation object
         // signals it, via usage of vkDeferredOperationJoinKHR and then vkGetDeferredOperationResultKHR
         // Hence pipeline state tracking needs to be deferred to the corresponding call to
         // vkGetDeferredOperationResultKHR => Store the deferred logic to do that in
@@ -1979,6 +2160,49 @@ void DeviceState::PostCallRecordCreateRayTracingPipelinesKHR(VkDevice device, Vk
     }
 }
 
+std::shared_ptr<vvl::Pipeline> DeviceState::CreateDataGraphPipelineState(
+    const VkDataGraphPipelineCreateInfoARM *pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
+    std::shared_ptr<const vvl::PipelineLayout> &&layout, spirv::StatelessData *stateless_data) const {
+    return std::make_shared<vvl::Pipeline>(*this, pCreateInfo, std::move(pipeline_cache), std::move(layout), stateless_data);
+}
+
+bool DeviceState::PreCallValidateCreateDataGraphPipelinesARM(
+    VkDevice device, VkDeferredOperationKHR deferredOperation, VkPipelineCache pipelineCache, uint32_t count,
+    const VkDataGraphPipelineCreateInfoARM *pCreateInfos, const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
+    const ErrorObject &error_obj, PipelineStates &pipeline_states, chassis::CreateDataGraphPipelinesARM &chassis_state) const {
+    pipeline_states.reserve(count);
+    auto pipeline_cache = Get<vvl::PipelineCache>(pipelineCache);
+    for (uint32_t i = 0; i < count; i++) {
+        // Create and initialize internal tracking data structure
+        pipeline_states.push_back(CreateDataGraphPipelineState(
+            &pCreateInfos[i], pipeline_cache, Get<vvl::PipelineLayout>(pCreateInfos[i].layout), &chassis_state.stateless_data));
+    }
+    return false;
+}
+
+void DeviceState::PostCallRecordCreateDataGraphPipelinesARM(
+    VkDevice device, VkDeferredOperationKHR deferredOperation, VkPipelineCache pipelineCache, uint32_t count,
+    const VkDataGraphPipelineCreateInfoARM *pCreateInfos, const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
+    const RecordObject &record_obj, PipelineStates &pipeline_states, chassis::CreateDataGraphPipelinesARM &chassis_state) {
+    // This API may create pipelines regardless of the return value
+    for (uint32_t i = 0; i < count; i++) {
+        if (pPipelines[i] != VK_NULL_HANDLE) {
+            pipeline_states[i]->SetHandle(pPipelines[i]);
+            Add(std::move(pipeline_states[i]));
+        }
+    }
+    pipeline_states.clear();
+}
+
+void DeviceState::PostCallRecordCmdDispatchDataGraphARM(VkCommandBuffer commandBuffer,
+                                                        VkDataGraphPipelineSessionARM session,
+                                                        const VkDataGraphPipelineDispatchInfoARM *pInfo,
+                                                        const RecordObject &record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+    std::shared_ptr<vvl::DataGraphPipelineSession> pipeline_session = Get<vvl::DataGraphPipelineSession>(session);
+    cb_state->AddChild(pipeline_session);
+}
+
 void DeviceState::PostCallRecordCreateSampler(VkDevice device, const VkSamplerCreateInfo *pCreateInfo,
                                               const VkAllocationCallbacks *pAllocator, VkSampler *pSampler,
                                               const RecordObject &record_obj) {
@@ -1999,14 +2223,7 @@ void DeviceState::PostCallRecordCreateDescriptorSetLayout(VkDevice device, const
     if (record_obj.result != VK_SUCCESS) {
         return;
     }
-    Add(std::make_shared<DescriptorSetLayout>(pCreateInfo, *pSetLayout));
-}
-
-void DeviceState::PostCallRecordGetDescriptorSetLayoutSizeEXT(VkDevice device, VkDescriptorSetLayout layout,
-                                                              VkDeviceSize *pLayoutSizeInBytes, const RecordObject &record_obj) {
-    if (auto descriptor_set_layout = Get<DescriptorSetLayout>(layout)) {
-        descriptor_set_layout->SetLayoutSizeInBytes(pLayoutSizeInBytes);
-    }
+    Add(std::make_shared<DescriptorSetLayout>(*this, pCreateInfo, *pSetLayout));
 }
 
 void DeviceState::PostCallRecordCreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo *pCreateInfo,
@@ -2205,114 +2422,27 @@ void DeviceState::PostCallRecordResetCommandBuffer(VkCommandBuffer commandBuffer
 void DeviceState::PostCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
                                                 VkPipeline pipeline, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
-    auto pipe_state = Get<Pipeline>(pipeline);
-    ASSERT_AND_RETURN(pipe_state);
+    cb_state->RecordCommand(record_obj.location);
+    auto pipeline_state = Get<Pipeline>(pipeline);
+    ASSERT_AND_RETURN(pipeline);
+    cb_state->RecordBindPipeline(pipelineBindPoint, *pipeline_state);
 
-    if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_GRAPHICS) {
-        cb_state->dynamic_state_status.pipeline.reset();
-
-        // Make a copy and then xor the new change
-        // This gives us which state has been invalidated, allows us to save time for most cases where nothing changes
-        CBDynamicFlags invalidated_state = cb_state->dynamic_state_status.cb;
-
-        // Spec: "[dynamic state] made invalid by another pipeline bind with that state specified as static"
-        // So unset the bitmask for the command buffer lifetime tracking
-        cb_state->dynamic_state_status.cb &= pipe_state->dynamic_state;
-
-        invalidated_state ^= cb_state->dynamic_state_status.cb;
-        if (invalidated_state.any()) {
-            // Reset dynamic state values
-            cb_state->dynamic_state_value.reset(invalidated_state);
-
-            for (int index = 1; index < CB_DYNAMIC_STATE_STATUS_NUM; ++index) {
-                CBDynamicState status = static_cast<CBDynamicState>(index);
-                if (invalidated_state[status]) {
-                    cb_state->invalidated_state_pipe[index] = pipeline;
-                }
-            }
-        }
-
-        if (!pipe_state->IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_EXT) &&
-            !pipe_state->IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE) && pipe_state->vertex_input_state) {
-            for (const auto &[binding_index, binding_state] : pipe_state->vertex_input_state->bindings) {
-                cb_state->current_vertex_buffer_binding_info[binding_index].stride = binding_state.desc.stride;
-            }
-        }
-
-        // Trash dynamic viewport/scissor state if pipeline defines static state and enabled rasterization.
-        // akeley98 NOTE: There's a bit of an ambiguity in the spec, whether binding such a pipeline overwrites
-        // the entire viewport (scissor) array, or only the subsection defined by the viewport (scissor) count.
-        // I am taking the latter interpretation based on the implementation details of NVIDIA's Vulkan driver.
-        const auto *viewport_state = pipe_state->ViewportState();
-        if (!pipe_state->IsDynamic(CB_DYNAMIC_STATE_VIEWPORT_WITH_COUNT)) {
-            cb_state->viewport.trashed_count = true;
-            if (viewport_state && (!pipe_state->IsDynamic(CB_DYNAMIC_STATE_VIEWPORT))) {
-                cb_state->viewport.trashed_mask |= (1u << viewport_state->viewportCount) - 1u;
-                // should become = ~uint32_t(0) if the other interpretation is correct.
-            }
-        }
-        if (!pipe_state->IsDynamic(CB_DYNAMIC_STATE_SCISSOR_WITH_COUNT)) {
-            cb_state->scissor.trashed_count = true;
-            if (viewport_state && (!pipe_state->IsDynamic(CB_DYNAMIC_STATE_SCISSOR))) {
-                cb_state->scissor.trashed_mask |= (1u << viewport_state->scissorCount) - 1u;
-                // should become = ~uint32_t(0) if the other interpretation is correct.
-            }
-        }
-
-        if (!enabled_features.variableMultisampleRate) {
-            if (const auto *multisample_state = pipe_state->MultisampleState(); multisample_state) {
-                if (const auto &render_pass = cb_state->active_render_pass) {
-                    const uint32_t subpass = cb_state->GetActiveSubpass();
-                    // if render pass uses no attachment, all bound pipelines in the same subpass must have the same
-                    // pMultisampleState->rasterizationSamples. To check that, record pMultisampleState->rasterizationSamples of the
-                    // first bound pipeline.
-                    if (render_pass->UsesNoAttachment(subpass)) {
-                        if (std::optional<VkSampleCountFlagBits> subpass_rasterization_samples =
-                                cb_state->GetActiveSubpassRasterizationSampleCount();
-                            !subpass_rasterization_samples) {
-                            cb_state->SetActiveSubpassRasterizationSampleCount(multisample_state->rasterizationSamples);
-                        }
-                    }
-                }
-            }
-        }
-
-    } else if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
-        cb_state->dynamic_state_status.rtx_stack_size_pipeline = false;
-        if (!pipe_state->IsDynamic(CB_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR)) {
-            cb_state->dynamic_state_status.rtx_stack_size_cb = false;  // invalidated
-        }
-    }
-
-    cb_state->BindPipeline(ConvertToVvlBindPoint(pipelineBindPoint), pipe_state.get());
     if (!disabled[command_buffer_state]) {
-        cb_state->AddChild(pipe_state);
+        cb_state->AddChild(pipeline_state);
     }
-
-    cb_state->dirty_static_state = false;
 }
 
 void DeviceState::PostCallRecordCmdSetViewport(VkCommandBuffer commandBuffer, uint32_t firstViewport, uint32_t viewportCount,
                                                const VkViewport *pViewports, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_VIEWPORT);
-    uint32_t bits = ((1u << viewportCount) - 1u) << firstViewport;
-    cb_state->viewport.mask |= bits;
-    cb_state->viewport.trashed_mask &= ~bits;
-    if (cb_state->dynamic_state_value.viewports.size() < firstViewport + viewportCount) {
-        cb_state->dynamic_state_value.viewports.resize(firstViewport + viewportCount);
-    }
-    for (size_t i = 0; i < viewportCount; ++i) {
-        cb_state->dynamic_state_value.viewports[firstViewport + i] = pViewports[i];
-    }
+    cb_state->RecordSetViewport(firstViewport, viewportCount, pViewports);
 }
 
 void DeviceState::PostCallRecordCmdSetExclusiveScissorNV(VkCommandBuffer commandBuffer, uint32_t firstExclusiveScissor,
                                                          uint32_t exclusiveScissorCount, const VkRect2D *pExclusiveScissors,
                                                          const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_NV);
     // TODO: We don't have VUIDs for validating that all exclusive scissors have been set.
     // cb_state->exclusiveScissorMask |= ((1u << exclusiveScissorCount) - 1u) << firstExclusiveScissor;
 
@@ -2329,7 +2459,7 @@ void DeviceState::PostCallRecordCmdSetExclusiveScissorEnableNV(VkCommandBuffer c
                                                                const VkBool32 *pExclusiveScissorEnables,
                                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_ENABLE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_ENABLE_NV);
 
     cb_state->dynamic_state_value.exclusive_scissor_enable_first = firstExclusiveScissor;
     cb_state->dynamic_state_value.exclusive_scissor_enable_count = exclusiveScissorCount;
@@ -2344,7 +2474,7 @@ void DeviceState::PostCallRecordCmdBindShadingRateImageNV(VkCommandBuffer comman
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
 
     if (imageView != VK_NULL_HANDLE) {
         auto view_state = Get<ImageView>(imageView);
@@ -2357,7 +2487,7 @@ void DeviceState::PostCallRecordCmdSetViewportShadingRatePaletteNV(VkCommandBuff
                                                                    const VkShadingRatePaletteNV *pShadingRatePalettes,
                                                                    const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_VIEWPORT_SHADING_RATE_PALETTE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_VIEWPORT_SHADING_RATE_PALETTE_NV);
     // TODO: We don't have VUIDs for validating that all shading rate palettes have been set.
     // cb_state->shadingRatePaletteMask |= ((1u << viewportCount) - 1u) << firstViewport;
     cb_state->dynamic_state_value.shading_rate_palette_count = viewportCount;
@@ -2455,7 +2585,7 @@ void DeviceState::PostCallRecordCmdBuildAccelerationStructuresKHR(
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     ASSERT_AND_RETURN(cb_state);
 
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     for (const auto [i, info] : enumerate(pInfos, infoCount)) {
         RecordDeviceAccelerationStructureBuildInfo(*cb_state, info);
         if (auto dst_as_state = Get<AccelerationStructureKHR>(info.dstAccelerationStructure)) {
@@ -2473,7 +2603,7 @@ void DeviceState::PostCallRecordCmdBuildAccelerationStructuresIndirectKHR(VkComm
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     ASSERT_AND_RETURN(cb_state);
 
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     for (uint32_t i = 0; i < infoCount; i++) {
         RecordDeviceAccelerationStructureBuildInfo(*cb_state, pInfos[i]);
 
@@ -2531,7 +2661,7 @@ void DeviceState::PostCallRecordCmdBuildAccelerationStructureNV(VkCommandBuffer 
     if (!cb_state) {
         return;
     }
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
 
     auto dst_as_state = Get<AccelerationStructureNV>(dst);
     if (dst_as_state) {
@@ -2574,18 +2704,18 @@ void DeviceState::PostCallRecordCmdCopyAccelerationStructureNV(VkCommandBuffer c
                                                                VkAccelerationStructureNV src,
                                                                VkCopyAccelerationStructureModeNV mode,
                                                                const RecordObject &record_obj) {
+    if (disabled[command_buffer_state]) return;
+
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    if (cb_state) {
-        auto src_as_state = Get<AccelerationStructureNV>(src);
-        auto dst_as_state = Get<AccelerationStructureNV>(dst);
-        if (dst_as_state && src_as_state) {
-            if (!disabled[command_buffer_state]) {
-                cb_state->RecordTransferCmd(record_obj.location.function, src_as_state, dst_as_state);
-            }
-            dst_as_state->built = true;
-            dst_as_state->build_info = src_as_state->build_info;
-        }
-    }
+    auto src_as_state = Get<AccelerationStructureNV>(src);
+    auto dst_as_state = Get<AccelerationStructureNV>(dst);
+    ASSERT_AND_RETURN(src_as_state && dst_as_state);
+    cb_state->AddChild(src_as_state);
+    cb_state->AddChild(dst_as_state);
+
+    cb_state->RecordCommand(record_obj.location);
+    dst_as_state->built = true;
+    dst_as_state->build_info = src_as_state->build_info;
 }
 
 void DeviceState::PreCallRecordDestroyAccelerationStructureKHR(VkDevice device, VkAccelerationStructureKHR accelerationStructure,
@@ -2604,7 +2734,7 @@ void DeviceState::PostCallRecordCmdSetViewportWScalingNV(VkCommandBuffer command
                                                          uint32_t viewportCount, const VkViewportWScalingNV *pViewportWScalings,
                                                          const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV);
     cb_state->dynamic_state_value.viewport_w_scaling_first = firstViewport;
     cb_state->dynamic_state_value.viewport_w_scaling_count = viewportCount;
     cb_state->dynamic_state_value.viewport_w_scalings.resize(viewportCount);
@@ -2615,13 +2745,13 @@ void DeviceState::PostCallRecordCmdSetViewportWScalingNV(VkCommandBuffer command
 
 void DeviceState::PostCallRecordCmdSetLineWidth(VkCommandBuffer commandBuffer, float lineWidth, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_LINE_WIDTH);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_LINE_WIDTH);
 }
 
 void DeviceState::PostCallRecordCmdSetLineStipple(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
                                                   uint16_t lineStipplePattern, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_LINE_STIPPLE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_LINE_STIPPLE);
 }
 
 void DeviceState::PostCallRecordCmdSetLineStippleEXT(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
@@ -2637,7 +2767,7 @@ void DeviceState::PostCallRecordCmdSetLineStippleKHR(VkCommandBuffer commandBuff
 void DeviceState::PostCallRecordCmdSetDepthBias(VkCommandBuffer commandBuffer, float depthBiasConstantFactor, float depthBiasClamp,
                                                 float depthBiasSlopeFactor, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_BIAS);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DEPTH_BIAS);
 }
 
 void DeviceState::PostCallRecordCmdSetDepthBias2EXT(VkCommandBuffer commandBuffer, const VkDepthBiasInfoEXT *pDepthBiasInfo,
@@ -2649,34 +2779,31 @@ void DeviceState::PostCallRecordCmdSetDepthBias2EXT(VkCommandBuffer commandBuffe
 void DeviceState::PostCallRecordCmdSetScissor(VkCommandBuffer commandBuffer, uint32_t firstScissor, uint32_t scissorCount,
                                               const VkRect2D *pScissors, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_SCISSOR);
-    uint32_t bits = ((1u << scissorCount) - 1u) << firstScissor;
-    cb_state->scissor.mask |= bits;
-    cb_state->scissor.trashed_mask &= ~bits;
+    cb_state->RecordSetScissor(firstScissor, scissorCount);
 }
 
 void DeviceState::PostCallRecordCmdSetBlendConstants(VkCommandBuffer commandBuffer, const float blendConstants[4],
                                                      const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_BLEND_CONSTANTS);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_BLEND_CONSTANTS);
 }
 
 void DeviceState::PostCallRecordCmdSetDepthBounds(VkCommandBuffer commandBuffer, float minDepthBounds, float maxDepthBounds,
                                                   const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_BOUNDS);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DEPTH_BOUNDS);
 }
 
 void DeviceState::PostCallRecordCmdSetStencilCompareMask(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask,
                                                          uint32_t compareMask, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_STENCIL_COMPARE_MASK);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_STENCIL_COMPARE_MASK);
 }
 
 void DeviceState::PostCallRecordCmdSetStencilWriteMask(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask,
                                                        uint32_t writeMask, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_STENCIL_WRITE_MASK);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_STENCIL_WRITE_MASK);
     if (faceMask == VK_STENCIL_FACE_FRONT_BIT || faceMask == VK_STENCIL_FACE_FRONT_AND_BACK) {
         cb_state->dynamic_state_value.write_mask_front = writeMask;
     }
@@ -2688,127 +2815,147 @@ void DeviceState::PostCallRecordCmdSetStencilWriteMask(VkCommandBuffer commandBu
 void DeviceState::PostCallRecordCmdSetStencilReference(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask,
                                                        uint32_t reference, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_STENCIL_REFERENCE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_STENCIL_REFERENCE);
 }
 
 // Update the bound state for the bind point, including the effects of incompatible pipeline layouts
-void DeviceState::PreCallRecordCmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
-                                                     VkPipelineLayout layout, uint32_t firstSet, uint32_t setCount,
-                                                     const VkDescriptorSet *pDescriptorSets, uint32_t dynamicOffsetCount,
-                                                     const uint32_t *pDynamicOffsets, const RecordObject &record_obj) {
+void DeviceState::PostCallRecordCmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
+                                                      VkPipelineLayout layout, uint32_t firstSet, uint32_t setCount,
+                                                      const VkDescriptorSet *pDescriptorSets, uint32_t dynamicOffsetCount,
+                                                      const uint32_t *pDynamicOffsets, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto pipeline_layout = Get<PipelineLayout>(layout);
     if (!cb_state || !pipeline_layout) {
         return;
     }
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
+
+    // legacy descriptor binding invalidates any previous call to vkCmdBindDescriptorBuffersEXT
+    cb_state->descriptor_buffer.binding_info.clear();
 
     std::shared_ptr<DescriptorSet> no_push_desc;
 
-    cb_state->UpdateLastBoundDescriptorSets(pipelineBindPoint, pipeline_layout, record_obj.location.function, firstSet, setCount,
-                                            pDescriptorSets, no_push_desc, dynamicOffsetCount, pDynamicOffsets);
+    cb_state->UpdateLastBoundDescriptorSets(pipelineBindPoint, pipeline_layout, firstSet, setCount, pDescriptorSets, no_push_desc,
+                                            dynamicOffsetCount, pDynamicOffsets, record_obj.location);
 }
 
-void DeviceState::PreCallRecordCmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
-                                                      const VkBindDescriptorSetsInfo *pBindDescriptorSetsInfo,
-                                                      const RecordObject &record_obj) {
+void DeviceState::PostCallRecordCmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
+                                                       const VkBindDescriptorSetsInfo *pBindDescriptorSetsInfo,
+                                                       const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto pipeline_layout = Get<PipelineLayout>(pBindDescriptorSetsInfo->layout);
     ASSERT_AND_RETURN(cb_state && pipeline_layout);
 
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
+
+    // legacy descriptor binding invalidates any previous call to vkCmdBindDescriptorBuffersEXT
+    cb_state->descriptor_buffer.binding_info.clear();
 
     std::shared_ptr<DescriptorSet> no_push_desc;
 
     if (IsStageInPipelineBindPoint(pBindDescriptorSetsInfo->stageFlags, VK_PIPELINE_BIND_POINT_GRAPHICS)) {
         cb_state->UpdateLastBoundDescriptorSets(
-            VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, record_obj.location.function, pBindDescriptorSetsInfo->firstSet,
+            VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, pBindDescriptorSetsInfo->firstSet,
             pBindDescriptorSetsInfo->descriptorSetCount, pBindDescriptorSetsInfo->pDescriptorSets, no_push_desc,
-            pBindDescriptorSetsInfo->dynamicOffsetCount, pBindDescriptorSetsInfo->pDynamicOffsets);
+            pBindDescriptorSetsInfo->dynamicOffsetCount, pBindDescriptorSetsInfo->pDynamicOffsets, record_obj.location);
     }
     if (IsStageInPipelineBindPoint(pBindDescriptorSetsInfo->stageFlags, VK_PIPELINE_BIND_POINT_COMPUTE)) {
         cb_state->UpdateLastBoundDescriptorSets(
-            VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, record_obj.location.function, pBindDescriptorSetsInfo->firstSet,
+            VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, pBindDescriptorSetsInfo->firstSet,
             pBindDescriptorSetsInfo->descriptorSetCount, pBindDescriptorSetsInfo->pDescriptorSets, no_push_desc,
-            pBindDescriptorSetsInfo->dynamicOffsetCount, pBindDescriptorSetsInfo->pDynamicOffsets);
+            pBindDescriptorSetsInfo->dynamicOffsetCount, pBindDescriptorSetsInfo->pDynamicOffsets, record_obj.location);
     }
     if (IsStageInPipelineBindPoint(pBindDescriptorSetsInfo->stageFlags, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR)) {
         cb_state->UpdateLastBoundDescriptorSets(
-            VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline_layout, record_obj.location.function,
-            pBindDescriptorSetsInfo->firstSet, pBindDescriptorSetsInfo->descriptorSetCount,
-            pBindDescriptorSetsInfo->pDescriptorSets, no_push_desc, pBindDescriptorSetsInfo->dynamicOffsetCount,
-            pBindDescriptorSetsInfo->pDynamicOffsets);
+            VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline_layout, pBindDescriptorSetsInfo->firstSet,
+            pBindDescriptorSetsInfo->descriptorSetCount, pBindDescriptorSetsInfo->pDescriptorSets, no_push_desc,
+            pBindDescriptorSetsInfo->dynamicOffsetCount, pBindDescriptorSetsInfo->pDynamicOffsets, record_obj.location);
     }
 }
 
-void DeviceState::PreCallRecordCmdBindDescriptorSets2KHR(VkCommandBuffer commandBuffer,
-                                                         const VkBindDescriptorSetsInfoKHR *pBindDescriptorSetsInfo,
-                                                         const RecordObject &record_obj) {
-    PreCallRecordCmdBindDescriptorSets2(commandBuffer, pBindDescriptorSetsInfo, record_obj);
+void DeviceState::PostCallRecordCmdBindDescriptorSets2KHR(VkCommandBuffer commandBuffer,
+                                                          const VkBindDescriptorSetsInfoKHR *pBindDescriptorSetsInfo,
+                                                          const RecordObject &record_obj) {
+    PostCallRecordCmdBindDescriptorSets2(commandBuffer, pBindDescriptorSetsInfo, record_obj);
 }
 
-void DeviceState::PreCallRecordCmdPushDescriptorSet(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
-                                                    VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
-                                                    const VkWriteDescriptorSet *pDescriptorWrites, const RecordObject &record_obj) {
+void DeviceState::PostCallRecordCmdPushDescriptorSet(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
+                                                     VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
+                                                     const VkWriteDescriptorSet *pDescriptorWrites,
+                                                     const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto pipeline_layout = Get<PipelineLayout>(layout);
     ASSERT_AND_RETURN(pipeline_layout);
-    cb_state->PushDescriptorSetState(pipelineBindPoint, pipeline_layout, record_obj.location.function, set, descriptorWriteCount,
-                                     pDescriptorWrites);
+    cb_state->PushDescriptorSetState(pipelineBindPoint, pipeline_layout, set, descriptorWriteCount, pDescriptorWrites,
+                                     record_obj.location);
 }
 
-void DeviceState::PreCallRecordCmdPushDescriptorSetKHR(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
-                                                       VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
-                                                       const VkWriteDescriptorSet *pDescriptorWrites,
-                                                       const RecordObject &record_obj) {
-    PreCallRecordCmdPushDescriptorSet(commandBuffer, pipelineBindPoint, layout, set, descriptorWriteCount, pDescriptorWrites,
-                                      record_obj);
+void DeviceState::PostCallRecordCmdPushDescriptorSetKHR(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
+                                                        VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
+                                                        const VkWriteDescriptorSet *pDescriptorWrites,
+                                                        const RecordObject &record_obj) {
+    PostCallRecordCmdPushDescriptorSet(commandBuffer, pipelineBindPoint, layout, set, descriptorWriteCount, pDescriptorWrites,
+                                       record_obj);
 }
 
-void DeviceState::PreCallRecordCmdPushDescriptorSet2(VkCommandBuffer commandBuffer,
-                                                     const VkPushDescriptorSetInfo *pPushDescriptorSetInfo,
-                                                     const RecordObject &record_obj) {
+void DeviceState::PostCallRecordCmdPushDescriptorSet2(VkCommandBuffer commandBuffer,
+                                                      const VkPushDescriptorSetInfo *pPushDescriptorSetInfo,
+                                                      const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto pipeline_layout = Get<PipelineLayout>(pPushDescriptorSetInfo->layout);
     ASSERT_AND_RETURN(pipeline_layout);
     if (IsStageInPipelineBindPoint(pPushDescriptorSetInfo->stageFlags, VK_PIPELINE_BIND_POINT_GRAPHICS)) {
-        cb_state->PushDescriptorSetState(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, record_obj.location.function,
-                                         pPushDescriptorSetInfo->set, pPushDescriptorSetInfo->descriptorWriteCount,
-                                         pPushDescriptorSetInfo->pDescriptorWrites);
+        cb_state->PushDescriptorSetState(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, pPushDescriptorSetInfo->set,
+                                         pPushDescriptorSetInfo->descriptorWriteCount, pPushDescriptorSetInfo->pDescriptorWrites,
+                                         record_obj.location);
     }
     if (IsStageInPipelineBindPoint(pPushDescriptorSetInfo->stageFlags, VK_PIPELINE_BIND_POINT_COMPUTE)) {
-        cb_state->PushDescriptorSetState(VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, record_obj.location.function,
-                                         pPushDescriptorSetInfo->set, pPushDescriptorSetInfo->descriptorWriteCount,
-                                         pPushDescriptorSetInfo->pDescriptorWrites);
+        cb_state->PushDescriptorSetState(VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, pPushDescriptorSetInfo->set,
+                                         pPushDescriptorSetInfo->descriptorWriteCount, pPushDescriptorSetInfo->pDescriptorWrites,
+                                         record_obj.location);
     }
     if (IsStageInPipelineBindPoint(pPushDescriptorSetInfo->stageFlags, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR)) {
-        cb_state->PushDescriptorSetState(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline_layout, record_obj.location.function,
-                                         pPushDescriptorSetInfo->set, pPushDescriptorSetInfo->descriptorWriteCount,
-                                         pPushDescriptorSetInfo->pDescriptorWrites);
+        cb_state->PushDescriptorSetState(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline_layout, pPushDescriptorSetInfo->set,
+                                         pPushDescriptorSetInfo->descriptorWriteCount, pPushDescriptorSetInfo->pDescriptorWrites,
+                                         record_obj.location);
     }
 }
 
-void DeviceState::PreCallRecordCmdPushDescriptorSet2KHR(VkCommandBuffer commandBuffer,
-                                                        const VkPushDescriptorSetInfoKHR *pPushDescriptorSetInfo,
-                                                        const RecordObject &record_obj) {
-    PreCallRecordCmdPushDescriptorSet2(commandBuffer, pPushDescriptorSetInfo, record_obj);
+void DeviceState::PostCallRecordCmdPushDescriptorSet2KHR(VkCommandBuffer commandBuffer,
+                                                         const VkPushDescriptorSetInfoKHR *pPushDescriptorSetInfo,
+                                                         const RecordObject &record_obj) {
+    PostCallRecordCmdPushDescriptorSet2(commandBuffer, pPushDescriptorSetInfo, record_obj);
 }
 
-void DeviceState::PreCallRecordCmdBindDescriptorBuffersEXT(VkCommandBuffer commandBuffer, uint32_t bufferCount,
-                                                           const VkDescriptorBufferBindingInfoEXT *pBindingInfos,
-                                                           const RecordObject &record_obj) {
+void DeviceState::PostCallRecordCmdBindDescriptorBuffersEXT(VkCommandBuffer commandBuffer, uint32_t bufferCount,
+                                                            const VkDescriptorBufferBindingInfoEXT *pBindingInfos,
+                                                            const RecordObject &record_obj) {
     auto cb_state = Get<CommandBuffer>(commandBuffer);
+    cb_state->descriptor_buffer.ever_bound = true;
 
-    cb_state->descriptor_buffer_binding_info.resize(bufferCount);
+    cb_state->descriptor_buffer.binding_info.resize(bufferCount);
+    for (uint32_t i = 0; i < bufferCount; i++) {
+        const VkDescriptorBufferBindingInfoEXT &binding_info = pBindingInfos[i];
+        VkBufferUsageFlags2 buffer_usage = binding_info.usage;
+        if (const auto usage_flags2 = vku::FindStructInPNextChain<VkBufferUsageFlags2CreateInfo>(binding_info.pNext)) {
+            buffer_usage = usage_flags2->usage;
+        }
 
-    std::copy(pBindingInfos, pBindingInfos + bufferCount, cb_state->descriptor_buffer_binding_info.data());
+        cb_state->descriptor_buffer.binding_info[i] = {binding_info.address, buffer_usage};
+    }
+
+    // So really this should be set at vkCmdSetDescriptorBufferOffsetsEXT time where the bindpoint is known.
+    // In practice, setting it here is better as if the app messes up, it might crash things.
+    for (uint32_t i = 0; i < vvl::BindPointCount; i++) {
+        cb_state->lastBound[i].SetDescriptorMode(DescriptorModeBuffer);
+    }
 }
 
-void DeviceState::PreCallRecordCmdSetDescriptorBufferOffsetsEXT(VkCommandBuffer commandBuffer,
-                                                                VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout,
-                                                                uint32_t firstSet, uint32_t setCount,
-                                                                const uint32_t *pBufferIndices, const VkDeviceSize *pOffsets,
-                                                                const RecordObject &record_obj) {
+void DeviceState::PostCallRecordCmdSetDescriptorBufferOffsetsEXT(VkCommandBuffer commandBuffer,
+                                                                 VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout,
+                                                                 uint32_t firstSet, uint32_t setCount,
+                                                                 const uint32_t *pBufferIndices, const VkDeviceSize *pOffsets,
+                                                                 const RecordObject &record_obj) {
     auto cb_state = Get<CommandBuffer>(commandBuffer);
     auto pipeline_layout = Get<PipelineLayout>(layout);
     ASSERT_AND_RETURN(pipeline_layout);
@@ -2816,7 +2963,7 @@ void DeviceState::PreCallRecordCmdSetDescriptorBufferOffsetsEXT(VkCommandBuffer 
     cb_state->UpdateLastBoundDescriptorBuffers(pipelineBindPoint, pipeline_layout, firstSet, setCount, pBufferIndices, pOffsets);
 }
 
-void DeviceState::PreCallRecordCmdSetDescriptorBufferOffsets2EXT(
+void DeviceState::PostCallRecordCmdSetDescriptorBufferOffsets2EXT(
     VkCommandBuffer commandBuffer, const VkSetDescriptorBufferOffsetsInfoEXT *pSetDescriptorBufferOffsetsInfo,
     const RecordObject &record_obj) {
     auto cb_state = Get<CommandBuffer>(commandBuffer);
@@ -2850,7 +2997,7 @@ void DeviceState::PostCallRecordCmdPushConstants(VkCommandBuffer commandBuffer, 
     auto pipeline_layout_state = Get<PipelineLayout>(layout);
     ASSERT_AND_RETURN(cb_state && pipeline_layout_state);
 
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     cb_state->RecordPushConstants(*pipeline_layout_state, stageFlags, offset, size, pValues);
 }
 
@@ -2917,7 +3064,7 @@ void DeviceState::PostCallRecordCmdBindVertexBuffers(VkCommandBuffer commandBuff
                                                      const VkBuffer *pBuffers, const VkDeviceSize *pOffsets,
                                                      const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
 
     for (uint32_t i = 0; i < bindingCount; ++i) {
         auto buffer_state = Get<Buffer>(pBuffers[i]);
@@ -2940,13 +3087,16 @@ void DeviceState::PostCallRecordCmdUpdateBuffer(VkCommandBuffer commandBuffer, V
     if (disabled[command_buffer_state]) return;
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordTransferCmd(record_obj.location.function, Get<Buffer>(dstBuffer));
+    auto buffer_state = Get<Buffer>(dstBuffer);
+    ASSERT_AND_RETURN(buffer_state);
+    cb_state->AddChild(buffer_state);
+    cb_state->RecordUpdateBuffer(*buffer_state, dstOffset, dataSize, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                             const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordSetEvent(record_obj.location.function, event, stageMask, nullptr);
+    cb_state->RecordSetEvent(event, stageMask, nullptr, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
@@ -2959,14 +3109,14 @@ void DeviceState::PostCallRecordCmdSetEvent2(VkCommandBuffer commandBuffer, VkEv
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto exec_scopes = sync_utils::GetExecScopes(*pDependencyInfo);
 
-    cb_state->RecordSetEvent(record_obj.location.function, event, exec_scopes.src, pDependencyInfo);
-    cb_state->RecordBarriers(*pDependencyInfo);
+    cb_state->RecordSetEvent(event, exec_scopes.src, pDependencyInfo, record_obj.location);
+    cb_state->RecordBarrierObjects(*pDependencyInfo, record_obj.location.dot(vvl::Field::pDependencyInfo));
 }
 
 void DeviceState::PostCallRecordCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                               const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordResetEvent(record_obj.location.function, event, stageMask);
+    cb_state->RecordResetEvent(event, stageMask, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2KHR stageMask,
@@ -2977,7 +3127,7 @@ void DeviceState::PostCallRecordCmdResetEvent2KHR(VkCommandBuffer commandBuffer,
 void DeviceState::PostCallRecordCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordResetEvent(record_obj.location.function, event, stageMask);
+    cb_state->RecordResetEvent(event, stageMask, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
@@ -2987,9 +3137,10 @@ void DeviceState::PostCallRecordCmdWaitEvents(VkCommandBuffer commandBuffer, uin
                                               uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier *pImageMemoryBarriers,
                                               const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordWaitEvents(record_obj.location.function, eventCount, pEvents, sourceStageMask, nullptr);
-    cb_state->RecordBarriers(memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers,
-                             imageMemoryBarrierCount, pImageMemoryBarriers);
+    cb_state->RecordCommand(record_obj.location);
+    cb_state->RecordWaitEvents(eventCount, pEvents, sourceStageMask, nullptr, record_obj.location);
+    cb_state->RecordBarrierObjects(bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers,
+                                   sourceStageMask, dstStageMask, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
@@ -3000,11 +3151,13 @@ void DeviceState::PostCallRecordCmdWaitEvents2KHR(VkCommandBuffer commandBuffer,
 void DeviceState::PostCallRecordCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
                                                const VkDependencyInfo *pDependencyInfos, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    cb_state->RecordCommand(record_obj.location);
     for (uint32_t i = 0; i < eventCount; i++) {
         const auto &dep_info = pDependencyInfos[i];
         auto exec_scopes = sync_utils::GetExecScopes(dep_info);
-        cb_state->RecordWaitEvents(record_obj.location.function, 1, &pEvents[i], exec_scopes.src, &pDependencyInfos[i]);
-        cb_state->RecordBarriers(dep_info);
+        const Location &dep_info_loc = record_obj.location.dot(vvl::Field::pDependencyInfos, i);
+        cb_state->RecordWaitEvents(1, &pEvents[i], exec_scopes.src, &pDependencyInfos[i], dep_info_loc);
+        cb_state->RecordBarrierObjects(dep_info, dep_info_loc);
     }
 }
 
@@ -3014,9 +3167,9 @@ void DeviceState::PostCallRecordCmdPipelineBarrier(
     uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier *pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
     const VkImageMemoryBarrier *pImageMemoryBarriers, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
-    cb_state->RecordBarriers(memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers,
-                             imageMemoryBarrierCount, pImageMemoryBarriers);
+    cb_state->RecordCommand(record_obj.location);
+    cb_state->RecordBarrierObjects(bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers,
+                                   srcStageMask, dstStageMask, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdPipelineBarrier2KHR(VkCommandBuffer commandBuffer, const VkDependencyInfoKHR *pDependencyInfo,
@@ -3027,75 +3180,26 @@ void DeviceState::PostCallRecordCmdPipelineBarrier2KHR(VkCommandBuffer commandBu
 void DeviceState::PostCallRecordCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo *pDependencyInfo,
                                                     const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
-    cb_state->RecordBarriers(*pDependencyInfo);
+    cb_state->RecordCommand(record_obj.location);
+    cb_state->RecordBarrierObjects(*pDependencyInfo, record_obj.location.dot(vvl::Field::pDependencyInfo));
 }
 
 void DeviceState::PostCallRecordCmdBeginQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t slot,
                                               VkQueryControlFlags flags, const RecordObject &record_obj) {
-    if (disabled[query_validation]) return;
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-
-    uint32_t num_queries = 1;
-    uint32_t subpass = 0;
-    const bool inside_render_pass = cb_state->active_render_pass != nullptr;
-    // If render pass instance has multiview enabled, query uses N consecutive query indices
-    if (inside_render_pass) {
-        subpass = cb_state->GetActiveSubpass();
-        uint32_t bits = cb_state->active_render_pass->GetViewMaskBits(subpass);
-        num_queries = std::max(num_queries, bits);
-    }
-    for (uint32_t i = 0; i < num_queries; ++i) {
-        cb_state->RecordCmd(record_obj.location.function);
-        if (!disabled[query_validation]) {
-            QueryObject query_obj = {queryPool, slot, flags};
-            query_obj.inside_render_pass = inside_render_pass;
-            query_obj.subpass = subpass;
-            cb_state->BeginQuery(query_obj);
-        }
-        if (!disabled[command_buffer_state]) {
-            auto pool_state = Get<QueryPool>(queryPool);
-            cb_state->AddChild(pool_state);
-        }
-    }
-}
-
-void DeviceState::PostCallRecordCmdEndQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t slot,
-                                            const RecordObject &record_obj) {
-    if (disabled[query_validation]) return;
-    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    uint32_t num_queries = 1;
-    uint32_t subpass = 0;
-    const bool inside_render_pass = cb_state->active_render_pass != nullptr;
-    // If render pass instance has multiview enabled, query uses N consecutive query indices
-    if (inside_render_pass) {
-        subpass = cb_state->GetActiveSubpass();
-        uint32_t bits = cb_state->active_render_pass->GetViewMaskBits(subpass);
-        num_queries = std::max(num_queries, bits);
+    cb_state->RecordCommand(record_obj.location);
+    if (disabled[query_validation]) {
+        return;
     }
 
-    for (uint32_t i = 0; i < num_queries; ++i) {
-        cb_state->RecordCmd(record_obj.location.function);
-        if (!disabled[query_validation]) {
-            QueryObject query_obj = {queryPool, slot + i};
-            query_obj.inside_render_pass = inside_render_pass;
-            query_obj.subpass = subpass;
-            cb_state->EndQuery(query_obj);
-        }
-        if (!disabled[command_buffer_state]) {
-            auto pool_state = Get<QueryPool>(queryPool);
-            cb_state->AddChild(pool_state);
-        }
+    QueryCount query_count(*cb_state);
+
+    for (uint32_t i = 0; i < query_count.count; ++i) {
+        QueryObject query_obj = {queryPool, slot + i, flags};
+        query_obj.inside_render_pass = query_count.inside_render_pass;
+        query_obj.subpass = query_count.subpass;
+        cb_state->RecordBeginQuery(query_obj, record_obj.location);
     }
-}
-
-void DeviceState::PostCallRecordCmdResetQueryPool(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
-                                                  uint32_t queryCount, const RecordObject &record_obj) {
-    if (disabled[query_validation]) return;
-    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-
-    cb_state->RecordCmd(record_obj.location.function);
-    cb_state->ResetQueryPool(queryPool, firstQuery, queryCount);
 
     if (!disabled[command_buffer_state]) {
         auto pool_state = Get<QueryPool>(queryPool);
@@ -3103,24 +3207,49 @@ void DeviceState::PostCallRecordCmdResetQueryPool(VkCommandBuffer commandBuffer,
     }
 }
 
+void DeviceState::PostCallRecordCmdEndQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t slot,
+                                            const RecordObject &record_obj) {
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    cb_state->RecordCommand(record_obj.location);
+    if (disabled[query_validation]) {
+        return;
+    }
+
+    QueryCount query_count(*cb_state);
+
+    for (uint32_t i = 0; i < query_count.count; ++i) {
+        QueryObject query_obj = {queryPool, slot + i};
+        query_obj.inside_render_pass = query_count.inside_render_pass;
+        query_obj.subpass = query_count.subpass;
+        query_obj.end_command_index = cb_state->command_count;  // counting this command
+        cb_state->RecordEndQuery(query_obj, record_obj.location);
+    }
+
+    if (!disabled[command_buffer_state]) {
+        auto pool_state = Get<QueryPool>(queryPool);
+        cb_state->AddChild(pool_state);
+    }
+}
+
+void DeviceState::PostCallRecordCmdResetQueryPool(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
+                                                  uint32_t queryCount, const RecordObject &record_obj) {
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    cb_state->RecordResetQueryPool(queryPool, firstQuery, queryCount, record_obj.location);
+}
+
 void DeviceState::PostCallRecordCmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
                                                         uint32_t queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset,
                                                         VkDeviceSize stride, VkQueryResultFlags flags,
                                                         const RecordObject &record_obj) {
-    if (disabled[query_validation] || disabled[command_buffer_state]) return;
-
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
-    auto dst_buff_state = Get<Buffer>(dstBuffer);
-    cb_state->AddChild(dst_buff_state);
-    auto pool_state = Get<QueryPool>(queryPool);
-    cb_state->AddChild(pool_state);
+    cb_state->RecordCopyQueryPoolResults(queryPool, dstBuffer, firstQuery, queryCount, dstOffset, stride, flags,
+                                         record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdWriteTimestamp(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage,
                                                   VkQueryPool queryPool, uint32_t slot, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordWriteTimestamp(record_obj.location.function, pipelineStage, queryPool, slot);
+    cb_state->RecordWriteTimestamp(queryPool, slot, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdWriteTimestamp2KHR(VkCommandBuffer commandBuffer, VkPipelineStageFlags2KHR pipelineStage,
@@ -3131,20 +3260,14 @@ void DeviceState::PostCallRecordCmdWriteTimestamp2KHR(VkCommandBuffer commandBuf
 void DeviceState::PostCallRecordCmdWriteTimestamp2(VkCommandBuffer commandBuffer, VkPipelineStageFlags2 pipelineStage,
                                                    VkQueryPool queryPool, uint32_t slot, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordWriteTimestamp(record_obj.location.function, pipelineStage, queryPool, slot);
+    cb_state->RecordWriteTimestamp(queryPool, slot, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdWriteAccelerationStructuresPropertiesKHR(
     VkCommandBuffer commandBuffer, uint32_t accelerationStructureCount, const VkAccelerationStructureKHR *pAccelerationStructures,
     VkQueryType queryType, VkQueryPool queryPool, uint32_t firstQuery, const RecordObject &record_obj) {
-    if (disabled[query_validation]) return;
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
-    if (!disabled[command_buffer_state]) {
-        auto pool_state = Get<QueryPool>(queryPool);
-        cb_state->AddChild(pool_state);
-    }
-    cb_state->EndQueries(queryPool, firstQuery, accelerationStructureCount);
+    cb_state->RecordWriteAccelerationStructuresProperties(queryPool, firstQuery, accelerationStructureCount, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCreateVideoSessionKHR(VkDevice device, const VkVideoSessionCreateInfoKHR *pCreateInfo,
@@ -3276,7 +3399,9 @@ void DeviceState::PostCallRecordCreateRenderPass2(VkDevice device, const VkRende
 void DeviceState::PostCallRecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
                                                    VkSubpassContents contents, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->BeginRenderPass(record_obj.location.function, pRenderPassBegin, contents);
+    VkSubpassBeginInfo subpass_begin_info = vku::InitStructHelper();
+    subpass_begin_info.contents = contents;
+    cb_state->RecordBeginRenderPass(*pRenderPassBegin, subpass_begin_info, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdBeginRenderPass2KHR(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
@@ -3288,7 +3413,7 @@ void DeviceState::PostCallRecordCmdBeginRenderPass2KHR(VkCommandBuffer commandBu
 void DeviceState::PostCallRecordCmdBeginVideoCodingKHR(VkCommandBuffer commandBuffer, const VkVideoBeginCodingInfoKHR *pBeginInfo,
                                                        const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->BeginVideoCoding(pBeginInfo);
+    cb_state->RecordBeginVideoCoding(*pBeginInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdBeginTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32_t firstCounterBuffer,
@@ -3296,8 +3421,7 @@ void DeviceState::PostCallRecordCmdBeginTransformFeedbackEXT(VkCommandBuffer com
                                                              const VkDeviceSize *pCounterBufferOffsets,
                                                              const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     cb_state->transform_feedback_active = true;
 }
 
@@ -3306,8 +3430,7 @@ void DeviceState::PostCallRecordCmdEndTransformFeedbackEXT(VkCommandBuffer comma
                                                            const VkDeviceSize *pCounterBufferOffsets,
                                                            const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     cb_state->transform_feedback_active = false;
 }
 
@@ -3315,20 +3438,12 @@ void DeviceState::PostCallRecordCmdBeginConditionalRenderingEXT(
     VkCommandBuffer commandBuffer, const VkConditionalRenderingBeginInfoEXT *pConditionalRenderingBegin,
     const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-
-    cb_state->RecordCmd(record_obj.location.function);
-    cb_state->conditional_rendering_active = true;
-    cb_state->conditional_rendering_inside_render_pass = cb_state->active_render_pass != nullptr;
-    cb_state->conditional_rendering_subpass = cb_state->GetActiveSubpass();
+    cb_state->RecordBeginConditionalRendering(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdEndConditionalRenderingEXT(VkCommandBuffer commandBuffer, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-
-    cb_state->RecordCmd(record_obj.location.function);
-    cb_state->conditional_rendering_active = false;
-    cb_state->conditional_rendering_inside_render_pass = false;
-    cb_state->conditional_rendering_subpass = 0;
+    cb_state->RecordEndConditionalRendering(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdBeginRenderingKHR(VkCommandBuffer commandBuffer, const VkRenderingInfoKHR *pRenderingInfo,
@@ -3339,7 +3454,7 @@ void DeviceState::PostCallRecordCmdBeginRenderingKHR(VkCommandBuffer commandBuff
 void DeviceState::PostCallRecordCmdBeginRendering(VkCommandBuffer commandBuffer, const VkRenderingInfo *pRenderingInfo,
                                                   const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->BeginRendering(record_obj.location.function, pRenderingInfo);
+    cb_state->RecordBeginRendering(*pRenderingInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdEndRenderingKHR(VkCommandBuffer commandBuffer, const RecordObject &record_obj) {
@@ -3348,25 +3463,27 @@ void DeviceState::PostCallRecordCmdEndRenderingKHR(VkCommandBuffer commandBuffer
 
 void DeviceState::PostCallRecordCmdEndRendering(VkCommandBuffer commandBuffer, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->EndRendering(record_obj.location.function);
+    cb_state->RecordEndRendering(nullptr, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdEndRendering2EXT(VkCommandBuffer commandBuffer, const VkRenderingEndInfoEXT *pRenderingEndInfo,
                                                     const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->EndRendering(record_obj.location.function);
+    cb_state->RecordEndRendering(pRenderingEndInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdBeginRenderPass2(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
                                                     const VkSubpassBeginInfo *pSubpassBeginInfo, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->BeginRenderPass(record_obj.location.function, pRenderPassBegin, pSubpassBeginInfo->contents);
+    cb_state->RecordBeginRenderPass(*pRenderPassBegin, *pSubpassBeginInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents,
                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->NextSubpass(record_obj.location.function, contents);
+    VkSubpassBeginInfo subpass_begin_info = vku::InitStructHelper();
+    subpass_begin_info.contents = contents;
+    cb_state->RecordNextSubpass(subpass_begin_info, nullptr, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdNextSubpass2KHR(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo *pSubpassBeginInfo,
@@ -3377,12 +3494,12 @@ void DeviceState::PostCallRecordCmdNextSubpass2KHR(VkCommandBuffer commandBuffer
 void DeviceState::PostCallRecordCmdNextSubpass2(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo *pSubpassBeginInfo,
                                                 const VkSubpassEndInfo *pSubpassEndInfo, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->NextSubpass(record_obj.location.function, pSubpassBeginInfo->contents);
+    cb_state->RecordNextSubpass(*pSubpassBeginInfo, pSubpassEndInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdEndRenderPass(VkCommandBuffer commandBuffer, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->EndRenderPass(record_obj.location.function);
+    cb_state->RecordEndRenderPass(nullptr, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdEndRenderPass2KHR(VkCommandBuffer commandBuffer, const VkSubpassEndInfo *pSubpassEndInfo,
@@ -3393,20 +3510,19 @@ void DeviceState::PostCallRecordCmdEndRenderPass2KHR(VkCommandBuffer commandBuff
 void DeviceState::PostCallRecordCmdEndRenderPass2(VkCommandBuffer commandBuffer, const VkSubpassEndInfo *pSubpassEndInfo,
                                                   const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->EndRenderPass(record_obj.location.function);
+    cb_state->RecordEndRenderPass(pSubpassEndInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdEndVideoCodingKHR(VkCommandBuffer commandBuffer, const VkVideoEndCodingInfoKHR *pEndCodingInfo,
                                                      const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->EndVideoCoding(pEndCodingInfo);
+    cb_state->RecordEndVideoCoding(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBuffersCount,
                                                    const VkCommandBuffer *pCommandBuffers, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-
-    cb_state->ExecuteCommands({pCommandBuffers, commandBuffersCount});
+    cb_state->RecordExecuteCommands({pCommandBuffers, commandBuffersCount}, record_obj.location);
 }
 
 void DeviceState::PostCallRecordMapMemory(VkDevice device, VkDeviceMemory mem, VkDeviceSize offset, VkDeviceSize size,
@@ -3715,7 +3831,7 @@ void DeviceState::RecordCreateSwapchainState(VkResult result, const VkSwapchainC
         surface_state->AddParent(swapchain.get());
         surface_state->swapchain = swapchain.get();
         swapchain->surface = std::move(surface_state);
-        auto swapchain_present_modes_ci = vku::FindStructInPNextChain<VkSwapchainPresentModesCreateInfoEXT>(pCreateInfo->pNext);
+        auto swapchain_present_modes_ci = vku::FindStructInPNextChain<VkSwapchainPresentModesCreateInfoKHR>(pCreateInfo->pNext);
         if (swapchain_present_modes_ci) {
             const uint32_t present_mode_count = swapchain_present_modes_ci->presentModeCount;
             swapchain->present_modes.reserve(present_mode_count);
@@ -3737,11 +3853,18 @@ void DeviceState::RecordCreateSwapchainState(VkResult result, const VkSwapchainC
                                                            IsExtEnabled(extensions.vk_ext_image_drm_format_modifier), device,
                                                            swapchain_images[i], image_ci.format, image_ci.tiling);
                 auto image_state = CreateImageState(swapchain_images[i], image_ci.ptr(), swapchain->VkHandle(), i, format_features);
+
+                // Create a copy since image state is needed after move. SetSwapchain modifies image substates.
+                auto image_state_ptr_copy = image_state;
+                Add(std::move(image_state_ptr_copy));
+
                 image_state->SetSwapchain(swapchain, i);
                 image_state->SetInitialLayoutMap();
                 swapchain->images[i].image_state = image_state.get();
-                Add(std::move(image_state));
             }
+        }
+        if (old_swapchain_state) {
+            old_swapchain_state->new_swapchain = swapchain;
         }
         Add(std::move(swapchain));
     } else {
@@ -3793,18 +3916,13 @@ void DeviceState::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentIn
     // VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT, or VK_ERROR_SURFACE_LOST_KHR, the set of queue operations are still considered
     // to be enqueued and thus any semaphore wait operation specified in VkPresentInfoKHR will execute when the corresponding queue
     // operation is complete.
-    //
-    // NOTE: This is the only queue submit-like call that has its state updated in PostCallRecord(). In part that is because of
-    // these non-fatal error cases. Also we need a place to handle the swapchain image bookkeeping, which really should be happening
-    // once all the wait semaphores have completed. Since most of the PostCall queue submit race conditions are related to timeline
-    // semaphores, and acquire sempaphores are always binary, this seems ok-ish.
     if (record_obj.result == VK_ERROR_OUT_OF_HOST_MEMORY || record_obj.result == VK_ERROR_OUT_OF_DEVICE_MEMORY ||
         record_obj.result == VK_ERROR_DEVICE_LOST) {
         return;
     }
 
     const Location present_loc = record_obj.location.dot(Field::pPresentInfo);
-    const auto *present_fence_info = vku::FindStructInPNextChain<VkSwapchainPresentFenceInfoEXT>(pPresentInfo->pNext);
+    const auto *present_fence_info = vku::FindStructInPNextChain<VkSwapchainPresentFenceInfoKHR>(pPresentInfo->pNext);
 
     std::vector<QueueSubmission> present_submissions;  // TODO: use small_vector. Update interfaces to use span
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; ++i) {
@@ -3812,7 +3930,9 @@ void DeviceState::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentIn
         if (present_fence_info) {
             present_submissions.back().AddFence(Get<Fence>(present_fence_info->pFences[i]));
         }
-        present_submissions.back().swapchain = pPresentInfo->pSwapchains[i];
+        auto swapchain = Get<Swapchain>(pPresentInfo->pSwapchains[i]);
+        present_submissions.back().swapchain = swapchain->VkHandle();
+        present_submissions.back().swapchain_image = swapchain->GetSwapChainImageShared(pPresentInfo->pImageIndices[i]);
     }
 
     vvl::Semaphore::SwapchainWaitInfo semaphore_swapchain_info;
@@ -3881,23 +4001,34 @@ void DeviceState::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentIn
     const auto *present_id_info = vku::FindStructInPNextChain<VkPresentIdKHR>(pPresentInfo->pNext);
     const auto *present_id_info_2 = vku::FindStructInPNextChain<VkPresentId2KHR>(pPresentInfo->pNext);
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; ++i) {
+        auto swapchain_data = Get<Swapchain>(pPresentInfo->pSwapchains[i]);
+        if (!swapchain_data) {
+            continue;
+        }
+
         // For multi-swapchain present pResults are always available (chassis adds pResults if necessary)
         assert(pPresentInfo->swapchainCount < 2 || pPresentInfo->pResults);
         auto local_result = pPresentInfo->pResults ? pPresentInfo->pResults[i] : record_obj.result;
-        if (local_result != VK_SUCCESS && local_result != VK_SUBOPTIMAL_KHR) continue;  // this present didn't actually happen.
-        // Mark the image as having been released to the WSI
-        if (auto swapchain_data = Get<Swapchain>(pPresentInfo->pSwapchains[i])) {
-            uint64_t present_id = 0;
-            // TODO - need to know what happens if both are included
-            // https://gitlab.khronos.org/vulkan/vulkan/-/issues/4317
-            if (present_id_info_2 && i < present_id_info_2->swapchainCount) {
-                present_id = present_id_info_2->pPresentIds[i];
-            } else if (present_id_info && i < present_id_info->swapchainCount) {
-                present_id = present_id_info->pPresentIds[i];
-            }
-            swapchain_data->PresentImage(pPresentInfo->pImageIndices[i], present_id, present_submission_ref,
-                                         present_wait_semaphores);
+
+        // spec: "However, if the presentation request is rejected by the presentation engine with an error
+        // VK_ERROR_OUT_OF_DATE_KHR, VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT, or VK_ERROR_SURFACE_LOST_KHR, the set of queue
+        // operations are still considered to be enqueued and thus any semaphore wait operation specified in VkPresentInfoKHR will
+        // execute when the corresponding queue operation is complete."
+        if (!IsValueIn(local_result, {VK_SUCCESS, VK_SUBOPTIMAL_KHR, VK_ERROR_OUT_OF_DATE_KHR,
+                                      VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT, VK_ERROR_SURFACE_LOST_KHR})) {
+            continue;
         }
+
+        // Mark the image as having been released to the WSI
+        uint64_t present_id = 0;
+        // TODO - need to know what happens if both are included
+        // https://gitlab.khronos.org/vulkan/vulkan/-/issues/4317
+        if (present_id_info_2 && i < present_id_info_2->swapchainCount) {
+            present_id = present_id_info_2->pPresentIds[i];
+        } else if (present_id_info && i < present_id_info->swapchainCount) {
+            present_id = present_id_info->pPresentIds[i];
+        }
+        swapchain_data->PresentImage(pPresentInfo->pImageIndices[i], present_id, present_submission_ref, present_wait_semaphores);
     }
 
     // wait on fence as we don't know when it will be signaled if external
@@ -3906,13 +4037,18 @@ void DeviceState::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentIn
     }
 }
 
-void DeviceState::PostCallRecordReleaseSwapchainImagesEXT(VkDevice device, const VkReleaseSwapchainImagesInfoEXT *pReleaseInfo,
+void DeviceState::PostCallRecordReleaseSwapchainImagesKHR(VkDevice device, const VkReleaseSwapchainImagesInfoKHR *pReleaseInfo,
                                                           const RecordObject &record_obj) {
     if (auto swapchain_data = Get<Swapchain>(pReleaseInfo->swapchain)) {
         for (uint32_t i = 0; i < pReleaseInfo->imageIndexCount; ++i) {
             swapchain_data->ReleaseImage(pReleaseInfo->pImageIndices[i]);
         }
     }
+}
+
+void DeviceState::PostCallRecordReleaseSwapchainImagesEXT(VkDevice device, const VkReleaseSwapchainImagesInfoEXT *pReleaseInfo,
+                                                          const RecordObject &record_obj) {
+    PostCallRecordReleaseSwapchainImagesKHR(device, pReleaseInfo, record_obj);
 }
 
 void DeviceState::PostCallRecordCreateSharedSwapchainsKHR(VkDevice device, uint32_t swapchainCount,
@@ -4251,12 +4387,12 @@ void InstanceState::PostCallRecordGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhy
         ASSERT_AND_RETURN(surface_state);
         if (!pSurfaceInfo->pNext) {
             surface_state->UpdateCapabilitiesCache(physicalDevice, pSurfaceCapabilities->surfaceCapabilities);
-        } else if (IsExtEnabled(extensions.vk_ext_surface_maintenance1)) {
-            const auto *surface_present_mode = vku::FindStructInPNextChain<VkSurfacePresentModeEXT>(pSurfaceInfo->pNext);
+        } else if (IsExtEnabled(extensions.vk_khr_surface_maintenance1) || IsExtEnabled(extensions.vk_ext_surface_maintenance1)) {
+            const auto *surface_present_mode = vku::FindStructInPNextChain<VkSurfacePresentModeKHR>(pSurfaceInfo->pNext);
             if (surface_present_mode) {
                 // The surface caps caching should take into account pSurfaceInfo->pNext chain structure,
                 // because each pNext element can affect query result. Here we support caching for a common
-                // case when pNext chain is a single VkSurfacePresentModeEXT structure.
+                // case when pNext chain is a single VkSurfacePresentModeKHR structure.
                 const bool single_pnext_element = (pSurfaceInfo->pNext == surface_present_mode) && !surface_present_mode->pNext;
                 if (single_pnext_element) {
                     surface_state->UpdateCapabilitiesCache(physicalDevice, *pSurfaceCapabilities,
@@ -4390,7 +4526,7 @@ void InstanceState::PostCallRecordGetPhysicalDeviceSurfaceFormats2KHR(VkPhysical
 void DeviceState::PreCallRecordCmdBeginDebugUtilsLabelEXT(VkCommandBuffer commandBuffer, const VkDebugUtilsLabelEXT *pLabelInfo,
                                                           const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     debug_report->BeginCmdDebugUtilsLabel(commandBuffer, pLabelInfo);
 }
 
@@ -4402,7 +4538,7 @@ void DeviceState::PostCallRecordCmdBeginDebugUtilsLabelEXT(VkCommandBuffer comma
 
 void DeviceState::PostCallRecordCmdEndDebugUtilsLabelEXT(VkCommandBuffer commandBuffer, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     cb_state->EndLabel();
     debug_report->EndCmdDebugUtilsLabel(commandBuffer);
 }
@@ -4412,7 +4548,7 @@ void DeviceState::PreCallRecordCmdInsertDebugUtilsLabelEXT(VkCommandBuffer comma
     debug_report->InsertCmdDebugUtilsLabel(commandBuffer, pLabelInfo);
 
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
 }
 
 void DeviceState::PostCallRecordAcquireProfilingLockKHR(VkDevice device, const VkAcquireProfilingLockInfoKHR *pInfo,
@@ -4476,10 +4612,10 @@ void DeviceState::PreCallRecordUpdateDescriptorSetWithTemplateKHR(VkDevice devic
     PreCallRecordUpdateDescriptorSetWithTemplate(device, descriptorSet, descriptorUpdateTemplate, pData, record_obj);
 }
 
-void DeviceState::PreCallRecordCmdPushDescriptorSetWithTemplate(VkCommandBuffer commandBuffer,
-                                                                VkDescriptorUpdateTemplate descriptorUpdateTemplate,
-                                                                VkPipelineLayout layout, uint32_t set, const void *pData,
-                                                                const RecordObject &record_obj) {
+void DeviceState::PostCallRecordCmdPushDescriptorSetWithTemplate(VkCommandBuffer commandBuffer,
+                                                                 VkDescriptorUpdateTemplate descriptorUpdateTemplate,
+                                                                 VkPipelineLayout layout, uint32_t set, const void *pData,
+                                                                 const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto template_state = Get<DescriptorUpdateTemplate>(descriptorUpdateTemplate);
     auto pipeline_layout = Get<PipelineLayout>(layout);
@@ -4487,23 +4623,23 @@ void DeviceState::PreCallRecordCmdPushDescriptorSetWithTemplate(VkCommandBuffer 
         return;
     }
 
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     auto dsl = pipeline_layout->set_layouts[set];
     // Decode the template into a set of write updates
     DecodedTemplateUpdate decoded_template(*this, VK_NULL_HANDLE, *template_state, pData, dsl->VkHandle());
-    cb_state->PushDescriptorSetState(template_state->create_info.pipelineBindPoint, pipeline_layout, record_obj.location.function,
-                                     set, static_cast<uint32_t>(decoded_template.desc_writes.size()),
-                                     decoded_template.desc_writes.data());
+    cb_state->PushDescriptorSetState(template_state->create_info.pipelineBindPoint, pipeline_layout, set,
+                                     static_cast<uint32_t>(decoded_template.desc_writes.size()),
+                                     decoded_template.desc_writes.data(), record_obj.location);
 }
 
-void DeviceState::PreCallRecordCmdPushDescriptorSetWithTemplateKHR(VkCommandBuffer commandBuffer,
-                                                                   VkDescriptorUpdateTemplate descriptorUpdateTemplate,
-                                                                   VkPipelineLayout layout, uint32_t set, const void *pData,
-                                                                   const RecordObject &record_obj) {
-    PreCallRecordCmdPushDescriptorSetWithTemplate(commandBuffer, descriptorUpdateTemplate, layout, set, pData, record_obj);
+void DeviceState::PostCallRecordCmdPushDescriptorSetWithTemplateKHR(VkCommandBuffer commandBuffer,
+                                                                    VkDescriptorUpdateTemplate descriptorUpdateTemplate,
+                                                                    VkPipelineLayout layout, uint32_t set, const void *pData,
+                                                                    const RecordObject &record_obj) {
+    PostCallRecordCmdPushDescriptorSetWithTemplate(commandBuffer, descriptorUpdateTemplate, layout, set, pData, record_obj);
 }
 
-void DeviceState::PreCallRecordCmdPushDescriptorSetWithTemplate2(
+void DeviceState::PostCallRecordCmdPushDescriptorSetWithTemplate2(
     VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfo *pPushDescriptorSetWithTemplateInfo,
     const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
@@ -4513,21 +4649,20 @@ void DeviceState::PreCallRecordCmdPushDescriptorSetWithTemplate2(
         return;
     }
 
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     auto dsl = pipeline_layout->set_layouts[pPushDescriptorSetWithTemplateInfo->set];
     // Decode the template into a set of write updates
     DecodedTemplateUpdate decoded_template(*this, VK_NULL_HANDLE, *template_state, pPushDescriptorSetWithTemplateInfo->pData,
                                            dsl->VkHandle());
-    cb_state->PushDescriptorSetState(template_state->create_info.pipelineBindPoint, pipeline_layout, record_obj.location.function,
-                                     pPushDescriptorSetWithTemplateInfo->set,
-                                     static_cast<uint32_t>(decoded_template.desc_writes.size()),
-                                     decoded_template.desc_writes.data());
+    cb_state->PushDescriptorSetState(
+        template_state->create_info.pipelineBindPoint, pipeline_layout, pPushDescriptorSetWithTemplateInfo->set,
+        static_cast<uint32_t>(decoded_template.desc_writes.size()), decoded_template.desc_writes.data(), record_obj.location);
 }
 
-void DeviceState::PreCallRecordCmdPushDescriptorSetWithTemplate2KHR(
+void DeviceState::PostCallRecordCmdPushDescriptorSetWithTemplate2KHR(
     VkCommandBuffer commandBuffer, const VkPushDescriptorSetWithTemplateInfoKHR *pPushDescriptorSetWithTemplateInfo,
     const RecordObject &record_obj) {
-    PreCallRecordCmdPushDescriptorSetWithTemplate2(commandBuffer, pPushDescriptorSetWithTemplateInfo, record_obj);
+    PostCallRecordCmdPushDescriptorSetWithTemplate2(commandBuffer, pPushDescriptorSetWithTemplateInfo, record_obj);
 }
 
 void InstanceState::PostCallRecordGetPhysicalDeviceFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures *pFeatures,
@@ -4577,56 +4712,47 @@ void InstanceState::PostCallRecordGetPhysicalDeviceDisplayPlaneProperties2KHR(Vk
 void DeviceState::PostCallRecordCmdBeginQueryIndexedEXT(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t slot,
                                                         VkQueryControlFlags flags, uint32_t index, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    uint32_t num_queries = 1;
-    uint32_t subpass = 0;
-    const bool inside_render_pass = cb_state->active_render_pass != nullptr;
-    // If render pass instance has multiview enabled, query uses N consecutive query indices
-    if (inside_render_pass) {
-        subpass = cb_state->GetActiveSubpass();
-        uint32_t bits = cb_state->active_render_pass->GetViewMaskBits(subpass);
-        num_queries = std::max(num_queries, bits);
+    cb_state->RecordCommand(record_obj.location);
+    if (disabled[query_validation]) {
+        return;
     }
 
-    for (uint32_t i = 0; i < num_queries; ++i) {
-        cb_state->RecordCmd(record_obj.location.function);
-        if (!disabled[query_validation]) {
-            QueryObject query_obj = {queryPool, slot, flags, 0, true, index + i};
-            query_obj.inside_render_pass = inside_render_pass;
-            query_obj.subpass = subpass;
-            cb_state->BeginQuery(query_obj);
-        }
-        if (!disabled[command_buffer_state]) {
-            auto pool_state = Get<QueryPool>(queryPool);
-            cb_state->AddChild(pool_state);
-        }
+    QueryCount query_count(*cb_state);
+
+    for (uint32_t i = 0; i < query_count.count; ++i) {
+        QueryObject query_obj = {queryPool, slot, flags, 0, true, index + i};
+        query_obj.inside_render_pass = query_count.inside_render_pass;
+        query_obj.subpass = query_count.subpass;
+        cb_state->RecordBeginQuery(query_obj, record_obj.location);
+    }
+
+    if (!disabled[command_buffer_state]) {
+        auto pool_state = Get<QueryPool>(queryPool);
+        cb_state->AddChild(pool_state);
     }
 }
 
 void DeviceState::PostCallRecordCmdEndQueryIndexedEXT(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t slot,
                                                       uint32_t index, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    uint32_t num_queries = 1;
-    uint32_t subpass = 0;
-    const bool inside_render_pass = cb_state->active_render_pass != nullptr;
-    // If render pass instance has multiview enabled, query uses N consecutive query indices
-    if (inside_render_pass) {
-        subpass = cb_state->GetActiveSubpass();
-        uint32_t bits = cb_state->active_render_pass->GetViewMaskBits(subpass);
-        num_queries = std::max(num_queries, bits);
+    cb_state->RecordCommand(record_obj.location);
+    if (disabled[query_validation]) {
+        return;
     }
 
-    for (uint32_t i = 0; i < num_queries; ++i) {
-        cb_state->RecordCmd(record_obj.location.function);
-        if (!disabled[query_validation]) {
-            QueryObject query_obj = {queryPool, slot, 0, 0, true, index + i};
-            query_obj.inside_render_pass = inside_render_pass;
-            query_obj.subpass = subpass;
-            cb_state->EndQuery(query_obj);
-        }
-        if (!disabled[command_buffer_state]) {
-            auto pool_state = Get<QueryPool>(queryPool);
-            cb_state->AddChild(pool_state);
-        }
+    QueryCount query_count(*cb_state);
+
+    for (uint32_t i = 0; i < query_count.count; ++i) {
+        QueryObject query_obj = {queryPool, slot, 0, 0, true, index + i};
+        query_obj.inside_render_pass = query_count.inside_render_pass;
+        query_obj.subpass = query_count.subpass;
+        query_obj.end_command_index = cb_state->command_count;  // counting this command
+        cb_state->RecordEndQuery(query_obj, record_obj.location);
+    }
+
+    if (!disabled[command_buffer_state]) {
+        auto pool_state = Get<QueryPool>(queryPool);
+        cb_state->AddChild(pool_state);
     }
 }
 
@@ -4637,7 +4763,7 @@ void DeviceState::PostCallRecordCreateSamplerYcbcrConversion(VkDevice device, co
     if (record_obj.result != VK_SUCCESS) {
         return;
     }
-    VkFormatFeatureFlags2KHR format_features = 0;
+    VkFormatFeatureFlags2 format_features = 0;
 
     if (pCreateInfo->format != VK_FORMAT_UNDEFINED) {
         format_features = GetPotentialFormatFeatures(pCreateInfo->format);
@@ -4677,7 +4803,11 @@ void DeviceState::PostCallRecordResetQueryPoolEXT(VkDevice device, VkQueryPool q
 void DeviceState::PostCallRecordResetQueryPool(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount,
                                                const RecordObject &record_obj) {
     // Do nothing if the feature is not enabled.
-    if (!enabled_features.hostQueryReset) return;
+    if (!enabled_features.hostQueryReset) {
+        return;
+    } else if (disabled[query_validation]) {
+        return;
+    }
 
     // Do nothing if the query pool has been destroyed.
     auto query_pool_state = Get<QueryPool>(queryPool);
@@ -4707,21 +4837,21 @@ void DeviceState::PerformUpdateDescriptorSetsWithTemplateKHR(VkDescriptorSet des
 void DeviceState::PostCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount,
                                         uint32_t firstVertex, uint32_t firstInstance, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdDrawMultiEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
                                                 const VkMultiDrawInfoEXT *pVertexInfo, uint32_t instanceCount,
                                                 uint32_t firstInstance, uint32_t stride, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount,
                                                uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance,
                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdDrawMultiIndexedEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
@@ -4729,14 +4859,14 @@ void DeviceState::PostCallRecordCmdDrawMultiIndexedEXT(VkCommandBuffer commandBu
                                                        uint32_t firstInstance, uint32_t stride, const int32_t *pVertexOffset,
                                                        const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t count,
                                                 uint32_t stride, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto buffer_state = Get<Buffer>(buffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
     if (!disabled[command_buffer_state]) {
         cb_state->AddChild(buffer_state);
     }
@@ -4746,7 +4876,7 @@ void DeviceState::PostCallRecordCmdDrawIndexedIndirect(VkCommandBuffer commandBu
                                                        uint32_t count, uint32_t stride, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto buffer_state = Get<Buffer>(buffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
     if (!disabled[command_buffer_state]) {
         cb_state->AddChild(buffer_state);
     }
@@ -4755,13 +4885,13 @@ void DeviceState::PostCallRecordCmdDrawIndexedIndirect(VkCommandBuffer commandBu
 void DeviceState::PostCallRecordCmdDispatch(VkCommandBuffer commandBuffer, uint32_t x, uint32_t y, uint32_t z,
                                             const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDispatchCmd(record_obj.location.function);
+    cb_state->RecordDispatch(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                     const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDispatchCmd(record_obj.location.function);
+    cb_state->RecordDispatch(record_obj.location);
     if (!disabled[command_buffer_state]) {
         auto buffer_state = Get<Buffer>(buffer);
         cb_state->AddChild(buffer_state);
@@ -4776,7 +4906,7 @@ void DeviceState::PostCallRecordCmdDispatchBaseKHR(VkCommandBuffer commandBuffer
 void DeviceState::PostCallRecordCmdDispatchBase(VkCommandBuffer commandBuffer, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
                                                 uint32_t, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDispatchCmd(record_obj.location.function);
+    cb_state->RecordDispatch(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdDrawIndirectCountKHR(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
@@ -4790,7 +4920,7 @@ void DeviceState::PostCallRecordCmdDrawIndirectCount(VkCommandBuffer commandBuff
                                                      VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                                      uint32_t stride, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
     if (!disabled[command_buffer_state]) {
         auto buffer_state = Get<Buffer>(buffer);
         auto count_buffer_state = Get<Buffer>(countBuffer);
@@ -4812,7 +4942,7 @@ void DeviceState::PostCallRecordCmdDrawIndexedIndirectCount(VkCommandBuffer comm
                                                             uint32_t maxDrawCount, uint32_t stride,
                                                             const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
     if (!disabled[command_buffer_state]) {
         auto buffer_state = Get<Buffer>(buffer);
         auto count_buffer_state = Get<Buffer>(countBuffer);
@@ -4824,13 +4954,13 @@ void DeviceState::PostCallRecordCmdDrawIndexedIndirectCount(VkCommandBuffer comm
 void DeviceState::PostCallRecordCmdDrawMeshTasksNV(VkCommandBuffer commandBuffer, uint32_t taskCount, uint32_t firstTask,
                                                    const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdDrawMeshTasksIndirectNV(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                            uint32_t drawCount, uint32_t stride, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
     auto buffer_state = Get<Buffer>(buffer);
     if (!disabled[command_buffer_state] && buffer_state) {
         cb_state->AddChild(buffer_state);
@@ -4842,7 +4972,7 @@ void DeviceState::PostCallRecordCmdDrawMeshTasksIndirectCountNV(VkCommandBuffer 
                                                                 uint32_t maxDrawCount, uint32_t stride,
                                                                 const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
     if (!disabled[command_buffer_state]) {
         if (auto buffer_state = Get<Buffer>(buffer)) {
             cb_state->AddChild(buffer_state);
@@ -4856,13 +4986,13 @@ void DeviceState::PostCallRecordCmdDrawMeshTasksIndirectCountNV(VkCommandBuffer 
 void DeviceState::PostCallRecordCmdDrawMeshTasksEXT(VkCommandBuffer commandBuffer, uint32_t groupCountX, uint32_t groupCountY,
                                                     uint32_t groupCountZ, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdDrawMeshTasksIndirectEXT(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                             uint32_t drawCount, uint32_t stride, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
     auto buffer_state = Get<Buffer>(buffer);
     if (!disabled[command_buffer_state] && buffer_state) {
         cb_state->AddChild(buffer_state);
@@ -4874,7 +5004,7 @@ void DeviceState::PostCallRecordCmdDrawMeshTasksIndirectCountEXT(VkCommandBuffer
                                                                  VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                                                  uint32_t stride, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateDrawCmd(record_obj.location.function);
+    cb_state->RecordDraw(record_obj.location);
     if (!disabled[command_buffer_state]) {
         if (auto buffer_state = Get<Buffer>(buffer)) {
             cb_state->AddChild(buffer_state);
@@ -4893,7 +5023,7 @@ void DeviceState::PostCallRecordCmdTraceRaysNV(VkCommandBuffer commandBuffer, Vk
                                                VkDeviceSize callableShaderBindingOffset, VkDeviceSize callableShaderBindingStride,
                                                uint32_t width, uint32_t height, uint32_t depth, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateTraceRayCmd(record_obj.location.function);
+    cb_state->RecordTraceRay(record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdTraceRaysKHR(VkCommandBuffer commandBuffer,
@@ -4903,7 +5033,7 @@ void DeviceState::PostCallRecordCmdTraceRaysKHR(VkCommandBuffer commandBuffer,
                                                 const VkStridedDeviceAddressRegionKHR *pCallableShaderBindingTable, uint32_t width,
                                                 uint32_t height, uint32_t depth, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateTraceRayCmd(record_obj.location.function);
+    cb_state->RecordTraceRay(record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdTraceRaysIndirectKHR(VkCommandBuffer commandBuffer,
@@ -4913,13 +5043,13 @@ void DeviceState::PostCallRecordCmdTraceRaysIndirectKHR(VkCommandBuffer commandB
                                                         const VkStridedDeviceAddressRegionKHR *pCallableShaderBindingTable,
                                                         VkDeviceAddress indirectDeviceAddress, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateTraceRayCmd(record_obj.location.function);
+    cb_state->RecordTraceRay(record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdTraceRaysIndirect2KHR(VkCommandBuffer commandBuffer, VkDeviceAddress indirectDeviceAddress,
                                                          const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->UpdateTraceRayCmd(record_obj.location.function);
+    cb_state->RecordTraceRay(record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdExecuteGeneratedCommandsEXT(VkCommandBuffer commandBuffer, VkBool32 isPreprocessed,
@@ -4928,11 +5058,11 @@ void DeviceState::PostCallRecordCmdExecuteGeneratedCommandsEXT(VkCommandBuffer c
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     const VkPipelineBindPoint bind_point = ConvertStageToBindPoint(pGeneratedCommandsInfo->shaderStages);
     if (bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS) {
-        cb_state->UpdateDrawCmd(record_obj.location.function);
+        cb_state->RecordDraw(record_obj.location);
     } else if (bind_point == VK_PIPELINE_BIND_POINT_COMPUTE) {
-        cb_state->UpdateDispatchCmd(record_obj.location.function);
+        cb_state->RecordDispatch(record_obj.location);
     } else if (bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
-        cb_state->UpdateTraceRayCmd(record_obj.location.function);
+        cb_state->RecordTraceRay(record_obj.location.function);
     }
 }
 
@@ -4943,12 +5073,12 @@ void DeviceState::PreCallRecordCreateShaderModule(VkDevice device, const VkShade
         return;
     } else if (chassis_state.module_state) {
         // We store the shader module at a chassis stack level (because we need it for PostCallRecord in things like GPU-AV)
-        // Only one validaiton object needs to create it
+        // Only one validation object needs to create it
         return;
     }
 
     chassis_state.module_state =
-        std::make_shared<spirv::Module>(pCreateInfo->codeSize, pCreateInfo->pCode, &chassis_state.stateless_data);
+        CreateSpirvModuleState(pCreateInfo->codeSize, pCreateInfo->pCode, global_settings, &chassis_state.stateless_data);
     if (chassis_state.module_state && chassis_state.stateless_data.has_group_decoration) {
         spv_target_env spirv_environment = PickSpirvEnv(api_version, IsExtEnabled(extensions.vk_khr_spirv_1_4));
         spvtools::Optimizer optimizer(spirv_environment);
@@ -4961,9 +5091,11 @@ void DeviceState::PreCallRecordCreateShaderModule(VkDevice device, const VkShade
         if (result) {
             // Easier to just re-create the ShaderModule as StaticData uses itself when building itself up
             // It is really rare this will get here as Group Decorations have been deprecated and before this was added no one ever
-            // raised an issue for a bug that would crash the layers that was around for many releases
-            chassis_state.module_state = std::make_shared<spirv::Module>(optimized_binary.size() * sizeof(uint32_t),
-                                                                         optimized_binary.data(), &chassis_state.stateless_data);
+            // raised an issue for a bug that would crash the layers that was around for many releases.
+            //
+            // We also ignore doing this for any newer way to provide SPIR-V (GPL, shaderObject, RTX, etc) for same reason.
+            chassis_state.module_state = CreateSpirvModuleState(optimized_binary.size() * sizeof(uint32_t), optimized_binary.data(),
+                                                                global_settings, &chassis_state.stateless_data);
         }
     }
 }
@@ -4977,9 +5109,9 @@ void DeviceState::PreCallRecordCreateShadersEXT(VkDevice device, uint32_t create
         if (create_info.codeSize == 0 || !create_info.pCode || create_info.codeType != VK_SHADER_CODE_TYPE_SPIRV_EXT) {
             continue;
         }
-        // don't need to worry about GroupDecoration with VK_EXT_shader_object
-        chassis_state.module_states[i] = std::make_shared<spirv::Module>(
-            create_info.codeSize, static_cast<const uint32_t *>(create_info.pCode), &chassis_state.stateless_data[i]);
+        chassis_state.module_states[i] =
+            CreateSpirvModuleState(create_info.codeSize, static_cast<const uint32_t *>(create_info.pCode), global_settings,
+                                   &chassis_state.stateless_data[i]);
     }
 }
 
@@ -5037,7 +5169,7 @@ void DeviceState::PostCallRecordCmdCopyAccelerationStructureKHR(VkCommandBuffer 
                                                                 const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     ASSERT_AND_RETURN(cb_state);
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     auto src_as_state = Get<AccelerationStructureKHR>(pInfo->src);
     auto dst_as_state = Get<AccelerationStructureKHR>(pInfo->dst);
     if (dst_as_state && src_as_state) {
@@ -5055,7 +5187,7 @@ void DeviceState::PostCallRecordCmdCopyAccelerationStructureToMemoryKHR(VkComman
                                                                         const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     ASSERT_AND_RETURN(cb_state);
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     auto src_as_state = Get<AccelerationStructureKHR>(pInfo->src);
     if (!disabled[command_buffer_state]) {
         cb_state->AddChild(src_as_state);
@@ -5070,7 +5202,7 @@ void DeviceState::PostCallRecordCmdCopyMemoryToAccelerationStructureKHR(VkComman
                                                                         const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     ASSERT_AND_RETURN(cb_state);
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     if (!disabled[command_buffer_state]) {
         auto dst_as_state = Get<AccelerationStructureKHR>(pInfo->dst);
         ASSERT_AND_RETURN(dst_as_state);
@@ -5091,7 +5223,7 @@ void DeviceState::PostCallRecordCmdSetCullModeEXT(VkCommandBuffer commandBuffer,
 void DeviceState::PostCallRecordCmdSetCullMode(VkCommandBuffer commandBuffer, VkCullModeFlags cullMode,
                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_CULL_MODE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_CULL_MODE);
     cb_state->dynamic_state_value.cull_mode = cullMode;
 }
 
@@ -5103,7 +5235,7 @@ void DeviceState::PostCallRecordCmdSetFrontFaceEXT(VkCommandBuffer commandBuffer
 void DeviceState::PostCallRecordCmdSetFrontFace(VkCommandBuffer commandBuffer, VkFrontFace frontFace,
                                                 const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_FRONT_FACE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_FRONT_FACE);
 }
 
 void DeviceState::PostCallRecordCmdSetPrimitiveTopologyEXT(VkCommandBuffer commandBuffer, VkPrimitiveTopology primitiveTopology,
@@ -5114,7 +5246,7 @@ void DeviceState::PostCallRecordCmdSetPrimitiveTopologyEXT(VkCommandBuffer comma
 void DeviceState::PostCallRecordCmdSetPrimitiveTopology(VkCommandBuffer commandBuffer, VkPrimitiveTopology primitiveTopology,
                                                         const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
     cb_state->dynamic_state_value.primitive_topology = primitiveTopology;
 }
 
@@ -5126,17 +5258,7 @@ void DeviceState::PostCallRecordCmdSetViewportWithCountEXT(VkCommandBuffer comma
 void DeviceState::PostCallRecordCmdSetViewportWithCount(VkCommandBuffer commandBuffer, uint32_t viewportCount,
                                                         const VkViewport *pViewports, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_VIEWPORT_WITH_COUNT);
-    uint32_t bits = (1u << viewportCount) - 1u;
-    cb_state->viewport.count_mask |= bits;
-    cb_state->viewport.trashed_mask &= ~bits;
-    cb_state->dynamic_state_value.viewport_count = viewportCount;
-    cb_state->viewport.trashed_count = false;
-
-    cb_state->dynamic_state_value.viewports.resize(viewportCount);
-    for (size_t i = 0; i < viewportCount; ++i) {
-        cb_state->dynamic_state_value.viewports[i] = pViewports[i];
-    }
+    cb_state->RecordSetViewportWithCount(viewportCount, pViewports);
 }
 
 void DeviceState::PostCallRecordCmdSetScissorWithCountEXT(VkCommandBuffer commandBuffer, uint32_t scissorCount,
@@ -5147,12 +5269,7 @@ void DeviceState::PostCallRecordCmdSetScissorWithCountEXT(VkCommandBuffer comman
 void DeviceState::PostCallRecordCmdSetScissorWithCount(VkCommandBuffer commandBuffer, uint32_t scissorCount,
                                                        const VkRect2D *pScissors, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
-    uint32_t bits = (1u << scissorCount) - 1u;
-    cb_state->scissor.count_mask |= bits;
-    cb_state->scissor.trashed_mask &= ~bits;
-    cb_state->dynamic_state_value.scissor_count = scissorCount;
-    cb_state->scissor.trashed_count = false;
+    cb_state->RecordSetScissorWithCount(scissorCount);
 }
 
 void DeviceState::PostCallRecordCmdBindVertexBuffers2EXT(VkCommandBuffer commandBuffer, uint32_t firstBinding,
@@ -5169,7 +5286,7 @@ void DeviceState::PostCallRecordCmdBindVertexBuffers2(VkCommandBuffer commandBuf
                                                       const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     if (pStrides) {
-        cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
+        cb_state->RecordStateCmd(CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
     }
 
     for (uint32_t i = 0; i < bindingCount; ++i) {
@@ -5199,8 +5316,7 @@ void DeviceState::PostCallRecordCmdSetDepthTestEnableEXT(VkCommandBuffer command
 void DeviceState::PostCallRecordCmdSetDepthTestEnable(VkCommandBuffer commandBuffer, VkBool32 depthTestEnable,
                                                       const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_TEST_ENABLE);
-    cb_state->dynamic_state_value.depth_test_enable = depthTestEnable;
+    cb_state->RecordSetDepthTestEnable(depthTestEnable);
 }
 
 void DeviceState::PostCallRecordCmdSetDepthWriteEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthWriteEnable,
@@ -5211,7 +5327,7 @@ void DeviceState::PostCallRecordCmdSetDepthWriteEnableEXT(VkCommandBuffer comman
 void DeviceState::PostCallRecordCmdSetDepthWriteEnable(VkCommandBuffer commandBuffer, VkBool32 depthWriteEnable,
                                                        const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_WRITE_ENABLE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DEPTH_WRITE_ENABLE);
     cb_state->dynamic_state_value.depth_write_enable = depthWriteEnable;
 }
 
@@ -5223,7 +5339,7 @@ void DeviceState::PostCallRecordCmdSetDepthCompareOpEXT(VkCommandBuffer commandB
 void DeviceState::PostCallRecordCmdSetDepthCompareOp(VkCommandBuffer commandBuffer, VkCompareOp depthCompareOp,
                                                      const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_COMPARE_OP);
+    cb_state->RecordSetDepthCompareOp(depthCompareOp);
 }
 
 void DeviceState::PostCallRecordCmdSetDepthBoundsTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthBoundsTestEnable,
@@ -5234,7 +5350,7 @@ void DeviceState::PostCallRecordCmdSetDepthBoundsTestEnableEXT(VkCommandBuffer c
 void DeviceState::PostCallRecordCmdSetDepthBoundsTestEnable(VkCommandBuffer commandBuffer, VkBool32 depthBoundsTestEnable,
                                                             const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE);
     cb_state->dynamic_state_value.depth_bounds_test_enable = depthBoundsTestEnable;
 }
 
@@ -5246,7 +5362,7 @@ void DeviceState::PostCallRecordCmdSetStencilTestEnableEXT(VkCommandBuffer comma
 void DeviceState::PostCallRecordCmdSetStencilTestEnable(VkCommandBuffer commandBuffer, VkBool32 stencilTestEnable,
                                                         const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_STENCIL_TEST_ENABLE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_STENCIL_TEST_ENABLE);
     cb_state->dynamic_state_value.stencil_test_enable = stencilTestEnable;
 }
 
@@ -5260,7 +5376,7 @@ void DeviceState::PostCallRecordCmdSetStencilOp(VkCommandBuffer commandBuffer, V
                                                 VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp,
                                                 const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_STENCIL_OP);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_STENCIL_OP);
     if (faceMask == VK_STENCIL_FACE_FRONT_BIT || faceMask == VK_STENCIL_FACE_FRONT_AND_BACK) {
         cb_state->dynamic_state_value.fail_op_front = failOp;
         cb_state->dynamic_state_value.pass_op_front = passOp;
@@ -5277,7 +5393,7 @@ void DeviceState::PostCallRecordCmdSetDiscardRectangleEXT(VkCommandBuffer comman
                                                           uint32_t discardRectangleCount, const VkRect2D *pDiscardRectangles,
                                                           const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DISCARD_RECTANGLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DISCARD_RECTANGLE_EXT);
     for (uint32_t i = 0; i < discardRectangleCount; i++) {
         cb_state->dynamic_state_value.discard_rectangles.set(firstDiscardRectangle + i);
     }
@@ -5286,7 +5402,7 @@ void DeviceState::PostCallRecordCmdSetDiscardRectangleEXT(VkCommandBuffer comman
 void DeviceState::PostCallRecordCmdSetDiscardRectangleEnableEXT(VkCommandBuffer commandBuffer, VkBool32 discardRectangleEnable,
                                                                 const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DISCARD_RECTANGLE_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DISCARD_RECTANGLE_ENABLE_EXT);
     cb_state->dynamic_state_value.discard_rectangle_enable = discardRectangleEnable;
 }
 
@@ -5294,14 +5410,14 @@ void DeviceState::PostCallRecordCmdSetDiscardRectangleModeEXT(VkCommandBuffer co
                                                               VkDiscardRectangleModeEXT discardRectangleMode,
                                                               const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DISCARD_RECTANGLE_MODE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DISCARD_RECTANGLE_MODE_EXT);
 }
 
 void DeviceState::PostCallRecordCmdSetSampleLocationsEXT(VkCommandBuffer commandBuffer,
                                                          const VkSampleLocationsInfoEXT *pSampleLocationsInfo,
                                                          const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT);
     cb_state->dynamic_state_value.sample_locations_info = *pSampleLocationsInfo;
 }
 
@@ -5310,18 +5426,18 @@ void DeviceState::PostCallRecordCmdSetCoarseSampleOrderNV(VkCommandBuffer comman
                                                           const VkCoarseSampleOrderCustomNV *pCustomSampleOrders,
                                                           const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_VIEWPORT_COARSE_SAMPLE_ORDER_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_VIEWPORT_COARSE_SAMPLE_ORDER_NV);
 }
 
 void DeviceState::PostCallRecordCmdSetPatchControlPointsEXT(VkCommandBuffer commandBuffer, uint32_t patchControlPoints,
                                                             const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT);
 }
 
 void DeviceState::PostCallRecordCmdSetLogicOpEXT(VkCommandBuffer commandBuffer, VkLogicOp logicOp, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_LOGIC_OP_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_LOGIC_OP_EXT);
 }
 
 void DeviceState::PostCallRecordCmdSetRasterizerDiscardEnableEXT(VkCommandBuffer commandBuffer, VkBool32 rasterizerDiscardEnable,
@@ -5332,7 +5448,7 @@ void DeviceState::PostCallRecordCmdSetRasterizerDiscardEnableEXT(VkCommandBuffer
 void DeviceState::PostCallRecordCmdSetRasterizerDiscardEnable(VkCommandBuffer commandBuffer, VkBool32 rasterizerDiscardEnable,
                                                               const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE);
     cb_state->dynamic_state_value.rasterizer_discard_enable = (rasterizerDiscardEnable == VK_TRUE);
 }
 
@@ -5344,7 +5460,7 @@ void DeviceState::PostCallRecordCmdSetDepthBiasEnableEXT(VkCommandBuffer command
 void DeviceState::PostCallRecordCmdSetDepthBiasEnable(VkCommandBuffer commandBuffer, VkBool32 depthBiasEnable,
                                                       const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_BIAS_ENABLE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DEPTH_BIAS_ENABLE);
     cb_state->dynamic_state_value.depth_bias_enable = depthBiasEnable;
 }
 
@@ -5356,7 +5472,7 @@ void DeviceState::PostCallRecordCmdSetPrimitiveRestartEnableEXT(VkCommandBuffer 
 void DeviceState::PostCallRecordCmdSetPrimitiveRestartEnable(VkCommandBuffer commandBuffer, VkBool32 primitiveRestartEnable,
                                                              const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE);
     cb_state->dynamic_state_value.primitive_restart_enable = primitiveRestartEnable;
 }
 
@@ -5364,7 +5480,7 @@ void DeviceState::PostCallRecordCmdSetFragmentShadingRateKHR(VkCommandBuffer com
                                                              const VkFragmentShadingRateCombinerOpKHR combinerOps[2],
                                                              const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR);
     cb_state->dynamic_state_value.fragment_size = *pFragmentSize;
 }
 
@@ -5372,12 +5488,7 @@ void DeviceState::PostCallRecordCmdSetRenderingAttachmentLocations(VkCommandBuff
                                                                    const VkRenderingAttachmentLocationInfo *pLocationInfo,
                                                                    const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-
-    cb_state->rendering_attachments.set_color_locations = true;
-    cb_state->rendering_attachments.color_locations.resize(pLocationInfo->colorAttachmentCount);
-    for (size_t i = 0; i < pLocationInfo->colorAttachmentCount; ++i) {
-        cb_state->rendering_attachments.color_locations[i] = pLocationInfo->pColorAttachmentLocations[i];
-    }
+    cb_state->RecordSetRenderingAttachmentLocations(pLocationInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdSetRenderingAttachmentLocationsKHR(VkCommandBuffer commandBuffer,
@@ -5390,15 +5501,7 @@ void DeviceState::PostCallRecordCmdSetRenderingInputAttachmentIndices(VkCommandB
                                                                       const VkRenderingInputAttachmentIndexInfo *pLocationInfo,
                                                                       const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-
-    cb_state->rendering_attachments.set_color_indexes = true;
-    cb_state->rendering_attachments.color_indexes.resize(pLocationInfo->colorAttachmentCount);
-    for (uint32_t i = 0; i < pLocationInfo->colorAttachmentCount; ++i) {
-        cb_state->rendering_attachments.color_indexes[i] =
-            pLocationInfo->pColorAttachmentInputIndices ? pLocationInfo->pColorAttachmentInputIndices[i] : i;
-    }
-    cb_state->rendering_attachments.depth_index = pLocationInfo->pDepthInputAttachmentIndex;
-    cb_state->rendering_attachments.stencil_index = pLocationInfo->pStencilInputAttachmentIndex;
+    cb_state->RecordSetRenderingInputAttachmentIndices(pLocationInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdSetRenderingInputAttachmentIndicesKHR(
@@ -5409,7 +5512,7 @@ void DeviceState::PostCallRecordCmdSetRenderingInputAttachmentIndicesKHR(
 void DeviceState::PostCallRecordCmdSetRayTracingPipelineStackSizeKHR(VkCommandBuffer commandBuffer, uint32_t pipelineStackSize,
                                                                      const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordCmd(record_obj.location.function);
+    cb_state->RecordCommand(record_obj.location);
     // CB_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR);
     cb_state->dynamic_state_status.rtx_stack_size_cb = true;
     cb_state->dynamic_state_status.rtx_stack_size_pipeline = true;
@@ -5421,7 +5524,7 @@ void DeviceState::PostCallRecordCmdSetVertexInputEXT(VkCommandBuffer commandBuff
                                                      const VkVertexInputAttributeDescription2EXT *pVertexAttributeDescriptions,
                                                      const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_VERTEX_INPUT_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_VERTEX_INPUT_EXT);
 
     const auto pipeline_state = cb_state->GetLastBoundGraphics().pipeline_state;
     if (pipeline_state && pipeline_state->IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE)) {
@@ -5449,7 +5552,7 @@ void DeviceState::PostCallRecordCmdSetVertexInputEXT(VkCommandBuffer commandBuff
 void DeviceState::PostCallRecordCmdSetColorWriteEnableEXT(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
                                                           const VkBool32 *pColorWriteEnables, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT);
     cb_state->dynamic_state_value.color_write_enable_attachment_count = attachmentCount;
     for (uint32_t i = 0; i < attachmentCount; ++i) {
         if (pColorWriteEnables[i]) {
@@ -5463,7 +5566,7 @@ void DeviceState::PostCallRecordCmdSetColorWriteEnableEXT(VkCommandBuffer comman
 void DeviceState::PostCallRecordCmdSetAttachmentFeedbackLoopEnableEXT(VkCommandBuffer commandBuffer, VkImageAspectFlags aspectMask,
                                                                       const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_ATTACHMENT_FEEDBACK_LOOP_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_ATTACHMENT_FEEDBACK_LOOP_ENABLE_EXT);
     cb_state->dynamic_state_value.attachment_feedback_loop_enable = aspectMask;
 }
 
@@ -5493,13 +5596,13 @@ void DeviceState::PostCallRecordCmdSetTessellationDomainOriginEXT(VkCommandBuffe
                                                                   VkTessellationDomainOrigin domainOrigin,
                                                                   const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_TESSELLATION_DOMAIN_ORIGIN_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_TESSELLATION_DOMAIN_ORIGIN_EXT);
 }
 
 void DeviceState::PostCallRecordCmdSetDepthClampEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthClampEnable,
                                                           const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT);
     cb_state->dynamic_state_value.depth_clamp_enable = depthClampEnable;
 }
 
@@ -5507,13 +5610,13 @@ void DeviceState::PostCallRecordCmdSetDepthClampRangeEXT(VkCommandBuffer command
                                                          const VkDepthClampRangeEXT *pDepthClampRange,
                                                          const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_CLAMP_RANGE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DEPTH_CLAMP_RANGE_EXT);
 }
 
 void DeviceState::PostCallRecordCmdSetPolygonModeEXT(VkCommandBuffer commandBuffer, VkPolygonMode polygonMode,
                                                      const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_POLYGON_MODE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_POLYGON_MODE_EXT);
     cb_state->dynamic_state_value.polygon_mode = polygonMode;
 }
 
@@ -5521,35 +5624,35 @@ void DeviceState::PostCallRecordCmdSetRasterizationSamplesEXT(VkCommandBuffer co
                                                               VkSampleCountFlagBits rasterizationSamples,
                                                               const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT);
     cb_state->dynamic_state_value.rasterization_samples = rasterizationSamples;
 }
 
 void DeviceState::PostCallRecordCmdSetSampleMaskEXT(VkCommandBuffer commandBuffer, VkSampleCountFlagBits samples,
                                                     const VkSampleMask *pSampleMask, const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_SAMPLE_MASK_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_SAMPLE_MASK_EXT);
     cb_state->dynamic_state_value.samples_mask_samples = samples;
 }
 
 void DeviceState::PostCallRecordCmdSetAlphaToCoverageEnableEXT(VkCommandBuffer commandBuffer, VkBool32 alphaToCoverageEnable,
                                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT);
     cb_state->dynamic_state_value.alpha_to_coverage_enable = alphaToCoverageEnable;
 }
 
 void DeviceState::PostCallRecordCmdSetAlphaToOneEnableEXT(VkCommandBuffer commandBuffer, VkBool32 alphaToOneEnable,
                                                           const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT);
     cb_state->dynamic_state_value.alpha_to_one_enable = alphaToOneEnable;
 }
 
 void DeviceState::PostCallRecordCmdSetLogicOpEnableEXT(VkCommandBuffer commandBuffer, VkBool32 logicOpEnable,
                                                        const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT);
     cb_state->dynamic_state_value.logic_op_enable = logicOpEnable;
 }
 
@@ -5557,7 +5660,7 @@ void DeviceState::PostCallRecordCmdSetColorBlendEnableEXT(VkCommandBuffer comman
                                                           uint32_t attachmentCount, const VkBool32 *pColorBlendEnables,
                                                           const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT);
     for (uint32_t i = 0; i < attachmentCount; i++) {
         cb_state->dynamic_state_value.color_blend_enable_attachments.set(firstAttachment + i);
         if (pColorBlendEnables[i]) {
@@ -5573,7 +5676,7 @@ void DeviceState::PostCallRecordCmdSetColorBlendEquationEXT(VkCommandBuffer comm
                                                             const VkColorBlendEquationEXT *pColorBlendEquations,
                                                             const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT);
     if (cb_state->dynamic_state_value.color_blend_equations.size() < firstAttachment + attachmentCount) {
         cb_state->dynamic_state_value.color_blend_equations.resize(firstAttachment + attachmentCount);
     }
@@ -5587,7 +5690,7 @@ void DeviceState::PostCallRecordCmdSetColorWriteMaskEXT(VkCommandBuffer commandB
                                                         uint32_t attachmentCount, const VkColorComponentFlags *pColorWriteMasks,
                                                         const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT);
     if (cb_state->dynamic_state_value.color_write_masks.size() < firstAttachment + attachmentCount) {
         cb_state->dynamic_state_value.color_write_masks.resize(firstAttachment + attachmentCount);
     }
@@ -5600,7 +5703,7 @@ void DeviceState::PostCallRecordCmdSetColorWriteMaskEXT(VkCommandBuffer commandB
 void DeviceState::PostCallRecordCmdSetRasterizationStreamEXT(VkCommandBuffer commandBuffer, uint32_t rasterizationStream,
                                                              const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT);
     cb_state->dynamic_state_value.rasterization_stream = rasterizationStream;
 }
 
@@ -5608,7 +5711,7 @@ void DeviceState::PostCallRecordCmdSetConservativeRasterizationModeEXT(
     VkCommandBuffer commandBuffer, VkConservativeRasterizationModeEXT conservativeRasterizationMode,
     const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_CONSERVATIVE_RASTERIZATION_MODE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_CONSERVATIVE_RASTERIZATION_MODE_EXT);
     cb_state->dynamic_state_value.conservative_rasterization_mode = conservativeRasterizationMode;
 }
 
@@ -5616,19 +5719,19 @@ void DeviceState::PostCallRecordCmdSetExtraPrimitiveOverestimationSizeEXT(VkComm
                                                                           float extraPrimitiveOverestimationSize,
                                                                           const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_EXTRA_PRIMITIVE_OVERESTIMATION_SIZE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_EXTRA_PRIMITIVE_OVERESTIMATION_SIZE_EXT);
 }
 
 void DeviceState::PostCallRecordCmdSetDepthClipEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthClipEnable,
                                                          const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_CLIP_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DEPTH_CLIP_ENABLE_EXT);
 }
 
 void DeviceState::PostCallRecordCmdSetSampleLocationsEnableEXT(VkCommandBuffer commandBuffer, VkBool32 sampleLocationsEnable,
                                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_ENABLE_EXT);
     cb_state->dynamic_state_value.sample_locations_enable = sampleLocationsEnable;
 }
 
@@ -5637,7 +5740,7 @@ void DeviceState::PostCallRecordCmdSetColorBlendAdvancedEXT(VkCommandBuffer comm
                                                             const VkColorBlendAdvancedEXT *pColorBlendAdvanced,
                                                             const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT);
     for (uint32_t i = 0; i < attachmentCount; i++) {
         cb_state->dynamic_state_value.color_blend_advanced_attachments.set(firstAttachment + i);
     }
@@ -5647,34 +5750,34 @@ void DeviceState::PostCallRecordCmdSetProvokingVertexModeEXT(VkCommandBuffer com
                                                              VkProvokingVertexModeEXT provokingVertexMode,
                                                              const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_PROVOKING_VERTEX_MODE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_PROVOKING_VERTEX_MODE_EXT);
 }
 
 void DeviceState::PostCallRecordCmdSetLineRasterizationModeEXT(VkCommandBuffer commandBuffer,
                                                                VkLineRasterizationModeEXT lineRasterizationMode,
                                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_LINE_RASTERIZATION_MODE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_LINE_RASTERIZATION_MODE_EXT);
     cb_state->dynamic_state_value.line_rasterization_mode = lineRasterizationMode;
 }
 
 void DeviceState::PostCallRecordCmdSetLineStippleEnableEXT(VkCommandBuffer commandBuffer, VkBool32 stippledLineEnable,
                                                            const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT);
     cb_state->dynamic_state_value.stippled_line_enable = stippledLineEnable;
 }
 
 void DeviceState::PostCallRecordCmdSetDepthClipNegativeOneToOneEXT(VkCommandBuffer commandBuffer, VkBool32 negativeOneToOne,
                                                                    const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_DEPTH_CLIP_NEGATIVE_ONE_TO_ONE_EXT);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_DEPTH_CLIP_NEGATIVE_ONE_TO_ONE_EXT);
 }
 
 void DeviceState::PostCallRecordCmdSetViewportWScalingEnableNV(VkCommandBuffer commandBuffer, VkBool32 viewportWScalingEnable,
                                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_ENABLE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_ENABLE_NV);
     cb_state->dynamic_state_value.viewport_w_scaling_enable = viewportWScalingEnable;
 }
 
@@ -5682,21 +5785,21 @@ void DeviceState::PostCallRecordCmdSetViewportSwizzleNV(VkCommandBuffer commandB
                                                         uint32_t viewportCount, const VkViewportSwizzleNV *pViewportSwizzles,
                                                         const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_VIEWPORT_SWIZZLE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_VIEWPORT_SWIZZLE_NV);
     cb_state->dynamic_state_value.viewport_swizzle_count = viewportCount;
 }
 
 void DeviceState::PostCallRecordCmdSetCoverageToColorEnableNV(VkCommandBuffer commandBuffer, VkBool32 coverageToColorEnable,
                                                               const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COVERAGE_TO_COLOR_ENABLE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COVERAGE_TO_COLOR_ENABLE_NV);
     cb_state->dynamic_state_value.coverage_to_color_enable = coverageToColorEnable;
 }
 
 void DeviceState::PostCallRecordCmdSetCoverageToColorLocationNV(VkCommandBuffer commandBuffer, uint32_t coverageToColorLocation,
                                                                 const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COVERAGE_TO_COLOR_LOCATION_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COVERAGE_TO_COLOR_LOCATION_NV);
     cb_state->dynamic_state_value.coverage_to_color_location = coverageToColorLocation;
 }
 
@@ -5704,7 +5807,7 @@ void DeviceState::PostCallRecordCmdSetCoverageModulationModeNV(VkCommandBuffer c
                                                                VkCoverageModulationModeNV coverageModulationMode,
                                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COVERAGE_MODULATION_MODE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COVERAGE_MODULATION_MODE_NV);
     cb_state->dynamic_state_value.coverage_modulation_mode = coverageModulationMode;
 }
 
@@ -5712,7 +5815,7 @@ void DeviceState::PostCallRecordCmdSetCoverageModulationTableEnableNV(VkCommandB
                                                                       VkBool32 coverageModulationTableEnable,
                                                                       const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COVERAGE_MODULATION_TABLE_ENABLE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COVERAGE_MODULATION_TABLE_ENABLE_NV);
     cb_state->dynamic_state_value.coverage_modulation_table_enable = coverageModulationTableEnable;
 }
 
@@ -5721,13 +5824,13 @@ void DeviceState::PostCallRecordCmdSetCoverageModulationTableNV(VkCommandBuffer 
                                                                 const float *pCoverageModulationTable,
                                                                 const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COVERAGE_MODULATION_TABLE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COVERAGE_MODULATION_TABLE_NV);
 }
 
 void DeviceState::PostCallRecordCmdSetShadingRateImageEnableNV(VkCommandBuffer commandBuffer, VkBool32 shadingRateImageEnable,
                                                                const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_SHADING_RATE_IMAGE_ENABLE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_SHADING_RATE_IMAGE_ENABLE_NV);
     cb_state->dynamic_state_value.shading_rate_image_enable = shadingRateImageEnable;
 }
 
@@ -5735,33 +5838,33 @@ void DeviceState::PostCallRecordCmdSetRepresentativeFragmentTestEnableNV(VkComma
                                                                          VkBool32 representativeFragmentTestEnable,
                                                                          const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_REPRESENTATIVE_FRAGMENT_TEST_ENABLE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_REPRESENTATIVE_FRAGMENT_TEST_ENABLE_NV);
 }
 
 void DeviceState::PostCallRecordCmdSetCoverageReductionModeNV(VkCommandBuffer commandBuffer,
                                                               VkCoverageReductionModeNV coverageReductionMode,
                                                               const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->RecordStateCmd(record_obj.location.function, CB_DYNAMIC_STATE_COVERAGE_REDUCTION_MODE_NV);
+    cb_state->RecordStateCmd(CB_DYNAMIC_STATE_COVERAGE_REDUCTION_MODE_NV);
 }
 
 void DeviceState::PostCallRecordCmdControlVideoCodingKHR(VkCommandBuffer commandBuffer,
                                                          const VkVideoCodingControlInfoKHR *pCodingControlInfo,
                                                          const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->ControlVideoCoding(pCodingControlInfo);
+    cb_state->RecordControlVideoCoding(*pCodingControlInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdDecodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoDecodeInfoKHR *pDecodeInfo,
                                                   const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->DecodeVideo(pDecodeInfo);
+    cb_state->RecordDecodeVideo(*pDecodeInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordCmdEncodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoEncodeInfoKHR *pEncodeInfo,
                                                   const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
-    cb_state->EncodeVideo(pEncodeInfo);
+    cb_state->RecordEncodeVideo(*pEncodeInfo, record_obj.location);
 }
 
 void DeviceState::PostCallRecordGetShaderModuleIdentifierEXT(VkDevice, const VkShaderModule shaderModule,

@@ -25,7 +25,7 @@ TEST_F(NegativeShaderDebugInfo, FileName1) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     RETURN_IF_SKIP(Init());
 
-    char const *source = R"(
+    const char *source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
           %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
@@ -37,7 +37,7 @@ TEST_F(NegativeShaderDebugInfo, FileName1) {
        %text = OpString "#version 450
 layout(set = 0, binding = 0) buffer ssbo { uint y; };
 void main() {
-    atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+    atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelease);
 }"
                OpDecorate %ssbo Block
                OpMemberDecorate %ssbo 0 Offset 0
@@ -49,7 +49,7 @@ void main() {
      %uint_0 = OpConstant %uint 0
      %uint_1 = OpConstant %uint 1
      %uint_4 = OpConstant %uint 4
-    %uint_64 = OpConstant %uint 64
+    %uint_68 = OpConstant %uint 68
         %int = OpTypeInt 32 1
       %int_0 = OpConstant %int 0
       %int_1 = OpConstant %int 1
@@ -62,7 +62,7 @@ void main() {
          %15 = OpLabel
          %48 = OpExtInst %void %1 DebugLine %18 %uint_4 %uint_4 %uint_0 %uint_0
          %47 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_0
-               OpAtomicStore %47 %int_1 %uint_64 %uint_1
+               OpAtomicStore %47 %int_1 %uint_68 %uint_1
                OpReturn
                OpFunctionEnd
     )";
@@ -79,7 +79,7 @@ TEST_F(NegativeShaderDebugInfo, FileName2) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     RETURN_IF_SKIP(Init());
 
-    char const *source = R"(
+    const char *source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
           %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
@@ -92,7 +92,7 @@ TEST_F(NegativeShaderDebugInfo, FileName2) {
 layout(set = 0, binding = 0) buffer ssbo { uint y; };
 void main() {
     atomicStore(y, 1u, gl_ScopeDevice,
-        gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+        gl_StorageSemanticsBuffer, gl_SemanticsRelease);
 }"
                OpDecorate %ssbo Block
                OpMemberDecorate %ssbo 0 Offset 0
@@ -105,7 +105,7 @@ void main() {
      %uint_1 = OpConstant %uint 1
      %uint_4 = OpConstant %uint 4
      %uint_5 = OpConstant %uint 5
-    %uint_64 = OpConstant %uint 64
+    %uint_68 = OpConstant %uint 68
         %int = OpTypeInt 32 1
       %int_0 = OpConstant %int 0
       %int_1 = OpConstant %int 1
@@ -118,7 +118,7 @@ void main() {
          %15 = OpLabel
          %48 = OpExtInst %void %1 DebugLine %18 %uint_4 %uint_5 %uint_0 %uint_0
          %47 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_0
-               OpAtomicStore %47 %int_1 %uint_64 %uint_1
+               OpAtomicStore %47 %int_1 %uint_68 %uint_1
                OpReturn
                OpFunctionEnd
     )";
@@ -135,7 +135,7 @@ TEST_F(NegativeShaderDebugInfo, FileName3) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     RETURN_IF_SKIP(Init());
 
-    char const *source = R"(
+    const char *source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
           %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
@@ -148,7 +148,7 @@ TEST_F(NegativeShaderDebugInfo, FileName3) {
 layout(set = 0, binding = 0) buffer ssbo { uint y; };
 void main() {
     atomicStore(y, 1u, gl_ScopeDevice,
-        gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+        gl_StorageSemanticsBuffer, gl_SemanticsRelease);
 }"
                OpDecorate %ssbo Block
                OpMemberDecorate %ssbo 0 Offset 0
@@ -161,7 +161,7 @@ void main() {
      %uint_1 = OpConstant %uint 1
      %uint_4 = OpConstant %uint 4
      %uint_5 = OpConstant %uint 5
-    %uint_64 = OpConstant %uint 64
+    %uint_68 = OpConstant %uint 68
         %int = OpTypeInt 32 1
       %int_0 = OpConstant %int 0
       %int_1 = OpConstant %int 1
@@ -174,7 +174,7 @@ void main() {
          %15 = OpLabel
          %48 = OpExtInst %void %1 DebugLine %18 %uint_4 %uint_5 %uint_0 %uint_0
          %47 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_0
-               OpAtomicStore %47 %int_1 %uint_64 %uint_1
+               OpAtomicStore %47 %int_1 %uint_68 %uint_1
                OpReturn
                OpFunctionEnd
     )";
@@ -191,7 +191,7 @@ TEST_F(NegativeShaderDebugInfo, FileName4) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     RETURN_IF_SKIP(Init());
 
-    char const *source = R"(
+    const char *source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
           %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
@@ -205,7 +205,7 @@ layout(set = 0, binding = 0) buffer ssbo { uint y; };
 void main() {
     atomicStore(y, 1u, gl_ScopeDevice,
         gl_StorageSemanticsBuffer,
-        gl_SemanticsRelaxed);
+        gl_SemanticsRelease);
 }"
                OpDecorate %ssbo Block
                OpMemberDecorate %ssbo 0 Offset 0
@@ -220,7 +220,7 @@ void main() {
      %uint_5 = OpConstant %uint 5
      %uint_6 = OpConstant %uint 6
     %uint_30 = OpConstant %uint 30
-    %uint_64 = OpConstant %uint 64
+    %uint_68 = OpConstant %uint 68
         %int = OpTypeInt 32 1
       %int_0 = OpConstant %int 0
       %int_1 = OpConstant %int 1
@@ -233,7 +233,7 @@ void main() {
          %15 = OpLabel
          %48 = OpExtInst %void %1 DebugLine %18 %uint_4 %uint_6 %uint_5 %uint_30
          %47 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_0
-               OpAtomicStore %47 %int_1 %uint_64 %uint_1
+               OpAtomicStore %47 %int_1 %uint_68 %uint_1
                OpReturn
                OpFunctionEnd
     )";
@@ -267,7 +267,7 @@ TEST_F(NegativeShaderDebugInfo, FloatShaderDebugInfo) {
 
 layout(set = 0, binding = 0) buffer ssbo { float32_t y; };
 void main() {
-    y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+    y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAquire);
 }"
          %29 = OpString "float"
          %33 = OpString "y"
@@ -325,7 +325,7 @@ void main() {
          %50 = OpExtInst %void %1 DebugTypePointer %30 %uint_12 %uint_0
       %int_1 = OpConstant %int 1
      %int_64 = OpConstant %int 64
-    %uint_64 = OpConstant %uint 64
+    %uint_66 = OpConstant %uint 66
      %uint_9 = OpConstant %uint 9
        %main = OpFunction %void None %5
          %15 = OpLabel
@@ -334,7 +334,7 @@ void main() {
          %25 = OpExtInst %void %1 DebugFunctionDefinition %17 %main
          %52 = OpExtInst %void %1 DebugLine %18 %uint_8 %uint_8 %uint_0 %uint_0
          %51 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
-         %56 = OpAtomicLoad %float %51 %int_1 %uint_64
+         %56 = OpAtomicLoad %float %51 %int_1 %uint_66
          %57 = OpFAdd %float %float_1 %56
          %58 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
                OpStore %58 %57
@@ -344,7 +344,7 @@ void main() {
     )";
 
     // VUID-RuntimeSpirv-None-06284
-    m_errorMonitor->SetDesiredError("atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);");
+    m_errorMonitor->SetDesiredError("atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsAquire);");
     VkShaderObj const cs(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }

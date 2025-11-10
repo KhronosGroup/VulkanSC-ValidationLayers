@@ -20,7 +20,6 @@
 #include "external/vma/vma.h"
 
 #include <typeinfo>
-#include <unordered_map>
 #include <vector>
 #include "containers/custom_containers.h"
 #include "containers/range.h"
@@ -101,7 +100,7 @@ class GpuResourcesManager {
 
     VkDescriptorSet GetManagedDescriptorSet(VkDescriptorSetLayout desc_set_layout);
 
-    vko::BufferRange GetHostVisibleBufferRange(VkDeviceSize size);
+    vko::BufferRange GetHostCoherentBufferRange(VkDeviceSize size);
     vko::BufferRange GetHostCachedBufferRange(VkDeviceSize size);
     void FlushAllocation(const vko::BufferRange &buffer_range);
     void InvalidateAllocation(const vko::BufferRange &buffer_range);
@@ -152,12 +151,35 @@ class GpuResourcesManager {
         size_t next_avail_buffer_pos_hint_ = 0;
     };
 
-    // One cache per buffer type: having them mixed in just one would worse cache lookups
-    BufferCache host_visible_buffer_cache_;
-    BufferCache host_cached_buffer_cache_;
-    BufferCache device_local_buffer_cache_;
-    BufferCache device_local_indirect_buffer_cache_;
-    BufferCache staging_buffer_cache_;
+    // One cache per buffer type: having them mixed in just one would make cache lookups worse
+    struct BufferCaches {
+        // Will have HOST_VISIBLE and HOST_COHERENT (may be HOST_CACHED)
+        BufferCache host_coherent;
+        // Will have HOST_VISIBLE and HOST_CACHED (may be HOST_COHERENT)
+        BufferCache host_cached;
+        // Will have DEVICE_LOCAL
+        BufferCache device_local;
+        // Will have DEVICE_LOCAL with VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
+        BufferCache device_local_indirect;
+        // Used to transfer from HOST_VISIBLE to DEVICE_LOCAL buffers
+        BufferCache staging;
+
+        void ReturnBuffers() {
+            host_coherent.ReturnBuffers();
+            host_cached.ReturnBuffers();
+            device_local.ReturnBuffers();
+            device_local_indirect.ReturnBuffers();
+            staging.ReturnBuffers();
+        }
+
+        void DestroyBuffers() {
+            host_coherent.DestroyBuffers();
+            host_cached.DestroyBuffers();
+            device_local.DestroyBuffers();
+            device_local_indirect.DestroyBuffers();
+            staging.DestroyBuffers();
+        }
+    } buffer_caches_;
 };
 
 class StagingBuffer {

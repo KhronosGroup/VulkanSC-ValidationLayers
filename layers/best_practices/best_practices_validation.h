@@ -20,6 +20,7 @@
 #pragma once
 
 #include "best_practices/bp_constants.h"
+#include "best_practices/bp_utils.h"
 #include "chassis/validation_object.h"
 #include "state_tracker/shader_module.h"
 #include "state_tracker/state_tracker.h"
@@ -75,10 +76,6 @@ void LogResult(const StateObject& state, Handle handle, const RecordObject& reco
     }
 }
 
-const char* VendorSpecificTag(BPVendorFlags vendors);
-
-bool VendorCheckEnabled(const ValidationEnabled& enabled, BPVendorFlags vendors);
-
 class Instance : public vvl::InstanceProxy {
     using BaseClass = vvl::InstanceProxy;
 
@@ -89,7 +86,7 @@ class Instance : public vvl::InstanceProxy {
 
     Instance(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch, LayerObjectTypeBestPractices) {}
 
-    bool VendorCheckEnabled(BPVendorFlags vendors) const { return bp_state::VendorCheckEnabled(enabled, vendors); }
+    bool VendorCheckEnabled(BPVendorFlags vendors) const { return IsVendorCheckEnabled(enabled, vendors); }
 
     bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
                                        VkInstance* pInstance, const ErrorObject& error_obj) const override;
@@ -215,7 +212,7 @@ class BestPractices : public vvl::DeviceProxy {
                                                VkCommandBuffer* pCommandBuffers, const ErrorObject& error_obj) const override;
     void PreCallRecordFreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator,
                                  const RecordObject& record_obj) override;
-    bool ValidateMultisampledBlendingArm(const VkGraphicsPipelineCreateInfo& create_info, const Location& create_info_loc) const;
+    bool ValidateMultisampledBlendingArm(const vvl::Pipeline& pipeline, const Location& create_info_loc) const;
 
     bool ValidateCreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo& create_info, const vvl::Pipeline& pipeline,
                                         const Location create_info_loc) const;
@@ -250,28 +247,14 @@ class BestPractices : public vvl::DeviceProxy {
                                            const ErrorObject& error_obj) const override;
     bool CheckEventSignalingState(const bp_state::CommandBufferSubState& command_buffer, VkEvent event,
                                   const Location& cb_loc) const;
-    void RecordCmdSetEvent(bp_state::CommandBufferSubState& command_buffer, VkEvent event);
-    void RecordCmdResetEvent(bp_state::CommandBufferSubState& command_buffer, VkEvent event);
     bool PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                     const ErrorObject& error_obj) const override;
-    void PostCallRecordCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
-                                   const RecordObject& record_obj) override;
     bool PreCallValidateCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfoKHR* pDependencyInfo,
                                         const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfo* pDependencyInfo,
                                      const ErrorObject& error_obj) const override;
-    void PostCallRecordCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfoKHR* pDependencyInfo,
-                                       const RecordObject& record_obj) override;
-    void PostCallRecordCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfo* pDependencyInfo,
-                                    const RecordObject& record_obj) override;
-    void PostCallRecordCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
-                                     const RecordObject& record_obj) override;
     bool PreCallValidateCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2KHR stageMask,
                                           const ErrorObject& error_obj) const override;
-    void PostCallRecordCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2KHR stageMask,
-                                         const RecordObject& record_obj) override;
-    void PostCallRecordCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
-                                      const RecordObject& record_obj) override;
     bool PreCallValidateCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
                                           const VkDependencyInfoKHR* pDependencyInfos, const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
@@ -303,40 +286,9 @@ class BestPractices : public vvl::DeviceProxy {
     bool PreCallValidateGetQueryPoolResults(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount,
                                             size_t dataSize, void* pData, VkDeviceSize stride, VkQueryResultFlags flags,
                                             const ErrorObject& error_obj) const override;
-    void PostCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline,
-                                       const RecordObject& record_obj) override;
-    void PostCallRecordCmdSetDepthCompareOp(VkCommandBuffer commandBuffer, VkCompareOp depthCompareOp,
-                                            const RecordObject& record_obj) override;
-    void PostCallRecordCmdSetDepthCompareOpEXT(VkCommandBuffer commandBuffer, VkCompareOp depthCompareOp,
-                                               const RecordObject& record_obj) override;
-    void PostCallRecordCmdSetDepthTestEnable(VkCommandBuffer commandBuffer, VkBool32 depthTestEnable,
-                                             const RecordObject& record_obj) override;
-    void PostCallRecordCmdSetDepthTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthTestEnable,
-                                                const RecordObject& record_obj) override;
     bool ValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
                                     const Location& loc) const;
     bool ValidateCmdBeginRendering(VkCommandBuffer commandBuffer, const VkRenderingInfo* pRenderingInfo, const Location& loc) const;
-
-    void PostCallRecordCmdBeginRendering(VkCommandBuffer commandBuffer, const VkRenderingInfo* pRenderingInfo,
-                                         const RecordObject& record_obj) override;
-    void PostCallRecordCmdBeginRenderingKHR(VkCommandBuffer commandBuffer, const VkRenderingInfo* pRenderingInfo,
-                                            const RecordObject& record_obj) override;
-
-    void PostCallRecordCmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents,
-                                      const RecordObject& record_obj) override;
-    void PostCallRecordCmdNextSubpass2KHR(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo* pSubpassBeginInfo,
-                                          const VkSubpassEndInfo* pSubpassEndInfo, const RecordObject& record_obj) override;
-    void PostCallRecordCmdNextSubpass2(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo* pSubpassBeginInfo,
-                                       const VkSubpassEndInfo* pSubpassEndInfo, const RecordObject& record_obj) override;
-    void RecordCmdNextSubpass(bp_state::CommandBufferSubState& cb_state);
-
-    void PreCallRecordCmdEndRenderPass(VkCommandBuffer commandBuffer, const RecordObject& record_obj) override;
-    void PreCallRecordCmdEndRenderPass2(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
-                                        const RecordObject& record_obj) override;
-    void PreCallRecordCmdEndRenderPass2KHR(VkCommandBuffer commandBuffer, const VkSubpassEndInfoKHR* pSubpassEndInfo,
-                                           const RecordObject& record_obj) override;
-    void PreCallRecordCmdEndRendering(VkCommandBuffer commandBuffer, const RecordObject& record_obj) override;
-    void PreCallRecordCmdEndRenderingKHR(VkCommandBuffer commandBuffer, const RecordObject& record_obj) override;
 
     bool PreCallValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
                                            VkSubpassContents contents, const ErrorObject& error_obj) const override;
@@ -350,18 +302,11 @@ class BestPractices : public vvl::DeviceProxy {
                                           const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdBeginRenderingKHR(VkCommandBuffer commandBuffer, const VkRenderingInfo* pRenderingInfo,
                                              const ErrorObject& error_obj) const override;
-    void ValidateBoundDescriptorSets(bp_state::CommandBufferSubState& commandBuffer, const LastBound& last_bound_state,
-                                     Func command);
+    void UpdateBoundDescriptorSets(bp_state::CommandBufferSubState& commandBuffer, const LastBound& last_bound_state,
+                                   const Location& loc);
     bool PreCallValidateCmdEndRendering(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdEndRenderingKHR(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const override;
 
-    void PostRecordCmdBeginRenderPass(bp_state::CommandBufferSubState& cb_state, const VkRenderPassBeginInfo* pRenderPassBegin);
-    void PostCallRecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
-                                          VkSubpassContents contents, const RecordObject& record_obj) override;
-    void PostCallRecordCmdBeginRenderPass2(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
-                                           const VkSubpassBeginInfo* pSubpassBeginInfo, const RecordObject& record_obj) override;
-    void PostCallRecordCmdBeginRenderPass2KHR(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
-                                              const VkSubpassBeginInfo* pSubpassBeginInfo, const RecordObject& record_obj) override;
     bool PreCallValidateCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                                 uint32_t firstInstance, const ErrorObject& error_obj) const override;
     void PostCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
@@ -471,10 +416,6 @@ class BestPractices : public vvl::DeviceProxy {
                                           const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdEndRenderPass2KHR(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
                                              const ErrorObject& error_obj) const override;
-    void PostCallRecordCmdDispatch(VkCommandBuffer commandBuffer, uint32_t x, uint32_t y, uint32_t z,
-                                   const RecordObject& record_obj) override;
-    void PostCallRecordCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
-                                           const RecordObject& record_obj) override;
     bool PreCallValidateBindAccelerationStructureMemoryNV(VkDevice device, uint32_t bindInfoCount,
                                                           const VkBindAccelerationStructureMemoryInfoNV* pBindInfos,
                                                           const ErrorObject& error_obj) const override;
@@ -494,45 +435,22 @@ class BestPractices : public vvl::DeviceProxy {
     bool PreCallValidateCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo,
                                          const ErrorObject& error_obj) const override;
 
-    using QueueCallbacks = std::vector<vvl::CommandBuffer::QueueCallback>;
+    using QueueCallback = std::function<bool(const class vvl::Queue& queue_state, const vvl::CommandBuffer& cb_state)>;
+    using QueueCallbacks = std::vector<QueueCallback>;
 
-    void QueueValidateImageView(QueueCallbacks& func, Func command, vvl::ImageView* view, IMAGE_SUBRESOURCE_USAGE_BP usage);
-    void QueueValidateImage(QueueCallbacks& func, Func command, std::shared_ptr<vvl::Image>& state,
-                            IMAGE_SUBRESOURCE_USAGE_BP usage, const VkImageSubresourceRange& subresource_range);
-    void QueueValidateImage(QueueCallbacks& func, Func command, std::shared_ptr<vvl::Image>& state,
-                            IMAGE_SUBRESOURCE_USAGE_BP usage, const VkImageSubresourceLayers& range);
-    void QueueValidateImage(QueueCallbacks& func, Func command, std::shared_ptr<vvl::Image>& state,
-                            IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level);
-    void ValidateImageInQueue(const vvl::Queue& qs, const vvl::CommandBuffer& cbs, Func command, vvl::Image& state,
+    void QueueValidateImageView(QueueCallbacks& func, const Location& loc, const vvl::ImageView& image_view,
+                                IMAGE_SUBRESOURCE_USAGE_BP usage);
+    void QueueValidateImage(QueueCallbacks& func, const Location& loc, vvl::Image& image_state, IMAGE_SUBRESOURCE_USAGE_BP usage,
+                            const VkImageSubresourceRange& subresource_range);
+    void QueueValidateImage(QueueCallbacks& func, const Location& loc, vvl::Image& image_state, IMAGE_SUBRESOURCE_USAGE_BP usage,
+                            const VkImageSubresourceLayers& range);
+    void QueueValidateImage(QueueCallbacks& func, const Location& loc, vvl::Image& image_state, IMAGE_SUBRESOURCE_USAGE_BP usage,
+                            uint32_t array_layer, uint32_t mip_level);
+    void ValidateImageInQueue(const vvl::Queue& qs, const vvl::CommandBuffer& cbs, const Location& loc, vvl::Image& image_state,
                               IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level);
-    void ValidateImageInQueueArmImg(Func command, const vvl::Image& image, IMAGE_SUBRESOURCE_USAGE_BP last_usage,
+    void ValidateImageInQueueArmImg(const Location& loc, vvl::Image& image_state, IMAGE_SUBRESOURCE_USAGE_BP last_usage,
                                     IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level);
 
-    void PostCallRecordCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                       VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                       const VkImageResolve* pRegions, const RecordObject& record_obj) override;
-    void PostCallRecordCmdResolveImage2KHR(VkCommandBuffer commandBuffer, const VkResolveImageInfo2KHR* pResolveImageInfo,
-                                           const RecordObject& record_obj) override;
-    void PostCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo,
-                                        const RecordObject& record_obj) override;
-    void PostCallRecordCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                          const VkClearColorValue* pColor, uint32_t rangeCount,
-                                          const VkImageSubresourceRange* pRanges, const RecordObject& record_obj) override;
-    void PostCallRecordCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                                 const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount,
-                                                 const VkImageSubresourceRange* pRanges, const RecordObject& record_obj) override;
-    void PostCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage,
-                                    VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageCopy* pRegions,
-                                    const RecordObject& record_obj) override;
-    void PostCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
-                                            VkImageLayout dstImageLayout, uint32_t regionCount, const VkBufferImageCopy* pRegions,
-                                            const RecordObject& record_obj) override;
-    void PostCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                            VkBuffer dstBuffer, uint32_t regionCount, const VkBufferImageCopy* pRegions,
-                                            const RecordObject& record_obj) override;
-    void PostCallRecordCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage,
-                                    VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageBlit* pRegions,
-                                    VkFilter filter, const RecordObject& record_obj) override;
     template <typename RegionType>
     bool ValidateCmdBlitImage(VkCommandBuffer command_buffer, uint32_t region_count, const RegionType* regions,
                               const Location& loc) const;
@@ -601,12 +519,6 @@ class BestPractices : public vvl::DeviceProxy {
                                           uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
                                           uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers,
                                           const RecordObject& record_obj) override;
-    void PostCallRecordCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
-                                           const RecordObject& record_obj) override;
-    void PostCallRecordCmdPipelineBarrier2KHR(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
-                                              const RecordObject& record_obj) override;
-    template <typename ImageMemoryBarrier>
-    void RecordCmdPipelineBarrierImageBarrier(VkCommandBuffer commandBuffer, const ImageMemoryBarrier& barrier);
 
     void PreCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                               const VkGraphicsPipelineCreateInfo* pCreateInfos,
@@ -656,14 +568,8 @@ class BestPractices : public vvl::DeviceProxy {
     void PreCallRecordQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
                                   const RecordObject& record_obj) override;
 
-    void PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
-                                           const VkClearAttachment* pClearAttachments, uint32_t rectCount,
-                                           const VkClearRect* pRects, const RecordObject& record_obj) override;
-
     bool PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount,
                                            const VkCommandBuffer* pCommandBuffers, const ErrorObject& error_obj) const override;
-    void PostCallRecordCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount,
-                                          const VkCommandBuffer* pCommandBuffers, const RecordObject& record_obj) override;
 
     bool PreCallValidateCmdBuildAccelerationStructureNV(VkCommandBuffer commandBuffer, const VkAccelerationStructureInfoNV* pInfo,
                                                         VkBuffer instanceData, VkDeviceSize instanceOffset, VkBool32 update,
@@ -683,6 +589,20 @@ class BestPractices : public vvl::DeviceProxy {
 
     void Created(vvl::CommandBuffer& cb_state) override;
     void Created(vvl::Image& image_state) override;
+
+    // Check that vendor-specific checks are enabled for at least one of the vendors
+    bool VendorCheckEnabled(BPVendorFlags vendors) const { return IsVendorCheckEnabled(enabled, vendors); }
+
+    // TODO - Move these to CommandBufferSubState
+    void RecordCmdDrawTypeArm(bp_state::CommandBufferSubState& cb_state, uint32_t draw_count);
+    void RecordClearColor(VkFormat format, const VkClearColorValue& clear_value);
+    bool ClearAttachmentsIsFullClear(const bp_state::CommandBufferSubState& cb_state, uint32_t rectCount,
+                                     const VkClearRect* pRects) const;
+    void PipelineUsedInFrame(VkPipeline pipeline) {
+        WriteLockGuard guard(pipeline_lock_);
+        pipelines_used_in_frame_.insert(pipeline);
+    }
+
 // Include code-generated functions
 #include "generated/best_practices_device_methods.h"
   private:
@@ -706,61 +626,21 @@ class BestPractices : public vvl::DeviceProxy {
         uint32_t iteration = 0;
     };
 
-    // Check that vendor-specific checks are enabled for at least one of the vendors
-    bool VendorCheckEnabled(BPVendorFlags vendors) const { return bp_state::VendorCheckEnabled(enabled, vendors); }
-    const char* VendorSpecificTag(BPVendorFlags vendors) const { return bp_state::VendorSpecificTag(vendors); }
-
-    void RecordCmdDrawTypeArm(bp_state::CommandBufferSubState& cb_state, uint32_t draw_count);
-    void RecordCmdDrawTypeNVIDIA(bp_state::CommandBufferSubState& cb_state);
-
-    void RecordAttachmentClearAttachments(bp_state::CommandBufferSubState& cb_state, uint32_t fb_attachment,
-                                          uint32_t color_attachment, VkImageAspectFlags aspects, uint32_t rectCount,
-                                          const VkClearRect* pRects);
-    void RecordAttachmentAccess(bp_state::CommandBufferSubState& cb_state, uint32_t attachment, VkImageAspectFlags aspects);
-    bool ClearAttachmentsIsFullClear(const bp_state::CommandBufferSubState& cb_state, uint32_t rectCount,
-                                     const VkClearRect* pRects) const;
     bool ValidateClearAttachment(const bp_state::CommandBufferSubState& cb_state, uint32_t fb_attachment, uint32_t color_attachment,
                                  VkImageAspectFlags aspects, const Location& loc) const;
 
     bool ValidateCmdEndRenderPass(VkCommandBuffer commandBuffer, const Location& loc) const;
-    void RecordCmdBeginRenderPass(bp_state::CommandBufferSubState& cb_state, const VkRenderPassBeginInfo* pRenderPassBegin);
 
     bool ValidateBuildAccelerationStructure(VkCommandBuffer commandBuffer, const Location& loc) const;
 
     bool ValidateBindMemory(VkDevice device, VkDeviceMemory memory, const Location& loc) const;
 
-    void RecordSetDepthTestState(bp_state::CommandBufferSubState& cb_state, VkCompareOp new_depth_compare_op,
-                                 bool new_depth_test_enable);
-
-    void RecordCmdBeginRenderingCommon(bp_state::CommandBufferSubState& cb_state, const VkRenderPassBeginInfo* pRenderPassBegin,
-                                       const VkRenderingInfo* pRenderingInfo);
-    void RecordCmdEndRenderingCommon(bp_state::CommandBufferSubState& cb_state, const vvl::RenderPass& rp_state);
-
-    void RecordBindZcullScope(bp_state::CommandBufferSubState& cb_state, VkImage depth_attachment,
-                              const VkImageSubresourceRange& subresource_range);
-    void RecordUnbindZcullScope(bp_state::CommandBufferSubState& cb_state);
-    void RecordResetScopeZcullDirection(bp_state::CommandBufferSubState& cb_state);
-    void RecordResetZcullDirection(bp_state::CommandBufferSubState& cb_state, VkImage depth_image,
-                                   const VkImageSubresourceRange& subresource_range);
-
-    void RecordSetScopeZcullDirection(bp_state::CommandBufferSubState& cb_state, ZcullDirection mode);
-    void RecordSetZcullDirection(bp_state::CommandBufferSubState& cb_state, VkImage depth_image,
-                                 const VkImageSubresourceRange& subresource_range, ZcullDirection mode);
-
-    void RecordZcullDraw(bp_state::CommandBufferSubState& cb_state);
-
     bool ValidateZcullScope(const bp_state::CommandBufferSubState& cb_state, const Location& loc) const;
     bool ValidateZcull(const bp_state::CommandBufferSubState& cb_state, VkImage image,
                        const VkImageSubresourceRange& subresource_range, const Location& loc) const;
 
-    void RecordClearColor(VkFormat format, const VkClearColorValue& clear_value);
     bool ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat format, const VkClearColorValue& clear_value,
                             const Location& loc) const;
-
-    void PipelineUsedInFrame(VkPipeline pipeline) {
-        WriteLockGuard guard(pipeline_lock_);
-        pipelines_used_in_frame_.insert(pipeline);
-    }
 
     void ClearPipelinesUsedInFrame() {
         WriteLockGuard guard(pipeline_lock_);
@@ -795,3 +675,45 @@ class BestPractices : public vvl::DeviceProxy {
     vvl::unordered_set<VkPipeline> pipelines_used_in_frame_;
     mutable std::shared_mutex pipeline_lock_;
 };
+
+static inline bool RenderPassUsesAttachmentOnTile(const vku::safe_VkRenderPassCreateInfo2& create_info, uint32_t attachment) {
+    for (uint32_t subpass = 0; subpass < create_info.subpassCount; subpass++) {
+        const auto& subpass_info = create_info.pSubpasses[subpass];
+
+        // If an attachment is ever used as a color attachment,
+        // resolve attachment or depth stencil attachment,
+        // it needs to exist on tile at some point.
+
+        for (uint32_t i = 0; i < subpass_info.colorAttachmentCount; i++) {
+            if (subpass_info.pColorAttachments[i].attachment == attachment) return true;
+        }
+
+        if (subpass_info.pResolveAttachments) {
+            for (uint32_t i = 0; i < subpass_info.colorAttachmentCount; i++) {
+                if (subpass_info.pResolveAttachments[i].attachment == attachment) return true;
+            }
+        }
+
+        if (subpass_info.pDepthStencilAttachment && subpass_info.pDepthStencilAttachment->attachment == attachment) return true;
+    }
+
+    return false;
+}
+
+static inline bool RenderPassUsesAttachmentAsImageOnly(const vku::safe_VkRenderPassCreateInfo2& create_info, uint32_t attachment) {
+    if (RenderPassUsesAttachmentOnTile(create_info, attachment)) {
+        return false;
+    }
+
+    for (uint32_t subpass = 0; subpass < create_info.subpassCount; subpass++) {
+        const auto& subpass_info = create_info.pSubpasses[subpass];
+
+        for (uint32_t i = 0; i < subpass_info.inputAttachmentCount; i++) {
+            if (subpass_info.pInputAttachments[i].attachment == attachment) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}

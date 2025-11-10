@@ -130,6 +130,10 @@ struct DeviceFeatures {
     bool cooperativeVector;
     // VkPhysicalDeviceCooperativeVectorFeaturesNV
     bool cooperativeVectorTraining;
+    // VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR
+    bool indirectMemoryCopy;
+    // VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR
+    bool indirectMemoryToImageCopy;
     // VkPhysicalDeviceCopyMemoryIndirectFeaturesNV
     bool indirectCopy;
     // VkPhysicalDeviceCornerSampledImageFeaturesNV
@@ -158,6 +162,8 @@ struct DeviceFeatures {
     bool dataGraphUpdateAfterBind;
     // VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV
     bool dedicatedAllocationImageAliasing;
+    // VkPhysicalDeviceDenseGeometryFormatFeaturesAMDX
+    bool denseGeometryFormat;
     // VkPhysicalDeviceDepthBiasControlFeaturesEXT
     bool depthBiasControl;
     // VkPhysicalDeviceDepthBiasControlFeaturesEXT
@@ -560,6 +566,8 @@ struct DeviceFeatures {
     bool stippledSmoothLines;
     // VkPhysicalDeviceLinearColorAttachmentFeaturesNV
     bool linearColorAttachment;
+    // VkPhysicalDeviceMaintenance10FeaturesKHR
+    bool maintenance10;
     // VkPhysicalDeviceMaintenance4Features, VkPhysicalDeviceVulkan13Features
     bool maintenance4;
     // VkPhysicalDeviceMaintenance5Features, VkPhysicalDeviceVulkan14Features
@@ -578,7 +586,7 @@ struct DeviceFeatures {
     bool memoryMapRangePlaced;
     // VkPhysicalDeviceMapMemoryPlacedFeaturesEXT
     bool memoryUnmapReserve;
-    // VkPhysicalDeviceMemoryDecompressionFeaturesNV
+    // VkPhysicalDeviceMemoryDecompressionFeaturesEXT
     bool memoryDecompression;
     // VkPhysicalDeviceMemoryPriorityFeaturesEXT
     bool memoryPriority;
@@ -638,6 +646,8 @@ struct DeviceFeatures {
     bool performanceCounterQueryPools;
     // VkPhysicalDevicePipelineBinaryFeaturesKHR
     bool pipelineBinaries;
+    // VkPhysicalDevicePipelineCacheIncrementalModeFeaturesSEC
+    bool pipelineCacheIncrementalMode;
     // VkPhysicalDevicePipelineCreationCacheControlFeatures, VkPhysicalDeviceVulkan13Features
     bool pipelineCreationCacheControl;
     // VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR
@@ -690,7 +700,7 @@ struct DeviceFeatures {
     bool presentId;
     // VkPhysicalDevicePresentMeteringFeaturesNV
     bool presentMetering;
-    // VkPhysicalDevicePresentModeFifoLatestReadyFeaturesEXT
+    // VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR
     bool presentModeFifoLatestReady;
     // VkPhysicalDevicePresentWait2FeaturesKHR
     bool presentWait2;
@@ -774,6 +784,8 @@ struct DeviceFeatures {
     bool schedulingControls;
     // VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures, VkPhysicalDeviceVulkan12Features
     bool separateDepthStencilLayouts;
+    // VkPhysicalDeviceShader64BitIndexingFeaturesEXT
+    bool shader64BitIndexing;
     // VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV
     bool shaderFloat16VectorAtomics;
     // VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT
@@ -862,6 +874,12 @@ struct DeviceFeatures {
     bool shaderFloat8CooperativeMatrix;
     // VkPhysicalDeviceShaderFloatControls2Features, VkPhysicalDeviceVulkan14Features
     bool shaderFloatControls2;
+    // VkPhysicalDeviceShaderFmaFeaturesKHR
+    bool shaderFmaFloat16;
+    // VkPhysicalDeviceShaderFmaFeaturesKHR
+    bool shaderFmaFloat32;
+    // VkPhysicalDeviceShaderFmaFeaturesKHR
+    bool shaderFmaFloat64;
     // VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT
     bool shaderImageInt64Atomics;
     // VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT
@@ -902,6 +920,10 @@ struct DeviceFeatures {
     bool shaderTileImageDepthReadAccess;
     // VkPhysicalDeviceShaderTileImageFeaturesEXT
     bool shaderTileImageStencilReadAccess;
+    // VkPhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT
+    bool shaderUniformBufferUnsizedArray;
+    // VkPhysicalDeviceShaderUntypedPointersFeaturesKHR
+    bool shaderUntypedPointers;
     // VkPhysicalDeviceShadingRateImageFeaturesNV
     bool shadingRateCoarseSampleOrder;
     // VkPhysicalDeviceShadingRateImageFeaturesNV
@@ -914,7 +936,7 @@ struct DeviceFeatures {
     bool subpassMergeFeedback;
     // VkPhysicalDeviceSubpassShadingFeaturesHUAWEI
     bool subpassShading;
-    // VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT
+    // VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR
     bool swapchainMaintenance1;
     // VkPhysicalDeviceSynchronization2Features, VkPhysicalDeviceVulkan13Features
     bool synchronization2;
@@ -994,8 +1016,12 @@ struct DeviceFeatures {
     bool videoDecodeVP9;
     // VkPhysicalDeviceVideoEncodeAV1FeaturesKHR
     bool videoEncodeAV1;
+    // VkPhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR
+    bool videoEncodeIntraRefresh;
     // VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR
     bool videoEncodeQuantizationMap;
+    // VkPhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE
+    bool videoEncodeRgbConversion;
     // VkPhysicalDeviceVideoMaintenance1FeaturesKHR
     bool videoMaintenance1;
     // VkPhysicalDeviceVideoMaintenance2FeaturesKHR

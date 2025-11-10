@@ -301,27 +301,47 @@ bool CoreChecks::PreCallValidateDestroyPipeline(VkDevice device, VkPipeline pipe
     return skip;
 }
 
+static bool MatchSampleLocationsInfo(const vku::safe_VkSampleLocationsInfoEXT &info_1, const VkSampleLocationsInfoEXT &info_2) {
+    if (info_1.sampleLocationsPerPixel != info_2.sampleLocationsPerPixel ||
+        info_1.sampleLocationGridSize.width != info_2.sampleLocationGridSize.width ||
+        info_1.sampleLocationGridSize.height != info_2.sampleLocationGridSize.height ||
+        info_1.sampleLocationsCount != info_2.sampleLocationsCount) {
+        return false;
+    }
+    for (uint32_t i = 0; i < info_1.sampleLocationsCount; ++i) {
+        if (info_1.pSampleLocations[i].x != info_2.pSampleLocations[i].x ||
+            info_1.pSampleLocations[i].y != info_2.pSampleLocations[i].y) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool CoreChecks::ValidateCmdBindPipelineRenderPassMultisample(const vvl::CommandBuffer &cb_state,
                                                               const vvl::Pipeline &pipeline_state, const vvl::RenderPass &rp_state,
                                                               const Location &loc) const {
     bool skip = false;
     const auto *multisample_state = pipeline_state.MultisampleState();
-    if (!multisample_state) return skip;
+    if (!multisample_state) {
+        return skip;
+    } else if (rp_state.UsesDynamicRendering()) {
+        // https://gitlab.khronos.org/vulkan/vulkan/-/issues/4372
+        // Currently seems to be no valid way to use VK_EXT_sample_locations with dynamic rendering
+        return skip;
+    }
 
-    if (phys_dev_ext_props.sample_locations_props.variableSampleLocations == VK_FALSE) {
+    const uint32_t subpass = cb_state.GetActiveSubpass();
+    if (!phys_dev_ext_props.sample_locations_props.variableSampleLocations) {
         const auto *sample_locations = vku::FindStructInPNextChain<VkPipelineSampleLocationsStateCreateInfoEXT>(multisample_state);
         if (sample_locations && sample_locations->sampleLocationsEnable == VK_TRUE &&
             !pipeline_state.IsDynamic(CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT)) {
             bool found = false;
-            if (cb_state.sample_locations_begin_info) {
-                for (uint32_t i = 0; i < cb_state.sample_locations_begin_info->postSubpassSampleLocationsCount; ++i) {
-                    if (cb_state.sample_locations_begin_info->pPostSubpassSampleLocations[i].subpassIndex ==
-                        cb_state.GetActiveSubpass()) {
-                        if (MatchSampleLocationsInfo(
-                                cb_state.sample_locations_begin_info->pPostSubpassSampleLocations[i].sampleLocationsInfo,
-                                sample_locations->sampleLocationsInfo)) {
-                            found = true;
-                        }
+            for (uint32_t i = 0; i < cb_state.sample_locations_begin_info.postSubpassSampleLocationsCount; ++i) {
+                const auto &post_subpass_sample_location = cb_state.sample_locations_begin_info.pPostSubpassSampleLocations[i];
+                if (post_subpass_sample_location.subpassIndex == subpass) {
+                    if (MatchSampleLocationsInfo(post_subpass_sample_location.sampleLocationsInfo,
+                                                 sample_locations->sampleLocationsInfo)) {
+                        found = true;
                     }
                 }
             }
@@ -337,8 +357,7 @@ bool CoreChecks::ValidateCmdBindPipelineRenderPassMultisample(const vvl::Command
         }
     }
 
-    if (enabled_features.variableMultisampleRate == VK_FALSE) {
-        const uint32_t subpass = cb_state.GetActiveSubpass();
+    if (!enabled_features.variableMultisampleRate) {
         // if render pass uses no attachment, verify that all bound pipelines referencing this subpass have the same
         // pMultisampleState->rasterizationSamples.
         if (rp_state.UsesNoAttachment(subpass)) {
@@ -463,7 +482,9 @@ bool CoreChecks::ValidatePipelineBindPoint(const vvl::CommandBuffer &cb_state, V
     bool skip = false;
     const auto *pool = cb_state.command_pool;
     // The loss of a pool in a recording cmd is reported in DestroyCommandPool
-    if (!pool) return skip;
+    if (!pool) {
+        return skip;
+    }
 
     const VkQueueFlags required_mask = (VK_PIPELINE_BIND_POINT_GRAPHICS == bind_point)  ? VK_QUEUE_GRAPHICS_BIT
                                        : (VK_PIPELINE_BIND_POINT_COMPUTE == bind_point) ? VK_QUEUE_COMPUTE_BIT
@@ -473,7 +494,7 @@ bool CoreChecks::ValidatePipelineBindPoint(const vvl::CommandBuffer &cb_state, V
 
     const auto &qfp = physical_device_state->queue_family_properties[pool->queueFamilyIndex];
     if (0 == (qfp.queueFlags & required_mask)) {
-        const LogObjectList objlist(cb_state.Handle(), cb_state.allocate_info.commandPool);
+        const LogObjectList objlist(cb_state.Handle(), pool->Handle());
         const char *vuid = kVUIDUndefined;
         switch (loc.function) {
             case Func::vkCmdBindDescriptorSets:
@@ -524,7 +545,7 @@ bool CoreChecks::ValidatePipelineBindPoint(const vvl::CommandBuffer &cb_state, V
                 break;
         }
         skip |= LogError(vuid, objlist, loc, "%s was allocated from %s that does not support bindpoint %s.",
-                         FormatHandle(cb_state.Handle()).c_str(), FormatHandle(cb_state.allocate_info.commandPool).c_str(),
+                         FormatHandle(cb_state.Handle()).c_str(), FormatHandle(pool->Handle()).c_str(),
                          string_VkPipelineBindPoint(bind_point));
     }
     return skip;

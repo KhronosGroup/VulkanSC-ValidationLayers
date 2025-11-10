@@ -1,6 +1,7 @@
 /* Copyright (c) 2018-2025 The Khronos Group Inc.
  * Copyright (c) 2018-2025 Valve Corporation
  * Copyright (c) 2018-2025 LunarG, Inc.
+ * Copyright (c) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,6 +57,8 @@ struct PostProcessDescriptorIndexSlot {
     // OpVariable ID of descriptor accessed.
     // This is required to distinguish between 2 aliased descriptors
     uint32_t variable_id;
+    // Used in order to print out information about which instruction caused the issue
+    uint32_t instruction_position_offset;
 };
 
 // Represented as a uvec2 in the shader
@@ -82,6 +85,8 @@ struct DescriptorState {
                 return (kInlineUniformDesc << kDescBitShift);
             case vvl::DescriptorClass::AccelerationStructure:
                 return (kAccelDesc << kDescBitShift);
+            case vvl::DescriptorClass::Tensor:
+                return (kTensorDesc << kDescBitShift);
             case vvl::DescriptorClass::Mutable:
             case vvl::DescriptorClass::Invalid:
                 assert(false);

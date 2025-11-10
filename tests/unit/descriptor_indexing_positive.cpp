@@ -61,7 +61,7 @@ TEST_F(PositiveDescriptorIndexing, BindingPartiallyBound) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, sizeof(uint32_t));
     descriptor_set.UpdateDescriptorSets();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) uniform foo_0 { int val; } doit;
         layout(set = 0, binding = 1) uniform foo_1 { int val; } readit;
@@ -147,7 +147,7 @@ TEST_F(PositiveDescriptorIndexing, UpdateAfterBind) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    buffer1.destroy();
+    buffer1.Destroy();
     descriptor_set.WriteDescriptorBufferInfo(0, buffer2, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
@@ -216,7 +216,7 @@ TEST_F(PositiveDescriptorIndexing, PartiallyBoundDescriptors) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    buffer1.destroy();
+    buffer1.Destroy();
 
     VkCommandBufferSubmitInfo cb_info = vku::InitStructHelper();
     cb_info.commandBuffer = m_command_buffer;
@@ -235,7 +235,7 @@ TEST_F(PositiveDescriptorIndexing, PipelineShaderBasic) {
         {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
     };
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set=0, binding=0) buffer block { int x; };
@@ -256,7 +256,7 @@ TEST_F(PositiveDescriptorIndexing, PipelineShaderSampler2D) {
         {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
     };
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set=0, binding=0) buffer block { vec2 x; };
@@ -276,7 +276,7 @@ TEST_F(PositiveDescriptorIndexing, PipelineShaderImageBufferArray) {
         {1, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
     };
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set=0, binding=0) buffer block { int x; };
@@ -303,7 +303,7 @@ TEST_F(PositiveDescriptorIndexing, PipelineShaderMultiArrayIndexing) {
         {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
     };
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform A { uint value; };
@@ -319,4 +319,125 @@ TEST_F(PositiveDescriptorIndexing, PipelineShaderMultiArrayIndexing) {
 
     AddRequiredFeature(vkt::Feature::shaderSampledImageArrayNonUniformIndexing);
     ComputePipelineShaderTest(csSource, bindings);
+}
+
+TEST_F(PositiveDescriptorIndexing, DescriptorSetVariableDescriptorCountAllocateInfo) {
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingVariableDescriptorCount);
+    RETURN_IF_SKIP(Init());
+
+    // Don't set VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT
+    vkt::DescriptorSetLayout ds_layout(*m_device, {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
+
+    VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1};
+    VkDescriptorPoolCreateInfo dspci = vku::InitStructHelper();
+    dspci.poolSizeCount = 1;
+    dspci.pPoolSizes = &pool_size;
+    dspci.maxSets = 1;
+    vkt::DescriptorPool pool(*m_device, dspci);
+
+    // Ignored because VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT isn't set
+    VkDescriptorSetVariableDescriptorCountAllocateInfo count_alloc_info = vku::InitStructHelper();
+    count_alloc_info.descriptorSetCount = 1;
+    uint32_t variable_count = 1024;
+    count_alloc_info.pDescriptorCounts = &variable_count;
+
+    VkDescriptorSetAllocateInfo ds_alloc_info = vku::InitStructHelper(&count_alloc_info);
+    ds_alloc_info.descriptorPool = pool;
+    ds_alloc_info.descriptorSetCount = 1;
+    ds_alloc_info.pSetLayouts = &ds_layout.handle();
+
+    VkDescriptorSet ds = VK_NULL_HANDLE;
+    vk::AllocateDescriptorSets(*m_device, &ds_alloc_info, &ds);
+}
+
+TEST_F(PositiveDescriptorIndexing, StaticAccessSomeOfTheArray) {
+    TEST_DESCRIPTION("https://gitlab.khronos.org/vulkan/vulkan/-/issues/4383");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    // Descriptor has 4 items, but only update the 2 used
+    OneOffDescriptorSet descriptor_set(m_device, {
+                                                     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4, VK_SHADER_STAGE_ALL, nullptr},
+                                                 });
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    vkt::Buffer buffer_0(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    vkt::Buffer buffer_1(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer_0, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer_0, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char *vs_source = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform Foo { float x; } bufs[2];
+        void main() {
+            gl_Position = vec4(bufs[0].x, bufs[0].x, bufs[1].x, bufs[1].x);
+        }
+    )glsl";
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_[0] = vs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pipeline_layout;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveDescriptorIndexing, VariableDescriptorCountBuffer) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10490");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::descriptorBindingVariableDescriptorCount);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    VkDescriptorBindingFlags binding_flags = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+    VkDescriptorSetLayoutBindingFlagsCreateInfo dsl_binding_flags = vku::InitStructHelper();
+    dsl_binding_flags.bindingCount = 1u;
+    dsl_binding_flags.pBindingFlags = &binding_flags;
+
+    uint32_t variable_count = 1u;
+    VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count_info = vku::InitStructHelper();
+    variable_count_info.descriptorSetCount = 1u;
+    variable_count_info.pDescriptorCounts = &variable_count;
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                       },
+                                       0u, &dsl_binding_flags, 0u, &variable_count_info);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0u, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0u);
+    descriptor_set.UpdateDescriptorSets();
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    const char *cs_source = R"glsl(
+        #version 450 core
+        layout(set = 0, binding = 0) buffer SSBO { int x; } bufs[3];
+        void main() {
+          bufs[0].x = 0;
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0u, 1u, &descriptor_set.set_, 0u,
+                              nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1u, 1u, 1u);
+    m_command_buffer.End();
 }

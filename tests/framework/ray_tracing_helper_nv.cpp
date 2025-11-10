@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2024 Valve Corporation
- * Copyright (c) 2023-2024 LunarG, Inc.
+ * Copyright (c) 2023-2025 Valve Corporation
+ * Copyright (c) 2023-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ void RayTracingPipelineHelper::InitPipelineLayoutInfo() {
 }
 
 void RayTracingPipelineHelper::InitShaderInfo() {  // DONE
-    static const char rayGenShaderText[] = R"glsl(
+    const char rayGenShaderText[] = R"glsl(
         #version 460 core
         #extension GL_NV_ray_tracing : require
         layout(set = 0, binding = 0, rgba8) uniform image2D image;
@@ -102,7 +102,7 @@ void RayTracingPipelineHelper::InitShaderInfo() {  // DONE
         }
     )glsl";
 
-    static char const closestHitShaderText[] = R"glsl(
+    const char closestHitShaderText[] = R"glsl(
         #version 460 core
         #extension GL_NV_ray_tracing : require
         layout(location = 0) rayPayloadInNV float hitValue;
@@ -112,7 +112,7 @@ void RayTracingPipelineHelper::InitShaderInfo() {  // DONE
         }
     )glsl";
 
-    static char const missShaderText[] = R"glsl(
+    const char missShaderText[] = R"glsl(
         #version 460 core
         #extension GL_NV_ray_tracing : require
         layout(location = 0) rayPayloadInNV float hitValue;
@@ -208,8 +208,8 @@ void GetSimpleGeometryForAccelerationStructureTests(const vkt::Device &device, v
         alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
         alloc_pnext = &alloc_flags;
     }
-    vbo->init(device, 1024, usage, kHostVisibleMemProps, alloc_pnext);
-    ibo->init(device, 1024, usage, kHostVisibleMemProps, alloc_pnext);
+    vbo->Init(device, 1024, usage, kHostVisibleMemProps, alloc_pnext);
+    ibo->Init(device, 1024, usage, kHostVisibleMemProps, alloc_pnext);
 
     constexpr std::array vertices = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f};
     constexpr std::array<uint32_t, 3> indicies = {{0, 1, 2}};
@@ -222,10 +222,9 @@ void GetSimpleGeometryForAccelerationStructureTests(const vkt::Device &device, v
     std::memcpy(mapped_ibo_buffer_data + offset, (uint8_t *)indicies.data(), sizeof(uint32_t) * indicies.size());
     ibo->Memory().Unmap();
 
-    *geometry = {};
-    geometry->sType = VK_STRUCTURE_TYPE_GEOMETRY_NV;
+    *geometry = vku::InitStructHelper();
     geometry->geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV;
-    geometry->geometry.triangles.sType = VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV;
+    geometry->geometry.triangles = vku::InitStructHelper();
     geometry->geometry.triangles.vertexData = vbo->handle();
     geometry->geometry.triangles.vertexOffset = 0;
     geometry->geometry.triangles.vertexCount = 3;
@@ -237,8 +236,7 @@ void GetSimpleGeometryForAccelerationStructureTests(const vkt::Device &device, v
     geometry->geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
     geometry->geometry.triangles.transformData = VK_NULL_HANDLE;
     geometry->geometry.triangles.transformOffset = 0;
-    geometry->geometry.aabbs = {};
-    geometry->geometry.aabbs.sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV;
+    geometry->geometry.aabbs = vku::InitStructHelper();
 }
 }  // namespace rt
 }  // namespace nv

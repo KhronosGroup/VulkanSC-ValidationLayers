@@ -2134,7 +2134,7 @@ TEST_F(NegativeImage, ImageViewLayerCount) {
 
     image_ci.imageType = VK_IMAGE_TYPE_3D;
     VkImageFormatProperties img_limits;
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &image_ci, &img_limits));
+    ASSERT_EQ(VK_SUCCESS, GetImageFormatProps(Gpu(), image_ci, img_limits));
     vkt::Image image_3d_array;
     image_ci.arrayLayers = 1;  // arrayLayers must be 1 for 3D images
     if (img_limits.maxArrayLayers >= image_ci.arrayLayers) {
@@ -2186,14 +2186,10 @@ TEST_F(NegativeImage, ImageViewLayerCount) {
 
 TEST_F(NegativeImage, ImageMisc) {
     TEST_DESCRIPTION("Misc leftover valid usage errors in VkImageCreateInfo struct");
-
     VkPhysicalDeviceFeatures features{};
     RETURN_IF_SKIP(Init(&features));
 
     const VkImageCreateInfo safe_image_ci = DefaultImageInfo();
-
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &safe_image_ci));
-
     {
         VkImageCreateInfo image_ci = safe_image_ci;
         image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;  // always has 4 samples support
@@ -2233,7 +2229,7 @@ TEST_F(NegativeImage, ImageMisc) {
         image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
         image_ci.mipLevels = 2;
         image_ci.flags = VK_IMAGE_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT;
-        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-flags-parameter");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-flags-parameter");  // skip stateless
         CreateImageTest(image_ci, "VUID-VkImageCreateInfo-flags-02259");
 
         image_ci = safe_image_ci;
@@ -2242,7 +2238,7 @@ TEST_F(NegativeImage, ImageMisc) {
         image_ci.mipLevels = 1;
         image_ci.flags = VK_IMAGE_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT;
         image_ci.tiling = VK_IMAGE_TILING_LINEAR;
-        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-flags-parameter");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-flags-parameter");  // skip stateless
         CreateImageTest(image_ci, "VUID-VkImageCreateInfo-flags-02259");
     }
 
@@ -2421,7 +2417,7 @@ TEST_F(NegativeImage, MaxLimitsMipLevels) {
         image_ci.format = format;
 
         VkImageFormatProperties img_limits;
-        if (VK_SUCCESS == GPDIFPHelper(Gpu(), &image_ci, &img_limits) && img_limits.maxMipLevels == 1) {
+        if (VK_SUCCESS == GetImageFormatProps(Gpu(), image_ci, img_limits) && img_limits.maxMipLevels == 1) {
             CreateImageTest(image_ci, "VUID-VkImageCreateInfo-mipLevels-02255");
             return;  // end test
         }
@@ -2436,7 +2432,7 @@ TEST_F(NegativeImage, MaxLimitsArrayLayers) {
     VkImageCreateInfo image_ci = DefaultImageInfo();
 
     VkImageFormatProperties img_limits;
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &image_ci, &img_limits));
+    ASSERT_EQ(VK_SUCCESS, GetImageFormatProps(Gpu(), image_ci, img_limits));
 
     if (img_limits.maxArrayLayers == vvl::kU32Max) {
         GTEST_SKIP() << "VkImageFormatProperties::maxArrayLayers is already UINT32_MAX; skipping part of test";
@@ -2458,7 +2454,7 @@ TEST_F(NegativeImage, MaxLimitsSamples) {
              samples = static_cast<VkSampleCountFlagBits>(samples >> 1)) {
             image_ci.samples = samples;
             VkImageFormatProperties img_limits;
-            if (VK_SUCCESS == GPDIFPHelper(Gpu(), &image_ci, &img_limits) && !(img_limits.sampleCounts & samples)) {
+            if (VK_SUCCESS == GetImageFormatProps(Gpu(), image_ci, img_limits) && !(img_limits.sampleCounts & samples)) {
                 CreateImageTest(image_ci, "VUID-VkImageCreateInfo-samples-02258");
                 return;  // end test
             }
@@ -2475,7 +2471,7 @@ TEST_F(NegativeImage, MaxLimitsExtent) {
     image_ci.imageType = VK_IMAGE_TYPE_3D;
 
     VkImageFormatProperties img_limits;
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &image_ci, &img_limits));
+    ASSERT_EQ(VK_SUCCESS, GetImageFormatProps(Gpu(), image_ci, img_limits));
 
     image_ci.extent = {img_limits.maxExtent.width + 1, 1, 1};
     CreateImageTest(image_ci, "VUID-VkImageCreateInfo-extent-02252");
@@ -2499,7 +2495,7 @@ TEST_F(NegativeImage, MaxLimitsFramebufferWidth) {
     image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;  // (any attachment bit)
 
     VkImageFormatProperties img_limits;
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &image_ci, &img_limits));
+    ASSERT_EQ(VK_SUCCESS, GetImageFormatProps(Gpu(), image_ci, img_limits));
 
     image_ci.extent = {dev_limits.maxFramebufferWidth + 1, 64, 1};
     if (dev_limits.maxFramebufferWidth + 1 > img_limits.maxExtent.width) {
@@ -2521,7 +2517,7 @@ TEST_F(NegativeImage, MaxLimitsFramebufferHeight) {
     image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;  // (any attachment bit)
 
     VkImageFormatProperties img_limits;
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &image_ci, &img_limits));
+    ASSERT_EQ(VK_SUCCESS, GetImageFormatProps(Gpu(), image_ci, img_limits));
 
     image_ci.extent = {64, dev_limits.maxFramebufferHeight + 1, 1};
     if (dev_limits.maxFramebufferHeight + 1 > img_limits.maxExtent.height) {
@@ -2984,8 +2980,7 @@ TEST_F(NegativeImage, BlockTextImageViewCompatibleFormat) {
     image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
 
     VkImageFormatProperties image_properties;
-    VkResult res = vk::GetPhysicalDeviceImageFormatProperties(Gpu(), image_ci.format, image_ci.imageType, image_ci.tiling,
-                                                              image_ci.usage, image_ci.flags, &image_properties);
+    VkResult res = GetImageFormatProps(Gpu(), image_ci, image_properties);
     if (res != VK_SUCCESS) {
         GTEST_SKIP() << "Image format not valid for format, type, tiling, usage and flags combination.";
     }
@@ -3002,8 +2997,7 @@ TEST_F(NegativeImage, BlockTextImageViewCompatibleFlag) {
     image_ci.format = VK_FORMAT_BC3_UNORM_BLOCK;
 
     VkImageFormatProperties image_properties;
-    VkResult res = vk::GetPhysicalDeviceImageFormatProperties(Gpu(), image_ci.format, image_ci.imageType, image_ci.tiling,
-                                                              image_ci.usage, image_ci.flags, &image_properties);
+    VkResult res = GetImageFormatProps(Gpu(), image_ci, image_properties);
     if (res != VK_SUCCESS) {
         GTEST_SKIP() << "Image format not valid for format, type, tiling, usage and flags combination.";
     }
@@ -3068,7 +3062,6 @@ TEST_F(NegativeImage, ImageSplitInstanceBindRegionCount) {
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
-    vkt::DeviceMemory image_mem;
     VkMemoryRequirements mem_reqs;
     vk::GetImageMemoryRequirements(device(), image, &mem_reqs);
     VkMemoryAllocateInfo mem_alloc = vku::InitStructHelper(nullptr);
@@ -3081,7 +3074,7 @@ TEST_F(NegativeImage, ImageSplitInstanceBindRegionCount) {
         }
     }
 
-    image_mem.init(*m_device, mem_alloc);
+    vkt::DeviceMemory image_mem(*m_device, mem_alloc);
 
     std::array<uint32_t, 2> deviceIndices = {{0, 0}};
     VkRect2D splitInstanceBindregion = {{0, 0}, {16, 16}};
@@ -3454,7 +3447,6 @@ TEST_F(NegativeImage, ImageSubresourceRangeAspectMask) {
 
 TEST_F(NegativeImage, CreateImageSharingModeConcurrentQueueFamilies) {
     TEST_DESCRIPTION("Checks for invalid queue families in ImageCreateInfo when sharingMode is VK_SHARING_MODE_CONCURRENT");
-
     AddOptionalExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
@@ -3471,8 +3463,6 @@ TEST_F(NegativeImage, CreateImageSharingModeConcurrentQueueFamilies) {
     ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     ci.sharingMode = VK_SHARING_MODE_CONCURRENT;
-
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &ci));
 
     // Invalid pQueueFamilyIndices
     {
@@ -3639,6 +3629,9 @@ TEST_F(NegativeImage, Image2DViewOf3DFeature) {
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
     image_ci.flags = VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
+    if (!IsImageFormatSupported(gpu_, image_ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+        GTEST_SKIP() << "Format not supported";
+    }
     vkt::Image image_3d(*m_device, image_ci, vkt::set_layout);
 
     VkImageViewCreateInfo view_ci = vku::InitStructHelper();
@@ -3803,7 +3796,7 @@ TEST_F(NegativeImage, ImageCompressionControl) {
             vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, VK_IMAGE_USAGE_TRANSFER_SRC_BIT, imageTiling);
         image_create_info.pNext = &compression_control;
 
-        bool supported = ImageFormatIsSupported(instance(), Gpu(), image_create_info, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
+        bool supported = IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
 
         if (supported) {
             image.Init(*m_device, image_create_info);
@@ -3945,7 +3938,7 @@ TEST_F(NegativeImage, ImageCompressionControlMultiPlane) {
             vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, VK_IMAGE_USAGE_TRANSFER_SRC_BIT, imageTiling);
         image_create_info.pNext = &compression_control;
 
-        bool supported = ImageFormatIsSupported(instance(), Gpu(), image_create_info, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
+        bool supported = IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
 
         if (supported) {
             image.Init(*m_device, image_create_info);
@@ -4373,7 +4366,7 @@ TEST_F(NegativeImage, ImageViewTextureSampleWeighted) {
     GetPhysicalDeviceProperties2(image_proc_properties);
 
     // check the format feature flags
-    VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+    VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
     VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
     vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_R8_UNORM, &fmt_props);
     if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_WEIGHT_IMAGE_BIT_QCOM) == 0) {
@@ -4898,14 +4891,6 @@ TEST_F(NegativeImage, Image3DWith2DArrayCompatIssue) {
     TEST_DESCRIPTION("https://gitlab.khronos.org/vulkan/vulkan/-/issues/4308");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
-
-    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_subset_features = vku::InitStructHelper();
-        GetPhysicalDeviceFeatures2(portability_subset_features);
-        if (!portability_subset_features.imageView2DOn3DImage) {
-            GTEST_SKIP() << "imageView2DOn3DImage not supported, skipping test";
-        }
-    }
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;

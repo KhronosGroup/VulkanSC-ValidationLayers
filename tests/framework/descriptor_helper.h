@@ -2,6 +2,7 @@
  * Copyright (c) 2023-2025 The Khronos Group Inc.
  * Copyright (c) 2023-2025 Valve Corporation
  * Copyright (c) 2023-2025 LunarG, Inc.
+ * Copyright (C) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +13,8 @@
 
 #pragma once
 
+#include <vulkan/vulkan_core.h>
+#include <vulkan/utility/vk_struct_helper.hpp>
 #include "layer_validation_tests.h"
 
 class OneOffDescriptorSet {
@@ -30,6 +33,7 @@ class OneOffDescriptorSet {
         std::optional<VkDescriptorBufferInfo> buffer_info;
         std::optional<VkBufferView> buffer_view;
         std::optional<VkWriteDescriptorSetAccelerationStructureKHR> accel_struct_info;
+        std::optional<VkWriteDescriptorSetTensorARM> tensor_info;
     };
     std::vector<ResourceInfo> resource_infos;
     std::vector<VkWriteDescriptorSet> descriptor_writes;
@@ -55,6 +59,7 @@ class OneOffDescriptorSet {
                                   VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, uint32_t arrayElement = 0);
     void WriteDescriptorAccelStruct(int binding, uint32_t accelerationStructureCount,
                                     const VkAccelerationStructureKHR *pAccelerationStructures, uint32_t arrayElement = 0);
+    void WriteDescriptorTensorInfo(int binding, const VkTensorViewARM *view, uint32_t arrayElement = 0);
     void UpdateDescriptorSets();
 
   private:
@@ -79,3 +84,24 @@ class OneOffDescriptorIndexingSet : public OneOffDescriptorSet {
     OneOffDescriptorIndexingSet(vkt::Device *device, const Bindings &bindings, void *allocate_pnext = nullptr,
                                 void *create_pool_pnext = nullptr);
 };
+
+namespace vkt {
+class Buffer;
+
+// VK_EXT_descriptor_buffer
+struct DescriptorGetInfo {
+    explicit DescriptorGetInfo(VkSampler *sampler);       // VK_DESCRIPTOR_TYPE_SAMPLER
+    explicit DescriptorGetInfo(VkDeviceAddress address);  // VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR
+    DescriptorGetInfo(VkDescriptorType type, VkSampler sampler, VkImageView image_view, VkImageLayout image_layout);
+    DescriptorGetInfo(VkDescriptorType type, VkDeviceAddress address, VkDeviceSize range, VkFormat format = VK_FORMAT_UNDEFINED);
+    DescriptorGetInfo(VkDescriptorType type, const vkt::Buffer &buffer, VkDeviceSize range, VkFormat format = VK_FORMAT_UNDEFINED);
+
+    VkDescriptorGetInfoEXT get_info = vku::InitStructHelper();
+    VkSampler sampler_handle;
+    VkDescriptorImageInfo image_info;
+    VkDescriptorAddressInfoEXT address_info;
+
+    operator VkDescriptorGetInfoEXT *() { return &get_info; }
+};
+
+}  // namespace vkt

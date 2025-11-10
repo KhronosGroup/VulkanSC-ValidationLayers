@@ -2,6 +2,7 @@
  * Copyright (c) 2015-2025 Valve Corporation
  * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (C) 2015-2025 Google Inc.
+ * Copyright (c) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +23,7 @@
 #include <cstdint>
 #include "state_tracker/image_state.h"
 #include "state_tracker/buffer_state.h"
+#include "state_tracker/tensor_state.h"
 #include "state_tracker/cmd_buffer_state.h"
 #include "state_tracker/ray_tracing_state.h"
 #include "state_tracker/sampler_state.h"
@@ -181,10 +183,9 @@ vvl::DescriptorClass vvl::DescriptorTypeToClass(VkDescriptorType type) {
             return DescriptorClass::AccelerationStructure;
         case VK_DESCRIPTOR_TYPE_MUTABLE_EXT:
             return DescriptorClass::Mutable;
-        case VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV:
         case VK_DESCRIPTOR_TYPE_TENSOR_ARM:
-            // TODO
-            break;
+            return DescriptorClass::Tensor;
+        case VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV:
         case VK_DESCRIPTOR_TYPE_MAX_ENUM:
             break;
     }
@@ -199,9 +200,11 @@ using DescriptorSetLayoutId = vvl::DescriptorSetLayoutId;
 // Canonical dictionary of DescriptorSetLayoutDef (without any handle/device specific information)
 vvl::DescriptorSetLayoutDict descriptor_set_layout_dict;
 
-DescriptorSetLayoutId GetCanonicalId(const VkDescriptorSetLayoutCreateInfo *p_create_info) {
-    return descriptor_set_layout_dict.LookUp(DescriptorSetLayoutDef(p_create_info));
+static DescriptorSetLayoutId GetCanonicalId(const VkDescriptorSetLayoutCreateInfo *p_create_info, vvl::DeviceState &device_state) {
+    return descriptor_set_layout_dict.LookUp(DescriptorSetLayoutDef(device_state, p_create_info));
 }
+
+void ClearDescriptorSetLayoutCanonicalIdDict() { descriptor_set_layout_dict.Clear(); }
 
 std::string DescriptorSetLayoutDef::DescribeDifference(uint32_t index, const DescriptorSetLayoutDef &other) const {
     std::ostringstream ss;
@@ -247,9 +250,8 @@ std::string DescriptorSetLayoutDef::DescribeDifference(uint32_t index, const Des
                 ss << "binding " << i << " stageFlags " << string_VkShaderStageFlags(l.stageFlags) << " doesn't match "
                    << string_VkShaderStageFlags(r.stageFlags);
                 break;
-            } else if (l.pImmutableSamplers != r.pImmutableSamplers) {
-                ss << "binding " << i << " pImmutableSamplers " << l.pImmutableSamplers << " doesn't match "
-                   << r.pImmutableSamplers;
+            } else if ((l.pImmutableSamplers && !r.pImmutableSamplers) || (!l.pImmutableSamplers && r.pImmutableSamplers)) {
+                ss << "binding " << i << " pImmutableSamplers doesn't match as one is null and one in non-null";
                 break;
             } else if (l.pImmutableSamplers) {
                 for (uint32_t s = 0; s < l.descriptorCount; s++) {
@@ -272,13 +274,13 @@ std::string DescriptorSetLayoutDef::DescribeDifference(uint32_t index, const Des
 
 // Construct DescriptorSetLayout instance from given create info
 // Proactively reserve and resize as possible, as the reallocation was visible in profiling
-vvl::DescriptorSetLayoutDef::DescriptorSetLayoutDef(const VkDescriptorSetLayoutCreateInfo *p_create_info)
+vvl::DescriptorSetLayoutDef::DescriptorSetLayoutDef(vvl::DeviceState &device_state,
+                                                    const VkDescriptorSetLayoutCreateInfo *p_create_info)
     : flags_(p_create_info->flags),
       binding_count_(0),
       descriptor_count_(0),
       non_inline_descriptor_count_(0),
-      dynamic_descriptor_count_(0),
-      has_immutable_samplers_(false) {
+      dynamic_descriptor_count_(0) {
     const auto *flags_create_info = vku::FindStructInPNextChain<VkDescriptorSetLayoutBindingFlagsCreateInfo>(p_create_info->pNext);
 
     binding_type_stats_ = {0, 0};
@@ -293,21 +295,8 @@ vvl::DescriptorSetLayoutDef::DescriptorSetLayoutDef(const VkDescriptorSetLayoutC
         sorted_bindings.emplace(p_create_info->pBindings + i, flags);
     }
 
-    const auto *mutable_descriptor_type_create_info = vku::FindStructInPNextChain<VkMutableDescriptorTypeCreateInfoEXT>(p_create_info->pNext);
-    if (mutable_descriptor_type_create_info) {
-        mutable_types_.resize(mutable_descriptor_type_create_info->mutableDescriptorTypeListCount);
-        for (uint32_t i = 0; i < mutable_descriptor_type_create_info->mutableDescriptorTypeListCount; ++i) {
-            const auto &list = mutable_descriptor_type_create_info->pMutableDescriptorTypeLists[i];
-            mutable_types_[i].reserve(list.descriptorTypeCount);
-            for (uint32_t j = 0; j < list.descriptorTypeCount; ++j) {
-                mutable_types_[i].push_back(list.pDescriptorTypes[j]);
-            }
-            std::sort(mutable_types_[i].begin(), mutable_types_[i].end());
-        }
-    }
-
     // Store the create info in the sorted order from above
-    uint32_t index = 0;
+    uint32_t binding_index = 0;
     binding_count_ = static_cast<uint32_t>(sorted_bindings.size());
     bindings_.reserve(binding_count_);
     binding_flags_.reserve(binding_count_);
@@ -315,8 +304,9 @@ vvl::DescriptorSetLayoutDef::DescriptorSetLayoutDef(const VkDescriptorSetLayoutC
     for (const auto &input_binding : sorted_bindings) {
         // Add to binding and map, s.t. it is robust to invalid duplication of binding_num
         const auto binding_num = input_binding.layout_binding->binding;
-        binding_to_index_map_[binding_num] = index++;
+        binding_to_index_map_[binding_num] = binding_index;
         bindings_.emplace_back(input_binding.layout_binding);
+        // safe_VkDescriptorSetLayoutBinding will do some extra "cleanup" logic, so want to use it
         auto &binding_info = bindings_.back();
         binding_flags_.emplace_back(input_binding.binding_flags);
 
@@ -340,8 +330,24 @@ vvl::DescriptorSetLayoutDef::DescriptorSetLayoutDef(const VkDescriptorSetLayoutC
                 binding_type_stats_.non_dynamic_buffer_count++;
             }
         }
-
-        has_immutable_samplers_ |= (binding_info.pImmutableSamplers != nullptr);
+        // Get immutable samplers info
+        if (binding_info.pImmutableSamplers != nullptr) {
+            if (immutable_sampler_create_infos_.empty()) {
+                immutable_sampler_create_infos_.resize(binding_count_);
+                immutable_sampler_combined_hashes_.resize(binding_count_, 0);
+            }
+            immutable_sampler_create_infos_[binding_index].resize(binding_info.descriptorCount, {});
+            hash_util::HashCombiner samplers_hc;
+            for (uint32_t array_index = 0; array_index < binding_info.descriptorCount; array_index++) {
+                if (auto sampler = device_state.Get<vvl::Sampler>(binding_info.pImmutableSamplers[array_index])) {
+                    immutable_sampler_create_infos_[binding_index][array_index] = sampler->safe_create_info;
+                    const size_t sampler_hash = HashSamplerCreateInfo(*sampler->safe_create_info.ptr());
+                    samplers_hc << sampler_hash;
+                }
+            }
+            immutable_sampler_combined_hashes_[binding_index] = samplers_hc.Value();
+        }
+        binding_index++;
     }
     assert(bindings_.size() == binding_count_);
     assert(binding_flags_.size() == binding_count_);
@@ -353,16 +359,38 @@ vvl::DescriptorSetLayoutDef::DescriptorSetLayoutDef(const VkDescriptorSetLayoutC
         global_index_range_.emplace_back(global_index, final_index);
         global_index = final_index;
     }
+
+    // Need to do after because of the way we sort above, the |index| in pMutableDescriptorTypeLists[index] is based on the create
+    // info, but this information is lost and we have changed to a sorted list based on bindings.
+    if (const auto *mutable_descriptor_type_create_info =
+            vku::FindStructInPNextChain<VkMutableDescriptorTypeCreateInfoEXT>(p_create_info->pNext)) {
+        mutable_bindings_.resize(mutable_descriptor_type_create_info->mutableDescriptorTypeListCount);
+        for (uint32_t i = 0; i < mutable_descriptor_type_create_info->mutableDescriptorTypeListCount; ++i) {
+            const auto &list = mutable_descriptor_type_create_info->pMutableDescriptorTypeLists[i];
+            const uint32_t mutable_index = binding_to_index_map_[p_create_info->pBindings[i].binding];
+            mutable_bindings_[mutable_index].original_index = i;
+            mutable_bindings_[mutable_index].types.resize(list.descriptorTypeCount);
+            for (uint32_t j = 0; j < list.descriptorTypeCount; ++j) {
+                mutable_bindings_[mutable_index].types[j] = list.pDescriptorTypes[j];
+            }
+            // Sort so we can do a quick compare if list is same later
+            std::sort(mutable_bindings_[mutable_index].types.begin(), mutable_bindings_[mutable_index].types.end());
+        }
+    }
 }
 
 size_t vvl::DescriptorSetLayoutDef::hash() const {
+    static const std::vector<size_t> empty_sampler_hashes;
     hash_util::HashCombiner hc;
     hc << flags_;
-    hc.Combine(bindings_);
+    for (auto [i, safe_binding] : vvl::enumerate(bindings_)) {
+        const VkDescriptorSetLayoutBinding &binding = *safe_binding.ptr();
+        const size_t samplers_combined_hash = binding.pImmutableSamplers ? immutable_sampler_combined_hashes_[i] : 0;
+        hc.Combine(DescriptorSetLayoutBindingHashingData{binding, samplers_combined_hash});
+    }
     hc.Combine(binding_flags_);
     return hc.Value();
 }
-//
 
 // Return valid index or "end" i.e. binding_count_;
 // The asserts in "Get" are reduced to the set where no valid answer(like null or 0) could be given
@@ -414,18 +442,25 @@ uint32_t vvl::DescriptorSetLayoutDef::GetNextValidBinding(const uint32_t binding
     if (it != non_empty_bindings_.cend()) return *it;
     return GetMaxBinding() + 1;
 }
-// For given index, return ptr to ImmutableSampler array
-VkSampler const *vvl::DescriptorSetLayoutDef::GetImmutableSamplerPtrFromIndex(const uint32_t index) const {
-    if (index < bindings_.size()) {
-        return bindings_[index].pImmutableSamplers;
+
+const std::vector<vku::safe_VkSamplerCreateInfo> &DescriptorSetLayoutDef::GetImmutableSamplerCreateInfosFromIndex(
+    uint32_t index) const {
+    static const std::vector<vku::safe_VkSamplerCreateInfo> empty_sampler_infos;
+    if (immutable_sampler_create_infos_.empty()) {
+        return empty_sampler_infos;
     }
-    return nullptr;
+    return immutable_sampler_create_infos_[index];
+}
+
+size_t DescriptorSetLayoutDef::GetImmutableSamplersCombinedHashFromIndex(uint32_t index) const {
+    return immutable_sampler_combined_hashes_.empty() ? 0 : immutable_sampler_combined_hashes_[index];
 }
 
 bool vvl::DescriptorSetLayoutDef::IsTypeMutable(const VkDescriptorType type, uint32_t binding) const {
-    if (binding < mutable_types_.size()) {
-        if (mutable_types_[binding].size() > 0) {
-            for (const auto mutable_type : mutable_types_[binding]) {
+    const uint32_t index = GetIndexFromBinding(binding);
+    if (index < mutable_bindings_.size()) {
+        if (mutable_bindings_[index].types.size() > 0) {
+            for (const VkDescriptorType &mutable_type : mutable_bindings_[index].types) {
                 if (type == mutable_type) {
                     return true;
                 }
@@ -439,37 +474,115 @@ bool vvl::DescriptorSetLayoutDef::IsTypeMutable(const VkDescriptorType type, uin
 }
 
 std::string vvl::DescriptorSetLayoutDef::PrintMutableTypes(uint32_t binding) const {
-    if (binding >= mutable_types_.size()) {
-        return "no Mutable Type list at this binding";
-    }
     std::ostringstream ss;
-    const auto mutable_types = mutable_types_[binding];
-    if (mutable_types.empty()) {
-        ss << "pMutableDescriptorTypeLists is empty";
+    const uint32_t index = GetIndexFromBinding(binding);
+    if (index >= mutable_bindings_.size()) {
+        ss << "no Mutable Type list at this binding " << binding;
     } else {
-        for (uint32_t i = 0; i < mutable_types.size(); i++) {
-            ss << string_VkDescriptorType(mutable_types[i]);
-            if (i + 1 != mutable_types.size()) {
-                ss << ", ";
+        ss << "pMutableDescriptorTypeLists[" << mutable_bindings_[index].original_index << "].pDescriptorTypes is ";
+        const std::vector<VkDescriptorType> &mutable_types = mutable_bindings_[index].types;
+        if (mutable_types.empty()) {
+            ss << "empty";
+        } else {
+            ss << "[";
+            for (uint32_t i = 0; i < mutable_types.size(); i++) {
+                ss << string_VkDescriptorType(mutable_types[i]);
+                if (i + 1 != mutable_types.size()) {
+                    ss << ", ";
+                }
             }
+            ss << "]";
+        }
+    }
+
+    return ss.str();
+}
+
+const std::vector<VkDescriptorType> &vvl::DescriptorSetLayoutDef::GetMutableTypes(uint32_t binding) const {
+    const uint32_t index = GetIndexFromBinding(binding);
+    if (index >= mutable_bindings_.size()) {
+        static const std::vector<VkDescriptorType> empty = {};
+        return empty;
+    }
+    return mutable_bindings_[index].types;
+}
+
+std::string vvl::DescriptorSetLayoutDef::DescribeDescriptorBufferSizeAndOffests(VkDevice device,
+                                                                                VkDescriptorSetLayout layout) const {
+    std::ostringstream ss;
+    if (flags_ & VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT) {
+        VkDeviceSize size;
+        DispatchGetDescriptorSetLayoutSizeEXT(device, layout, &size);
+        ss << "layout total size = " << size << '\n';
+        for (auto binding : bindings_) {
+            DispatchGetDescriptorSetLayoutBindingOffsetEXT(device, layout, binding.binding, &size);
+            ss << "  binding " << binding.binding << " offset = " << size << " (" << string_VkDescriptorType(binding.descriptorType)
+               << ", descriptorCount = " << binding.descriptorCount;
+            if (binding.pImmutableSamplers) {
+                ss << ", embedded sampler";
+            }
+            ss << ")\n";
         }
     }
     return ss.str();
 }
 
-const std::vector<VkDescriptorType> &vvl::DescriptorSetLayoutDef::GetMutableTypes(uint32_t binding) const {
-    if (binding >= mutable_types_.size()) {
-        static const std::vector<VkDescriptorType> empty = {};
-        return empty;
+bool vvl::ImmutableSamplersAreEqual(const DescriptorSetLayoutDef &dsl_def1, const DescriptorSetLayoutDef &dsl_def2,
+                                    uint32_t binding_index) {
+    const size_t hash1 = dsl_def1.GetImmutableSamplersCombinedHashFromIndex(binding_index);
+    const size_t hash2 = dsl_def2.GetImmutableSamplersCombinedHashFromIndex(binding_index);
+    if (hash1 != hash2) {
+        return false;
     }
-    return mutable_types_[binding];
+    for (uint32_t i = 0; i < binding_index; i++) {
+        const std::vector<vku::safe_VkSamplerCreateInfo> &create_infos1 =
+            dsl_def1.GetImmutableSamplerCreateInfosFromIndex(binding_index);
+        const std::vector<vku::safe_VkSamplerCreateInfo> &create_infos2 =
+            dsl_def1.GetImmutableSamplerCreateInfosFromIndex(binding_index);
+        if (create_infos1.size() != create_infos2.size()) {
+            return false;
+        }
+        for (size_t s = 0; s < create_infos1.size(); s++) {
+            if (!CompareSamplerCreateInfo(*create_infos1[s].ptr(), *create_infos2[s].ptr())) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
-void vvl::DescriptorSetLayout::SetLayoutSizeInBytes(const VkDeviceSize *layout_size_in_bytes) {
-    layout_size_in_bytes_ = layout_size_in_bytes ? *layout_size_in_bytes : 0;
+bool vvl::operator==(const DescriptorSetLayoutDef &lhs, const DescriptorSetLayoutDef &rhs) {
+    // trivial types
+    if ((lhs.GetCreateFlags() != rhs.GetCreateFlags()) || (lhs.GetBindingFlags() != rhs.GetBindingFlags())) {
+        return false;
+    }
+    // vectors of vku::safe_VkDescriptorSetLayoutBinding structures
+    const auto &lhs_bindings = lhs.GetBindings();
+    const auto &rhs_bindings = rhs.GetBindings();
+    if (lhs_bindings.size() != rhs_bindings.size()) {
+        return false;
+    }
+    for (uint32_t i = 0; i < lhs_bindings.size(); i++) {
+        const auto &l = lhs_bindings[i];
+        const auto &r = rhs_bindings[i];
+        // For things where we are comparing with the bound pipeline, the binding will always be right, but when comparing two
+        // arbitrary layouts (ex. templates, DeviceState Generated Commands, etc) the bindings might be different
+        if (l.binding != r.binding) {
+            return false;
+        }
+        if (l.descriptorType != r.descriptorType || l.descriptorCount != r.descriptorCount || l.stageFlags != r.stageFlags) {
+            return false;
+        }
+        if (!ImmutableSamplersAreEqual(lhs, rhs, i)) {
+            return false;
+        }
+        // These have been sorted already so can direct compare
+        if (lhs.GetMutableTypes(i) != rhs.GetMutableTypes(i)) {
+            return false;
+        }
+    }
+    return true;
 }
-
-VkDeviceSize vvl::DescriptorSetLayout::GetLayoutSizeInBytes() const { return layout_size_in_bytes_; }
 
 // If our layout is compatible with rh_ds_layout, return true.
 bool vvl::DescriptorSetLayout::IsCompatible(DescriptorSetLayout const *rh_ds_layout) const {
@@ -478,9 +591,23 @@ bool vvl::DescriptorSetLayout::IsCompatible(DescriptorSetLayout const *rh_ds_lay
 
 // The DescriptorSetLayout stores the per handle data for a descriptor set layout, and references the common defintion for the
 // handle invariant portion
-vvl::DescriptorSetLayout::DescriptorSetLayout(const VkDescriptorSetLayoutCreateInfo *pCreateInfo,
+vvl::DescriptorSetLayout::DescriptorSetLayout(vvl::DeviceState &device_state, const VkDescriptorSetLayoutCreateInfo *pCreateInfo,
                                               const VkDescriptorSetLayout handle)
-    : StateObject(handle, kVulkanObjectTypeDescriptorSetLayout), layout_id_(GetCanonicalId(pCreateInfo)) {}
+    : StateObject(handle, kVulkanObjectTypeDescriptorSetLayout),
+      layout_id_(GetCanonicalId(pCreateInfo, device_state)),
+      desc_set_layout_ci(pCreateInfo) {
+    const bool is_descriptor_buffer = (pCreateInfo->flags & VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT) != 0;
+    if (is_descriptor_buffer) {
+        DispatchGetDescriptorSetLayoutSizeEXT(device_state.VkHandle(), handle, &layout_size_in_bytes_);
+    }
+
+    if (pCreateInfo->pBindings) {
+        for (uint32_t i = 0; i < pCreateInfo->bindingCount; i++) {
+            const uint32_t binding = pCreateInfo->pBindings[i].binding;
+            binding_to_original_index_map_[binding] = i;
+        }
+    }
+}
 
 vvl::DescriptorSet::DescriptorSet(const VkDescriptorSet handle, vvl::DescriptorPool *pool_state,
                                   const std::shared_ptr<DescriptorSetLayout const> &layout, uint32_t variable_count,
@@ -571,6 +698,10 @@ vvl::DescriptorSet::DescriptorSet(const VkDescriptorSet handle, vvl::DescriptorP
                 bindings_.push_back(MakeBinding<MutableBinding>(free_binding++, *create_info, descriptor_count, flags));
                 break;
             }
+            case DescriptorClass::Tensor: {
+                bindings_.push_back(MakeBinding<TensorBinding>(free_binding++, *create_info, descriptor_count, flags));
+                break;
+            }
             case DescriptorClass::Invalid:
                 assert(false);  // Bad descriptor type specified
                 break;
@@ -595,7 +726,7 @@ void vvl::DescriptorSet::NotifyInvalidate(const NodeList &invalid_nodes, bool un
 uint32_t vvl::DescriptorSet::GetDynamicOffsetIndexFromBinding(uint32_t dynamic_binding) const {
     const uint32_t index = layout_->GetIndexFromBinding(dynamic_binding);
     if (index == bindings_.size()) {  // binding not found
-        return vvl::kU32Max;
+        return vvl::kNoIndex32;
     }
     assert(IsDynamicDescriptor(bindings_[index]->type));
     uint32_t dynamic_offset_index = 0;
@@ -774,6 +905,10 @@ bool vvl::DescriptorSet::ValidateBindingOnGPU(const DescriptorBinding &binding,
     // Some applications (notably Doom Eternal) might have large non-bindless descriptors attached (basically doing Descriptor
     // Indexing without the extension). Trying to loop through these on the CPU will bring FPS down by over 50% so we make use of
     // the post processing to detect which descriptors were actually accessed
+    //
+    // TODO - Currently we will conflate large descriptor arrays as being "bindless" because they come out of GPU-AV. what this just
+    // means that we are miss validating non-bindless rules on these arrays if the app is doing illegal aliasing of the descriptor
+    // array, but its a non-trival perf operation to track the difference for very little ROI
     static constexpr uint32_t max_descriptor_on_cpu = 1024;
     if (GetNonInlineDescriptorCount() > max_descriptor_on_cpu) {
         // If too much CPU work
@@ -1054,7 +1189,15 @@ void vvl::AccelerationStructureDescriptor::WriteUpdate(DescriptorSet &set_state,
                                                        const VkWriteDescriptorSet &update, const uint32_t index, bool is_bindless) {
     const auto *acc_info = vku::FindStructInPNextChain<VkWriteDescriptorSetAccelerationStructureKHR>(update.pNext);
     const auto *acc_info_nv = vku::FindStructInPNextChain<VkWriteDescriptorSetAccelerationStructureNV>(update.pNext);
-    assert(acc_info || acc_info_nv);
+    const auto *acc_info_partition_nv =
+        vku::FindStructInPNextChain<VkWriteDescriptorSetPartitionedAccelerationStructureNV>(update.pNext);
+    assert(acc_info || acc_info_nv || acc_info_partition_nv);
+
+    if (acc_info_partition_nv) {
+        acc_partition_nv_ = acc_info_partition_nv->pAccelerationStructures[index];
+        ReplaceStatePtr(set_state, acc_state_, dev_data.GetConstCastShared<vvl::AccelerationStructureKHR>(acc_), is_bindless);
+        return;
+    }
     is_khr_ = (acc_info != NULL);
     if (is_khr_) {
         acc_ = acc_info->pAccelerationStructures[index];
@@ -1174,6 +1317,15 @@ void vvl::MutableDescriptor::WriteUpdate(DescriptorSet &set_state, const vvl::De
             }
             break;
         }
+        case DescriptorClass::Tensor: {
+            const auto *tensor_info = vku::FindStructInPNextChain<VkWriteDescriptorSetTensorARM>(update.pNext);
+            assert(tensor_info);
+            assert(index < tensor_info->tensorViewCount);
+            const auto tensor_view_state = dev_data.GetConstCastShared<vvl::TensorView>(tensor_info->pTensorViews[index]);
+            const auto &tensor_state = tensor_view_state->tensor_state;
+            ReplaceStatePtr(set_state, tensor_state_, tensor_state, is_bindless);
+            break;
+        }
         case DescriptorClass::TexelBuffer: {
             if (update.pTexelBufferView) {
                 // can be null if using nullDescriptors
@@ -1240,7 +1392,7 @@ void vvl::MutableDescriptor::CopyUpdate(DescriptorSet &set_state, const vvl::Dev
         case DescriptorClass::TexelBuffer: {
             ReplaceStatePtr(set_state, buffer_view_state_, static_cast<const TexelDescriptor &>(src).GetSharedBufferViewState(),
                             is_bindless);
-            buffer_size = buffer_view_state_ ? buffer_view_state_->Size() : vvl::kU32Max;
+            buffer_size = buffer_view_state_ ? buffer_view_state_->Size() : vvl::kNoIndex32;
             break;
         }
         case DescriptorClass::GeneralBuffer: {
@@ -1293,6 +1445,9 @@ void vvl::MutableDescriptor::CopyUpdate(DescriptorSet &set_state, const vvl::Dev
                 case DescriptorClass::TexelBuffer: {
                     ReplaceStatePtr(set_state, buffer_view_state_, mutable_src.GetSharedBufferViewState(), is_bindless);
                 } break;
+                case DescriptorClass::Tensor: {
+                    ReplaceStatePtr(set_state, tensor_state_, mutable_src.GetSharedTensor(), is_bindless);
+                } break;
                 case DescriptorClass::AccelerationStructure: {
                     if (mutable_src.IsKHR()) {
                         acc_ = mutable_src.GetAccelerationStructureKHR();
@@ -1313,6 +1468,12 @@ void vvl::MutableDescriptor::CopyUpdate(DescriptorSet &set_state, const vvl::Dev
             buffer_size = mutable_src.GetBufferSize();
             break;
         }
+        case vvl::DescriptorClass::Tensor: {
+            const auto tensor_desc = static_cast<const MutableDescriptor *>(&src);
+            tensor_view_count_ = tensor_desc->GetTensorViewCount();
+            tensor_views_ = tensor_desc->GetTensorViews();
+            ReplaceStatePtr(set_state, tensor_state_, std::shared_ptr<vvl::Tensor>(), is_bindless);
+        } break;
         case vvl::DescriptorClass::InlineUniform:
         case vvl::DescriptorClass::Invalid:
             break;
@@ -1385,6 +1546,11 @@ bool vvl::MutableDescriptor::AddParent(StateObject *state_object) {
                 result |= acc_state_nv_->AddParent(state_object);
             }
             break;
+        case DescriptorClass::Tensor:
+            if (tensor_state_) {
+                result |= tensor_state_->AddParent(state_object);
+            }
+            break;
         case DescriptorClass::InlineUniform:
         case DescriptorClass::Mutable:
         case DescriptorClass::Invalid:
@@ -1411,6 +1577,9 @@ void vvl::MutableDescriptor::RemoveParent(StateObject *state_object) {
     if (acc_state_nv_) {
         acc_state_nv_->RemoveParent(state_object);
     }
+    if (tensor_state_) {
+        tensor_state_->RemoveParent(state_object);
+    }
 }
 
 bool vvl::MutableDescriptor::Invalid() const {
@@ -1436,6 +1605,9 @@ bool vvl::MutableDescriptor::Invalid() const {
             } else {
                 return !acc_state_nv_ || acc_state_nv_->Invalid();
             }
+        case DescriptorClass::Tensor:
+            return !tensor_state_ || tensor_state_->Invalid();
+
         case DescriptorClass::InlineUniform:
         case DescriptorClass::Mutable:
         case DescriptorClass::Invalid:
@@ -1454,4 +1626,27 @@ std::string vvl::DslErrorSource::PrintMessage(const Logger &error_logger) const 
     }
     msg << "";
     return msg.str();
+}
+void vvl::TensorDescriptor::WriteUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const VkWriteDescriptorSet &update,
+                                        const uint32_t index, bool is_bindless) {
+    const auto tensor_info = reinterpret_cast<const VkWriteDescriptorSetTensorARM *>(update.pNext);
+    tensor_view_count_ = tensor_info->tensorViewCount;
+    tensor_views_ = tensor_info->pTensorViews;
+    auto tensor_view = dev_data.GetConstCastShared<vvl::TensorView>(tensor_views_[index]);
+    ReplaceStatePtr(set_state, tensor_view_state_, tensor_view, is_bindless);
+}
+
+void vvl::TensorDescriptor::CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &src,
+                                       bool is_bindless, VkDescriptorType type) {
+    if (src.GetClass() == vvl::DescriptorClass::Mutable) {
+        const auto tensor_desc = static_cast<const MutableDescriptor *>(&src);
+        tensor_view_count_ = tensor_desc->GetTensorViewCount();
+        tensor_views_ = tensor_desc->GetTensorViews();
+        ReplaceStatePtr(set_state, tensor_state_, std::shared_ptr<vvl::Tensor>(), is_bindless);
+        return;
+    }
+    const auto tensor_desc = static_cast<const TensorDescriptor *>(&src);
+    tensor_view_count_ = tensor_desc->tensor_view_count_;
+    tensor_views_ = tensor_desc->tensor_views_;
+    ReplaceStatePtr(set_state, tensor_state_, std::shared_ptr<vvl::Tensor>(), is_bindless);
 }

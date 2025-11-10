@@ -7,7 +7,7 @@
             "sub_dir": "Vulkan-Headers",
             "build_dir": "Vulkan-Headers/build",
             "install_dir": "Vulkan-Headers/build/install",
-            "commit": "v1.4.319"
+            "commit": "v1.4.330"
         },
         {
             "name": "Vulkan-Headers",
@@ -19,7 +19,7 @@
             "cmake_options": [
                 "-DGEN_VULKANSC_COMBINED=ON"
             ],
-            "commit": "vksc1.0.19"
+            "commit": "bf0610365d145d59daad3027ffef1a254e6169f9"
         },
         {
             "name": "Vulkan-Utility-Libraries",
@@ -28,7 +28,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "v1.4.319",
+            "commit": "v1.4.330",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -43,7 +43,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "vksc1.0.19",
+            "commit": "2113791e647967a1034b2f39f1c0d829c38e3aaa",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -57,7 +57,7 @@
             "sub_dir": "SPIRV-Headers",
             "build_dir": "SPIRV-Headers/build",
             "install_dir": "SPIRV-Headers/build/install",
-            "commit": "3b9447dc98371e96b59a6225bd062a9867e1d203"
+            "commit": "9268f3057354a2cb65991ba5f38b16d81e803692"
         },
         {
             "name": "SPIRV-Tools",
@@ -71,7 +71,7 @@
                 "-DSPIRV_SKIP_TESTS=ON",
                 "-DSPIRV_SKIP_EXECUTABLES=OFF"
             ],
-            "commit": "27dd301f866121798eca9f2b920b6cb58be3a92e"
+            "commit": "6d43afe9a0ef71712d8cec5b0ce0cd3570d1fd41"
         },
         {
             "name": "mimalloc",
@@ -85,7 +85,7 @@
                 "-DMI_BUILD_SHARED=OFF",
                 "-DMI_BUILD_TESTS=OFF"
             ],
-            "commit": "v3.0.3",
+            "commit": "v3.1.5",
             "build_platforms": [
                 "windows"
             ]
@@ -112,7 +112,7 @@
             "sub_dir": "glslang",
             "build_dir": "glslang/build",
             "install_dir": "glslang/build/install",
-            "commit": "ac1c686d562147c751a0c284f879499418beee46",
+            "commit": "8e1494f9d742a27b54193ecd9475dcb2ef23b8b7",
             "cmake_options": [
                 "-DENABLE_OPT=OFF"
             ],
@@ -127,7 +127,7 @@
             "sub_dir": "Vulkan-Loader",
             "build_dir": "Vulkan-Loader/build",
             "install_dir": "Vulkan-Loader/build/install",
-            "commit": "v1.4.319",
+            "commit": "v1.4.330",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -140,7 +140,7 @@
             "sub_dir": "Vulkan-Loader",
             "build_dir": "Vulkan-Loader/build",
             "install_dir": "Vulkan-Loader/build/install",
-            "commit": "vksc1.0.19",
+            "commit": "68ba57b3ccfc32d8c04f15ed36a197ec569e0433",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -153,7 +153,7 @@
             "sub_dir": "Vulkan-Profiles",
             "build_dir": "Vulkan-Profiles/build",
             "install_dir": "Vulkan-Profiles/build/install",
-            "commit": "642f2653f2d4cecd6c2c0bf8b8d5399ecabb6bf0",
+            "commit": "v1.4.329",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -166,7 +166,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "vksc1.0.19",
+            "commit": "e5e0130918b9a0361b8473872e43236253703ce8",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -188,6 +188,12 @@
                 "-DJSONCPP_WITH_PKGCONFIG_SUPPORT=OFF",
                 "-DJSONCPP_STATIC_WINDOWS_RUNTIME=OFF"
             ]
+        },
+        {
+            "name": "slang",
+            "repo_binaries_url": "https://github.com/shader-slang/slang/releases/tag/v2025.12.1",
+            "build_dir": "slang/download",
+            "install_dir": "slang/install"
         }
     ],
     "install_names": {
@@ -198,6 +204,7 @@
         "SPIRV-Tools": "SPIRV_TOOLS_INSTALL_DIR",
         "jsoncpp": "JSONCPP_INSTALL_DIR",
         "googletest": "GOOGLETEST_INSTALL_DIR",
-        "mimalloc": "MIMALLOC_INSTALL_DIR"
+        "mimalloc": "MIMALLOC_INSTALL_DIR",
+        "slang": "SLANG_INSTALL_DIR"
     }
 }

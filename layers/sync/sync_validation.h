@@ -35,7 +35,6 @@ class Instance : public vvl::InstanceProxy {
   public:
     Instance(vvl::dispatch::Instance *dispatch) : vvl::InstanceProxy(dispatch, LayerObjectTypeSyncValidation) {}
 };
-}  // namespace syncval
 
 class SyncValidator : public vvl::DeviceProxy {
     using BaseClass = vvl::DeviceProxy;
@@ -45,16 +44,16 @@ class SyncValidator : public vvl::DeviceProxy {
     using Struct = vvl::Struct;
     using Field = vvl::Field;
 
-    SyncValidator(vvl::dispatch::Device *dev, syncval::Instance *instance_vo)
-        : BaseClass(dev, instance_vo, LayerObjectTypeSyncValidation), error_messages_(*this) {}
+    SyncValidator(vvl::dispatch::Device *dev, syncval::Instance *instance_vo);
     ~SyncValidator();
 
-    syncval::ErrorMessages error_messages_;
+    ErrorMessages error_messages_;
 
     // Stats object must be the first member of this class:
     // - it is the first to be constructed: can observe all subsequent syncval stats events
     // - it is the last to be destroyed: ensures there are no unreported syncval stats events.
-    mutable syncval_stats::Stats stats;  // Stats object is thread safe
+    mutable Stats stats;  // Stats object is thread safe
+    const bool report_stats_ = false;
 
     // Global tag range for submitted command buffers resource usage logs
     // Started the global tag count at 1 s.t. zero are invalid and ResourceUsageTag normalization can just zero them.
@@ -74,7 +73,7 @@ class SyncValidator : public vvl::DeviceProxy {
     vvl::unordered_map<VkFence, FenceHostSyncPoint> waitable_fences_;
     vvl::unordered_map<VkSemaphore, std::deque<TimelineHostSyncPoint>> host_waitable_semaphores_;
 
-    uint32_t debug_command_number = vvl::kU32Max;
+    uint32_t debug_command_number = vvl::kNoIndex32;
     uint32_t debug_reset_count = 1;
     std::string debug_cmdbuf_pattern;
 
@@ -103,12 +102,10 @@ class SyncValidator : public vvl::DeviceProxy {
     bool ProcessUnresolvedBatch(UnresolvedBatch &unresolved_batch, SignalsUpdate &signals_update, BatchContextPtr &last_batch,
                                 bool &skip, const ErrorObject &error_obj) const;
 
-    void ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag);
+    void ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag, const LastSynchronizedPresent &last_synchronized_present);
     void ApplyAcquireWait(const AcquiredImage &acquired);
 
-    // Go through every queue batch context and apply synchronization operation
-    template <typename BatchOp>
-    void ForAllQueueBatchContexts(BatchOp &&op);
+    std::vector<QueueBatchContext::Ptr> GetAllQueueBatchContexts();
 
     void UpdateFenceHostSyncPoint(VkFence fence, FenceHostSyncPoint &&sync_point);
 
@@ -118,11 +115,13 @@ class SyncValidator : public vvl::DeviceProxy {
     void UpdateSyncImageMemoryBindState(uint32_t count, const VkBindImageMemoryInfo *infos);
 
     std::shared_ptr<const QueueSyncState> GetQueueSyncStateShared(VkQueue queue) const;
+    std::shared_ptr<const QueueSyncState> GetQueueSyncStateShared(QueueId queue_id) const;
     QueueId GetQueueIdLimit() const { return queue_id_limit_; }
 
     std::vector<QueueBatchContext::ConstPtr> GetLastBatches(std::function<bool(const QueueBatchContext::ConstPtr &)> filter) const;
     std::vector<QueueBatchContext::Ptr> GetLastBatches(std::function<bool(const QueueBatchContext::ConstPtr &)> filter);
-    std::vector<QueueBatchContext::ConstPtr> GetLastPendingBatches(std::function<bool(const QueueBatchContext::ConstPtr &)> filter) const;
+    std::vector<QueueBatchContext::ConstPtr> GetLastPendingBatches(
+        std::function<bool(const QueueBatchContext::ConstPtr &)> filter) const;
     void ClearPending() const;
 
     void Created(vvl::CommandBuffer &cb_state) override;
@@ -135,18 +134,14 @@ class SyncValidator : public vvl::DeviceProxy {
                                     const RecordObject &record_obj) override;
     void PreCallRecordDestroyImage(VkDevice device, VkImage image, const VkAllocationCallbacks *pAllocator,
                                    const RecordObject &record_obj) override;
-
-    void RecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
-                                  const VkSubpassBeginInfo *pSubpassBeginInfo, Func command);
-    void RecordCmdNextSubpass(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo *pSubpassBeginInfo,
-                              const VkSubpassEndInfo *pSubpassEndInfo, Func command);
-    void RecordCmdEndRenderPass(VkCommandBuffer commandBuffer, const VkSubpassEndInfo *pSubpassEndInfo, Func command);
+    void PreCallRecordDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks *pAllocator,
+                                          const RecordObject &record_obj) override;
     bool SuppressedBoundDescriptorWAW(const HazardResult &hazard) const;
 
     void FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) override;
 
-    void PreCallRecordDestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator,
-                                    const RecordObject& record_obj) override;
+    void PreCallRecordDestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator,
+                                    const RecordObject &record_obj) override;
 
     void PostCallRecordCreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo *pCreateInfo,
                                        const VkAllocationCallbacks *pAllocator, VkSemaphore *pSemaphore,
@@ -171,37 +166,19 @@ class SyncValidator : public vvl::DeviceProxy {
     bool PreCallValidateCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount,
                                       const VkBufferCopy *pRegions, const ErrorObject &error_obj) const override;
 
-    void PostCallRecordCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount,
-                                     const VkBufferCopy *pRegions, const RecordObject &record_obj) override;
-
     bool PreCallValidateCmdCopyBuffer2KHR(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2KHR *pCopyBufferInfo,
                                           const ErrorObject &error_obj) const override;
     bool PreCallValidateCmdCopyBuffer2(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2 *pCopyBufferInfo,
                                        const ErrorObject &error_obj) const override;
-    void RecordCmdCopyBuffer2(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2KHR *pCopyBufferInfo, Func command);
-    void PostCallRecordCmdCopyBuffer2KHR(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2KHR *pCopyBufferInfo,
-                                         const RecordObject &record_obj) override;
-    void PostCallRecordCmdCopyBuffer2(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2 *pCopyBufferInfo,
-                                      const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                      VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
                                      const VkImageCopy *pRegions, const ErrorObject &error_obj) const override;
 
-    void PostCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage,
-                                    VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageCopy *pRegions,
-                                    const RecordObject &record_obj) override;
-
     bool PreCallValidateCmdCopyImage2KHR(VkCommandBuffer commandBuffer, const VkCopyImageInfo2KHR *pCopyImageInfo,
                                          const ErrorObject &error_obj) const override;
     bool PreCallValidateCmdCopyImage2(VkCommandBuffer commandBuffer, const VkCopyImageInfo2 *pCopyImageInfo,
                                       const ErrorObject &error_obj) const override;
-
-    void RecordCmdCopyImage2(VkCommandBuffer commandBuffer, const VkCopyImageInfo2 *pCopyImageInfo, Func command);
-    void PostCallRecordCmdCopyImage2KHR(VkCommandBuffer commandBuffer, const VkCopyImageInfo2KHR *pCopyImageInfo,
-                                        const RecordObject &record_obj) override;
-    void PostCallRecordCmdCopyImage2(VkCommandBuffer commandBuffer, const VkCopyImageInfo2 *pCopyImageInfo,
-                                     const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask,
                                            VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags,
@@ -226,13 +203,6 @@ class SyncValidator : public vvl::DeviceProxy {
     void PostCallRecordCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo *pDependencyInfo,
                                            const RecordObject &record_obj) override;
 
-    void PostCallRecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
-                                          VkSubpassContents contents, const RecordObject &record_obj) override;
-    void PostCallRecordCmdBeginRenderPass2(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
-                                           const VkSubpassBeginInfo *pSubpassBeginInfo, const RecordObject &record_obj) override;
-    void PostCallRecordCmdBeginRenderPass2KHR(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
-                                              const VkSubpassBeginInfo *pSubpassBeginInfo, const RecordObject &record_obj) override;
-
     bool ValidateCmdNextSubpass(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo *pSubpassBeginInfo,
                                 const VkSubpassEndInfo *pSubpassEndInfo, const ErrorObject &error_obj) const;
     bool PreCallValidateCmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents,
@@ -242,13 +212,6 @@ class SyncValidator : public vvl::DeviceProxy {
     bool PreCallValidateCmdNextSubpass2KHR(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo *pSubpassBeginInfo,
                                            const VkSubpassEndInfo *pSubpassEndInfo, const ErrorObject &error_obj) const override;
 
-    void PostCallRecordCmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents,
-                                      const RecordObject &record_obj) override;
-    void PostCallRecordCmdNextSubpass2(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo *pSubpassBeginInfo,
-                                       const VkSubpassEndInfo *pSubpassEndInfo, const RecordObject &record_obj) override;
-    void PostCallRecordCmdNextSubpass2KHR(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo *pSubpassBeginInfo,
-                                          const VkSubpassEndInfo *pSubpassEndInfo, const RecordObject &record_obj) override;
-
     bool ValidateCmdEndRenderPass(VkCommandBuffer commandBuffer, const VkSubpassEndInfo *pSubpassEndInfo,
                                   const ErrorObject &error_obj) const;
     bool PreCallValidateCmdEndRenderPass(VkCommandBuffer commandBuffer, const ErrorObject &error_obj) const override;
@@ -256,12 +219,6 @@ class SyncValidator : public vvl::DeviceProxy {
                                              const ErrorObject &error_obj) const override;
     bool PreCallValidateCmdEndRenderPass2(VkCommandBuffer commandBuffer, const VkSubpassEndInfo *pSubpassEndInfo,
                                           const ErrorObject &error_obj) const override;
-
-    void PostCallRecordCmdEndRenderPass(VkCommandBuffer commandBuffer, const RecordObject &record_obj) override;
-    void PostCallRecordCmdEndRenderPass2(VkCommandBuffer commandBuffer, const VkSubpassEndInfo *pSubpassEndInfo,
-                                         const RecordObject &record_obj) override;
-    void PostCallRecordCmdEndRenderPass2KHR(VkCommandBuffer commandBuffer, const VkSubpassEndInfo *pSubpassEndInfo,
-                                            const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdBeginRenderingKHR(VkCommandBuffer commandBuffer, const VkRenderingInfoKHR *pRenderingInfo,
                                              const ErrorObject &error_obj) const override;
@@ -291,18 +248,6 @@ class SyncValidator : public vvl::DeviceProxy {
                                               const ErrorObject &error_obj) const override;
 
     template <typename RegionType>
-    void RecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
-                                    VkImageLayout dstImageLayout, uint32_t regionCount, const RegionType *pRegions, Func command);
-    void PostCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
-                                            VkImageLayout dstImageLayout, uint32_t regionCount, const VkBufferImageCopy *pRegions,
-                                            const RecordObject &record_obj) override;
-    void PostCallRecordCmdCopyBufferToImage2KHR(VkCommandBuffer commandBuffer,
-                                                const VkCopyBufferToImageInfo2KHR *pCopyBufferToImageInfo,
-                                                const RecordObject &record_obj) override;
-    void PostCallRecordCmdCopyBufferToImage2(VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2 *pCopyBufferToImageInfo,
-                                             const RecordObject &record_obj) override;
-
-    template <typename RegionType>
     bool ValidateCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                       VkBuffer dstBuffer, uint32_t regionCount, const RegionType *pRegions,
                                       const Location &loc) const;
@@ -316,18 +261,6 @@ class SyncValidator : public vvl::DeviceProxy {
                                               const ErrorObject &error_obj) const override;
 
     template <typename RegionType>
-    void RecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                    VkBuffer dstBuffer, uint32_t regionCount, const RegionType *pRegions, Func command);
-    void PostCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                            VkBuffer dstBuffer, uint32_t regionCount, const VkBufferImageCopy *pRegions,
-                                            const RecordObject &record_obj) override;
-    void PostCallRecordCmdCopyImageToBuffer2KHR(VkCommandBuffer commandBuffer,
-                                                const VkCopyImageToBufferInfo2KHR *pCopyImageToBufferInfo,
-                                                const RecordObject &record_obj) override;
-    void PostCallRecordCmdCopyImageToBuffer2(VkCommandBuffer commandBuffer, const VkCopyImageToBufferInfo2 *pCopyImageToBufferInfo,
-                                             const RecordObject &record_obj) override;
-
-    template <typename RegionType>
     bool ValidateCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage,
                               VkImageLayout dstImageLayout, uint32_t regionCount, const RegionType *pRegions, VkFilter filter,
                               const Location &loc) const;
@@ -339,18 +272,6 @@ class SyncValidator : public vvl::DeviceProxy {
                                          const ErrorObject &error_obj) const override;
     bool PreCallValidateCmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2 *pBlitImageInfo,
                                       const ErrorObject &error_obj) const override;
-
-    template <typename RegionType>
-    void RecordCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage,
-                            VkImageLayout dstImageLayout, uint32_t regionCount, const RegionType *pRegions, VkFilter filter,
-                            Func command);
-    void PostCallRecordCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage,
-                                    VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageBlit *pRegions,
-                                    VkFilter filter, const RecordObject &record_obj) override;
-    void PostCallRecordCmdBlitImage2KHR(VkCommandBuffer commandBuffer, const VkBlitImageInfo2KHR *pBlitImageInfo,
-                                        const RecordObject &record_obj) override;
-    void PostCallRecordCmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2 *pBlitImageInfo,
-                                     const RecordObject &record_obj) override;
 
     bool ValidateIndirectBuffer(const CommandBufferAccessContext &cb_context, const AccessContext &context,
                                 const VkDeviceSize struct_size, const VkBuffer buffer, const VkDeviceSize offset,
@@ -453,59 +374,34 @@ class SyncValidator : public vvl::DeviceProxy {
     bool PreCallValidateCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
                                            const VkClearColorValue *pColor, uint32_t rangeCount,
                                            const VkImageSubresourceRange *pRanges, const ErrorObject &error_obj) const override;
-    void PostCallRecordCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                          const VkClearColorValue *pColor, uint32_t rangeCount,
-                                          const VkImageSubresourceRange *pRanges, const RecordObject &record_obj) override;
-
     bool PreCallValidateCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
                                                   const VkClearDepthStencilValue *pDepthStencil, uint32_t rangeCount,
                                                   const VkImageSubresourceRange *pRanges,
                                                   const ErrorObject &error_obj) const override;
-    void PostCallRecordCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                                 const VkClearDepthStencilValue *pDepthStencil, uint32_t rangeCount,
-                                                 const VkImageSubresourceRange *pRanges, const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
                                             const VkClearAttachment *pAttachments, uint32_t rectCount, const VkClearRect *pRects,
                                             const ErrorObject &error_obj) const override;
-    void PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
-                                           const VkClearAttachment *pAttachments, uint32_t rectCount, const VkClearRect *pRects,
-                                           const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
                                                 uint32_t queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset,
                                                 VkDeviceSize stride, VkQueryResultFlags flags,
                                                 const ErrorObject &error_obj) const override;
-    void PreCallRecordCmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
-                                              uint32_t queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize stride,
-                                              VkQueryResultFlags flags, const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size,
                                       uint32_t data, const ErrorObject &error_obj) const override;
-    void PostCallRecordCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size,
-                                     uint32_t data, const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                         VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
                                         const VkImageResolve *pRegions, const ErrorObject &error_obj) const override;
 
-    void PostCallRecordCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                       VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                       const VkImageResolve *pRegions, const RecordObject &record_obj) override;
-
     bool PreCallValidateCmdResolveImage2KHR(VkCommandBuffer commandBuffer, const VkResolveImageInfo2KHR *pResolveImageInfo,
                                             const ErrorObject &error_obj) const override;
     bool PreCallValidateCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2 *pResolveImageInfo,
                                          const ErrorObject &error_obj) const override;
-    void PostCallRecordCmdResolveImage2KHR(VkCommandBuffer commandBuffer, const VkResolveImageInfo2KHR *pResolveImageInfo,
-                                           const RecordObject &record_obj) override;
-    void PostCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2 *pResolveImageInfo,
-                                        const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdUpdateBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
                                         VkDeviceSize dataSize, const void *pData, const ErrorObject &error_obj) const override;
-    void PostCallRecordCmdUpdateBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
-                                       VkDeviceSize dataSize, const void *pData, const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdWriteBufferMarkerAMD(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage,
                                                 VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker,
@@ -516,12 +412,8 @@ class SyncValidator : public vvl::DeviceProxy {
 
     bool PreCallValidateCmdDecodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoDecodeInfoKHR *pDecodeInfo,
                                           const ErrorObject &error_obj) const override;
-    void PreCallRecordCmdDecodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoDecodeInfoKHR *pDecodeInfo,
-                                        const RecordObject &record_obj) override;
     bool PreCallValidateCmdEncodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoEncodeInfoKHR *pEncodeInfo,
                                           const ErrorObject &error_obj) const override;
-    void PreCallRecordCmdEncodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoEncodeInfoKHR *pEncodeInfo,
-                                        const RecordObject &record_obj) override;
 
     bool PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                     const ErrorObject &error_obj) const override;
@@ -578,8 +470,6 @@ class SyncValidator : public vvl::DeviceProxy {
                                                 VkDeviceSize dstOffset, uint32_t marker, const RecordObject &record_obj) override;
     bool PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount,
                                            const VkCommandBuffer *pCommandBuffers, const ErrorObject &error_obj) const override;
-    void PostCallRecordCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount,
-                                          const VkCommandBuffer *pCommandBuffers, const RecordObject &record_obj) override;
     void PostCallRecordBindImageMemory(VkDevice device, VkImage image, VkDeviceMemory mem, VkDeviceSize memoryOffset,
                                        const RecordObject &record_obj) override;
     void PostCallRecordBindImageMemory2(VkDevice device, uint32_t bindInfoCount, const VkBindImageMemoryInfo *pBindInfos,
@@ -629,11 +519,10 @@ class SyncValidator : public vvl::DeviceProxy {
                                                 const RecordObject &record_obj) override;
     void PostCallRecordGetSemaphoreCounterValueKHR(VkDevice device, VkSemaphore semaphore, uint64_t *pValue,
                                                    const RecordObject &record_obj) override;
-    void PostCallRecordGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t *pSwapchainImageCount,
-                                             VkImage *pSwapchainImages, const RecordObject &record_obj) override;
-    bool PreCallValidateCmdBuildAccelerationStructuresKHR(
-        VkCommandBuffer commandBuffer, uint32_t infoCount, const VkAccelerationStructureBuildGeometryInfoKHR *pInfos,
-        const VkAccelerationStructureBuildRangeInfoKHR *const *ppBuildRangeInfos, const ErrorObject &error_obj) const override;
+    bool PreCallValidateCmdBuildAccelerationStructuresKHR(VkCommandBuffer commandBuffer, uint32_t infoCount,
+                                                          const VkAccelerationStructureBuildGeometryInfoKHR *pInfos,
+                                                          const VkAccelerationStructureBuildRangeInfoKHR *const *ppBuildRangeInfos,
+                                                          const ErrorObject &error_obj) const override;
     void PostCallRecordCmdBuildAccelerationStructuresKHR(VkCommandBuffer commandBuffer, uint32_t infoCount,
                                                          const VkAccelerationStructureBuildGeometryInfoKHR *pInfos,
                                                          const VkAccelerationStructureBuildRangeInfoKHR *const *ppBuildRangeInfos,
@@ -685,3 +574,5 @@ class SyncValidator : public vvl::DeviceProxy {
     void PostCallRecordCmdTraceRaysIndirect2KHR(VkCommandBuffer commandBuffer, VkDeviceAddress indirectDeviceAddress,
                                                 const RecordObject &record_obj) override;
 };
+
+}  // namespace syncval

@@ -2,6 +2,7 @@
  * Copyright (c) 2015-2025 Valve Corporation
  * Copyright (c) 2015-2025 LunarG, Inc.
  * Copyright (C) 2015-2025 Google Inc.
+ * Copyright (c) 2025 Arm Limited.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -140,7 +141,7 @@ bool CoreChecks::ValidatePushConstantUsage(const spirv::Module &module_state, co
         }
     } else {
         shader_object_push_constant_ranges_id = GetCanonicalId(stage_state.shader_object_create_info->pushConstantRangeCount,
-                                                          stage_state.shader_object_create_info->pPushConstantRanges);
+                                                               stage_state.shader_object_create_info->pPushConstantRanges);
         push_constant_ranges = shader_object_push_constant_ranges_id.get();
         stage_vuid = "VUID-VkShaderCreateInfoEXT-codeType-10064";
         range_vuid = "VUID-VkShaderCreateInfoEXT-codeType-10065";
@@ -184,10 +185,12 @@ bool CoreChecks::ValidatePushConstantUsage(const spirv::Module &module_state, co
     return skip;
 }
 
-static void TypeToDescriptorTypeSet(const spirv::Module &module_state, uint32_t type_id,
-                                    vvl::unordered_set<uint32_t> &descriptor_type_set) {
+static void TypeToDescriptorTypeSet(const spirv::Module &module_state, uint32_t type_id, uint32_t data_type_id, vvl::unordered_set<uint32_t> &descriptor_type_set) {
     const spirv::Instruction *type = module_state.FindDef(type_id);
-    bool is_storage_buffer = false;
+    assert(type->Opcode() == spv::OpTypePointer || type->Opcode() == spv::OpTypeUntypedPointerKHR);
+    bool is_storage_buffer = type->StorageClass() == spv::StorageClassStorageBuffer;
+
+    if (data_type_id != 0) type = module_state.FindDef(data_type_id);
 
     // Strip off any array or ptrs. Where we remove array levels, adjust the  descriptor count for each dimension.
     while (type->IsArray() || type->Opcode() == spv::OpTypePointer) {
@@ -276,6 +279,11 @@ static void TypeToDescriptorTypeSet(const spirv::Module &module_state, uint32_t 
             }
             return;
 
+        case spv::OpTypeTensorARM: {
+            descriptor_type_set.insert(VK_DESCRIPTOR_TYPE_TENSOR_ARM);
+            return;
+        }
+
         default:
             // We shouldn't really see any other junk types -- but if we do, they're a mismatch.
             return;  // Matches nothing
@@ -293,34 +301,53 @@ static std::string string_DescriptorTypeSet(const vvl::unordered_set<uint32_t> &
 
 // Map SPIR-V type to VK_COMPONENT_TYPE enum
 VkComponentTypeKHR GetComponentType(const spirv::Instruction *insn, bool is_signed_int) {
-    switch (insn->Opcode()) {
-        case spv::OpTypeInt:
-            switch (insn->Word(2)) {
-                case 8:
-                    return is_signed_int ? VK_COMPONENT_TYPE_SINT8_KHR : VK_COMPONENT_TYPE_UINT8_KHR;
-                case 16:
-                    return is_signed_int ? VK_COMPONENT_TYPE_SINT16_KHR : VK_COMPONENT_TYPE_UINT16_KHR;
-                case 32:
-                    return is_signed_int ? VK_COMPONENT_TYPE_SINT32_KHR : VK_COMPONENT_TYPE_UINT32_KHR;
-                case 64:
-                    return is_signed_int ? VK_COMPONENT_TYPE_SINT64_KHR : VK_COMPONENT_TYPE_UINT64_KHR;
-                default:
-                    return VK_COMPONENT_TYPE_MAX_ENUM_KHR;
-            }
-        case spv::OpTypeFloat:
-            switch (insn->Word(2)) {
-                case 16:
+    if (insn->Opcode() == spv::OpTypeInt) {
+        switch (insn->Word(2)) {
+            case 8:
+                return is_signed_int ? VK_COMPONENT_TYPE_SINT8_KHR : VK_COMPONENT_TYPE_UINT8_KHR;
+            case 16:
+                return is_signed_int ? VK_COMPONENT_TYPE_SINT16_KHR : VK_COMPONENT_TYPE_UINT16_KHR;
+            case 32:
+                return is_signed_int ? VK_COMPONENT_TYPE_SINT32_KHR : VK_COMPONENT_TYPE_UINT32_KHR;
+            case 64:
+                return is_signed_int ? VK_COMPONENT_TYPE_SINT64_KHR : VK_COMPONENT_TYPE_UINT64_KHR;
+            default:
+                return VK_COMPONENT_TYPE_MAX_ENUM_KHR;
+        }
+    } else if (insn->Opcode() == spv::OpTypeFloat) {
+        switch (insn->Word(2)) {
+            case 8: {
+                assert(insn->Length() > 3);  // all float8 have an encoding
+                const uint32_t encoding = insn->Word(3);
+                if (encoding == spv::FPEncodingFloat8E4M3EXT) {
+                    return VK_COMPONENT_TYPE_FLOAT8_E4M3_EXT;
+                } else if (encoding == spv::FPEncodingFloat8E5M2EXT) {
+                    return VK_COMPONENT_TYPE_FLOAT8_E5M2_EXT;
+                } else {
+                    assert(false);  // New float8 encoding
+                }
+            } break;
+            case 16: {
+                if (insn->Length() > 3) {
+                    const uint32_t encoding = insn->Word(3);
+                    if (encoding == spv::FPEncodingBFloat16KHR) {
+                        return VK_COMPONENT_TYPE_BFLOAT16_KHR;
+                    } else {
+                        assert(false);  // New float16 encoding
+                    }
+                } else {
                     return VK_COMPONENT_TYPE_FLOAT16_KHR;
-                case 32:
-                    return VK_COMPONENT_TYPE_FLOAT32_KHR;
-                case 64:
-                    return VK_COMPONENT_TYPE_FLOAT64_KHR;
-                default:
-                    return VK_COMPONENT_TYPE_MAX_ENUM_KHR;
-            }
-        default:
-            return VK_COMPONENT_TYPE_MAX_ENUM_KHR;
+                }
+            } break;
+            case 32:
+                return VK_COMPONENT_TYPE_FLOAT32_KHR;
+            case 64:
+                return VK_COMPONENT_TYPE_FLOAT64_KHR;
+            default:
+                return VK_COMPONENT_TYPE_MAX_ENUM_KHR;
+        }
     }
+    return VK_COMPONENT_TYPE_MAX_ENUM_KHR;
 }
 
 static bool IsSignedIntEnum(const VkComponentTypeKHR component_type) {
@@ -781,29 +808,29 @@ bool CoreChecks::ValidateCooperativeMatrix(const spirv::Module &module_state, co
                         }
                     }
                     if (!valid_a) {
-                        skip |= LogError(
-                            "VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059", module_state.handle(), loc,
-                            "SPIR-V (%s) OpCooperativeMatrixMulAddNV (result id = %u) operands don't match a supported matrix "
-                            "VkCooperativeMatrixPropertiesNV for A type (%s).",
-                            string_VkShaderStageFlagBits(entrypoint.stage), insn.Word(2), a.Describe().c_str());
+                        skip |= LogError("VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059", module_state.handle(), loc,
+                                         "SPIR-V (%s) OpCooperativeMatrixMulAddNV (result id = %" PRIu32
+                                         ") operands don't match a supported matrix "
+                                         "VkCooperativeMatrixPropertiesNV for A type (%s).",
+                                         string_VkShaderStageFlagBits(entrypoint.stage), insn.Word(2), a.Describe().c_str());
                     } else if (!valid_b) {
-                        skip |= LogError(
-                            "VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059", module_state.handle(), loc,
-                            "SPIR-V (%s) OpCooperativeMatrixMulAddNV (result id = %u) operands don't match a supported matrix "
-                            "VkCooperativeMatrixPropertiesNV for B type (%s).",
-                            string_VkShaderStageFlagBits(entrypoint.stage), insn.Word(2), b.Describe().c_str());
+                        skip |= LogError("VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059", module_state.handle(), loc,
+                                         "SPIR-V (%s) OpCooperativeMatrixMulAddNV (result id = %" PRIu32
+                                         ") operands don't match a supported matrix "
+                                         "VkCooperativeMatrixPropertiesNV for B type (%s).",
+                                         string_VkShaderStageFlagBits(entrypoint.stage), insn.Word(2), b.Describe().c_str());
                     } else if (!valid_c) {
-                        skip |= LogError(
-                            "VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059", module_state.handle(), loc,
-                            "SPIR-V (%s) OpCooperativeMatrixMulAddNV (result id = %u) operands don't match a supported matrix "
-                            "VkCooperativeMatrixPropertiesNV for C type (%s).",
-                            string_VkShaderStageFlagBits(entrypoint.stage), insn.Word(2), c.Describe().c_str());
+                        skip |= LogError("VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059", module_state.handle(), loc,
+                                         "SPIR-V (%s) OpCooperativeMatrixMulAddNV (result id = %" PRIu32
+                                         ") operands don't match a supported matrix "
+                                         "VkCooperativeMatrixPropertiesNV for C type (%s).",
+                                         string_VkShaderStageFlagBits(entrypoint.stage), insn.Word(2), c.Describe().c_str());
                     } else if (!valid_d) {
-                        skip |= LogError(
-                            "VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059", module_state.handle(), loc,
-                            "SPIR-V (%s) OpCooperativeMatrixMulAddNV (result id = %u) operands don't match a supported matrix "
-                            "VkCooperativeMatrixPropertiesNV for D type (%s).",
-                            string_VkShaderStageFlagBits(entrypoint.stage), insn.Word(2), d.Describe().c_str());
+                        skip |= LogError("VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059", module_state.handle(), loc,
+                                         "SPIR-V (%s) OpCooperativeMatrixMulAddNV (result id = %" PRIu32
+                                         ") operands don't match a supported matrix "
+                                         "VkCooperativeMatrixPropertiesNV for D type (%s).",
+                                         string_VkShaderStageFlagBits(entrypoint.stage), insn.Word(2), d.Describe().c_str());
                     }
                 }
                 break;
@@ -1149,14 +1176,15 @@ bool CoreChecks::ValidateShaderExecutionModes(const spirv::Module &module_state,
     if (entrypoint.stage == VK_SHADER_STAGE_GEOMETRY_BIT) {
         const uint32_t vertices_out = entrypoint.execution_mode.output_vertices;
         const uint32_t invocations = entrypoint.execution_mode.invocations;
-        if (vertices_out == 0 || vertices_out > phys_dev_props.limits.maxGeometryOutputVertices) {
+        if (vertices_out != spirv::kInvalidValue &&
+            (vertices_out == 0 || vertices_out > phys_dev_props.limits.maxGeometryOutputVertices)) {
             const char *vuid =
                 pipeline ? "VUID-VkPipelineShaderStageCreateInfo-stage-00714" : "VUID-VkShaderCreateInfoEXT-pCode-08454";
             skip |= LogError(vuid, module_state.handle(), loc,
                              "SPIR-V (Geometry stage) entry point must have an OpExecutionMode instruction that "
                              "specifies a maximum output vertex count that is greater than 0 and less "
-                             "than or equal to maxGeometryOutputVertices. "
-                             "OutputVertices=%" PRIu32 ", maxGeometryOutputVertices=%" PRIu32 ".",
+                             "than or equal to maxGeometryOutputVertices.\n"
+                             "OutputVertices = %" PRIu32 "\nmaxGeometryOutputVertices = %" PRIu32 "\n",
                              vertices_out, phys_dev_props.limits.maxGeometryOutputVertices);
         }
 
@@ -1166,8 +1194,8 @@ bool CoreChecks::ValidateShaderExecutionModes(const spirv::Module &module_state,
             skip |= LogError(vuid, module_state.handle(), loc,
                              "SPIR-V (Geometry stage) entry point must have an OpExecutionMode instruction that "
                              "specifies an invocation count that is greater than 0 and less "
-                             "than or equal to maxGeometryShaderInvocations. "
-                             "Invocations=%" PRIu32 ", maxGeometryShaderInvocations=%" PRIu32 ".",
+                             "than or equal to maxGeometryShaderInvocations.\n"
+                             "Invocations = %" PRIu32 "\nmaxGeometryShaderInvocations = %" PRIu32 "\n",
                              invocations, phys_dev_props.limits.maxGeometryShaderInvocations);
         }
     } else if (entrypoint.stage == VK_SHADER_STAGE_FRAGMENT_BIT &&
@@ -1233,14 +1261,11 @@ bool CoreChecks::ValidatePointSizeShaderState(const spirv::Module &module_state,
         }
     } else if (stage == VK_SHADER_STAGE_VERTEX_BIT &&
                ((pipeline.create_info_shaders & (VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT | VK_SHADER_STAGE_GEOMETRY_BIT)) ==
-                0) &&
-               pipeline.topology_at_rasterizer == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) {
-        const bool ignore_topology = pipeline.IsDynamic(CB_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY) &&
-                                     phys_dev_ext_props.extended_dynamic_state3_props.dynamicPrimitiveTopologyUnrestricted;
-        if (!entrypoint.written_builtin_point_size && !ignore_topology && !maintenance5) {
-            skip |= LogError(
-                "VUID-VkGraphicsPipelineCreateInfo-topology-08773", module_state.handle(), loc,
-                "SPIR-V (Vertex) PointSize is not written to, but Pipeline topology is set to VK_PRIMITIVE_TOPOLOGY_POINT_LIST.");
+                0)) {
+        if (!entrypoint.written_builtin_point_size && IsPointTopology(pipeline.topology_at_rasterizer) && !maintenance5) {
+            skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-topology-08773", module_state.handle(), loc,
+                             "SPIR-V (Vertex) PointSize is not written to, but Pipeline topology is set to "
+                             "VK_PRIMITIVE_TOPOLOGY_POINT_LIST.");
         }
     }
 
@@ -1468,10 +1493,13 @@ bool CoreChecks::ValidateShaderInterfaceVariablePipeline(const spirv::Module &mo
     // TODO - Need to add Shader Object variation of these checks
     // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9893
     const bool possible_ycbcr = (pipeline_layout_state && pipeline_layout_state->has_immutable_samplers) &&
-                                // IsAccessed() will prevent things like textureSize() from be marked as a false positive
+                                // IsAccessed() will prevent things like textureSize() from be marked as a false positive.
+                                // Note that for YCbCr, OpImageQueryLod will query the sampler, but OpImageQuerySize only queries
+                                // the image and therefor can still be used with YCbCr.
                                 (variable.IsImage() && variable.IsImageAccessed()) &&
-                                // Quick check to prevent doing tons of sampler state lookup
-                                (variable.info.is_sampler_offset || !variable.info.is_sampler_sampled);
+                                // Quick check to prevent doing tons of sampler state lookup.
+                                // YCbCr can't be used with dynamic indexing, so can use at pipeline creation time
+                                (variable.info.image_insn.is_sampler_offset || !variable.info.image_insn.is_sampler_sampled);
     if (binding && possible_ycbcr) {
         if (variable.is_type_sampled_image) {
             // simple case if using combined image sampler
@@ -1521,15 +1549,15 @@ bool CoreChecks::ValidateShaderYcbcrSamplerAccess(const VkDescriptorSetLayoutBin
             continue;
         }
 
-        if (!image_variable.info.is_sampler_sampled) {
+        if (!image_variable.info.image_insn.is_sampler_sampled) {
             skip |= LogError("VUID-RuntimeSpirv-None-10716", objlist, loc,
                              "%s points to pImmutableSamplers[%" PRIu32
                              "] (%s) that was created with a VkSamplerYcbcrConversion, but was accessed in the SPIR-V "
-                             "with a non OpImage*Sample* instruction.\nNon-sampled operations (like texelFetch) can't be used used "
+                             "with a non OpImage*Sample* instruction.\nNon-sampled operations (like texelFetch) can't be used "
                              "because it doesn't contain the sampler YCbCr conversion information for the driver.",
                              print_access_info().c_str(), i, FormatHandle(sampler_state->Handle()).c_str());
             break;  // only need to report a single descriptor
-        } else if (image_variable.info.is_sampler_offset) {
+        } else if (image_variable.info.image_insn.is_sampler_offset) {
             skip |= LogError("VUID-RuntimeSpirv-ConstOffset-10718", objlist, loc,
                              "%s points to pImmutableSamplers[%" PRIu32
                              "] (%s) that was created with a VkSamplerYcbcrConversion, but was accessed in the SPIR-V "
@@ -1749,12 +1777,21 @@ bool CoreChecks::ValidateShaderStage(const ShaderStageState &stage_state, const 
         }
     }
 
+    // Skip if VK_VALIDATION_FEATURE_DISABLE_SHADERS_EXT is set
+    // Both the validation and running spirv-opt on the spec constants really makes this function slow
+    // See https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/10566 for more info
+    if (disabled[shader_validation]) {
+        return skip;
+    }
+
     if ((pipeline && pipeline->uses_shader_module_id) || !stage_state.spirv_state) {
         return skip;  // these edge cases should be validated already
     }
 
     const spirv::Module &module_state = *stage_state.spirv_state.get();
-    if (!module_state.valid_spirv) return skip;  // checked elsewhere
+    if (!module_state.valid_spirv) {
+        return skip;  // checked elsewhere
+    }
 
     if (!stage_state.entrypoint) {
         const char *vuid = pipeline ? "VUID-VkPipelineShaderStageCreateInfo-pName-00707" : "VUID-VkShaderCreateInfoEXT-pName-08440";
@@ -1764,12 +1801,18 @@ bool CoreChecks::ValidateShaderStage(const ShaderStageState &stage_state, const 
         if (stage_state.spirv_state->static_data_.entry_points.size() == 1) {
             auto entry_point = stage_state.spirv_state->static_data_.entry_points[0];
             if (entry_point) {
-                err << " (The only entry point found was \"" << entry_point->name << "\" for "
-                    << string_VkShaderStageFlagBits(entry_point->stage) << ")";
-                if (entry_point->name == "main") {
-                    err << "\nSome shading languages will let you name the main function something else, but when "
-                           "compiled to SPIR-V, it will keep it as 'main' to match defaults found in other shading langauges such "
-                           "as GLSL. It is also valid in a single SPIR-V binary to have 'main' for two different stages.";
+                if (entry_point->stage != stage) {
+                    err << " (Seems like you accidently created your SPIR-V with "
+                        << string_VkShaderStageFlagBits(entry_point->stage) << " so the entry point is not matching up)";
+                } else {
+                    err << " (The only entry point found was \"" << entry_point->name << "\" for "
+                        << string_VkShaderStageFlagBits(entry_point->stage) << ")";
+                    if (entry_point->name == "main") {
+                        err << "\nSome shading languages will let you name the main function something else, but when "
+                               "compiled to SPIR-V, it will keep it as 'main' to match defaults found in other shading langauges "
+                               "such "
+                               "as GLSL. It is also valid in a single SPIR-V binary to have 'main' for two different stages.";
+                    }
                 }
             }
         } else {
@@ -1789,9 +1832,8 @@ bool CoreChecks::ValidateShaderStage(const ShaderStageState &stage_state, const 
     uint32_t total_task_payload_memory = 0;
 
     // If specialization-constant instructions are present in the shader, the specializations should be applied.
-    if (module_state.static_data_.has_specialization_constants) {
+    if (module_state.static_data_.has_specialization_constants && global_settings.spirv_const_fold) {
         // setup the call back if the optimizer fails
-        spv_target_env spirv_environment = PickSpirvEnv(api_version, IsExtEnabled(extensions.vk_khr_spirv_1_4));
         spvtools::Optimizer optimizer(spirv_environment);
         spvtools::MessageConsumer consumer = [&skip, &module_state, &stage, loc, this](
                                                  spv_message_level_t level, const char *source, const spv_position_t &position,
@@ -1908,8 +1950,10 @@ bool CoreChecks::ValidateShaderStage(const ShaderStageState &stage_state, const 
                                             : "VUID-VkShaderCreateInfoEXT-pCode-08460";
                 std::string name = pipeline ? FormatHandle(module_state.handle()) : "shader object";
                 skip |= LogError(vuid, device, loc,
-                                 "After specialization was applied, %s produces a spirv-val error (stage %s):\n%s", name.c_str(),
-                                 string_VkShaderStageFlagBits(stage), diag && diag->error ? diag->error : "(no error text)");
+                                 "After specialization was applied, %s produces a spirv-val error (stage %s):\n%s\nCommand to "
+                                 "reproduce:\n\t%s\n",
+                                 name.c_str(), string_VkShaderStageFlagBits(stage),
+                                 diag && diag->error ? diag->error : "(no error text)", spirv_val_command.c_str());
             }
 
             // The new optimized SPIR-V will NOT match the original spirv::Module object parsing, so a new spirv::Module
@@ -1929,8 +1973,8 @@ bool CoreChecks::ValidateShaderStage(const ShaderStageState &stage_state, const 
 
             total_workgroup_shared_memory = spec_mod.CalculateWorkgroupSharedMemory();
 
-            if ((stage == VK_SHADER_STAGE_TASK_BIT_EXT || stage == VK_SHADER_STAGE_MESH_BIT_EXT)) {
-                total_task_payload_memory = spec_mod.CalculateTaskPayloadMemory();
+            if (spec_entrypoint->task_payload_variable) {
+                total_task_payload_memory = spec_entrypoint->task_payload_variable->size;
             }
 
             spvDiagnosticDestroy(diag);
@@ -1952,8 +1996,8 @@ bool CoreChecks::ValidateShaderStage(const ShaderStageState &stage_state, const 
 
         total_workgroup_shared_memory = module_state.CalculateWorkgroupSharedMemory();
 
-        if ((stage == VK_SHADER_STAGE_TASK_BIT_EXT || stage == VK_SHADER_STAGE_MESH_BIT_EXT)) {
-            total_task_payload_memory = module_state.CalculateTaskPayloadMemory();
+        if (entrypoint.task_payload_variable) {
+            total_task_payload_memory = entrypoint.task_payload_variable->size;
         }
     }
 
@@ -2026,7 +2070,7 @@ bool CoreChecks::ValidateShaderStage(const ShaderStageState &stage_state, const 
 
     for (const auto &variable : entrypoint.resource_interface_variables) {
         vvl::unordered_set<uint32_t> descriptor_type_set;
-        TypeToDescriptorTypeSet(module_state, variable.type_id, descriptor_type_set);
+        TypeToDescriptorTypeSet(module_state, variable.type_id, variable.data_type_id, descriptor_type_set);
         skip |= ValidateShaderInterfaceVariable(module_state, variable, descriptor_type_set, loc);
         if (pipeline) {
             skip |=
@@ -2071,7 +2115,7 @@ uint32_t CoreChecks::CalcShaderStageCount(const vvl::Pipeline &pipeline, VkShade
 }
 
 bool CoreChecks::GroupHasValidIndex(const vvl::Pipeline &pipeline, uint32_t group, uint32_t stage) const {
-    if (group == VK_SHADER_UNUSED_NV) {
+    if (group == VK_SHADER_UNUSED_KHR) {
         return true;
     }
 
@@ -2085,7 +2129,9 @@ bool CoreChecks::GroupHasValidIndex(const vvl::Pipeline &pipeline, uint32_t grou
     if (pipeline.ray_tracing_library_ci) {
         for (uint32_t i = 0; i < pipeline.ray_tracing_library_ci->libraryCount; ++i) {
             auto library_pipeline = Get<vvl::Pipeline>(pipeline.ray_tracing_library_ci->pLibraries[i]);
-            if (!library_pipeline) continue;
+            if (!library_pipeline) {
+                continue;
+            }
             const uint32_t stage_count = static_cast<uint32_t>(library_pipeline->shader_stages_ci.size());
             if (group < stage_count) {
                 return (library_pipeline->shader_stages_ci[group].stage & stage) != 0;
@@ -2112,13 +2158,10 @@ void CoreChecks::PreCallRecordCreateShaderModule(VkDevice device, const VkShader
 void CoreChecks::PreCallRecordCreateShadersEXT(VkDevice device, uint32_t createInfoCount, const VkShaderCreateInfoEXT *pCreateInfos,
                                                const VkAllocationCallbacks *pAllocator, VkShaderEXT *pShaders,
                                                const RecordObject &record_obj, chassis::ShaderObject &chassis_state) {
-    for (uint32_t i = 0; i < createInfoCount; ++i) {
-        // Will be empty if not VK_SHADER_CODE_TYPE_SPIRV_EXT
-        if (chassis_state.module_states[i]) {
-            chassis_state.skip |= stateless_spirv_validator.Validate(
-                *chassis_state.module_states[i], chassis_state.stateless_data[i], record_obj.location.dot(Field::pCreateInfos, i));
-        }
-    }
+    // For ShaderObjects, to validate most things we need to first parse the SPIR-V.
+    // We use to parse both at PreCallValidate and PreCallRecord which was wasteful.
+    // We now parse it at PreCallRecord (so we can store it) and then just do the validation here
+    chassis_state.skip = ValidateCreateShadersSpirv(createInfoCount, pCreateInfos, record_obj.location, chassis_state);
 }
 
 bool CoreChecks::RunSpirvValidation(spv_const_binary_t &binary, const Location &loc, ValidationCache *cache) const {
@@ -2138,7 +2181,6 @@ bool CoreChecks::RunSpirvValidation(spv_const_binary_t &binary, const Location &
 
     // Use SPIRV-Tools validator to try and catch any issues with the module itself. If specialization constants are present,
     // the default values will be used during validation.
-    spv_target_env spirv_environment = PickSpirvEnv(api_version, IsExtEnabled(extensions.vk_khr_spirv_1_4));
     spv_context ctx = spvContextCreate(spirv_environment);
     spv_diagnostic diag = nullptr;
     const spv_result_t spv_valid = spvValidateWithOptions(ctx, spirv_val_options, &binary, &diag);
@@ -2170,9 +2212,13 @@ bool CoreChecks::RunSpirvValidation(spv_const_binary_t &binary, const Location &
         }
 
         if (spv_valid == SPV_WARNING) {
-            skip |= LogWarning(vuid, device, loc.dot(Field::pCode), "(spirv-val produced a warning):\n%s", error_message);
+            skip |= LogWarning(vuid, device, loc.dot(Field::pCode),
+                               "(spirv-val produced a warning):\n%s\nCommand to reproduce:\n\t%s\n", error_message,
+                               spirv_val_command.c_str());
         } else {
-            skip |= LogError(vuid, device, loc.dot(Field::pCode), "(spirv-val produced an error):\n%s", error_message);
+            skip |=
+                LogError(vuid, device, loc.dot(Field::pCode), "(spirv-val produced an error):\n%s\nCommand to reproduce:\n\t%s\n",
+                         error_message, spirv_val_command.c_str());
         }
 
         if (spirv_val_vuid) {
@@ -2194,12 +2240,12 @@ bool CoreChecks::ValidateShaderModuleCreateInfo(const VkShaderModuleCreateInfo &
     bool skip = false;
 
     if (disabled[shader_validation]) {
-        return skip; // VK_VALIDATION_FEATURE_DISABLE_SHADERS_EXT
+        return skip;  // VK_VALIDATION_FEATURE_DISABLE_SHADERS_EXT
     } else if (!create_info.pCode) {
         return skip;  // will be caught elsewhere
     }
 
-    // This extension is ment for tooling, but still valid to be used, if used, we need to detect if GLSL
+    // This extension is meant for tooling, but still valid to be used, if used, we need to detect if GLSL
     if (IsExtEnabled(extensions.vk_nv_glsl_shader)) {
         if (strncmp((char *)create_info.pCode, "#version", 8) == 0) {
             return skip;  // incoming GLSL
@@ -2567,6 +2613,189 @@ bool CoreChecks::ValidateMeshMemorySize(const spirv::Module &module_state, uint3
                 " bytes), which is more than maxMeshPayloadAndSharedMemorySize (%" PRIu32 ").",
                 total_task_payload_memory, total_workgroup_shared_memory, total_task_payload_memory + total_workgroup_shared_memory,
                 phys_dev_ext_props.mesh_shader_props_ext.maxMeshPayloadAndSharedMemorySize);
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateTaskPayload(const spirv::Module &task_state, const spirv::EntryPoint &mesh_entrypoint,
+                                     const Location &loc) const {
+    bool skip = false;
+    uint32_t task_payload_size = 0;
+    uint32_t mesh_payload_size = 0;
+
+    if (task_state.static_data_.emit_mesh_tasks_inst.size() > 1) {
+        // If there are multiple OpEmitMeshTasksEXT we will need GPU-AV to know which was actually called
+        return skip;
+    }
+
+    if (!task_state.static_data_.emit_mesh_tasks_inst.empty()) {
+        const auto emit_mesh_task = task_state.static_data_.emit_mesh_tasks_inst.front();
+        // Payload is optional
+        if (emit_mesh_task->Length() == 5) {
+            if (task_state.static_data_.has_specialization_constants) {
+                // There is a chance this is not resolvable here to match exact size
+                return skip;
+            }
+            const auto *payload_variable = task_state.FindDef(emit_mesh_task->Word(4));
+            const spirv::Instruction *type = task_state.GetVariablePointerType(*payload_variable);
+            task_payload_size = task_state.GetTypeBytesSize(type);
+        }
+    }
+
+    if (mesh_entrypoint.task_payload_variable) {
+        mesh_payload_size = mesh_entrypoint.task_payload_variable->size;
+    }
+
+    // If task and mesh are both set and just matter of trying to resolve spec constant values, skip possibly reporting false
+    // positives
+    if (mesh_payload_size == spirv::kInvalidValue && task_payload_size != 0) {
+        return skip;
+    }
+
+    // It is valid to have the Task use the payload, but the mesh to ignore it
+    if (mesh_payload_size != 0 && task_payload_size != mesh_payload_size) {
+        std::stringstream ss;
+        ss << "The Mesh Shader has a TaskPayloadWorkgroupEXT variable, but the Task Shader ";
+        if (task_payload_size == 0) {
+            ss << "never sets a TaskPayloadWorkgroupEXT variable in the call to OpEmitMeshTasksEXT";
+        } else {
+            ss << "sets a TaskPayloadWorkgroupEXT variable that is " << task_payload_size << " bytes but needs to match the "
+               << mesh_payload_size << " bytes payload in the Mesh Shader.";
+        }
+        skip |= LogError("VUID-RuntimeSpirv-MeshEXT-10883", device, loc, "%s", ss.str().c_str());
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateDataGraphPipelineShaderModuleSpirv(VkDevice device, const VkDataGraphPipelineCreateInfoARM& create_info, const Location& create_info_loc, const vvl::Pipeline& pipeline) const {
+    bool skip = false;
+    auto dg_pipeline_shader_module_ci = vku::FindStructInPNextChain<VkDataGraphPipelineShaderModuleCreateInfoARM>(create_info.pNext);
+    if (!dg_pipeline_shader_module_ci) {
+        return skip;
+    }
+
+    auto module_state = Get<vvl::ShaderModule>(dg_pipeline_shader_module_ci->module);
+    if (!module_state) {
+        return skip;
+    }
+    ASSERT_AND_RETURN_SKIP(module_state->spirv);
+    auto &module_spirv = *(module_state->spirv);
+
+    const Location pipeline_shader_module_ci_loc = create_info_loc.pNext(Struct::VkDataGraphPipelineShaderModuleCreateInfoARM);
+    const Location module_loc = pipeline_shader_module_ci_loc.dot(Field::module);
+
+    std::vector<std::pair<uint32_t, uint32_t>> tensor_bindings;
+    bool name_found = false;
+    for (auto &entry_point : module_spirv.static_data_.entry_points) {
+        if (!entry_point->is_data_graph)
+            continue;
+
+        if (!name_found && entry_point->name.compare(dg_pipeline_shader_module_ci->pName) == 0) {
+            name_found = true;
+            for (const auto &variable : entry_point->resource_interface_variables) {
+                vvl::unordered_set<uint32_t> descriptor_type_set;
+                TypeToDescriptorTypeSet(module_spirv, variable.type_id, variable.data_type_id, descriptor_type_set);
+                skip |= ValidateShaderInterfaceVariable(module_spirv, variable, descriptor_type_set, module_loc);
+                skip |= ValidateShaderInterfaceVariablePipeline(module_spirv, *entry_point, pipeline, variable, descriptor_type_set,
+                                                                module_loc);
+                if (variable.is_storage_tensor) {
+                    tensor_bindings.push_back({variable.decorations.set, variable.decorations.binding});
+                }
+            }
+            break;
+        }
+    }
+
+    if (!name_found) {
+        std::stringstream wrong_names;
+        for (const auto& entry_point : module_spirv.static_data_.entry_points) {
+            if (!wrong_names.str().empty()) {
+                wrong_names << ", ";
+            }
+            wrong_names << entry_point->name;
+        }
+        skip |= LogError("VUID-VkDataGraphPipelineShaderModuleCreateInfoARM-pName-09872", device,
+                         pipeline_shader_module_ci_loc.dot(Field::pName),
+                         " is '%s' but names in OpGraphEntryPointARM instructions are: '%s'", dg_pipeline_shader_module_ci->pName,
+                         wrong_names.str().c_str());
+    }
+
+    std::unordered_set<uint32_t> graph_tensor_ids;
+    std::unordered_map<uint32_t, uint32_t> graph_constant_map;
+    for (auto &instruction : module_spirv.GetInstructions()) {
+        if (instruction.Opcode() == spv::OpTypeTensorARM) {
+            graph_tensor_ids.insert(instruction.Word(1));
+        }
+        if (instruction.Opcode() == spv::OpGraphConstantARM) {
+            graph_constant_map[instruction.Word(3)] = instruction.Word(1);
+        }
+    }
+    if (!enabled_features.dataGraphSpecializationConstants) {
+        if (module_spirv.static_data_.has_specialization_constants) {
+            skip |= LogError("VUID-VkDataGraphPipelineShaderModuleCreateInfoARM-dataGraphSpecializationConstants-09849", device,
+                             module_loc,
+                             "contains OpSpec* instruction(s), but the dataGraphSpecializationConstants feature is not enabled.");
+        }
+    }
+    for (uint32_t j = 0; j < dg_pipeline_shader_module_ci->constantCount; j++) {
+        auto& constant = dg_pipeline_shader_module_ci->pConstants[j];
+        const Location constant_loc = pipeline_shader_module_ci_loc.dot(Field::pConstants, j);
+        if (graph_constant_map.find(constant.id) == graph_constant_map.end()) {
+            std::stringstream const_ids;
+            for (auto &c : graph_constant_map) {
+                if (!const_ids.str().empty()) {
+                    const_ids << ", ";
+                }
+                const_ids << c.first;
+            }
+            skip |= LogError(
+                "VUID-VkDataGraphPipelineShaderModuleCreateInfoARM-id-09774", device, constant_loc.dot(Field::id),
+                "(%" PRIu32 ") does not match any of the GraphConstantIDs ([%s]) used by OpGraphConstantARM instructions in module",
+                constant.id, const_ids.str().c_str());
+        } else {
+            if (std::find(graph_tensor_ids.begin(), graph_tensor_ids.end(), graph_constant_map[constant.id]) !=
+                graph_tensor_ids.end()) {
+                auto *tensor_desc = vku::FindStructInPNextChain<VkTensorDescriptionARM>(constant.pNext);
+                if (!tensor_desc) {
+                    skip |=
+                        LogError("VUID-VkDataGraphPipelineConstantARM-id-09850", device, constant_loc,
+                                 "(%" PRIu32
+                                 ") is a graph constant of tensor type, but there is no VkTensorDescriptionARM in the pNext chain",
+                                 constant.id);
+                } else if ((tensor_desc->usage & VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM) == 0) {
+                    skip |= LogError(
+                        "VUID-VkDataGraphPipelineConstantARM-id-09850", device, constant_loc.dot(Field::id),
+                        "(%" PRIu32
+                        ") is a graph constant of tensor type but its matching VkTensorDescriptionARM has an invalid usage (%s)",
+                        constant.id, string_VkTensorUsageFlagsARM(tensor_desc->usage).c_str());
+                }
+            }
+        }
+    }
+
+    for (uint32_t j = 0; j < create_info.resourceInfoCount; j++) {
+        auto resource = create_info.pResourceInfos[j];
+        auto resource_loc = create_info_loc.dot(Field::pResourceInfos, j);
+        std::pair<uint32_t, uint32_t> resource_binding = {resource.descriptorSet, resource.binding};
+        auto tensor_binding = std::find(tensor_bindings.begin(), tensor_bindings.end(), resource_binding);
+        if (tensor_binding != tensor_bindings.end()) {
+            auto *tensor_desc = vku::FindStructInPNextChain<VkTensorDescriptionARM>(resource.pNext);
+            if (!tensor_desc) {
+                skip |= LogError("VUID-VkDataGraphPipelineResourceInfoARM-descriptorSet-09851", device, resource_loc,
+                                 "(descriptorSet %" PRIu32 ", binding %" PRIu32
+                                 ") identifies a tensor or array of tensor resources, but the pNext chain doesn't include a "
+                                 "VkTensorDescriptionARM structure",
+                                 resource.descriptorSet, resource.binding);
+            } else if ((tensor_desc->usage & VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM) == 0) {
+                skip |=
+                    LogError("VUID-VkDataGraphPipelineResourceInfoARM-descriptorSet-09851", device,
+                             resource_loc.pNext(Struct::VkTensorDescriptionARM).dot(Field::usage),
+                             "(%s) invalid for tensor resource with (descriptorSet %" PRIu32 ", binding %" PRIu32 ")",
+                             string_VkTensorUsageFlagsARM(tensor_desc->usage).c_str(), resource.descriptorSet, resource.binding);
+            }
         }
     }
 

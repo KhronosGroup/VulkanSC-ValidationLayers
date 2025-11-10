@@ -65,6 +65,13 @@
             ]
         },
         {
+            "reason": "Not supported in Vulkan SC: deprecation messages",
+            "cases": [
+                "NegativeDeprecation.*",
+                "PositiveDeprecation.*"
+            ]
+        },
+        {
             "reason": "Not supported in Vulkan SC: best practices layers",
             "cases": [
                 "VkBestPracticesLayerTest.*",
@@ -263,9 +270,39 @@
                 "NegativePipeline.CreateFlagsCompute",
                 "PositiveDeviceFeatureProperty.PropertyWithoutExtension"
             ]
+        },
+        {
+            "reason": "TODO: This test is disabled because the sync validation layer crashes on cleanup if the case is skipped mid-run",
+            "cases": [
+                "NegativeSyncVal.QSBufferEvents"
+            ]
         }
     ],
     "modify": [
+        {
+            "reason": "TODO: This test case requires SPIR-V debug information even though the tested VUs should not due to incorrectly structured upstream validation code",
+            "cases": [
+                "NegativeDynamicState.BlendConstantsNotBound",
+                "NegativeDynamicState.ColorWriteNotSet",
+                "NegativeDynamicState.ColorWriteNotSet2",
+                "NegativeDynamicState.ExtendedDynamicStateSetViewportScissor",
+                "NegativePipelineTopology.DynamicPrimitiveRestartEnablePatchList",
+                "NegativeShaderSpirv.DuplicatedSpecializationConstantID",
+                "NegativeShaderSpirv.SpecializationOffsetOutOfBounds",
+                "NegativeShaderSpirv.SpecializationSizeOutOfBounds",
+                "NegativeSubgroup.SubgroupSizeControlStage",
+                "NegativeVertexInput.AttributeAlignment",
+                "NegativeVertexInput.BindVertexOffset",
+                "NegativeVertexInput.VertexStride",
+                "NegativeVertexInput.VertexStrideDoubleDynamicStride",
+                "NegativeVertexInput.VertexStrideDynamicInput",
+                "NegativeVertexInput.VertexStrideDynamicStride",
+                "NegativeVertexInput.VertexStrideDynamicStrideArray"
+            ],
+            "patch": [
+                "RequiresSpvDebugInfo()"
+            ]
+        },
         {
             "reason": "This test case requires SPIR-V debug information",
             "cases": [
@@ -288,12 +325,16 @@
                 "NegativeCommand.DrawTimeImageViewTypeMismatchWithPipeline",
                 "NegativeCommand.DrawTimeImageViewTypeMismatchWithPipelineFunction",
                 "NegativeCommand.FilterCubicSamplerInCmdDraw",
+                "NegativeDescriptorIndexing.VariableDescriptorCountBuffer",
+                "NegativeDescriptors.BindInvalidPipelineLayout",
                 "NegativeDescriptors.CmdBufferDescriptorSetBufferDestroyed",
                 "NegativeDescriptors.CmdBufferDescriptorSetImageSamplerDestroyed",
+                "NegativeDescriptors.CompatiblePushConstantRanges",
                 "NegativeDescriptors.ConstantArrayElementNotBound",
                 "NegativeDescriptors.DescriptorPoolInUseResetSignaled",
                 "NegativeDescriptors.DISABLED_DescriptorReadFromWriteAttachment",
                 "NegativeDescriptors.DescriptorSetCompatibility",
+                "NegativeDescriptors.DescriptorSetCompatibilityCompute",
                 "NegativeDescriptors.DescriptorSetSamplerDestroyed",
                 "NegativeDescriptors.DescriptorWriteFromReadAttachment",
                 "NegativeDescriptors.DispatchWithUnboundSet",
@@ -302,11 +343,11 @@
                 "NegativeDescriptors.ImageDescriptorLayoutMismatch",
                 "NegativeDescriptors.DISABLED_ImageSubresourceOverlapBetweenAttachmentsAndDescriptorSets",
                 "NegativeDescriptors.ImageSubresourceOverlapBetweenRenderPassAndDescriptorSets",
-                "NegativeDescriptors.WriteDescriptorSetConsecutiveUpdates",
-                "NegativeDescriptors.BindInvalidPipelineLayout",
-                "NegativeDescriptors.DescriptorSetCompatibilityCompute",
                 "NegativeDescriptors.ImageSubresourceOverlapBetweenRenderPassAndDescriptorSetsFunction",
+                "NegativeDescriptors.ImmutableSamplerIdenticallyDefined",
+                "NegativeDescriptors.ImmutableSamplerIdenticallyDefinedFilterMinmax",
                 "NegativeDescriptors.OpArrayLengthStaticallyUsed",
+                "NegativeDescriptors.WriteDescriptorSetConsecutiveUpdates",
                 "NegativeDynamicState.VertexInputLocationMissing",
                 "NegativeFragmentShadingRate.PrimitiveFragmentShadingRateWriteMultiViewportLimitDynamic",
                 "NegativeFragmentShadingRate.PrimitiveWriteMultiViewportLimit",
@@ -410,8 +451,9 @@
                 "NegativeShaderSpirv.DeviceMemoryScopeDebugInfo",
                 "NegativeShaderSpirv.DynamicUniformIndex",
                 "NegativeShaderSpirv.FragmentShaderInterlockEnabled",
-                "NegativeShaderSpirv.InvalidExtension",
                 "NegativeShaderSpirv.ImageGatherOffsetMaintenance8",
+                "NegativeShaderSpirv.InputOutput8Bit",
+                "NegativeShaderSpirv.InvalidExtension",
                 "NegativeShaderSpirv.NoScalarBlockLayout12",
                 "NegativeShaderSpirv.NoUniformBufferStandardLayout12",
                 "NegativeShaderSpirv.QueueFamilyMemoryScope",
@@ -468,8 +510,13 @@
                 "NegativeVertexInput.AttributeStructTypeSecondLocation",
                 "NegativeVertexInput.AttributeTypeMismatch",
                 "NegativeVertexInput.AttributeTypeMismatchDynamic",
+                "NegativeVertexInput.NoBoundVertexBuffer",
                 "NegativeVertexInput.ResetCmdSetVertexInput",
                 "NegativeVertexInput.VertexInputRebinding",
+                "NegativeVertexInput.VertextBinding",
+                "NegativeVertexInput.VertextBindingDynamicState",
+                "NegativeVertexInput.VertextBindingMultipleLocations",
+                "NegativeVertexInput.VertextBindingNonLinear",
                 "NegativeYcbcr.ConstOffset",
                 "NegativeYcbcr.TexelFetch",
                 "NegativeYcbcr.TexelFetchArray",

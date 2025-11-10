@@ -17,11 +17,17 @@
  * limitations under the License.
  */
 
+#include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/vk_enum_string_helper.h>
+#include "core_checks/cc_buffer_address.h"
 #include "drawdispatch/drawdispatch_vuids.h"
 #include "core_validation.h"
+#include "error_message/error_strings.h"
+#include "error_message/logging.h"
+#include "generated/spirv_grammar_helper.h"
 #include "generated/vk_extension_helper.h"
 #include "state_tracker/buffer_state.h"
+#include "state_tracker/image_state.h"
 #include "state_tracker/last_bound_state.h"
 #include "state_tracker/shader_object_state.h"
 #include "state_tracker/descriptor_sets.h"
@@ -957,18 +963,13 @@ bool CoreChecks::ValidateCmdTraceRaysKHR(const Location &loc, const LastBound &l
             }
         }
 
-        const char *vuid_single_device_memory = is_indirect ? "VUID-vkCmdTraceRaysIndirectKHR-pHitShaderBindingTable-03687"
-                                                            : "VUID-vkCmdTraceRaysKHR-pHitShaderBindingTable-03687";
         const char *vuid_binding_table_flag = is_indirect ? "VUID-vkCmdTraceRaysIndirectKHR-pHitShaderBindingTable-03688"
                                                           : "VUID-vkCmdTraceRaysKHR-pHitShaderBindingTable-03688";
-        skip |= ValidateRaytracingShaderBindingTable(cb_state, table_loc, vuid_single_device_memory, vuid_binding_table_flag,
-                                                     *pHitShaderBindingTable);
+        skip |= ValidateRaytracingShaderBindingTable(cb_state, table_loc, vuid_binding_table_flag, *pHitShaderBindingTable);
     }
 
     if (pRaygenShaderBindingTable) {
         const Location table_loc = loc.dot(Field::pRaygenShaderBindingTable);
-        const char *vuid_single_device_memory = is_indirect ? "VUID-vkCmdTraceRaysIndirectKHR-pRayGenShaderBindingTable-03680"
-                                                            : "VUID-vkCmdTraceRaysKHR-pRayGenShaderBindingTable-03680";
         const char *vuid_binding_table_flag = is_indirect ? "VUID-vkCmdTraceRaysIndirectKHR-pRayGenShaderBindingTable-03681"
                                                           : "VUID-vkCmdTraceRaysKHR-pRayGenShaderBindingTable-03681";
         // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9368
@@ -978,18 +979,14 @@ bool CoreChecks::ValidateCmdTraceRaysKHR(const Location &loc, const LastBound &l
                              cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR), table_loc.dot(Field::deviceAddress),
                              "(0x%" PRIx64 ") does not belong to a valid VkBuffer.", pRaygenShaderBindingTable->deviceAddress);
         }
-        skip |= ValidateRaytracingShaderBindingTable(cb_state, table_loc, vuid_single_device_memory, vuid_binding_table_flag,
-                                                     *pRaygenShaderBindingTable);
+        skip |= ValidateRaytracingShaderBindingTable(cb_state, table_loc, vuid_binding_table_flag, *pRaygenShaderBindingTable);
     }
 
     if (pMissShaderBindingTable) {
         const Location table_loc = loc.dot(Field::pMissShaderBindingTable);
-        const char *vuid_single_device_memory = is_indirect ? "VUID-vkCmdTraceRaysIndirectKHR-pMissShaderBindingTable-03683"
-                                                            : "VUID-vkCmdTraceRaysKHR-pMissShaderBindingTable-03683";
         const char *vuid_binding_table_flag = is_indirect ? "VUID-vkCmdTraceRaysIndirectKHR-pMissShaderBindingTable-03684"
                                                           : "VUID-vkCmdTraceRaysKHR-pMissShaderBindingTable-03684";
-        skip |= ValidateRaytracingShaderBindingTable(cb_state, table_loc, vuid_single_device_memory, vuid_binding_table_flag,
-                                                     *pMissShaderBindingTable);
+        skip |= ValidateRaytracingShaderBindingTable(cb_state, table_loc, vuid_binding_table_flag, *pMissShaderBindingTable);
         if (pMissShaderBindingTable->deviceAddress == 0) {
             if (pipeline_state->create_flags & VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_MISS_SHADERS_BIT_KHR) {
                 const char *vuid =
@@ -1005,12 +1002,9 @@ bool CoreChecks::ValidateCmdTraceRaysKHR(const Location &loc, const LastBound &l
 
     if (pCallableShaderBindingTable) {
         const Location table_loc = loc.dot(Field::pCallableShaderBindingTable);
-        const char *vuid_single_device_memory = is_indirect ? "VUID-vkCmdTraceRaysIndirectKHR-pCallableShaderBindingTable-03691"
-                                                            : "VUID-vkCmdTraceRaysKHR-pCallableShaderBindingTable-03691";
         const char *vuid_binding_table_flag = is_indirect ? "VUID-vkCmdTraceRaysIndirectKHR-pCallableShaderBindingTable-03692"
                                                           : "VUID-vkCmdTraceRaysKHR-pCallableShaderBindingTable-03692";
-        skip |= ValidateRaytracingShaderBindingTable(cb_state, table_loc, vuid_single_device_memory, vuid_binding_table_flag,
-                                                     *pCallableShaderBindingTable);
+        skip |= ValidateRaytracingShaderBindingTable(cb_state, table_loc, vuid_binding_table_flag, *pCallableShaderBindingTable);
     }
     return skip;
 }
@@ -1032,6 +1026,24 @@ bool CoreChecks::PreCallValidateCmdTraceRaysKHR(VkCommandBuffer commandBuffer,
     return skip;
 }
 
+bool CoreChecks::ValidateCmdTraceRaysIndirect(const Location &loc, const LastBound &last_bound_state,
+                                              VkDeviceAddress indirect_device_address) const {
+    bool skip = false;
+    const bool is_2khr = loc.function == Func::vkCmdTraceRaysIndirect2KHR;
+
+    const char *usage_vuid = is_2khr ? " VUID-vkCmdTraceRaysIndirect2KHR-indirectDeviceAddress-03633"
+                                     : "VUID-vkCmdTraceRaysIndirectKHR-indirectDeviceAddress-03633";
+    BufferAddressValidation<1> buffer_address_validator = {
+        {{{usage_vuid,
+           [](const vvl::Buffer &buffer_state) { return (buffer_state.usage & VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT) == 0; },
+           []() { return "The following buffers are missing VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT"; },
+           [](const vvl::Buffer &buffer_state) { return "buffer has usage " + string_VkBufferUsageFlags2(buffer_state.usage); }}}}};
+
+    skip |= buffer_address_validator.ValidateDeviceAddress(
+        *this, loc.dot(Field::indirectDeviceAddress), LogObjectList(last_bound_state.cb_state.Handle()), indirect_device_address);
+    return skip;
+}
+
 bool CoreChecks::PreCallValidateCmdTraceRaysIndirectKHR(VkCommandBuffer commandBuffer,
                                                         const VkStridedDeviceAddressRegionKHR *pRaygenShaderBindingTable,
                                                         const VkStridedDeviceAddressRegionKHR *pMissShaderBindingTable,
@@ -1046,6 +1058,7 @@ bool CoreChecks::PreCallValidateCmdTraceRaysIndirectKHR(VkCommandBuffer commandB
     skip |= ValidateActionState(last_bound_state, vuid);
     skip |= ValidateCmdTraceRaysKHR(error_obj.location, last_bound_state, pRaygenShaderBindingTable, pMissShaderBindingTable,
                                     pHitShaderBindingTable, pCallableShaderBindingTable);
+    skip |= ValidateCmdTraceRaysIndirect(error_obj.location, last_bound_state, indirectDeviceAddress);
     return skip;
 }
 
@@ -1057,6 +1070,7 @@ bool CoreChecks::PreCallValidateCmdTraceRaysIndirect2KHR(VkCommandBuffer command
     const DrawDispatchVuid &vuid = GetDrawDispatchVuid(error_obj.location.function);
 
     skip |= ValidateActionState(last_bound_state, vuid);
+    skip |= ValidateCmdTraceRaysIndirect(error_obj.location, last_bound_state, indirectDeviceAddress);
     return skip;
 }
 
@@ -1227,12 +1241,12 @@ bool CoreChecks::PreCallValidateCmdDrawMeshTasksEXT(VkCommandBuffer commandBuffe
     uint64_t invocations = static_cast<uint64_t>(groupCountX) * static_cast<uint64_t>(groupCountY);
     // Prevent overflow.
     bool fail = false;
-    if (invocations > vvl::MaxTypeValue(maxTaskWorkGroupTotalCount) || invocations > maxTaskWorkGroupTotalCount) {
+    if (invocations > vvl::kU32Max || invocations > maxTaskWorkGroupTotalCount) {
         fail = true;
     }
     if (!fail) {
         invocations *= static_cast<uint64_t>(groupCountZ);
-        if (invocations > vvl::MaxTypeValue(maxTaskWorkGroupTotalCount) || invocations > maxTaskWorkGroupTotalCount) {
+        if (invocations > vvl::kU32Max || invocations > maxTaskWorkGroupTotalCount) {
             fail = true;
         }
     }
@@ -1350,7 +1364,7 @@ bool CoreChecks::ValidateActionState(const LastBound &last_bound_state, const Dr
     bool skip = false;
     skip |= ValidateCmd(cb_state, loc);
 
-    // Quick verify that if there is no pipeine, the shade object is being used
+    // Quick verify that if there is no pipeline, the shader object is being used
     if (!pipeline && !enabled_features.shaderObject) {
         return LogError(vuid.pipeline_bound_08606, cb_state.GetObjectList(bind_point), loc,
                         "A valid %s pipeline must be bound with vkCmdBindPipeline before calling this command.",
@@ -1361,11 +1375,16 @@ bool CoreChecks::ValidateActionState(const LastBound &last_bound_state, const Dr
         skip |= ValidateDrawDynamicState(last_bound_state, vuid);
         skip |= ValidateDrawPrimitivesGeneratedQuery(last_bound_state, vuid);
         skip |= ValidateDrawProtectedMemory(last_bound_state, vuid);
-        skip |= ValidateDrawDualSourceBlend(last_bound_state, vuid);
         skip |= ValidateDrawFragmentShadingRate(last_bound_state, vuid);
+        skip |= ValidateDrawAttachmentColorBlend(last_bound_state, vuid);
+        skip |= ValidateDrawAttachmentSampleLocation(last_bound_state, vuid);
+        skip |= ValidateDrawDepthStencilAttachments(last_bound_state, vuid);
+        skip |= ValidateDrawTessellation(last_bound_state, vuid);
+        skip |= ValidateDrawVertexBinding(last_bound_state, vuid);
 
         if (cb_state.active_render_pass && cb_state.active_render_pass->UsesDynamicRendering()) {
-            skip |= ValidateDrawDynamicRenderingFsOutputs(last_bound_state, pipeline, *cb_state.active_render_pass, loc);
+            skip |= ValidateDrawDynamicRenderingFsOutputs(last_bound_state, cb_state, loc);
+            skip |= ValidateDrawDynamicRenderpassExternalFormatResolve(last_bound_state, *cb_state.active_render_pass, vuid);
         }
 
         if (pipeline) {
@@ -1397,7 +1416,7 @@ bool CoreChecks::ValidateActionState(const LastBound &last_bound_state, const Dr
 
     if (pipeline) {
         skip |= ValidateActionStateDescriptorsPipeline(last_bound_state, bind_point, *pipeline, vuid);
-    } else if (last_bound_state.cb_state.descriptor_buffer_binding_info.empty()) {
+    } else if (last_bound_state.cb_state.descriptor_buffer.binding_info.empty()) {
         // TODO - VkPipeline have VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT (descriptor_buffer_mode) to know if using descriptor
         // buffers, but VK_EXT_shader_object has no flag. For now, if the command buffer ever calls vkCmdBindDescriptorBuffersEXT,
         // we just assume things are bound until we add some form of GPU side tracking for descriptor buffers
@@ -1431,6 +1450,10 @@ static bool NeedDrawStateValidated(const vvl::CommandBuffer &cb_state, const vvl
 bool CoreChecks::ValidateActionStateDescriptorsPipeline(const LastBound &last_bound_state, const VkPipelineBindPoint bind_point,
                                                         const vvl::Pipeline &pipeline, const vvl::DrawDispatchVuid &vuid) const {
     bool skip = false;
+    // If the pipeline is not using any descriptors, then any descriptor state set can be ignored
+    if (pipeline.active_slots.empty()) {
+        return skip;
+    }
     const vvl::CommandBuffer &cb_state = last_bound_state.cb_state;
 
     for (const auto &ds_slot : last_bound_state.ds_slots) {
@@ -1463,7 +1486,7 @@ bool CoreChecks::ValidateActionStateDescriptorsPipeline(const LastBound &last_bo
     }
 
     const auto pipeline_layout = pipeline.PipelineLayoutState();
-    if (!pipeline.active_slots.empty() && !last_bound_state.IsBoundSetCompatible(pipeline.max_active_slot, *pipeline_layout)) {
+    if (!last_bound_state.IsBoundSetCompatible(pipeline.max_active_slot, *pipeline_layout)) {
         // If they never bound any descriptors
         if (!last_bound_state.desc_set_pipeline_layout) {
             skip |= LogError(vuid.compatible_pipeline_08600, cb_state.GetObjectList(bind_point), vuid.loc(),
@@ -1511,7 +1534,8 @@ bool CoreChecks::ValidateActionStateDescriptorsPipeline(const LastBound &last_bo
                                  "%s uses set %" PRIu32
                                  " but that set is not bound. (Need to use a command like vkCmdBindDescriptorSets to bind the set)",
                                  FormatHandle(pipeline).c_str(), set_index);
-            } else if (!VerifyDescriptorSetIsCompatibile(*ds_slot.ds_state, pipeline_layout->set_layouts, set_index,
+            } else if (pipeline_layout->set_layouts[set_index] &&
+                       !VerifyDescriptorSetIsCompatibile(*ds_slot.ds_state, *pipeline_layout->set_layouts[set_index],
                                                          error_string)) {
                 // Set is bound but not compatible w/ corresponding VkPipelineLayoutCreateInfo::pSetLayouts
                 VkDescriptorSet set_handle = ds_slot.ds_state->VkHandle();
@@ -1528,7 +1552,8 @@ bool CoreChecks::ValidateActionStateDescriptorsPipeline(const LastBound &last_bo
                 const bool need_validate =
                     NeedDrawStateValidated(cb_state, descriptor_set, ds_slot, disabled[image_layout_validation]);
                 if (need_validate) {
-                    skip |= ValidateDrawState(*descriptor_set, set_index, binding_req_map, cb_state, vuid, pipeline.Handle());
+                    skip |= ValidateDrawState(*descriptor_set, set_index, binding_req_map, cb_state, vuid,
+                                              LogObjectList(pipeline.Handle()));
                 }
             }
         }
@@ -1543,12 +1568,12 @@ bool CoreChecks::ValidateActionStateDescriptorsShaderObject(const LastBound &las
 
     // Check if the current shader objects are compatible for the maximum used set with the bound sets.
     for (const auto &shader_state : last_bound_state.shader_object_states) {
-        if (!shader_state) {
+        // If the shader is not using any descriptors, then any descriptor state set can be ignored
+        if (!shader_state || shader_state->active_slots.empty()) {
             continue;
         }
 
-        if (!shader_state->active_slots.empty() &&
-            !last_bound_state.IsBoundSetCompatible(shader_state->max_active_slot, *shader_state)) {
+        if (!last_bound_state.IsBoundSetCompatible(shader_state->max_active_slot, *shader_state)) {
             LogObjectList objlist(cb_state.Handle(), shader_state->Handle());
 
             if (!last_bound_state.desc_set_pipeline_layout) {
@@ -1584,7 +1609,8 @@ bool CoreChecks::ValidateActionStateDescriptorsShaderObject(const LastBound &las
                     skip |= LogError(vuid.compatible_pipeline_08600, objlist, vuid.loc(),
                                      "%s uses set %" PRIu32 " but that set is not bound.",
                                      FormatHandle(shader_state->Handle()).c_str(), set_index);
-                } else if (!VerifyDescriptorSetIsCompatibile(*ds_slot.ds_state, shader_state->set_layouts, set_index,
+                } else if (shader_state->set_layouts[set_index] &&
+                           !VerifyDescriptorSetIsCompatibile(*ds_slot.ds_state, *shader_state->set_layouts[set_index],
                                                              error_string)) {
                     // Set is bound but not compatible w/ corresponding VkShaderCreateInfoEXT::pSetLayouts
                     VkDescriptorSet set_handle = ds_slot.ds_state->VkHandle();
@@ -1601,8 +1627,8 @@ bool CoreChecks::ValidateActionStateDescriptorsShaderObject(const LastBound &las
                     const bool need_validate =
                         NeedDrawStateValidated(cb_state, descriptor_set, ds_slot, disabled[image_layout_validation]);
                     if (need_validate) {
-                        skip |=
-                            ValidateDrawState(*descriptor_set, set_index, binding_req_map, cb_state, vuid, shader_state->Handle());
+                        skip |= ValidateDrawState(*descriptor_set, set_index, binding_req_map, cb_state, vuid,
+                                                  LogObjectList(shader_state->Handle()));
                     }
                 }
             }
@@ -1689,22 +1715,8 @@ bool CoreChecks::ValidateActionStateProtectedMemory(const LastBound &last_bound_
     return skip;
 }
 
-bool CoreChecks::MatchSampleLocationsInfo(const VkSampleLocationsInfoEXT &info_1, const VkSampleLocationsInfoEXT &info_2) const {
-    if (info_1.sampleLocationsPerPixel != info_2.sampleLocationsPerPixel ||
-        info_1.sampleLocationGridSize.width != info_2.sampleLocationGridSize.width ||
-        info_1.sampleLocationGridSize.height != info_2.sampleLocationGridSize.height ||
-        info_1.sampleLocationsCount != info_2.sampleLocationsCount) {
-        return false;
-    }
-    for (uint32_t i = 0; i < info_1.sampleLocationsCount; ++i) {
-        if (info_1.pSampleLocations[i].x != info_2.pSampleLocations[i].x ||
-            info_1.pSampleLocations[i].y != info_2.pSampleLocations[i].y) {
-            return false;
-        }
-    }
-    return true;
-}
-
+// Note, these don't include the RTX Indirect commands (vkCmdTraceRaysIndirectKHR) because
+// they use a VkDeviceAddress instead of a VkBuffer
 bool CoreChecks::ValidateIndirectCmd(const vvl::CommandBuffer &cb_state, const vvl::Buffer &buffer_state,
                                      const DrawDispatchVuid &vuid) const {
     bool skip = false;
@@ -1805,78 +1817,6 @@ bool CoreChecks::ValidateDrawProtectedMemory(const LastBound &last_bound_state, 
     return skip;
 }
 
-bool CoreChecks::ValidateDrawDualSourceBlend(const LastBound &last_bound_state, const vvl::DrawDispatchVuid &vuid) const {
-    bool skip = false;
-    const vvl::CommandBuffer &cb_state = last_bound_state.cb_state;
-    const auto *pipeline = last_bound_state.pipeline_state;
-    if (pipeline && !pipeline->ColorBlendState()) return skip;
-
-    const spirv::EntryPoint *fragment_entry_point = last_bound_state.GetFragmentEntryPoint();
-    if (!fragment_entry_point) return skip;
-
-    uint32_t max_fragment_location = 0;
-    for (const auto *variable : fragment_entry_point->user_defined_interface_variables) {
-        if (variable->storage_class != spv::StorageClassOutput) continue;
-        if (variable->decorations.location != spirv::kInvalidValue) {
-            max_fragment_location = std::max(max_fragment_location, variable->decorations.location);
-        }
-    }
-    if (max_fragment_location < phys_dev_props.limits.maxFragmentDualSrcAttachments) return skip;
-
-    // If color blend is disabled, the blend equation doesn't matter
-    const bool dynamic_blend_enable = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT);
-    const bool dynamic_blend_equation = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT);
-    const uint32_t attachment_count = pipeline ? pipeline->ColorBlendState()->attachmentCount
-                                               : (uint32_t)cb_state.dynamic_state_value.color_blend_equations.size();
-    for (uint32_t i = 0; i < attachment_count; ++i) {
-        const bool blend_enable = dynamic_blend_enable ? cb_state.dynamic_state_value.color_blend_enabled[i]
-                                                       : pipeline->ColorBlendState()->pAttachments[i].blendEnable;
-        if (!blend_enable) continue;
-        if (dynamic_blend_equation) {
-            const VkColorBlendEquationEXT &color_blend_equation = cb_state.dynamic_state_value.color_blend_equations[i];
-            if (IsSecondaryColorInputBlendFactor(color_blend_equation.srcColorBlendFactor) ||
-                IsSecondaryColorInputBlendFactor(color_blend_equation.dstColorBlendFactor) ||
-                IsSecondaryColorInputBlendFactor(color_blend_equation.srcAlphaBlendFactor) ||
-                IsSecondaryColorInputBlendFactor(color_blend_equation.dstAlphaBlendFactor)) {
-                skip |= LogError(vuid.blend_dual_source_09239, cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
-                                 "Fragment output attachment %" PRIu32
-                                 " is using Dual-Source Blending, but the largest output fragment Location (%" PRIu32
-                                 ") is not less than maxFragmentDualSrcAttachments (%" PRIu32
-                                 "). The following are set by vkCmdSetColorBlendEquationEXT:\n\tsrcColorBlendFactor = "
-                                 "%s\n\tdstColorBlendFactor = %s\n\tsrcAlphaBlendFactor = "
-                                 "%s\n\tdstAlphaBlendFactor = %s\n",
-                                 i, max_fragment_location, phys_dev_props.limits.maxFragmentDualSrcAttachments,
-                                 string_VkBlendFactor(color_blend_equation.srcColorBlendFactor),
-                                 string_VkBlendFactor(color_blend_equation.dstColorBlendFactor),
-                                 string_VkBlendFactor(color_blend_equation.srcAlphaBlendFactor),
-                                 string_VkBlendFactor(color_blend_equation.dstAlphaBlendFactor));
-                break;
-            }
-        } else {
-            const VkPipelineColorBlendAttachmentState &attachment = pipeline->ColorBlendState()->pAttachments[i];
-            if (IsSecondaryColorInputBlendFactor(attachment.srcColorBlendFactor) ||
-                IsSecondaryColorInputBlendFactor(attachment.dstColorBlendFactor) ||
-                IsSecondaryColorInputBlendFactor(attachment.srcAlphaBlendFactor) ||
-                IsSecondaryColorInputBlendFactor(attachment.dstAlphaBlendFactor)) {
-                skip |= LogError(
-                    vuid.blend_dual_source_09239, cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
-                    "Fragment output attachment %" PRIu32
-                    " is using Dual-Source Blending, but the largest output fragment Location (%" PRIu32
-                    ") is not less than maxFragmentDualSrcAttachments (%" PRIu32
-                    "). The following are set by VkPipelineColorBlendAttachmentState:\n\tsrcColorBlendFactor = "
-                    "%s\n\tdstColorBlendFactor = %s\n\tsrcAlphaBlendFactor = %s\n\tdstAlphaBlendFactor "
-                    "= %s\n",
-                    i, max_fragment_location, phys_dev_props.limits.maxFragmentDualSrcAttachments,
-                    string_VkBlendFactor(attachment.srcColorBlendFactor), string_VkBlendFactor(attachment.dstColorBlendFactor),
-                    string_VkBlendFactor(attachment.srcAlphaBlendFactor), string_VkBlendFactor(attachment.dstAlphaBlendFactor));
-                break;
-            }
-        }
-    }
-
-    return skip;
-}
-
 bool CoreChecks::ValidateDrawFragmentShadingRate(const LastBound &last_bound_state, const vvl::DrawDispatchVuid &vuid) const {
     bool skip = false;
     const vvl::CommandBuffer &cb_state = last_bound_state.cb_state;
@@ -1921,6 +1861,596 @@ bool CoreChecks::ValidateDrawFragmentShadingRate(const LastBound &last_bound_sta
                 }
                 break;
             }
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateDrawAttachmentColorBlend(const LastBound &last_bound_state, const vvl::DrawDispatchVuid &vuid) const {
+    bool skip = false;
+
+    const vvl::CommandBuffer &cb_state = last_bound_state.cb_state;
+    const bool has_pipeline = last_bound_state.pipeline_state != nullptr;
+    if (has_pipeline && !last_bound_state.pipeline_state->ColorBlendState()) {
+        return skip;
+    }
+
+    const spirv::EntryPoint *fragment_entry_point = last_bound_state.GetFragmentEntryPoint();
+    if (last_bound_state.IsRasterizationDisabled() || !fragment_entry_point) {
+        return skip;
+    }
+
+    if (enabled_features.colorWriteEnable && last_bound_state.IsDynamic(CB_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT) &&
+        cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT)) {
+        // Found in https://gitlab.khronos.org/vulkan/vulkan/-/issues/4116 that not setting all attachment can invalidate previous
+        // calls, so the last call needs to have set them all
+        const uint32_t blend_attachment_count = (uint32_t)cb_state.active_color_attachments_index.size();
+        const uint32_t dynamic_attachment_count = cb_state.dynamic_state_value.color_write_enable_attachment_count;
+        if (dynamic_attachment_count < blend_attachment_count) {
+            LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+            skip |= LogError(vuid.dynamic_color_write_enable_count_07750, objlist, vuid.loc(),
+                             "There are currently (%" PRIu32
+                             ") active color attachments, but the last call to vkCmdSetColorWriteEnableEXT() only set the color "
+                             "write enables for attachments 0 to %" PRIu32
+                             " and the color write enable state of the remaining attachments is undefined.%s",
+                             blend_attachment_count, dynamic_attachment_count,
+                             cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT).c_str());
+        }
+    }
+
+    const auto get_max_fragment_location = [fragment_entry_point]() {
+        uint32_t max_fragment_location = 0;
+        for (const auto *variable : fragment_entry_point->user_defined_interface_variables) {
+            if (variable->storage_class != spv::StorageClassOutput) {
+                continue;
+            }
+            if (variable->decorations.location != spirv::kInvalidValue) {
+                max_fragment_location = std::max(max_fragment_location, variable->decorations.location);
+            }
+        }
+        return max_fragment_location;
+    };
+
+    const bool dynamic_equation = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT);
+    const bool dynamic_advanced = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT);
+    const bool dynamic_blend_enable = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT);
+    const bool dynamic_write_mask = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT);
+    const bool dynamic_blend_constants = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_BLEND_CONSTANTS);
+
+    for (uint32_t i = 0; i < cb_state.active_attachments.size(); ++i) {
+        const auto &attachment_info = cb_state.active_attachments[i];
+        const auto *attachment = attachment_info.image_view;
+        if (!attachment || !attachment_info.IsColor()) {
+            continue;
+        }
+        const uint32_t color_index = attachment_info.type_index;
+
+        if (dynamic_write_mask && cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT) &&
+            !cb_state.dynamic_state_value.color_write_mask_attachments[color_index]) {
+            LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+            objlist.add(attachment->Handle());
+            skip |=
+                LogError(vuid.dynamic_color_write_mask_07478, objlist, vuid.loc(),
+                         "vkCmdSetColorWriteMaskEXT was not set for color attachment index %" PRIu32 " for this command buffer.%s",
+                         color_index, cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT).c_str());
+        }
+
+        if (dynamic_blend_enable && cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT) &&
+            !cb_state.dynamic_state_value.color_blend_enable_attachments[color_index]) {
+            LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+            objlist.add(attachment->Handle());
+            skip |= LogError(vuid.dynamic_color_blend_enable_07476, objlist, vuid.loc(),
+                             "vkCmdSetColorBlendEnableEXT was not set for color attachment index %" PRIu32
+                             " for this command buffer.%s",
+                             color_index, cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT).c_str());
+            continue;  // If no value is set, IsColorBlendEnabled will give garbage
+        }
+        // The following all rely on color blend
+        if (!last_bound_state.IsColorBlendEnabled(color_index)) {
+            continue;
+        }
+
+        const bool has_blend_bit = attachment->format_features & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT;
+        if (!has_blend_bit) {
+            LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+            objlist.add(attachment->Handle());
+            skip |= LogError(vuid.blend_enable_04727, objlist, vuid.loc(),
+                             "%s was created with %s which doesn't support VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT, but %s\n"
+                             "(supported features: %s)",
+                             attachment_info.Describe(cb_state, i).c_str(), string_VkFormat(attachment->create_info.format),
+                             last_bound_state.DescribeColorBlendEnabled(color_index).c_str(),
+                             string_VkFormatFeatureFlags2(attachment->format_features).c_str());
+        }
+
+        // These checks "could" be done in ValidateGraphicsDynamicStateSetStatus, but are exceptions/complex and better done here
+        // where we also need to check for other things related to the color attachments
+        if (dynamic_equation && dynamic_advanced) {
+            // always the case for shader object, can also be done with pipeline
+            if (!cb_state.dynamic_state_value.color_blend_equation_attachments[color_index] &&
+                !cb_state.dynamic_state_value.color_blend_advanced_attachments[color_index]) {
+                LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+                objlist.add(attachment->Handle());
+                skip |= LogError(vuid.dynamic_color_blend_equation_10864, objlist, vuid.loc(),
+                                 "%s needs to be set for color attachmet index %" PRIu32 " (%s)\n%s",
+                                 IsExtEnabled(extensions.vk_ext_blend_operation_advanced)
+                                     ? "Either vkCmdSetColorBlendEquationEXT or vkCmdSetColorBlendAdvancedEXT"
+                                     : "vkCmdSetColorBlendEquationEXT",
+                                 color_index, attachment_info.Describe(cb_state, i).c_str(),
+                                 last_bound_state.DescribeColorBlendEnabled(color_index).c_str());
+            }
+        } else if (dynamic_equation) {
+            // Only possible with pipelines
+            if (!cb_state.dynamic_state_value.color_blend_equation_attachments[color_index]) {
+                const LogObjectList objlist(cb_state.Handle(), attachment->VkHandle(), last_bound_state.pipeline_state->Handle());
+                skip |= LogError(vuid.dynamic_color_blend_equation_10862, objlist, vuid.loc(),
+                                 "The pipeline was created with VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT, but "
+                                 "vkCmdSetColorBlendEquationEXT was never set for color attachment index %" PRIu32 " (%s).%s\n%s",
+                                 color_index, attachment_info.Describe(cb_state, i).c_str(),
+                                 cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT).c_str(),
+                                 last_bound_state.DescribeColorBlendEnabled(color_index).c_str());
+            }
+        } else if (dynamic_advanced) {
+            // Only possible with pipelines
+            if (!cb_state.dynamic_state_value.color_blend_advanced_attachments[color_index]) {
+                const LogObjectList objlist(cb_state.Handle(), attachment->VkHandle(), last_bound_state.pipeline_state->Handle());
+                skip |= LogError(vuid.dynamic_color_blend_equation_10863, objlist, vuid.loc(),
+                                 "The pipeline was created with VK_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT, but "
+                                 "vkCmdSetColorBlendAdvancedEXT was never set for color attachment index %" PRIu32 " (%s).%s\n%s",
+                                 color_index, attachment_info.Describe(cb_state, i).c_str(),
+                                 cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT).c_str(),
+                                 last_bound_state.DescribeColorBlendEnabled(color_index).c_str());
+            }
+        }
+
+        if (dynamic_advanced && cb_state.dynamic_state_value.color_blend_advanced_attachments[color_index]) {
+            if (cb_state.active_color_attachments_index.size() >
+                phys_dev_ext_props.blend_operation_advanced_props.advancedBlendMaxColorAttachments) {
+                LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+                objlist.add(attachment->Handle());
+                skip |= LogError(vuid.blend_advanced_07480, objlist, vuid.loc(),
+                                 "vkCmdSetColorBlendAdvancedEXT has set color attachment index %" PRIu32
+                                 " (%s) to advanced blending, but the total active color attachment count (%zu) is greater than "
+                                 "advancedBlendMaxColorAttachments (%" PRIu32 ").%s\n%s",
+                                 color_index, attachment_info.Describe(cb_state, i).c_str(),
+                                 cb_state.active_color_attachments_index.size(),
+                                 phys_dev_ext_props.blend_operation_advanced_props.advancedBlendMaxColorAttachments,
+                                 cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT).c_str(),
+                                 last_bound_state.DescribeColorBlendEnabled(color_index).c_str());
+            }
+        }
+
+        if (dynamic_blend_constants && !cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_BLEND_CONSTANTS) &&
+            last_bound_state.IsBlendConstantsEnabled(color_index)) {
+            LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+            objlist.add(attachment->Handle());
+            skip |= LogError(vuid.dynamic_blend_constants_07835, objlist, vuid.loc(),
+                             "%svkCmdSetBlendConstants was never called, but color attachment index %" PRIu32
+                             " (%s) has blending enabled (%s), and the blend factor is constant.\n%s\n%s",
+                             has_pipeline ? "VK_DYNAMIC_STATE_BLEND_CONSTANT state is dynamic, " : "", color_index,
+                             attachment_info.Describe(cb_state, i).c_str(),
+                             last_bound_state.DescribeColorBlendEnabled(color_index).c_str(),
+                             last_bound_state.DescribeBlendFactorEquation(color_index).c_str(),
+                             cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_BLEND_CONSTANTS).c_str());
+        }
+
+        if (last_bound_state.IsDualBlending(color_index)) {
+            const uint32_t max_fragment_location = get_max_fragment_location();
+            if (max_fragment_location >= phys_dev_props.limits.maxFragmentDualSrcAttachments) {
+                skip |= LogError(vuid.blend_dual_source_09239, cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
+                                 "color attachment index %" PRIu32
+                                 " (%s) is using Dual-Source Blending, but the largest output fragment Location (%" PRIu32
+                                 ") is not less than maxFragmentDualSrcAttachments (%" PRIu32 ").\n%s\n%s",
+                                 color_index, attachment_info.Describe(cb_state, i).c_str(), max_fragment_location,
+                                 phys_dev_props.limits.maxFragmentDualSrcAttachments,
+                                 last_bound_state.DescribeColorBlendEnabled(color_index).c_str(),
+                                 last_bound_state.DescribeBlendFactorEquation(color_index).c_str());
+                break;
+            }
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateDrawAttachmentSampleLocation(const LastBound &last_bound_state, const vvl::DrawDispatchVuid &vuid) const {
+    bool skip = false;
+    if (!last_bound_state.IsFragmentBound()) {
+        return skip;
+    }
+
+    const vvl::CommandBuffer &cb_state = last_bound_state.cb_state;
+    if (last_bound_state.IsSampleLocationsEnable()) {
+        for (uint32_t i = 0; i < cb_state.active_attachments.size(); i++) {
+            const auto &attachment_info = cb_state.active_attachments[i];
+            const auto *attachment = attachment_info.image_view;
+            if (!attachment || !attachment_info.IsDepth()) {
+                continue;
+            }
+            if ((attachment->image_state->create_info.flags & VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT) == 0) {
+                const LogObjectList objlist(cb_state.Handle(), attachment->Handle());
+                const char *err = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_ENABLE_EXT)
+                                      ? vuid.sample_locations_enable_07484
+                                      : vuid.sample_location_02689;
+                skip |= LogError(err, objlist, vuid.loc(),
+                                 "sampleLocationsEnable is true, but %s (%s created with %s) was not created with "
+                                 "VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT.",
+                                 attachment_info.Describe(cb_state, i).c_str(), FormatHandle(attachment->Handle()).c_str(),
+                                 FormatHandle(attachment->image_state->Handle()).c_str());
+            }
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateDrawDepthStencilAttachments(const LastBound &last_bound_state, const vvl::DrawDispatchVuid &vuid) const {
+    bool skip = false;
+
+    const vvl::CommandBuffer &cb_state = last_bound_state.cb_state;
+    for (uint32_t i = 0; i < cb_state.active_attachments.size(); i++) {
+        const auto &attachment_info = cb_state.active_attachments[i];
+        const auto *attachment = attachment_info.image_view;
+        if (!attachment) {
+            continue;
+        }
+
+        if (attachment_info.IsDepth() && last_bound_state.IsDepthWriteEnable() &&
+            IsImageLayoutDepthReadOnly(attachment_info.layout)) {
+            LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+            objlist.add(attachment->Handle());
+            skip |= LogError(vuid.depth_read_only_06886, objlist, vuid.loc(),
+                             "depthWriteEnable is VK_TRUE, but %s (%s created with %s) has a layout %s which is READ_ONLY.",
+                             attachment_info.Describe(cb_state, i).c_str(), FormatHandle(attachment->Handle()).c_str(),
+                             FormatHandle(attachment->image_state->Handle()).c_str(), string_VkImageLayout(attachment_info.layout));
+        }
+
+        if (attachment_info.IsStencil() && last_bound_state.IsStencilTestEnable()) {
+            VkStencilOpState front = last_bound_state.GetStencilOpStateFront();
+            VkStencilOpState back = last_bound_state.GetStencilOpStateBack();
+
+            const bool all_keep_op = ((front.failOp == VK_STENCIL_OP_KEEP) && (front.passOp == VK_STENCIL_OP_KEEP) &&
+                                      (front.depthFailOp == VK_STENCIL_OP_KEEP) && (back.failOp == VK_STENCIL_OP_KEEP) &&
+                                      (back.passOp == VK_STENCIL_OP_KEEP) && (back.depthFailOp == VK_STENCIL_OP_KEEP));
+            const bool write_mask_enabled = (front.writeMask != 0) && (back.writeMask != 0);
+
+            if (!all_keep_op && write_mask_enabled) {
+                bool is_stencil_layout_read_only = false;
+                if (attachment_info.separate_stencil_layout != VK_IMAGE_LAYOUT_UNDEFINED) {
+                    is_stencil_layout_read_only = IsImageLayoutStencilReadOnly(attachment_info.separate_stencil_layout);
+                } else {
+                    is_stencil_layout_read_only = IsImageLayoutStencilReadOnly(attachment_info.layout);
+                }
+
+                if (is_stencil_layout_read_only) {
+                    LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+                    objlist.add(attachment->Handle());
+                    skip |= LogError(
+                        vuid.stencil_read_only_06887, objlist, vuid.loc(),
+                        "%s (%s created with %s) has a layout of %s which is READ_ONLY, but stencilTestEnable is VK_TRUE, "
+                        "writeMask is non-zero, and all stencil ops are not VK_STENCIL_OP_KEEP.\n"
+                        "front:\n%sback:\n%s",
+                        attachment_info.Describe(cb_state, i).c_str(), FormatHandle(attachment->Handle()).c_str(),
+                        FormatHandle(attachment->image_state->Handle()).c_str(), string_VkImageLayout(attachment_info.layout),
+                        string_VkStencilOpState(front).c_str(), string_VkStencilOpState(back).c_str());
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateDrawTessellation(const LastBound &last_bound_state, const vvl::DrawDispatchVuid &vuid) const {
+    bool skip = false;
+    if ((last_bound_state.GetAllActiveBoundStages() & VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT) == 0) {
+        return skip;
+    }
+
+    const spirv::ExecutionModeSet *tesc_execution_mode = nullptr;
+    const spirv::ExecutionModeSet *tese_execution_mode = nullptr;
+
+    if (last_bound_state.pipeline_state) {
+        for (const auto &stage_state : last_bound_state.pipeline_state->stage_states) {
+            const VkShaderStageFlagBits stage = stage_state.GetStage();
+            if (stage & VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT) {
+                if (stage_state.entrypoint) {
+                    tesc_execution_mode = &stage_state.entrypoint->execution_mode;
+                }
+            } else if (stage & VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) {
+                if (stage_state.entrypoint) {
+                    tese_execution_mode = &stage_state.entrypoint->execution_mode;
+                }
+            }
+        }
+    } else {
+        const auto tesc_shader = last_bound_state.GetShaderState(ShaderObjectStage::TESSELLATION_CONTROL);
+        if (tesc_shader && tesc_shader->entrypoint) {
+            tesc_execution_mode = &tesc_shader->entrypoint->execution_mode;
+        }
+        const auto tese_shader = last_bound_state.GetShaderState(ShaderObjectStage::TESSELLATION_EVALUATION);
+        if (tese_shader && tese_shader->entrypoint) {
+            tese_execution_mode = &tese_shader->entrypoint->execution_mode;
+        }
+    }
+
+    if (!tesc_execution_mode || !tese_execution_mode) {
+        return skip;  // Occurs if using binary shader object
+    }
+
+    // VUID being added in https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/7694
+    const uint32_t tesc_subdivision = tesc_execution_mode->GetTessellationSubdivision();
+    const uint32_t tese_subdivision = tese_execution_mode->GetTessellationSubdivision();
+    if (tesc_subdivision != spirv::kInvalidValue && tese_subdivision != spirv::kInvalidValue &&
+        tesc_subdivision != tese_subdivision) {
+        skip |= LogError("UNASSIGNED-vkCmdDraw-tessellation-subdivision",
+                         last_bound_state.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
+                         "The subdivision specified in tessellation control shader (%s) does not match the subdivision in "
+                         "tessellation evaluation shader (%s).",
+                         string_SpvExecutionMode(tesc_subdivision), string_SpvExecutionMode(tese_subdivision));
+    }
+
+    const uint32_t tesc_orientation = tesc_execution_mode->GetTessellationOrientation();
+    const uint32_t tese_orientation = tese_execution_mode->GetTessellationOrientation();
+    if (tesc_orientation != spirv::kInvalidValue && tese_orientation != spirv::kInvalidValue &&
+        tesc_orientation != tese_orientation) {
+        skip |= LogError("UNASSIGNED-vkCmdDraw-tessellation-orientation",
+                         last_bound_state.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
+                         "The orientation specified in tessellation control shader (%s) does not match the orientation in "
+                         "tessellation evaluation shader (%s).",
+                         string_SpvExecutionMode(tesc_orientation), string_SpvExecutionMode(tese_orientation));
+    }
+
+    const uint32_t tesc_spacing = tesc_execution_mode->GetTessellationSpacing();
+    const uint32_t tese_spacing = tese_execution_mode->GetTessellationSpacing();
+    if (tesc_spacing != spirv::kInvalidValue && tese_spacing != spirv::kInvalidValue && tesc_spacing != tese_spacing) {
+        skip |= LogError("UNASSIGNED-vkCmdDraw-tessellation-spacing",
+                         last_bound_state.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
+                         "The spacing specified in tessellation control shader (%s) does not match the spacing in "
+                         "tessellation evaluation shader (%s).",
+                         string_SpvExecutionMode(tesc_spacing), string_SpvExecutionMode(tese_spacing));
+    }
+    const uint32_t tesc_patch_size = tesc_execution_mode->output_vertices;
+    const uint32_t tese_patch_size = tese_execution_mode->output_vertices;
+    if (tesc_patch_size != spirv::kInvalidValue && tese_patch_size != spirv::kInvalidValue && tesc_patch_size != tese_patch_size) {
+        skip |= LogError("UNASSIGNED-vkCmdDraw-tessellation-patch-size",
+                         last_bound_state.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
+                         "The OutputVertices (patch size) specified in tessellation control shader (%" PRIu32
+                         ") does not match the spacing in "
+                         "tessellation evaluation shader (%" PRIu32 ").",
+                         tesc_patch_size, tese_patch_size);
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateDrawVertexBinding(const LastBound &last_bound, const vvl::DrawDispatchVuid &vuid) const {
+    bool skip = false;
+    const vvl::CommandBuffer &cb_state = last_bound.cb_state;
+    if (!last_bound.pipeline_state) {
+        return skip;  // TODO - Add Shader Object support
+    }
+
+    if ((last_bound.GetAllActiveBoundStages() & VK_SHADER_STAGE_VERTEX_BIT) == 0) {
+        return skip;
+    }
+    // Since we need to know if the Vertex shader actually declares/uses the Input Location, if the shader validation was disabled,
+    // there will no SPIR-V to reflect the information from.
+    if (disabled[shader_validation]) {
+        return skip;
+    }
+
+    const bool has_dynamic_descriptions = last_bound.IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_EXT);
+    const auto &vertex_bindings = has_dynamic_descriptions ? cb_state.dynamic_state_value.vertex_bindings
+                                                           : last_bound.pipeline_state->vertex_input_state->bindings;
+
+    const bool robust_pipeline = last_bound.pipeline_state && last_bound.pipeline_state->uses_pipeline_vertex_robustness;
+
+    auto print_binding = [has_dynamic_descriptions](const VertexBindingState binding_description) {
+        std::stringstream ss;
+        if (has_dynamic_descriptions) {
+            ss << "the last call to vkCmdSetVertexInputEXT";
+        } else {
+            ss << "the last bound pipeline";
+        }
+        ss << " has pVertexBindingDescriptions[" << binding_description.index << "].binding (" << binding_description.desc.binding
+           << ") (pointing to Locations [";
+        const char *separator = "";
+        for (const auto &location : binding_description.locations) {
+            ss << separator << location.first;
+            separator = ", ";
+        }
+        ss << "])";
+        return ss.str();
+    };
+
+    const spirv::EntryPoint *vertex_entry_point = last_bound.GetVertexEntryPoint();
+    // Can be NULL if pipeline binaries are used
+    if (!vertex_entry_point) {
+        return skip;
+    }
+    vvl::unordered_set<uint32_t> spirv_input_locations;
+    for (const auto &pair : vertex_entry_point->input_interface_slots) {
+        spirv_input_locations.emplace(pair.first.Location());
+    }
+
+    // It is ok to have binding descriptions not used, them and find if there is matching buffer tied to it or not
+    for (const auto &[binding_index, binding_description] : vertex_bindings) {
+        // If no attribute points to a binding, it is unused
+        if (binding_description.locations.empty()) {
+            continue;
+        }
+
+        bool shader_has_location = false;
+        for (const auto &location : binding_description.locations) {
+            if (spirv_input_locations.find(location.first) != spirv_input_locations.end()) {
+                shader_has_location = true;
+                break;
+            }
+        }
+        if (!shader_has_location) {
+            // If the Vertex shader doesn't declare the vertex input, there can be invalid/unbound bindings
+            continue;
+        }
+
+        const auto *vertex_buffer_binding = vvl::Find(cb_state.current_vertex_buffer_binding_info, binding_index);
+        if (!vertex_buffer_binding || !vertex_buffer_binding->bound) {
+            // Likely to not get
+            skip |=
+                LogError(vuid.vertex_binding_04007, last_bound.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
+                         "%s which didn't have a buffer bound from any vkCmdBindVertexBuffers call in this command buffer.",
+                         print_binding(binding_description).c_str());
+            continue;
+        }
+
+        // This means the app actively set the buffer to null
+        // Going to hit VUID-vkCmdBindVertexBuffers-pBuffers-04001 first anyway
+        if (vertex_buffer_binding->buffer == VK_NULL_HANDLE) {
+            if (!enabled_features.nullDescriptor) {
+                skip |=
+                    LogError(vuid.vertex_binding_null_04008, last_bound.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS),
+                             vuid.loc(), "%s which was bound with a buffer of VK_NULL_HANDLE, but nullDescriptor is not enabled.",
+                             print_binding(binding_description).c_str());
+            }
+            continue;
+        }
+
+        const auto vertex_buffer_state = Get<vvl::Buffer>(vertex_buffer_binding->buffer);
+        if (!vertex_buffer_state) {
+            skip |= LogError(
+                vuid.vertex_binding_04007, last_bound.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
+                "%s which has an invalid/destroyed buffer bound from a vkCmdBindVertexBuffers call in this command buffer.",
+                print_binding(binding_description).c_str());
+            continue;
+        }
+
+        for (const auto &location : binding_description.locations) {
+            const auto attr_index = location.second.index;
+            const auto &attr_desc = location.second.desc;
+
+            if (last_bound.IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE)) {
+                const VkDeviceSize attribute_binding_extent = attr_desc.offset + GetVertexInputFormatSize(attr_desc.format);
+                if (vertex_buffer_binding->stride != 0 && vertex_buffer_binding->stride < attribute_binding_extent) {
+                    skip |= LogError("VUID-vkCmdBindVertexBuffers2-pStrides-06209",
+                                     last_bound.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), vuid.loc(),
+                                     "(attribute binding %" PRIu32 ", attribute location %" PRIu32 ") The pStrides value (%" PRIu64
+                                     ") parameter in the last call to %s is not 0 "
+                                     "and less than the extent of the binding for the attribute (%" PRIu64 ").",
+                                     attr_desc.binding, attr_desc.location, vertex_buffer_binding->stride, String(vuid.function),
+                                     attribute_binding_extent);
+                }
+            }
+
+            if (!enabled_features.robustBufferAccess && !robust_pipeline) {
+                const VkDeviceSize vertex_buffer_offset = vertex_buffer_binding->offset;
+
+                // Use 1 as vertex/instance index to use buffer stride as well
+                const VkDeviceSize attrib_address = vertex_buffer_offset + vertex_buffer_binding->stride + attr_desc.offset;
+
+                VkDeviceSize vtx_attrib_req_alignment = GetVertexInputFormatSize(attr_desc.format);
+
+                // TODO - There is no real spec language describing these, but also almost no one supports these formats for vertex
+                // input and this check should probably just removed and do the safe division always. Will need to run against CTS
+                // before-and-after to make sure.
+                if (!vkuFormatIsPacked(attr_desc.format) && !vkuFormatIsCompressed(attr_desc.format) &&
+                    !vkuFormatIsSinglePlane_422(attr_desc.format) && !vkuFormatIsMultiplane(attr_desc.format)) {
+                    vtx_attrib_req_alignment = SafeDivision(vtx_attrib_req_alignment, vkuFormatComponentCount(attr_desc.format));
+                }
+
+                if (SafeModulo(attrib_address, vtx_attrib_req_alignment) != 0) {
+                    LogObjectList objlist(last_bound.cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS));
+                    objlist.add(vertex_buffer_state->Handle());
+                    skip |= LogError(vuid.vertex_binding_attribute_02721, objlist, vuid.loc(),
+                                     "Format %s has an alignment of %" PRIu64 " but the alignment of attribAddress (%" PRIu64
+                                     ") is not aligned in pVertexAttributeDescriptions[%" PRIu32 "] (binding=%" PRIu32
+                                     " location=%" PRIu32 ") where attribAddress = vertex buffer offset (%" PRIu64
+                                     ") + binding stride (%" PRIu64 ") + attribute offset (%" PRIu32 ").",
+                                     string_VkFormat(attr_desc.format), vtx_attrib_req_alignment, attrib_address, attr_index,
+                                     attr_desc.binding, attr_desc.location, vertex_buffer_offset, vertex_buffer_binding->stride,
+                                     attr_desc.offset);
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateDrawDynamicRenderpassExternalFormatResolve(const LastBound &last_bound_state,
+                                                                    const vvl::RenderPass &rp_state,
+                                                                    const vvl::DrawDispatchVuid &vuid) const {
+    bool skip = false;
+
+    if (!last_bound_state.pipeline_state) {
+        // Need to understand if possible to actually use this extension with Shader Object
+        // https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/7510#note_547500
+        return skip;
+    }
+    const uint64_t pipeline_external_format = GetExternalFormat(last_bound_state.pipeline_state->GetCreateInfoPNext());
+    if (pipeline_external_format == 0) {
+        return skip;
+    }
+
+    const vvl::CommandBuffer &cb_state = last_bound_state.cb_state;
+    LogObjectList objlist = cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    const VkRenderingInfo &rendering_info = *(rp_state.dynamic_rendering_begin_rendering_info.ptr());
+
+    if (rendering_info.colorAttachmentCount == 1 &&
+        rendering_info.pColorAttachments[0].resolveMode == VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_BIT_ANDROID) {
+        if (auto resolve_image_view_state = Get<vvl::ImageView>(rendering_info.pColorAttachments[0].resolveImageView)) {
+            if (resolve_image_view_state->image_state->ahb_format != pipeline_external_format) {
+                skip |= LogError(vuid.external_format_resolve_09362, objlist, vuid.loc(),
+                                 "pipeline externalFormat is %" PRIu64
+                                 " but the resolveImageView's image was created with externalFormat %" PRIu64 "",
+                                 pipeline_external_format, resolve_image_view_state->image_state->ahb_format);
+            }
+        }
+
+        if (auto color_image_view_state = Get<vvl::ImageView>(rendering_info.pColorAttachments[0].imageView)) {
+            if (color_image_view_state->image_state->ahb_format != pipeline_external_format) {
+                skip |= LogError(vuid.external_format_resolve_09363, objlist, vuid.loc(),
+                                 "pipeline externalFormat is %" PRIu64
+                                 " but the imageView's image was created with externalFormat %" PRIu64 "",
+                                 pipeline_external_format, color_image_view_state->image_state->ahb_format);
+            }
+        }
+    }
+
+    if (last_bound_state.IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT) &&
+        cb_state.dynamic_state_value.color_blend_enable_attachments.test(0)) {
+        skip |= LogError(vuid.external_format_resolve_09364, objlist, vuid.loc(),
+                         "pipeline externalFormat is %" PRIu64 ", but dynamic blend enable for attachment zero was set to VK_TRUE.",
+                         pipeline_external_format);
+    }
+    if (last_bound_state.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT) &&
+        cb_state.dynamic_state_value.rasterization_samples != VK_SAMPLE_COUNT_1_BIT) {
+        skip |=
+            LogError(vuid.external_format_resolve_09365, objlist, vuid.loc(),
+                     "pipeline externalFormat is %" PRIu64 ", but dynamic rasterization samples set to %s.",
+                     pipeline_external_format, string_VkSampleCountFlagBits(cb_state.dynamic_state_value.rasterization_samples));
+    }
+    if (last_bound_state.IsDynamic(CB_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR)) {
+        if (cb_state.dynamic_state_value.fragment_size.width != 1) {
+            skip |= LogError(vuid.external_format_resolve_09368, objlist, vuid.loc(),
+                             "pipeline externalFormat is %" PRIu64 ", but dynamic fragment size width is %" PRIu32 ".",
+                             pipeline_external_format, cb_state.dynamic_state_value.fragment_size.width);
+        }
+        if (cb_state.dynamic_state_value.fragment_size.height != 1) {
+            skip |= LogError(vuid.external_format_resolve_09369, objlist, vuid.loc(),
+                             "pipeline externalFormat is %" PRIu64 ", but dynamic fragment size height is %" PRIu32 ".",
+                             pipeline_external_format, cb_state.dynamic_state_value.fragment_size.height);
+        }
+    }
+
+    if (auto fragment_entry_point = last_bound_state.GetFragmentEntryPoint()) {
+        if (fragment_entry_point->execution_mode.Has(spirv::ExecutionModeSet::depth_replacing_bit)) {
+            skip |= LogError(vuid.external_format_resolve_09372, objlist, vuid.loc(),
+                             "pipeline externalFormat is %" PRIu64 " but the fragment shader declares DepthReplacing.",
+                             pipeline_external_format);
+        } else if (fragment_entry_point->execution_mode.Has(spirv::ExecutionModeSet::stencil_ref_replacing_bit)) {
+            skip |= LogError(vuid.external_format_resolve_09372, objlist, vuid.loc(),
+                             "pipeline externalFormat is %" PRIu64 " but the fragment shader declares StencilRefReplacingEXT.",
+                             pipeline_external_format);
         }
     }
 

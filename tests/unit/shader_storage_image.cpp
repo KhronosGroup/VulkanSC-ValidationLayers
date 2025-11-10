@@ -150,7 +150,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
 
     struct {
         VkFormat format;
-        VkFormatProperties3KHR props;
+        VkFormatProperties3 props;
     } tests[2] = {};
     int n_tests = 0;
     bool has_without_format_test = false, has_with_format_test = false;
@@ -160,7 +160,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
         if (has_without_format_test && has_with_format_test) break;
         if (!vkuFormatIsSampledFloat((VkFormat)fmt)) continue;
 
-        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
 
         vk::GetPhysicalDeviceFormatProperties2(Gpu(), (VkFormat)fmt, &fmt_props);
@@ -277,8 +277,8 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
         }
 
         vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipeline);
-        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipeline.pipeline_layout_.handle(), 0, 1,
-                                  &ds.set_, 0, nullptr);
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipeline.pipeline_layout_, 0, 1, &ds.set_, 0,
+                                  nullptr);
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-OpTypeImage-07028");
         vk::CmdDispatch(m_command_buffer, 1, 1, 1);
@@ -298,7 +298,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
 
     struct {
         VkFormat format;
-        VkFormatProperties3KHR props;
+        VkFormatProperties3 props;
     } tests[2] = {};
     int n_tests = 0;
     bool has_without_format_test = false, has_with_format_test = false;
@@ -308,7 +308,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
         if (has_without_format_test && has_with_format_test) break;
         if (!vkuFormatIsSampledFloat((VkFormat)fmt)) continue;
 
-        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
 
         vk::GetPhysicalDeviceFormatProperties2(Gpu(), (VkFormat)fmt, &fmt_props);
@@ -421,8 +421,8 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
         }
 
         vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipeline);
-        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipeline.pipeline_layout_.handle(), 0, 1,
-                                  &ds.set_, 0, nullptr);
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipeline.pipeline_layout_, 0, 1, &ds.set_, 0,
+                                  nullptr);
 
         if ((tests[t].props.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
             m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-OpTypeImage-07027");
@@ -764,7 +764,7 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteLessComponent) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
-    VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+    VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
     VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
     vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &fmt_props);
     if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
@@ -843,7 +843,7 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
-    VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+    VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
     VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
     vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &fmt_props);
     if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
@@ -881,7 +881,20 @@ void NegativeShaderStorageImage::FormatComponentMismatchTest(std::string spirv_f
         }
     )";
 
-    vkt::Image image(*m_device, 4, 4, vk_format, VK_IMAGE_USAGE_STORAGE_BIT);
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = vk_format;
+    image_create_info.extent = {4u, 4u, 1u};
+    image_create_info.mipLevels = 1u;
+    image_create_info.arrayLayers = 1u;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_STORAGE_BIT;
+    if (!IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+        GTEST_SKIP() << "Format doesn't support storage image";
+    }
+
+    vkt::Image image(*m_device, image_create_info);
     vkt::ImageView image_view = image.CreateView();
 
     OneOffDescriptorSet descriptor_set(m_device, {

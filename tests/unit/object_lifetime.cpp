@@ -12,6 +12,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <vulkan/vulkan_core.h>
 #include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
@@ -85,7 +86,7 @@ TEST_F(NegativeObjectLifetime, CmdBarrierBufferDestroyed) {
     vkt::DeviceMemory buffer_mem(*m_device, alloc_info);
     ASSERT_TRUE(buffer_mem.initialized());
 
-    ASSERT_EQ(VK_SUCCESS, vk::BindBufferMemory(device(), buffer, buffer_mem.handle(), 0));
+    ASSERT_EQ(VK_SUCCESS, vk::BindBufferMemory(device(), buffer, buffer_mem, 0));
 
     m_command_buffer.Begin();
     VkBufferMemoryBarrier buf_barrier = vku::InitStructHelper();
@@ -100,7 +101,7 @@ TEST_F(NegativeObjectLifetime, CmdBarrierBufferDestroyed) {
     m_default_queue->Submit(m_command_buffer);
 
     m_errorMonitor->SetDesiredError("VUID-vkFreeMemory-memory-00677");
-    vk::FreeMemory(*m_device, buffer_mem.handle(), nullptr);
+    vk::FreeMemory(*m_device, buffer_mem, nullptr);
     m_errorMonitor->VerifyFound();
 
     m_default_queue->Wait();
@@ -109,7 +110,6 @@ TEST_F(NegativeObjectLifetime, CmdBarrierBufferDestroyed) {
 TEST_F(NegativeObjectLifetime, CmdBarrierImageDestroyed) {
     RETURN_IF_SKIP(Init());
 
-    vkt::DeviceMemory image_mem;
     VkMemoryRequirements mem_reqs;
 
     auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
@@ -123,9 +123,9 @@ TEST_F(NegativeObjectLifetime, CmdBarrierImageDestroyed) {
     pass = m_device->Physical().SetMemoryType(mem_reqs.memoryTypeBits, &alloc_info, 0);
     ASSERT_TRUE(pass);
 
-    image_mem.init(*m_device, alloc_info);
+    vkt::DeviceMemory image_mem(*m_device, alloc_info);
 
-    auto err = vk::BindImageMemory(device(), image, image_mem.handle(), 0);
+    auto err = vk::BindImageMemory(device(), image, image_mem, 0);
     ASSERT_EQ(VK_SUCCESS, err);
 
     m_command_buffer.Begin();
@@ -135,14 +135,14 @@ TEST_F(NegativeObjectLifetime, CmdBarrierImageDestroyed) {
     img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0,
-                           NULL, 1, &img_barrier);
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &img_barrier);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
 
     m_errorMonitor->SetDesiredError("VUID-vkFreeMemory-memory-00677");
-    vk::FreeMemory(*m_device, image_mem.handle(), NULL);
+    vk::FreeMemory(*m_device, image_mem, nullptr);
     m_errorMonitor->VerifyFound();
 
     m_default_queue->Wait();
@@ -284,7 +284,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferBufferViewDestroyed) {
         descriptor_set.WriteDescriptorBufferView(0, view);
         descriptor_set.UpdateDescriptorSets();
 
-        char const *fsSource = R"glsl(
+        const char *fsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, r32f) uniform readonly imageBuffer s;
             layout(location=0) out vec4 x;
@@ -369,7 +369,7 @@ TEST_F(NegativeObjectLifetime, DescriptorSetStorageBufferDestroyed) {
     pipe.CreateComputePipeline();
 
     // Destroy the buffer before it's bound to the cmd buffer
-    buffer.destroy();
+    buffer.Destroy();
 
     m_command_buffer.Begin();
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
@@ -392,10 +392,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_DescriptorSetMutableBufferDestroyed) {
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
     };
 
-    VkMutableDescriptorTypeListEXT type_list = {};
-    type_list.descriptorTypeCount = 2;
-    type_list.pDescriptorTypes = desc_types;
-
+    VkMutableDescriptorTypeListEXT type_list = {2, desc_types};
     VkMutableDescriptorTypeCreateInfoEXT mdtci = vku::InitStructHelper();
     mdtci.mutableDescriptorTypeListCount = 1;
     mdtci.pMutableDescriptorTypeLists = &type_list;
@@ -421,7 +418,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_DescriptorSetMutableBufferDestroyed) {
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
-    buffer.destroy();  // Destroy the buffer before it's bound to the cmd buffer
+    buffer.Destroy();  // Destroy the buffer before it's bound to the cmd buffer
 
     m_command_buffer.Begin();
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
@@ -444,10 +441,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_DescriptorSetMutableBufferArrayDestroyed
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
     };
 
-    VkMutableDescriptorTypeListEXT type_list = {};
-    type_list.descriptorTypeCount = 2;
-    type_list.pDescriptorTypes = desc_types;
-
+    VkMutableDescriptorTypeListEXT type_list = {2, desc_types};
     VkMutableDescriptorTypeCreateInfoEXT mdtci = vku::InitStructHelper();
     mdtci.mutableDescriptorTypeListCount = 1;
     mdtci.pMutableDescriptorTypeLists = &type_list;
@@ -475,7 +469,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_DescriptorSetMutableBufferArrayDestroyed
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
-    uniform_buffer.destroy();  // Destroy the buffer before it's bound to the cmd buffer
+    uniform_buffer.Destroy();  // Destroy the buffer before it's bound to the cmd buffer
 
     m_command_buffer.Begin();
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
@@ -613,9 +607,8 @@ TEST_F(NegativeObjectLifetime, FramebufferAttachmentMemoryFreed) {
     image_ci.flags = 0;
     vkt::Image image(*m_device, image_ci, vkt::no_mem);
 
-    vkt::DeviceMemory *image_memory = new vkt::DeviceMemory;
-    image_memory->init(*m_device, vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(), 0));
-    image.BindMemory(*image_memory, 0);
+    vkt::DeviceMemory image_memory(*m_device, vkt::DeviceMemory::GetResourceAllocInfo(*m_device, image.MemoryRequirements(), 0));
+    image.BindMemory(image_memory, 0);
 
     VkImageViewCreateInfo ivci = {
         VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -634,7 +627,7 @@ TEST_F(NegativeObjectLifetime, FramebufferAttachmentMemoryFreed) {
 
     // Introduce error:
     // Free the attachment image memory, then create framebuffer.
-    delete image_memory;
+    image_memory.Destroy();
     m_errorMonitor->SetDesiredError("UNASSIGNED-VkFramebufferCreateInfo-BoundResourceFreedMemoryAccess");
     vk::CreateFramebuffer(device(), &fci, nullptr, &fb);
     m_errorMonitor->VerifyFound();
@@ -727,18 +720,11 @@ TEST_F(NegativeObjectLifetime, FramebufferInUseDestroyedSignaled) {
 
 TEST_F(NegativeObjectLifetime, PushDescriptorUniformDestroySignaled) {
     TEST_DESCRIPTION("Destroy a uniform buffer in use by a push descriptor set");
-
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    VkDescriptorSetLayoutBinding dsl_binding = {};
-    dsl_binding.binding = 2;
-    dsl_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    dsl_binding.descriptorCount = 1;
-    dsl_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    dsl_binding.pImmutableSamplers = NULL;
-
+    VkDescriptorSetLayoutBinding dsl_binding = {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
     // Create push descriptor set layout
     const vkt::DescriptorSetLayout push_ds_layout(*m_device, {dsl_binding}, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
@@ -751,10 +737,7 @@ TEST_F(NegativeObjectLifetime, PushDescriptorUniformDestroySignaled) {
     const uint32_t data_size = sizeof(float) * 3;
     vkt::Buffer vbo(*m_device, data_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
-    VkDescriptorBufferInfo buff_info;
-    buff_info.buffer = vbo;
-    buff_info.offset = 0;
-    buff_info.range = data_size;
+    VkDescriptorBufferInfo buff_info{vbo, 0, data_size};
     VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstBinding = 2;
     descriptor_write.descriptorCount = 1;
@@ -768,7 +751,7 @@ TEST_F(NegativeObjectLifetime, PushDescriptorUniformDestroySignaled) {
 
     // In Intel GPU, it needs to bind pipeline before push descriptor set.
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, helper.Handle());
-    vk::CmdPushDescriptorSetKHR(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, helper.pipeline_layout_.handle(), 0, 1,
+    vk::CmdPushDescriptorSetKHR(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, helper.pipeline_layout_, 0, 1,
                                 &descriptor_write);
     m_command_buffer.End();
 
@@ -812,7 +795,7 @@ TEST_F(NegativeObjectLifetime, FramebufferImageInUseDestroyedSignaled) {
     m_default_queue->Wait();
     m_errorMonitor->SetUnexpectedError("If image is not VK_NULL_HANDLE, image must be a valid VkImage handle");
     m_errorMonitor->SetUnexpectedError("Unable to remove Image obj");
-    fb.destroy();
+    fb.Destroy();
 }
 
 TEST_F(NegativeObjectLifetime, EventInUseDestroyedSignaled) {
@@ -1010,7 +993,7 @@ TEST_F(NegativeObjectLifetime, BufferViewInUseDestroyedSignaled) {
     VkResult err = vk::CreateBufferView(device(), &bvci, NULL, &view);
     ASSERT_EQ(VK_SUCCESS, err);
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0, r32f) uniform readonly imageBuffer s;
         layout(location=0) out vec4 x;
@@ -1357,7 +1340,7 @@ TEST_F(NegativeObjectLifetime, DescriptorBufferInfoUpdate) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     descriptor_set.WriteDescriptorBufferInfo(1, invalid_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
-    buffer.destroy();
+    buffer.Destroy();
     m_errorMonitor->SetDesiredError("VUID-VkDescriptorBufferInfo-buffer-parameter");  // destroyed
     m_errorMonitor->SetDesiredError("VUID-VkDescriptorBufferInfo-buffer-parameter");  // invalid
     descriptor_set.UpdateDescriptorSets();

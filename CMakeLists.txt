@@ -17,7 +17,10 @@
 # ~~~
 cmake_minimum_required(VERSION 3.22.1)
 
-project(VVL LANGUAGES CXX)
+# The VERSION field is generated with the "--generated-version" flag in the generate_source.py script
+#
+# If working with unreleased extensions, make sure the header and validation version are all on the same header version
+project(VVL VERSION 1.4.330 LANGUAGES CXX)
 
 option(VULKANSC "Build Vulkan SC validation layers" ON)
 option(BUILD_WSI_SCREEN_QNX_SUPPORT "Build QNX screen support" OFF)
@@ -63,6 +66,7 @@ elseif(APPLE)
 else()
     option(BUILD_WSI_XCB_SUPPORT "Build XCB WSI support" ON)
     option(BUILD_WSI_XLIB_SUPPORT "Build Xlib WSI support" ON)
+    option(BUILD_WSI_XLIB_XRANDR_SUPPORT "Build X11 Xrandr WSI support" ON)
     option(BUILD_WSI_WAYLAND_SUPPORT "Build Wayland WSI support" ON)
 
     if (BUILD_WSI_XCB_SUPPORT OR BUILD_WSI_XLIB_SUPPORT OR BUILD_WSI_WAYLAND_SUPPORT)
@@ -76,7 +80,11 @@ else()
 
     if(BUILD_WSI_XLIB_SUPPORT)
         pkg_check_modules(X11 REQUIRED QUIET IMPORTED_TARGET x11)
-        add_compile_definitions(VK_USE_PLATFORM_XLIB_KHR VK_USE_PLATFORM_XLIB_XRANDR_EXT)
+        add_compile_definitions(VK_USE_PLATFORM_XLIB_KHR)
+        if(BUILD_WSI_XLIB_XRANDR_SUPPORT)
+            pkg_check_modules(XRANDR REQUIRED QUIET IMPORTED_TARGET xrandr)
+            add_compile_definitions(VK_USE_PLATFORM_XLIB_XRANDR_EXT)
+        endif()
     endif()
 
     if(BUILD_WSI_WAYLAND_SUPPORT)
@@ -125,8 +133,7 @@ if (VVL_ENABLE_TRACY)
     endif()
 endif()
 
-
-find_package(VulkanHeaders CONFIG QUIET)
+find_package(VulkanHeaders ${PROJECT_VERSION} CONFIG QUIET)
 
 find_package(VulkanUtilityLibraries CONFIG QUIET)
 

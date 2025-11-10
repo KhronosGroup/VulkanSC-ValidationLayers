@@ -118,7 +118,7 @@ bool CoreChecks::GetPhysicalDeviceImageFormatProperties(vvl::Image &image_state,
     return skip;
 }
 
-bool CoreChecks::ValidateDeviceMaskToPhysicalDeviceCount(uint32_t deviceMask, const LogObjectList &objlist, const Location loc,
+bool CoreChecks::ValidateDeviceMaskToPhysicalDeviceCount(uint32_t deviceMask, const LogObjectList &objlist, const Location &loc,
                                                          const char *vuid) const {
     bool skip = false;
     uint32_t count = 1 << device_state->physical_device_count;
@@ -129,7 +129,7 @@ bool CoreChecks::ValidateDeviceMaskToPhysicalDeviceCount(uint32_t deviceMask, co
     return skip;
 }
 
-bool CoreChecks::ValidateDeviceMaskToZero(uint32_t deviceMask, const LogObjectList &objlist, const Location loc,
+bool CoreChecks::ValidateDeviceMaskToZero(uint32_t deviceMask, const LogObjectList &objlist, const Location &loc,
                                           const char *vuid) const {
     bool skip = false;
     if (deviceMask == 0) {
@@ -139,7 +139,7 @@ bool CoreChecks::ValidateDeviceMaskToZero(uint32_t deviceMask, const LogObjectLi
 }
 
 bool CoreChecks::ValidateDeviceMaskToCommandBuffer(const vvl::CommandBuffer &cb_state, uint32_t deviceMask,
-                                                   const LogObjectList &objlist, const Location loc, const char *vuid) const {
+                                                   const LogObjectList &objlist, const Location &loc, const char *vuid) const {
     bool skip = false;
     if ((deviceMask & cb_state.initial_device_mask) != deviceMask) {
         skip |= LogError(vuid, objlist, loc, "(0x%" PRIx32 ") is not a subset of %s initial device mask (0x%" PRIx32 ").",
@@ -148,7 +148,7 @@ bool CoreChecks::ValidateDeviceMaskToCommandBuffer(const vvl::CommandBuffer &cb_
     return skip;
 }
 
-bool CoreChecks::ValidateDeviceMaskToRenderPass(const vvl::CommandBuffer &cb_state, uint32_t deviceMask, const Location loc,
+bool CoreChecks::ValidateDeviceMaskToRenderPass(const vvl::CommandBuffer &cb_state, uint32_t deviceMask, const Location &loc,
                                                 const char *vuid) const {
     bool skip = false;
     if (cb_state.active_render_pass && ((deviceMask & cb_state.render_pass_device_mask) != deviceMask)) {
@@ -179,7 +179,6 @@ bool core::Instance::ValidateDeviceQueueCreateInfos(const vvl::PhysicalDevice &p
                                                     const VkDeviceQueueCreateInfo *infos, const Location &loc) const {
     bool skip = false;
 
-    const uint32_t not_used = std::numeric_limits<uint32_t>::max();
     struct create_flags {
         // uint32_t is to represent the queue family index to allow for better error messages
         uint32_t unprocted_index;
@@ -203,7 +202,7 @@ bool core::Instance::ValidateDeviceQueueCreateInfos(const vvl::PhysicalDevice &p
 
         if (api_version == VK_API_VERSION_1_0) {
             // Vulkan 1.0 didn't have protected memory so always needed unique info
-            create_flags flags = {requested_queue_family, not_used};
+            create_flags flags = {requested_queue_family, vvl::kNoIndex32};
             if (queue_family_map.emplace(requested_queue_family, flags).second == false) {
                 skip |= LogError("VUID-VkDeviceCreateInfo-queueFamilyIndex-02802", pd_state.Handle(),
                                  info_loc.dot(Field::queueFamilyIndex),
@@ -215,7 +214,7 @@ bool core::Instance::ValidateDeviceQueueCreateInfos(const vvl::PhysicalDevice &p
             auto it = queue_family_map.find(requested_queue_family);
             if (it == queue_family_map.end()) {
                 // Add first time seeing queue family index and what the create flags were
-                create_flags new_flags = {not_used, not_used};
+                create_flags new_flags = {vvl::kNoIndex32, vvl::kNoIndex32};
                 if (protected_create_bit) {
                     new_flags.protected_index = requested_queue_family;
                 } else {
@@ -225,7 +224,7 @@ bool core::Instance::ValidateDeviceQueueCreateInfos(const vvl::PhysicalDevice &p
             } else {
                 // The queue family was seen, so now need to make sure the flags were different
                 if (protected_create_bit) {
-                    if (it->second.protected_index != not_used) {
+                    if (it->second.protected_index != vvl::kNoIndex32) {
                         skip |= LogError("VUID-VkDeviceCreateInfo-queueFamilyIndex-02802", pd_state.Handle(),
                                          info_loc.dot(Field::queueFamilyIndex),
                                          "(%" PRIu32 ") is not unique and was also used in pCreateInfo->pQueueCreateInfos[%" PRIu32
@@ -236,7 +235,7 @@ bool core::Instance::ValidateDeviceQueueCreateInfos(const vvl::PhysicalDevice &p
                         it->second.protected_index = requested_queue_family;
                     }
                 } else {
-                    if (it->second.unprocted_index != not_used) {
+                    if (it->second.unprocted_index != vvl::kNoIndex32) {
                         skip |= LogError("VUID-VkDeviceCreateInfo-queueFamilyIndex-02802", pd_state.Handle(),
                                          info_loc.dot(Field::queueFamilyIndex),
                                          "(%" PRIu32 ") is not unique and was also used in pCreateInfo->pQueueCreateInfos[%" PRIu32
@@ -346,7 +345,9 @@ bool core::Instance::PreCallValidateCreateDevice(VkPhysicalDevice gpu, const VkD
 void CoreChecks::FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) {
     BaseClass::FinishDeviceSetup(pCreateInfo, loc);
 
-    AdjustValidatorOptions(extensions, enabled_features, spirv_val_options, &spirv_val_option_hash);
+    spirv_environment = PickSpirvEnv(api_version, IsExtEnabled(extensions.vk_khr_spirv_1_4));
+    AdjustValidatorOptions(extensions, enabled_features, spirv_environment, spirv_val_options, &spirv_val_option_hash,
+                           spirv_val_command);
 
     // Allocate shader validation cache
     if (!disabled[shader_validation_caching] && !disabled[shader_validation] && !core_validation_cache) {
@@ -537,8 +538,8 @@ bool core::Instance::PreCallValidateGetPhysicalDeviceImageFormatProperties2KHR(
 }
 
 // Access helper functions for external modules
-VkFormatProperties3KHR CoreChecks::GetPDFormatProperties(const VkFormat format) const {
-    VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+VkFormatProperties3 CoreChecks::GetPDFormatProperties(const VkFormat format) const {
+    VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
     VkFormatProperties2 fmt_props_2 = vku::InitStructHelper(&fmt_props_3);
 
     if (device_state->special_supported.vk_khr_format_feature_flags2) {
@@ -768,6 +769,10 @@ bool CoreChecks::ValidateDeviceQueueSupport(const Location &loc) const {
         case Func::vkCreateGraphicsPipelines:
             vuid = "VUID-vkCreateGraphicsPipelines-device-09662";
             flags = VK_QUEUE_GRAPHICS_BIT;
+            break;
+        case Func::vkCreateDataGraphPipelinesARM:
+            vuid = "VUID-vkCreateDataGraphPipelinesARM-device-09927";
+            flags = VK_QUEUE_DATA_GRAPH_BIT_ARM;
             break;
         case Func::vkCreateQueryPool:
             vuid = "VUID-vkCreateQueryPool-device-09663";

@@ -51,11 +51,13 @@ struct CreateGraphicsPipelines;
 struct CreateComputePipelines;
 struct CreateRayTracingPipelinesNV;
 struct CreateRayTracingPipelinesKHR;
+struct CreateDataGraphPipelinesARM;
 struct CreateShaderModule;
 struct ShaderObject;
 struct ShaderBinaryData;
 struct CreatePipelineLayout;
 struct CreateBuffer;
+struct CmdBindDescriptorBuffers;
 }  // namespace chassis
 
 namespace vvl {
@@ -118,6 +120,8 @@ class Instance : public Logger {
         PreCallRecordCreateDevice(physicalDevice, pCreateInfo, pAllocator, pDevice, record_obj);
     }
     void CopyDispatchState() { instance = dispatch_instance_->instance; }
+    // Because this object was created before dispatch_instance_ can query for supported extensions, we must copy them afterwards here
+    void CopyExtensions() { extensions = dispatch_instance_->extensions; }
     VkInstance VkHandle() const { return instance; }
 
 #if defined(DEBUG_CAPTURE_KEYBOARD)
@@ -354,6 +358,35 @@ class Device : public Logger {
                                                    pAllocator, pPipelines, record_obj);
     }
 
+    // Allow additional state parameter for CreateDataGraphPipelinesARM
+    virtual bool PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                             VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                             const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                                             const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                             const ErrorObject& error_obj, PipelineStates& pipeline_states,
+                                                             chassis::CreateDataGraphPipelinesARM& chassis_state) const {
+        return PreCallValidateCreateDataGraphPipelinesARM(device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos,
+                                                           pAllocator, pPipelines, error_obj);
+    }
+    virtual void PreCallRecordCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                           VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                           const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                                           const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                           const RecordObject& record_obj, PipelineStates& pipeline_states,
+                                                           chassis::CreateDataGraphPipelinesARM& chassis_state) {
+        PreCallRecordCreateDataGraphPipelinesARM(device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos,
+                                                  pAllocator, pPipelines, record_obj);
+    }
+    virtual void PostCallRecordCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                            VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                            const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                                            const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                            const RecordObject& record_obj, PipelineStates& pipeline_states,
+                                                            chassis::CreateDataGraphPipelinesARM& chassis_state) {
+        PostCallRecordCreateDataGraphPipelinesARM(device, deferredOperation, pipelineCache, createInfoCount, pCreateInfos,
+                                                   pAllocator, pPipelines, record_obj);
+    }
+
     // Allow modification of a down-chain parameter for CreatePipelineLayout
     virtual void PreCallRecordCreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo,
                                                    const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout,
@@ -407,6 +440,13 @@ class Device : public Logger {
                                            const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer,
                                            const RecordObject& record_obj, chassis::CreateBuffer& chassis_state) {
         PreCallRecordCreateBuffer(device, pCreateInfo, pAllocator, pBuffer, record_obj);
+    }
+
+    virtual void PreCallRecordCmdBindDescriptorBuffersEXT(VkCommandBuffer commandBuffer, uint32_t bufferCount,
+                                                          const VkDescriptorBufferBindingInfoEXT* pBindingInfos,
+                                                          const RecordObject& record_obj,
+                                                          chassis::CmdBindDescriptorBuffers& chassis_state) {
+        PreCallRecordCmdBindDescriptorBuffersEXT(commandBuffer, bufferCount, pBindingInfos, record_obj);
     }
 
 #include "generated/validation_object_device_methods.h"

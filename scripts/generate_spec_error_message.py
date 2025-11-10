@@ -38,7 +38,8 @@ class ValidationJSON:
 
         # A set of specific regular expression substitutions needed to clean up VUID text
         self.regex_dict = {}
-        self.regex_dict[re.compile('<.*?>|&(amp;)+lt;|&(amp;)+gt;')] = ""
+        self.regex_dict[re.compile(r'<sup>(.*?)</sup>')] = r'^\1'
+        self.regex_dict[re.compile(r'<.*?>|&(amp;)+lt;|&(amp;)+gt;')] = ""
         self.regex_dict[re.compile(r'\\\(codeSize \\over 4\\\)')] = "(codeSize/4)"
         self.regex_dict[re.compile(r'\\\(\\lceil\{\\mathit\{rasterizationSamples} \\over 32}\\rceil\\\)')] = "(rasterizationSamples/32)"
         self.regex_dict[re.compile(r'\\\(\\left\\lceil{\\frac{maxFramebufferWidth}{minFragmentDensityTexelSize_{width}}}\\right\\rceil\\\)')] = "the ceiling of maxFramebufferWidth/minFragmentDensityTexelSize.width"
@@ -48,7 +49,7 @@ class ValidationJSON:
         self.regex_dict[re.compile(r'\\\(\\textrm\{codeSize} \\over 4\\\)')] = "(codeSize/4)"
 
         # Regular expression for characters outside ascii range
-        self.unicode_regex = re.compile('[^\x00-\x7f]')
+        self.unicode_regex = re.compile(r'[^\x00-\x7f]')
         # Mapping from unicode char to ascii approximation
         self.unicode_dict = {
             '\u002b' : '+',  # PLUS SIGN
@@ -161,7 +162,12 @@ oversized_vus = {
     'VUID-VkColorBlendEquationEXT-colorBlendOp-07361' : 'colorBlendOp and alphaBlendOp must not be a VkBlendOp from VK_EXT_blend_operation_advanced',
     'VUID-VkDeviceCreateInfo-pNext-pNext' : 'Each pNext member of any structure (including this one) in the pNext chain must be either NULL or a pointer to a valid struct for extending VkDeviceCreateInfo',
     'VUID-VkPhysicalDeviceProperties2-pNext-pNext' : 'Each pNext member of any structure (including this one) in the pNext chain must be either NULL or a pointer to a valid struct for extending VkPhysicalDeviceProperties2',
-    'VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060' : 'For OpCooperativeMatrixMulAddKHR, the operands must match a supported VkCooperativeMatrixPropertiesKHR'
+    'VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060' : 'For OpCooperativeMatrixMulAddKHR, the operands must match a supported VkCooperativeMatrixPropertiesKHR',
+    'VUID-RuntimeSpirv-OpTypeCooperativeMatrixKHR-10163' : 'For OpTypeCooperativeMatrixKHR, if the cooperativeMatrixFlexibleDimensions feature is not enabled, the component type, scope, number of rows, and number of columns must match one of the matrices in any of the supported VkCooperativeMatrixPropertiesKHR',
+    'VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059' : 'For OpTypeCooperativeMatrixMulAddNV, the operands must match a supported VkCooperativeMatrixPropertiesNV',
+    'VUID-RuntimeSpirv-cooperativeMatrixFlexibleDimensions-10165' : 'For OpTypeCooperativeMatrixKHR, if the cooperativeMatrixFlexibleDimensions feature is enabled, the component type, scope, number of rows, and number of columns must match either one of the matrices in one of the supported VkCooperativeMatrixPropertiesKHR or VkCooperativeMatrixFlexibleDimensionsPropertiesNV',
+    'VUID-RuntimeSpirv-cooperativeMatrixFlexibleDimensions-10166' : 'For OpCooperativeMatrixMulAddKHR, if the cooperativeMatrixFlexibleDimensions feature is enabled, the operands must match either one of the supported VkCooperativeMatrixPropertiesKHR or VkCooperativeMatrixFlexibleDimensionsPropertiesNV',
+    'VUID-RuntimeSpirv-pNext-09923' : 'The data graph pipeline must satisfies all constraints',
 }
 
 def GenerateSpecErrorMessage(api : str, valid_usage_json : str, out_file : str):
@@ -192,27 +198,33 @@ def GenerateSpecErrorMessage(api : str, valid_usage_json : str, out_file : str):
  ****************************************************************************/
 #pragma once
 
+#include "containers/custom_containers.h"
+
+#include <array>
+
 // clang-format off
 
 // Mapping from VUID string to the corresponding spec text
-typedef struct _vuid_spec_text_pair {{
-    const char * vuid;
-    const char * spec_text;
-    const char * url_id;
-}} vuid_spec_text_pair;
-\n''')
+struct vuid_info {{
+    const std::string_view spec_text;
+    const std::string_view url_id;
+}};
+''')
 
     vuid_list = list(val_json.all_vuids)
     vuid_list.sort()
 
-    out.append('static const vuid_spec_text_pair vuid_spec_text[] = {\n')
+    out.append(f'''
+const vvl::unordered_map<std::string_view, vuid_info> &GetVuidMap() {{
+    static const std::array<std::pair<std::string_view, vuid_info>, {len(vuid_list)}> vuid_array = {{{{
+''')
     for vuid in vuid_list:
         db_entry = val_json.vuid_db[vuid][0]
         html_page = db_entry['page']
 
         # Escape quotes and backslashes when generating C strings for source code
         db_text = db_entry['text'].replace('\\', '\\\\').replace('"', '\\"').strip()
-        html_remove_tags = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+        html_remove_tags = re.compile(r'<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
         db_text = re.sub(html_remove_tags, '', db_text)
         # In future we could use the `/n` to add new lines to a pretty print in the console
         db_text = db_text.replace('\n', ' ')
@@ -222,12 +234,20 @@ typedef struct _vuid_spec_text_pair {{
         if vuid in oversized_vus:
             db_text = oversized_vus[vuid]
 
-        out.append(f'    {{"{vuid}", "{db_text}", "{html_page}"}},\n')
+        # If hit this warning, likely should be added to oversized_vus
+        if (len(db_text) > 1000):
+            print(f'Warning: {vuid} has a large message ({len(db_text)})')
+
+        out.append(f'        {{ {{"{vuid}", {len(vuid)}}}, {{ {{"{db_text}", {len(db_text)}}}, {{ "{html_page}", {len(html_page)}}} }} }},\n')
         # For multiply-defined VUIDs, include versions with extension appended
         if len(val_json.vuid_db[vuid]) > 1:
             print(f'Warning: Found a duplicate VUID: {vuid}')
 
-    out.append('};')
+    out.append('''    }};
+    static const vvl::unordered_map<std::string_view, vuid_info> vuid_map(std::begin(vuid_array), std::end(vuid_array));
+    return vuid_map;
+}
+''')
 
     with open(out_file, 'w', newline='\n', encoding='utf-8') as file:
         file.write("".join(out))

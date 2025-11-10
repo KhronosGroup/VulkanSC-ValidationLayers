@@ -73,7 +73,7 @@ const int kHeaderStageInfoOffset_1 = 4;
 const int kHeaderStageInfoOffset_2 = 5;
 
 // Compressed dword to know where the error came from in the API
-const int kHeaderActionIdOffset = 6;
+const int kHeaderActionIdErrorLoggerIdOffset = 6;
 
 const int kHeaderSize = 7;
 
@@ -100,20 +100,20 @@ const int kErrorGroupMask = 0xFF << kErrorGroupShift;  // 256 slots
 // | 31 .. 27 | 26 ...... 0 |
 // | Stage Id | Instruction Id |
 // We control and know there are under 32 shader stages
-// We can assume shader don't have 128 million lines of code in them
+// We can assume shader are under 128MB
 const int kStageIdShift = 27;
 const int kStageIdMask = 0x1F << kStageIdShift;  // 32 slot
 const int kInstructionIdMask = 0x7FFFFFF;
 
-// kHeaderActionIdOffset
+// kHeaderActionIdErrorLoggerIdOffset
 // ---
 // This dword is split up as
 // | 31 ..... 16 | 15 ................. 0 |
 // | Error Group | Instrumented Shader Id |
-// Note we have a limit (kMaxActionsPerCommandBuffer) but for simplicity, divide in half until find need to adjust.
+// Note we have a limit (cst::indices_count) but for simplicity, divide in half until find need to adjust.
 const int kActionIdShift = 16;
 const int kActionIdMask = 0xFFFF << kActionIdShift;  // 64k slot
-const int kCommandResourceIdMask = 0xFFFF;
+const int kErrorLoggerIdMask = 0xFFFF;
 
 // Error specific parameters offsets:
 // ----------------------------------
@@ -152,10 +152,10 @@ const int kInstRayQueryParamOffset_0 = kHeaderSize;
 
 // Validation commands shaders
 // ---
-const int kPreActionParamOffset_0 = kHeaderSize;
-const int kPreActionParamOffset_1 = kHeaderSize + 1;
-const int kPreActionParamOffset_2 = kHeaderSize + 2;
-const int kPreActionParamOffset_3 = kHeaderSize + 3;
+const int kValCmdErrorPayloadDword_0 = kHeaderSize;
+const int kValCmdErrorPayloadDword_1 = kHeaderSize + 1;
+const int kValCmdErrorPayloadDword_2 = kHeaderSize + 2;
+const int kValCmdErrorPayloadDword_3 = kHeaderSize + 3;
 
 // Sizes/Counts
 // -------------------

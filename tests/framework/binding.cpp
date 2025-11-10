@@ -2,6 +2,7 @@
  * Copyright (c) 2015-2025 The Khronos Group Inc.
  * Copyright (c) 2015-2025 Valve Corporation
  * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (C) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,15 +45,15 @@
     } while (0)
 
 #define NON_DISPATCHABLE_HANDLE_DTOR(cls, destroy_func)        \
-    void cls::destroy() noexcept {                             \
+    void cls::Destroy() noexcept {                             \
         if (!initialized()) {                                  \
             return;                                            \
         }                                                      \
         destroy_func(device(), handle(), NULL);                \
         handle_ = VK_NULL_HANDLE;                              \
-        internal::NonDispHandle<decltype(handle_)>::destroy(); \
+        internal::NonDispHandle<decltype(handle_)>::Destroy(); \
     }                                                          \
-    cls::~cls() noexcept { destroy(); }
+    cls::~cls() noexcept { Destroy(); }
 
 namespace vkt {
 
@@ -329,6 +330,10 @@ void Device::InitQueues(const VkDeviceCreateInfo &info) {
             if (queue_family_prop.queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR) {
                 queues_[VIDEO_ENCODE].push_back(queue_storage.back().get());
             }
+
+            if (queue_family_prop.queueFlags & VK_QUEUE_DATA_GRAPH_BIT_ARM) {
+                queues_[DATA_GRAPH].push_back(queue_storage.back().get());
+            }
         }
     }
 }
@@ -403,7 +408,7 @@ bool Device::IsEnabledExtension(const char *extension) const {
 
 VkFormatFeatureFlags2 Device::FormatFeaturesLinear(VkFormat format) const {
     if (IsEnabledExtension(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
-        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props_2 = vku::InitStructHelper(&fmt_props_3);
         vk::GetPhysicalDeviceFormatProperties2(Physical().handle(), format, &fmt_props_2);
         return fmt_props_3.linearTilingFeatures;
@@ -416,7 +421,7 @@ VkFormatFeatureFlags2 Device::FormatFeaturesLinear(VkFormat format) const {
 
 VkFormatFeatureFlags2 Device::FormatFeaturesOptimal(VkFormat format) const {
     if (IsEnabledExtension(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
-        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props_2 = vku::InitStructHelper(&fmt_props_3);
         vk::GetPhysicalDeviceFormatProperties2(Physical().handle(), format, &fmt_props_2);
         return fmt_props_3.optimalTilingFeatures;
@@ -429,7 +434,7 @@ VkFormatFeatureFlags2 Device::FormatFeaturesOptimal(VkFormat format) const {
 
 VkFormatFeatureFlags2 Device::FormatFeaturesBuffer(VkFormat format) const {
     if (IsEnabledExtension(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
-        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props_2 = vku::InitStructHelper(&fmt_props_3);
         vk::GetPhysicalDeviceFormatProperties2(Physical().handle(), format, &fmt_props_2);
         return fmt_props_3.bufferFeatures;
@@ -834,7 +839,7 @@ VkResult Queue::Wait() {
     return result;
 }
 
-void DeviceMemory::destroy() noexcept {
+void DeviceMemory::Destroy() noexcept {
     if (!initialized()) {
         return;
     }
@@ -843,9 +848,9 @@ void DeviceMemory::destroy() noexcept {
     handle_ = VK_NULL_HANDLE;
 }
 
-DeviceMemory::~DeviceMemory() noexcept { destroy(); }
+DeviceMemory::~DeviceMemory() noexcept { Destroy(); }
 
-void DeviceMemory::init(const Device &dev, const VkMemoryAllocateInfo &info) {
+void DeviceMemory::Init(const Device &dev, const VkMemoryAllocateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::AllocateMemory, dev, &info);
     memory_allocate_info_ = info;
 }
@@ -890,7 +895,7 @@ VkMemoryAllocateInfo DeviceMemory::GetResourceAllocInfo(const Device &dev, const
 NON_DISPATCHABLE_HANDLE_DTOR(Fence, vk::DestroyFence)
 
 Fence &Fence::operator=(Fence &&rhs) noexcept {
-    destroy();
+    Destroy();
     NonDispHandle<VkFence>::operator=(std::move(rhs));
     return *this;
 }
@@ -945,23 +950,23 @@ NON_DISPATCHABLE_HANDLE_DTOR(Semaphore, vk::DestroySemaphore)
 
 Semaphore::Semaphore(const Device &dev, VkSemaphoreType type, uint64_t initial_value) {
     if (type == VK_SEMAPHORE_TYPE_BINARY) {
-        init(dev, vku::InitStruct<VkSemaphoreCreateInfo>());
+        Init(dev, vku::InitStruct<VkSemaphoreCreateInfo>());
     } else {
         VkSemaphoreTypeCreateInfo semaphore_type_ci = vku::InitStructHelper();
         semaphore_type_ci.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
         semaphore_type_ci.initialValue = initial_value;
         VkSemaphoreCreateInfo semaphore_ci = vku::InitStructHelper(&semaphore_type_ci);
-        init(dev, semaphore_ci);
+        Init(dev, semaphore_ci);
     }
 }
 
 Semaphore &Semaphore::operator=(Semaphore &&rhs) noexcept {
-    destroy();
+    Destroy();
     NonDispHandle<VkSemaphore>::operator=(std::move(rhs));
     return *this;
 }
 
-void Semaphore::init(const Device &dev, const VkSemaphoreCreateInfo &info) {
+void Semaphore::Init(const Device &dev, const VkSemaphoreCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateSemaphore, dev, &info);
 }
 
@@ -1049,7 +1054,7 @@ VkResult Semaphore::ImportHandle(int fd_handle, VkExternalSemaphoreHandleTypeFla
 
 NON_DISPATCHABLE_HANDLE_DTOR(Event, vk::DestroyEvent)
 
-void Event::init(const Device &dev, const VkEventCreateInfo &info) { NON_DISPATCHABLE_HANDLE_INIT(vk::CreateEvent, dev, &info); }
+void Event::Init(const Device &dev, const VkEventCreateInfo &info) { NON_DISPATCHABLE_HANDLE_INIT(vk::CreateEvent, dev, &info); }
 
 void Event::Set() { ASSERT_EQ(VK_SUCCESS, vk::SetEvent(device(), handle())); }
 
@@ -1074,7 +1079,7 @@ void Event::Reset() { ASSERT_EQ(VK_SUCCESS, vk::ResetEvent(device(), handle()));
 
 NON_DISPATCHABLE_HANDLE_DTOR(QueryPool, vk::DestroyQueryPool)
 
-void QueryPool::init(const Device &dev, const VkQueryPoolCreateInfo &info) {
+void QueryPool::Init(const Device &dev, const VkQueryPoolCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateQueryPool, dev, &info);
 }
 
@@ -1096,19 +1101,19 @@ Buffer &Buffer::operator=(Buffer &&rhs) noexcept {
     if (&rhs == this) {
         return *this;
     }
-    destroy();
-    internal_mem_.destroy();
+    Destroy();
+    internal_mem_.Destroy();
     NonDispHandle::operator=(std::move(rhs));
     create_info_ = std::move(rhs.create_info_);
     internal_mem_ = std::move(rhs.internal_mem_);
     return *this;
 }
 
-void Buffer::init(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props, void *alloc_info_pnext) {
+void Buffer::Init(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props, void *alloc_info_pnext) {
     InitNoMemory(dev, info);
 
     auto alloc_info = DeviceMemory::GetResourceAllocInfo(dev, MemoryRequirements(), mem_props, alloc_info_pnext);
-    internal_mem_.init(dev, alloc_info);
+    internal_mem_.Init(dev, alloc_info);
 
     BindMemory(internal_mem_, 0);
 }
@@ -1119,13 +1124,13 @@ void Buffer::InitHostVisibleWithData(const Device &dev, VkBufferUsageFlags usage
     InitNoMemory(dev, create_info);
 
     // According to the specification there is always a host visible coherent memory type.
-    // It can always be bound to a buffer created without SPARSE_BIDNING/PROTECTED flags.
+    // It can always be bound to a buffer created without SPARSE_BINDING/PROTECTED flags.
     const VkMemoryPropertyFlags memory_properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     const VkMemoryRequirements memory_requirements = MemoryRequirements();
     VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.allocationSize = memory_requirements.size;
     dev.Physical().SetMemoryType(memory_requirements.memoryTypeBits, &alloc_info, memory_properties);
-    internal_mem_.init(dev, alloc_info);
+    internal_mem_.Init(dev, alloc_info);
     BindMemory(internal_mem_, 0);
 
     void *ptr = internal_mem_.Map();
@@ -1148,7 +1153,7 @@ VkMemoryRequirements Buffer::MemoryRequirements() const {
 
 void Buffer::AllocateAndBindMemory(const Device &dev, VkMemoryPropertyFlags mem_props, void *alloc_info_pnext) {
     assert(!internal_mem_.initialized());
-    internal_mem_.init(dev, DeviceMemory::GetResourceAllocInfo(dev, MemoryRequirements(), mem_props, alloc_info_pnext));
+    internal_mem_.Init(dev, DeviceMemory::GetResourceAllocInfo(dev, MemoryRequirements(), mem_props, alloc_info_pnext));
     BindMemory(internal_mem_, 0);
 }
 
@@ -1171,8 +1176,144 @@ VkDeviceAddress Buffer::Address() const {
 
 NON_DISPATCHABLE_HANDLE_DTOR(BufferView, vk::DestroyBufferView)
 
-void BufferView::init(const Device &dev, const VkBufferViewCreateInfo &info) {
+void BufferView::Init(const Device &dev, const VkBufferViewCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateBufferView, dev, &info);
+}
+
+NON_DISPATCHABLE_HANDLE_DTOR(Tensor, vk::DestroyTensorARM)
+
+Tensor::Tensor() {
+    dimensions_ = std::vector<int64_t>{1, 8, 8, 8};
+    description_ = vku::InitStructHelper();
+    description_.tiling = VK_TENSOR_TILING_LINEAR_ARM;
+    description_.format = VK_FORMAT_R32_SINT;
+    description_.dimensionCount = dimensions_.size();
+    description_.pDimensions = dimensions_.data();
+    description_.pStrides = nullptr;
+    description_.usage = VK_TENSOR_USAGE_SHADER_BIT_ARM;
+
+    create_info_ = vku::InitStructHelper();
+    create_info_.flags = 0;
+    create_info_.pDescription = &description_;
+    create_info_.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    create_info_.queueFamilyIndexCount = 0;
+    create_info_.pQueueFamilyIndices = nullptr;
+}
+
+Tensor::Tensor(const Device &dev, const bool is_copy_tensor) {
+    dimensions_ = std::vector<int64_t>{1, 8, 8, 8};
+    description_ = vku::InitStructHelper();
+    description_.tiling = VK_TENSOR_TILING_LINEAR_ARM;
+    description_.format = VK_FORMAT_R32_SINT;
+    description_.dimensionCount = dimensions_.size();
+    description_.pDimensions = dimensions_.data();
+    description_.pStrides = nullptr;
+    description_.usage = VK_TENSOR_USAGE_SHADER_BIT_ARM;
+
+    if (is_copy_tensor) {
+        description_.usage |= VK_TENSOR_USAGE_TRANSFER_SRC_BIT_ARM | VK_TENSOR_USAGE_TRANSFER_DST_BIT_ARM;
+    }
+
+    create_info_ = vku::InitStructHelper();
+    create_info_.flags = 0;
+    create_info_.pDescription = &description_;
+    create_info_.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    create_info_.queueFamilyIndexCount = 0;
+    create_info_.pQueueFamilyIndices = nullptr;
+
+    InitNoMem(dev, create_info_);
+}
+
+Tensor::Tensor(const Device &dev, const VkTensorDescriptionARM &desc) : Tensor() {
+    description_ = desc;
+    create_info_.pDescription = &description_;
+    InitNoMem(dev, create_info_);
+}
+
+Tensor::Tensor(const Device &dev, const VkTensorCreateInfoARM &info) {
+    description_ = *info.pDescription;
+    InitNoMem(dev, info);
+}
+
+void Tensor::BindToMem(VkFlags required_flags, VkFlags forbidden_flags) {
+    VkMemoryRequirements2 mem_reqs = this->GetMemoryReqs();
+
+    VkMemoryAllocateInfo tensor_alloc_info = vku::InitStructHelper();
+    tensor_alloc_info.allocationSize = mem_reqs.memoryRequirements.size;
+    device_->Physical().SetMemoryType(mem_reqs.memoryRequirements.memoryTypeBits, &tensor_alloc_info, required_flags, forbidden_flags);
+    memory_ = vkt::DeviceMemory(*device_, tensor_alloc_info);
+    VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
+    bind_info.tensor = *this;
+    bind_info.memory = memory_.handle();
+    vk::BindTensorMemoryARM(*device_, 1, &bind_info);
+}
+
+void Tensor::InitNoMem(const Device &dev, const VkTensorCreateInfoARM &info) {
+    device_ = &dev;
+    create_info_ = info;
+    description_ = *info.pDescription;
+    NON_DISPATCHABLE_HANDLE_INIT(vk::CreateTensorARM, dev, &create_info_);
+}
+
+const VkMemoryRequirements2 &Tensor::GetMemoryReqs() {
+    mem_req_info_ = vku::InitStructHelper();
+    mem_req_info_.tensor = *this;
+    mem_reqs_ = vku::InitStructHelper();
+    vk::GetTensorMemoryRequirementsARM(*device_, &mem_req_info_, &mem_reqs_);
+    return mem_reqs_;
+}
+
+NON_DISPATCHABLE_HANDLE_DTOR(TensorView, vk::DestroyTensorViewARM)
+TensorView::TensorView(const Device &dev, const VkTensorViewCreateInfoARM &info) { Init(dev, info); }
+
+void TensorView::Init(const Device &dev, const VkTensorViewCreateInfoARM &info) {
+    device_ = &dev;
+    create_info_ = info;
+    NON_DISPATCHABLE_HANDLE_INIT(vk::CreateTensorViewARM, dev, &create_info_);
+}
+
+NON_DISPATCHABLE_HANDLE_DTOR(DataGraphPipelineSession, vk::DestroyDataGraphPipelineSessionARM)
+DataGraphPipelineSession::DataGraphPipelineSession(const Device &dev, const VkDataGraphPipelineSessionCreateInfoARM &info) {
+    create_info_ = info;
+    Init(dev);
+}
+void DataGraphPipelineSession::Init(const Device &dev) {
+    device_ = &dev;
+    NON_DISPATCHABLE_HANDLE_INIT(vk::CreateDataGraphPipelineSessionARM, dev, &create_info_);
+}
+
+void DataGraphPipelineSession::GetMemoryReqs() {
+    VkDataGraphPipelineSessionBindPointRequirementsInfoARM bind_info = vku::InitStructHelper();
+    bind_info.session = handle();
+    uint32_t count = 0;
+    vk::GetDataGraphPipelineSessionBindPointRequirementsARM(*device_, &bind_info, &count, nullptr);
+    bind_point_reqs_.resize(count, vku::InitStructHelper());
+    vk::GetDataGraphPipelineSessionBindPointRequirementsARM(*device_, &bind_info, &count, bind_point_reqs_.data());
+
+    mem_reqs_.resize(count);
+    for (uint32_t i = 0; i < count; i++) {
+        if (bind_point_reqs_[i].bindPointType != VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TYPE_MEMORY_ARM) {
+            continue;
+        }
+        VkDataGraphPipelineSessionMemoryRequirementsInfoARM session_mem_reqs = vku::InitStructHelper();
+        session_mem_reqs.session = handle();
+        session_mem_reqs.bindPoint = bind_point_reqs_[i].bindPoint;
+        mem_reqs_[i] = vku::InitStructHelper();
+        vk::GetDataGraphPipelineSessionMemoryRequirementsARM(*device_, &session_mem_reqs, &mem_reqs_[i]);
+    }
+}
+
+void DataGraphPipelineSession::AllocSessionMem(std::vector<vkt::DeviceMemory> &device_mem, bool is_protected, size_t scale_factor,
+                                               int32_t size_modifier) {
+    assert(mem_reqs_.size() == device_mem.size());
+    for (size_t i = 0; i < device_mem.size(); i++) {
+        auto &mem_req = mem_reqs_[i].memoryRequirements;
+        VkMemoryAllocateInfo session_alloc_info = vku::InitStructHelper();
+        session_alloc_info.allocationSize = mem_req.size * scale_factor + size_modifier;
+        auto flags = is_protected ? VK_MEMORY_PROPERTY_PROTECTED_BIT : 0;
+        device_->Physical().SetMemoryType(mem_req.memoryTypeBits, &session_alloc_info, flags);
+        device_mem[i] = vkt::DeviceMemory(*device_, session_alloc_info);
+    }
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(Image, vk::DestroyImage)
@@ -1218,8 +1359,8 @@ Image &Image::operator=(Image &&rhs) noexcept {
     if (&rhs == this) {
         return *this;
     }
-    destroy();
-    internal_mem_.destroy();
+    Destroy();
+    internal_mem_.Destroy();
     NonDispHandle::operator=(std::move(rhs));
 
     device_ = std::move(rhs.device_);
@@ -1237,7 +1378,7 @@ void Image::Init(const Device &dev, const VkImageCreateInfo &info, VkMemoryPrope
 
     if (initialized()) {
         auto alloc_info = DeviceMemory::GetResourceAllocInfo(dev, MemoryRequirements(), mem_props, alloc_info_pnext);
-        internal_mem_.init(dev, alloc_info);
+        internal_mem_.Init(dev, alloc_info);
         BindMemory(internal_mem_, 0);
     }
 }
@@ -1336,7 +1477,7 @@ VkMemoryRequirements Image::MemoryRequirements() const {
 
 void Image::AllocateAndBindMemory(const Device &dev, VkMemoryPropertyFlags mem_props, void *alloc_info_pnext) {
     assert(!internal_mem_.initialized());
-    internal_mem_.init(dev, DeviceMemory::GetResourceAllocInfo(dev, MemoryRequirements(), mem_props, alloc_info_pnext));
+    internal_mem_.Init(dev, DeviceMemory::GetResourceAllocInfo(dev, MemoryRequirements(), mem_props, alloc_info_pnext));
     BindMemory(internal_mem_, 0);
 }
 
@@ -1376,9 +1517,9 @@ void Image::SetLayout(VkImageLayout image_layout) { TransitionLayout(create_info
 
 void Image::TransitionLayout(CommandBuffer &cmd_buf, VkImageLayout old_layout, VkImageLayout new_layout) {
     VkFlags src_mask, dst_mask;
-    const VkFlags all_cache_outputs = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+    const VkFlags all_cache_outputs = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                                       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-    const VkFlags all_cache_inputs = VK_ACCESS_HOST_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
+    const VkFlags all_cache_inputs = VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
                                      VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_READ_BIT |
                                      VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                                      VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_MEMORY_READ_BIT;
@@ -1482,11 +1623,11 @@ ImageView Image::CreateView(VkImageViewType type, uint32_t baseMipLevel, uint32_
 
 NON_DISPATCHABLE_HANDLE_DTOR(ImageView, vk::DestroyImageView)
 
-void ImageView::init(const Device &dev, const VkImageViewCreateInfo &info) {
+void ImageView::Init(const Device &dev, const VkImageViewCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateImageView, dev, &info);
 }
 
-void AccelerationStructureNV::destroy() noexcept {
+void AccelerationStructureNV::Destroy() noexcept {
     if (!initialized()) {
         return;
     }
@@ -1497,7 +1638,7 @@ void AccelerationStructureNV::destroy() noexcept {
     vkDestroyAccelerationStructureNV(device(), handle(), nullptr);
     handle_ = VK_NULL_HANDLE;
 }
-AccelerationStructureNV::~AccelerationStructureNV() noexcept { destroy(); }
+AccelerationStructureNV::~AccelerationStructureNV() noexcept { Destroy(); }
 
 VkMemoryRequirements2 AccelerationStructureNV::MemoryRequirements() const {
     PFN_vkGetAccelerationStructureMemoryRequirementsNV vkGetAccelerationStructureMemoryRequirementsNV =
@@ -1527,7 +1668,7 @@ VkMemoryRequirements2 AccelerationStructureNV::BuildScratchMemoryRequirements() 
     return memory_requirements;
 }
 
-void AccelerationStructureNV::init(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory) {
+void AccelerationStructureNV::Init(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory) {
     PFN_vkCreateAccelerationStructureNV vkCreateAccelerationStructureNV =
         (PFN_vkCreateAccelerationStructureNV)vk::GetDeviceProcAddr(dev.handle(), "vkCreateAccelerationStructureNV");
     assert(vkCreateAccelerationStructureNV != nullptr);
@@ -1537,7 +1678,7 @@ void AccelerationStructureNV::init(const Device &dev, const VkAccelerationStruct
     info_ = info.info;
 
     if (init_memory) {
-        memory_.init(dev, DeviceMemory::GetResourceAllocInfo(dev, MemoryRequirements().memoryRequirements,
+        memory_.Init(dev, DeviceMemory::GetResourceAllocInfo(dev, MemoryRequirements().memoryRequirements,
                                                              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
         PFN_vkBindAccelerationStructureMemoryNV vkBindAccelerationStructureMemoryNV =
@@ -1559,13 +1700,11 @@ void AccelerationStructureNV::init(const Device &dev, const VkAccelerationStruct
 Buffer AccelerationStructureNV::CreateScratchBuffer(const Device &device, VkBufferCreateInfo *pCreateInfo /*= nullptr*/,
                                                     bool buffer_device_address /*= false*/) const {
     VkMemoryRequirements scratch_buffer_memory_requirements = BuildScratchMemoryRequirements().memoryRequirements;
-    VkBufferCreateInfo create_info = {};
+    VkBufferCreateInfo create_info = vku::InitStructHelper();
     create_info.size = scratch_buffer_memory_requirements.size;
     if (pCreateInfo) {
-        create_info.sType = pCreateInfo->sType;
         create_info.usage = pCreateInfo->usage;
     } else {
-        create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         create_info.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
         if (buffer_device_address) create_info.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
@@ -1583,12 +1722,12 @@ Buffer AccelerationStructureNV::CreateScratchBuffer(const Device &device, VkBuff
 NON_DISPATCHABLE_HANDLE_DTOR(ShaderModule, vk::DestroyShaderModule)
 
 ShaderModule &ShaderModule::operator=(ShaderModule &&rhs) noexcept {
-    destroy();
+    Destroy();
     NonDispHandle<VkShaderModule>::operator=(std::move(rhs));
     return *this;
 }
 
-void ShaderModule::init(const Device &dev, const VkShaderModuleCreateInfo &info) {
+void ShaderModule::Init(const Device &dev, const VkShaderModuleCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateShaderModule, dev, &info);
 }
 
@@ -1603,7 +1742,7 @@ VkResult ShaderModule::InitTry(const Device &dev, const VkShaderModuleCreateInfo
 
 NON_DISPATCHABLE_HANDLE_DTOR(Shader, vk::DestroyShaderEXT)
 
-void Shader::init(const Device &dev, const VkShaderCreateInfoEXT &info) {
+void Shader::Init(const Device &dev, const VkShaderCreateInfoEXT &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateShadersEXT, dev, 1u, &info);
 }
 
@@ -1633,7 +1772,7 @@ Shader::Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::
         createInfo.pushConstantRangeCount = 1u;
         createInfo.pPushConstantRanges = pushConstRange;
     }
-    init(dev, createInfo);
+    Init(dev, createInfo);
 }
 
 Shader::Shader(const Device &dev, const VkShaderStageFlagBits stage, const char *code,
@@ -1661,7 +1800,7 @@ Shader::Shader(const Device &dev, const VkShaderStageFlagBits stage, const char 
         createInfo.pushConstantRangeCount = 1u;
         createInfo.pPushConstantRanges = pushConstRange;
     }
-    init(dev, createInfo);
+    Init(dev, createInfo);
 }
 
 Shader::Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint8_t> &binary,
@@ -1681,18 +1820,18 @@ Shader::Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::
         createInfo.pushConstantRangeCount = 1u;
         createInfo.pPushConstantRanges = pushConstRange;
     }
-    init(dev, createInfo);
+    Init(dev, createInfo);
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(PipelineCache, vk::DestroyPipelineCache)
 
-void PipelineCache::init(const Device &dev, const VkPipelineCacheCreateInfo &info) {
+void PipelineCache::Init(const Device &dev, const VkPipelineCacheCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreatePipelineCache, dev, &info);
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(Pipeline, vk::DestroyPipeline)
 
-void Pipeline::init(const Device &dev, const VkGraphicsPipelineCreateInfo &info) {
+void Pipeline::Init(const Device &dev, const VkGraphicsPipelineCreateInfo &info) {
     VkPipelineCache cache;
     VkPipelineCacheCreateInfo ci = vku::InitStructHelper();
     VkResult err = vk::CreatePipelineCache(dev.handle(), &ci, NULL, &cache);
@@ -1719,7 +1858,7 @@ VkResult Pipeline::InitTry(const Device &dev, const VkGraphicsPipelineCreateInfo
     return err;
 }
 
-void Pipeline::init(const Device &dev, const VkComputePipelineCreateInfo &info) {
+void Pipeline::Init(const Device &dev, const VkComputePipelineCreateInfo &info) {
     VkPipelineCache cache;
     VkPipelineCacheCreateInfo ci = vku::InitStructHelper();
     VkResult err = vk::CreatePipelineCache(dev.handle(), &ci, NULL, &cache);
@@ -1729,7 +1868,7 @@ void Pipeline::init(const Device &dev, const VkComputePipelineCreateInfo &info) 
     }
 }
 
-void Pipeline::init(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info) {
+void Pipeline::Init(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRayTracingPipelinesKHR, dev, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &info);
 }
 
@@ -1743,9 +1882,13 @@ void Pipeline::InitDeferred(const Device &dev, const VkRayTracingPipelineCreateI
     NonDispHandle::SetDevice(dev.handle());
 }
 
+void Pipeline::Init(const Device &dev, const VkDataGraphPipelineCreateInfoARM &info) {
+    NON_DISPATCHABLE_HANDLE_INIT(vk::CreateDataGraphPipelinesARM, dev, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &info);
+}
+
 NON_DISPATCHABLE_HANDLE_DTOR(PipelineLayout, vk::DestroyPipelineLayout)
 
-void PipelineLayout::init(const Device &dev, VkPipelineLayoutCreateInfo &info,
+void PipelineLayout::Init(const Device &dev, VkPipelineLayoutCreateInfo &info,
                           const std::vector<const DescriptorSetLayout *> &layouts) {
     std::vector<VkDescriptorSetLayout> layout_handles;
     layout_handles.reserve(layouts.size());
@@ -1755,69 +1898,47 @@ void PipelineLayout::init(const Device &dev, VkPipelineLayoutCreateInfo &info,
     info.setLayoutCount = static_cast<uint32_t>(layout_handles.size());
     info.pSetLayouts = layout_handles.data();
 
-    init(dev, info);
+    Init(dev, info);
 }
 
-void PipelineLayout::init(const Device &dev, VkPipelineLayoutCreateInfo &info) {
+void PipelineLayout::Init(const Device &dev, VkPipelineLayoutCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreatePipelineLayout, dev, &info);
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(Sampler, vk::DestroySampler)
 
-void Sampler::init(const Device &dev, const VkSamplerCreateInfo &info) {
+void Sampler::Init(const Device &dev, const VkSamplerCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateSampler, dev, &info);
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(DescriptorSetLayout, vk::DestroyDescriptorSetLayout)
 
-void DescriptorSetLayout::init(const Device &dev, const VkDescriptorSetLayoutCreateInfo &info) {
+void DescriptorSetLayout::Init(const Device &dev, const VkDescriptorSetLayoutCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateDescriptorSetLayout, dev, &info);
+}
+
+VkDeviceSize DescriptorSetLayout::GetDescriptorBufferSize() const {
+    VkDeviceSize size = 0;
+    vk::GetDescriptorSetLayoutSizeEXT(device(), handle(), &size);
+    return size;
+}
+
+VkDeviceSize DescriptorSetLayout::GetDescriptorBufferBindingOffset(uint32_t binding) const {
+    VkDeviceSize size = 0;
+    vk::GetDescriptorSetLayoutBindingOffsetEXT(device(), handle(), binding, &size);
+    return size;
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(DescriptorPool, vk::DestroyDescriptorPool)
 
-void DescriptorPool::init(const Device &dev, const VkDescriptorPoolCreateInfo &info) {
+void DescriptorPool::Init(const Device &dev, const VkDescriptorPoolCreateInfo &info) {
     dynamic_usage_ = (info.flags & VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT) != 0;
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateDescriptorPool, dev, &info);
 }
 
 void DescriptorPool::Reset() { ASSERT_EQ(VK_SUCCESS, vk::ResetDescriptorPool(device(), handle(), 0)); }
 
-std::vector<DescriptorSet *> DescriptorPool::AllocateSets(const Device &dev,
-                                                          const std::vector<const DescriptorSetLayout *> &layouts) {
-    std::vector<VkDescriptorSetLayout> layout_handles;
-    layout_handles.reserve(layouts.size());
-    std::transform(layouts.begin(), layouts.end(), std::back_inserter(layout_handles),
-                   [](const DescriptorSetLayout *o) { return (o) ? o->handle() : VK_NULL_HANDLE; });
-
-    std::vector<VkDescriptorSet> set_handles;
-    set_handles.resize(layout_handles.size());
-
-    VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
-    alloc_info.descriptorSetCount = static_cast<uint32_t>(layout_handles.size());
-    alloc_info.descriptorPool = handle();
-    alloc_info.pSetLayouts = layout_handles.data();
-    VkResult err = vk::AllocateDescriptorSets(device(), &alloc_info, set_handles.data());
-    EXPECT_EQ(VK_SUCCESS, err);
-
-    std::vector<DescriptorSet *> sets;
-    for (std::vector<VkDescriptorSet>::const_iterator it = set_handles.begin(); it != set_handles.end(); it++) {
-        // do descriptor sets need memories bound?
-        DescriptorSet *descriptorSet = new DescriptorSet(dev, this, *it);
-        sets.push_back(descriptorSet);
-    }
-    return sets;
-}
-
-std::vector<DescriptorSet *> DescriptorPool::AllocateSets(const Device &dev, const DescriptorSetLayout &layout, uint32_t count) {
-    return AllocateSets(dev, std::vector<const DescriptorSetLayout *>(count, &layout));
-}
-
-DescriptorSet *DescriptorPool::AllocateSets(const Device &dev, const DescriptorSetLayout &layout) {
-    std::vector<DescriptorSet *> set = AllocateSets(dev, layout, 1);
-    return (set.empty()) ? NULL : set[0];
-}
-void DescriptorSet::destroy() noexcept {
+void DescriptorSet::Destroy() noexcept {
     if (!initialized()) {
         return;
     }
@@ -1828,7 +1949,7 @@ void DescriptorSet::destroy() noexcept {
     }
     handle_ = VK_NULL_HANDLE;
 }
-DescriptorSet::~DescriptorSet() noexcept { destroy(); }
+DescriptorSet::~DescriptorSet() noexcept { Destroy(); }
 
 void DescriptorUpdateTemplate::Init(const Device &dev, const VkDescriptorUpdateTemplateCreateInfo &info) {
     if (vk::CreateDescriptorUpdateTemplateKHR) {
@@ -1838,7 +1959,7 @@ void DescriptorUpdateTemplate::Init(const Device &dev, const VkDescriptorUpdateT
     }
 }
 
-void DescriptorUpdateTemplate::destroy() noexcept {
+void DescriptorUpdateTemplate::Destroy() noexcept {
     if (!initialized()) {
         return;
     }
@@ -1848,10 +1969,10 @@ void DescriptorUpdateTemplate::destroy() noexcept {
         vk::DestroyDescriptorUpdateTemplate(device(), handle(), nullptr);
     }
     handle_ = VK_NULL_HANDLE;
-    internal::NonDispHandle<decltype(handle_)>::destroy();
+    internal::NonDispHandle<decltype(handle_)>::Destroy();
 }
 
-DescriptorUpdateTemplate::~DescriptorUpdateTemplate() noexcept { destroy(); }
+DescriptorUpdateTemplate::~DescriptorUpdateTemplate() noexcept { Destroy(); }
 
 NON_DISPATCHABLE_HANDLE_DTOR(CommandPool, vk::DestroyCommandPool)
 
@@ -1870,7 +1991,7 @@ CommandPool::CommandPool(const Device &dev, uint32_t queue_family_index, VkComma
     Init(dev, queue_family_index, flags);
 }
 
-void CommandBuffer::destroy() noexcept {
+void CommandBuffer::Destroy() noexcept {
     if (!initialized()) {
         return;
     }
@@ -1878,9 +1999,9 @@ void CommandBuffer::destroy() noexcept {
     vk::FreeCommandBuffers(dev_handle_, cmd_pool_, 1, cmds);
     handle_ = VK_NULL_HANDLE;
 }
-CommandBuffer::~CommandBuffer() noexcept { destroy(); }
+CommandBuffer::~CommandBuffer() noexcept { Destroy(); }
 
-void CommandBuffer::init(const Device &dev, const VkCommandBufferAllocateInfo &info) {
+void CommandBuffer::Init(const Device &dev, const VkCommandBufferAllocateInfo &info) {
     VkCommandBuffer cmd;
 
     // Make sure commandPool is set
@@ -1895,7 +2016,7 @@ void CommandBuffer::init(const Device &dev, const VkCommandBufferAllocateInfo &i
 void CommandBuffer::Init(const Device &dev, const CommandPool &pool, VkCommandBufferLevel level) {
     auto create_info = CommandBuffer::CreateInfo(pool.handle());
     create_info.level = level;
-    init(dev, create_info);
+    Init(dev, create_info);
 }
 
 void CommandBuffer::Begin(const VkCommandBufferBeginInfo *info) { ASSERT_EQ(VK_SUCCESS, vk::BeginCommandBuffer(handle(), info)); }
@@ -2109,11 +2230,11 @@ void CommandBuffer::FullMemoryBarrier() {
                            nullptr, 0, nullptr);
 }
 
-void RenderPass::init(const Device &dev, const VkRenderPassCreateInfo &info) {
+void RenderPass::Init(const Device &dev, const VkRenderPassCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRenderPass, dev, &info);
 }
 
-void RenderPass::init(const Device &dev, const VkRenderPassCreateInfo2 &info) {
+void RenderPass::Init(const Device &dev, const VkRenderPassCreateInfo2 &info) {
     if (vk::CreateRenderPass2KHR) {
         NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRenderPass2KHR, dev, &info);
     } else {
@@ -2123,13 +2244,13 @@ void RenderPass::init(const Device &dev, const VkRenderPassCreateInfo2 &info) {
 
 NON_DISPATCHABLE_HANDLE_DTOR(RenderPass, vk::DestroyRenderPass)
 
-void Framebuffer::init(const Device &dev, const VkFramebufferCreateInfo &info) {
+void Framebuffer::Init(const Device &dev, const VkFramebufferCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateFramebuffer, dev, &info);
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(Framebuffer, vk::DestroyFramebuffer)
 
-void SamplerYcbcrConversion::init(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info) {
+void SamplerYcbcrConversion::Init(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info) {
     if (vk::CreateSamplerYcbcrConversionKHR) {
         NON_DISPATCHABLE_HANDLE_INIT(vk::CreateSamplerYcbcrConversionKHR, dev, &info);
     } else {
@@ -2158,7 +2279,7 @@ VkSamplerYcbcrConversionCreateInfo SamplerYcbcrConversion::DefaultConversionInfo
     return ycbcr_create_info;
 }
 
-void SamplerYcbcrConversion::destroy() noexcept {
+void SamplerYcbcrConversion::Destroy() noexcept {
     if (!initialized()) {
         return;
     }
@@ -2168,10 +2289,10 @@ void SamplerYcbcrConversion::destroy() noexcept {
         vk::DestroySamplerYcbcrConversion(device(), handle(), nullptr);
     }
     handle_ = VK_NULL_HANDLE;
-    internal::NonDispHandle<decltype(handle_)>::destroy();
+    internal::NonDispHandle<decltype(handle_)>::Destroy();
 }
 
-SamplerYcbcrConversion::~SamplerYcbcrConversion() noexcept { destroy(); }
+SamplerYcbcrConversion::~SamplerYcbcrConversion() noexcept { Destroy(); }
 
 NON_DISPATCHABLE_HANDLE_DTOR(Swapchain, vk::DestroySwapchainKHR)
 
@@ -2289,4 +2410,24 @@ VkResult Surface::Init(VkInstance instance, const VkWaylandSurfaceCreateInfoKHR 
     return result;
 }
 #endif
+
+struct DummyAlloc {
+    static VKAPI_ATTR void *VKAPI_CALL allocFunction(void *, size_t size, size_t, VkSystemAllocationScope) { return malloc(size); };
+    static VKAPI_ATTR void *VKAPI_CALL realloc(void *, void *, size_t, size_t, VkSystemAllocationScope) { return nullptr; };
+    static VKAPI_ATTR void VKAPI_CALL freeFunction(void *, void *pMemory) { free(pMemory); };
+    static VKAPI_ATTR void VKAPI_CALL internalAlloc(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+    static VKAPI_ATTR void VKAPI_CALL internalFree(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+};
+
+const VkAllocationCallbacks *DefaultAllocator() {
+    static const VkAllocationCallbacks alloc = {nullptr,
+                                                DummyAlloc::allocFunction,
+                                                DummyAlloc::realloc,
+                                                DummyAlloc::freeFunction,
+                                                DummyAlloc::internalAlloc,
+                                                DummyAlloc::internalFree};
+
+    return &alloc;
+}
+
 }  // namespace vkt

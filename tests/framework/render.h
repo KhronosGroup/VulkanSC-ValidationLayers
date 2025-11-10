@@ -63,7 +63,7 @@ struct SurfaceContext {
     void Resize(uint32_t width, uint32_t height);
 #else
     static bool CanResize() { return false; }
-    void Resize(uint32_t width, uint32_t height) {}
+    void Resize(uint32_t, uint32_t) {}
 #endif
     void Destroy();
     ~SurfaceContext() { Destroy(); }
@@ -102,25 +102,29 @@ class VkRenderFramework : public VkTestFramework {
     // Functions to modify the VkRenderFramework surface & swapchain variables
     void InitSurface();
     void InitSwapchainInfo();
-    void InitSwapchain(VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                       VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
+    void InitSwapchain(VkImageUsageFlags image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     void DestroySwapchain();
+
     // Functions to create surfaces and swapchains that *aren't* member variables of VkRenderFramework
     VkResult CreateSurface(SurfaceContext &surface_context, vkt::Surface &surface, VkInstance custom_instance = VK_NULL_HANDLE);
     SurfaceInformation GetSwapchainInfo(const VkSurfaceKHR surface);
-    vkt::Swapchain CreateSwapchain(VkSurfaceKHR surface, VkImageUsageFlags imageUsage, VkSurfaceTransformFlagBitsKHR preTransform,
-                                   VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE);
+    static VkSwapchainCreateInfoKHR GetDefaultSwapchainCreateInfo(VkSurfaceKHR surface, const SurfaceInformation &surface_info,
+                                                                  VkImageUsageFlags image_usage);
+    vkt::Swapchain CreateSwapchain(VkSurfaceKHR surface, VkImageUsageFlags image_usage, VkSurfaceTransformFlagBitsKHR pre_transform,
+                                   VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
 
     // Swapchain capabilities declaration to be used with RETURN_IF_SKIP
     void SupportMultiSwapchain();
     void SupportSurfaceResize();
+
+    void SetPresentImageLayout(VkImage image);
 
     void InitRenderTarget();
     void InitRenderTarget(uint32_t targets);
     void InitRenderTarget(const VkImageView *dsBinding);
     void InitRenderTarget(uint32_t targets, const VkImageView *dsBinding);
     void InitDynamicRenderTarget(VkFormat format = VK_FORMAT_UNDEFINED);
-    VkImageView GetDynamicRenderTarget() const;
+    VkImageView GetDynamicRenderTarget(uint32_t idx = 0) const;
     VkRect2D GetRenderTargetArea() const;
     void DestroyRenderTarget();
 
@@ -137,7 +141,6 @@ class VkRenderFramework : public VkTestFramework {
     // default to CommandPool Reset flag to allow recording multiple command buffers simpler
     void InitState(VkPhysicalDeviceFeatures *features = nullptr, void *create_device_pnext = nullptr,
                    const VkCommandPoolCreateFlags flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    void InitStateWithRequirements(vkt::FeatureRequirements &feature_requirements);
     bool DeviceExtensionSupported(const char *extension_name, uint32_t spec_version = 0) const;
     bool DeviceExtensionSupported(VkPhysicalDevice, const char *, const char *name,
                                   uint32_t spec_version = 0) const {  // deprecated

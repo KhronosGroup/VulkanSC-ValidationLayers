@@ -17,16 +17,20 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
-class PositiveMesh : public VkLayerTest {};
+class PositiveMesh : public MeshTest {};
+
+void MeshTest::InitBasicMeshAndTask() {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    // While not "required", it highly supported together
+    AddRequiredFeature(vkt::Feature::taskShader);
+    RETURN_IF_SKIP(Init());
+}
 
 TEST_F(PositiveMesh, BasicUsage) {
     TEST_DESCRIPTION("Test basic VK_EXT_mesh_shader.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::meshShader);
-
-    RETURN_IF_SKIP(Init());
-
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
     const char *mesh_source = R"glsl(
@@ -76,7 +80,7 @@ TEST_F(PositiveMesh, MeshShaderOnly) {
 
     InitRenderTarget();
 
-    static const char meshShaderText[] = R"glsl(
+    const char meshShaderText[] = R"glsl(
         #version 450
         #extension GL_NV_mesh_shader : require
         layout(local_size_x = 1) in;
@@ -123,7 +127,7 @@ TEST_F(PositiveMesh, PointSize) {
 
     InitRenderTarget();
 
-    static const char meshShaderText[] = R"glsl(
+    const char meshShaderText[] = R"glsl(
         #version 460
         #extension GL_NV_mesh_shader : enable
         layout (local_size_x=1) in;
@@ -173,7 +177,7 @@ TEST_F(PositiveMesh, TaskAndMeshShaderNV) {
                         "VK_SHADER_STAGE_TASK_BIT_NV, skipping test.";
     }
 
-    static const char taskShaderText[] = R"glsl(
+    const char taskShaderText[] = R"glsl(
         #version 450
 
         #extension GL_NV_mesh_shader : require
@@ -208,7 +212,7 @@ TEST_F(PositiveMesh, TaskAndMeshShaderNV) {
         }
     )glsl";
 
-    static const char meshShaderText[] = R"glsl(
+    const char meshShaderText[] = R"glsl(
         #version 450
 
         #extension GL_NV_mesh_shader : require
@@ -251,7 +255,7 @@ TEST_F(PositiveMesh, MeshPerTaskNV) {
     RETURN_IF_SKIP(InitState(nullptr, &mesh_shader_features));
     InitRenderTarget();
 
-    static const char taskShaderText[] = R"glsl(
+    const char taskShaderText[] = R"glsl(
         #version 450
         #extension GL_NV_mesh_shader : require
         layout(local_size_x = 32) in;
@@ -261,7 +265,7 @@ TEST_F(PositiveMesh, MeshPerTaskNV) {
         void main() {}
     )glsl";
 
-    static const char meshShaderText[] = R"glsl(
+    const char meshShaderText[] = R"glsl(
         #version 460
         #extension GL_NV_mesh_shader : enable
 
@@ -296,12 +300,8 @@ TEST_F(PositiveMesh, MeshPerTaskNV) {
 
 TEST_F(PositiveMesh, PrimitiveTopology) {
     TEST_DESCRIPTION("pInputAssemblyState is ignored when pipeline includes a mesh shading stage");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::meshShader);
-
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
     VkShaderObj ms(this, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
@@ -315,12 +315,8 @@ TEST_F(PositiveMesh, PrimitiveTopology) {
 
 TEST_F(PositiveMesh, DrawIndexMesh) {
     TEST_DESCRIPTION("use DrawIndex only with Mesh Shader.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::meshShader);
     AddRequiredFeature(vkt::Feature::shaderDrawParameters);
-
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
     const char *mesh_source = R"glsl(
@@ -343,13 +339,8 @@ TEST_F(PositiveMesh, DrawIndexMesh) {
 
 TEST_F(PositiveMesh, DrawIndexTask) {
     TEST_DESCRIPTION("use DrawIndex only with Task Shader.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::meshShader);
-    AddRequiredFeature(vkt::Feature::taskShader);
     AddRequiredFeature(vkt::Feature::shaderDrawParameters);
-
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
     const char *task_source = R"glsl(
@@ -382,13 +373,9 @@ TEST_F(PositiveMesh, DrawIndexTask) {
 }
 
 TEST_F(PositiveMesh, MeshAndTaskShaderDerivatives) {
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::computeDerivativeGroupQuads);
-    AddRequiredFeature(vkt::Feature::meshShader);
-
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
     VkPhysicalDeviceComputeShaderDerivativesPropertiesKHR derivatives_properties = vku::InitStructHelper();
@@ -437,13 +424,9 @@ TEST_F(PositiveMesh, MeshAndTaskShaderDerivatives) {
 
 TEST_F(PositiveMesh, TessellationDynamicState) {
     TEST_DESCRIPTION("Test basic VK_EXT_mesh_shader.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::meshShader);
     AddRequiredFeature(vkt::Feature::extendedDynamicState3TessellationDomainOrigin);
-    RETURN_IF_SKIP(Init());
-
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
     const char *mesh_source = R"glsl(
@@ -472,4 +455,46 @@ TEST_F(PositiveMesh, TessellationDynamicState) {
     vk::CmdDrawMeshTasksEXT(m_command_buffer, 1, 1, 1);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
+}
+
+TEST_F(PositiveMesh, TaskPayloadSharedSpecConstant) {
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
+    InitRenderTarget();
+
+    const char *task_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : enable
+        layout(constant_id = 0) const int SIZE = 64;
+        struct Foo {
+            uint x[SIZE];
+        };
+        taskPayloadSharedEXT Foo payload;
+        void main() {
+            payload.x[0] = 4;
+            EmitMeshTasksEXT(1u, 1u, 1u);
+        }
+    )glsl";
+
+    const char *mesh_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : enable
+        layout(max_vertices = 32, max_primitives = 32, triangles) out;
+        layout(constant_id = 1) const int SIZE = 64;
+        struct Foo {
+            uint x[SIZE];
+        };
+        taskPayloadSharedEXT Foo payload;
+        void main() {
+            uint y = payload.x[0];
+            SetMeshOutputsEXT(3,1);
+        }
+    )glsl";
+
+    VkShaderObj ts(this, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj ms(this, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {ts.GetStageCreateInfo(), ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
 }

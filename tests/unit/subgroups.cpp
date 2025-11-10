@@ -280,7 +280,7 @@ TEST_F(NegativeSubgroup, ExtendedTypesDisabled) {
     const vkt::DescriptorSetLayout dsl(*m_device, bindings);
     const vkt::PipelineLayout pl(*m_device, {&dsl});
 
-    char const *csSource = R"glsl(
+    const char *csSource = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_arithmetic : enable
         #extension GL_EXT_shader_subgroup_extended_types_float16 : enable
@@ -450,7 +450,7 @@ TEST_F(NegativeSubgroup, SubgroupSizeControlFeaturesWithIdentifierGraphics) {
     VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 
     VkShaderModuleIdentifierEXT get_identifier = vku::InitStructHelper();
-    vk::GetShaderModuleIdentifierEXT(device(), vs.handle(), &get_identifier);
+    vk::GetShaderModuleIdentifierEXT(device(), vs, &get_identifier);
     sm_id_create_info.identifierSize = get_identifier.identifierSize;
     sm_id_create_info.pIdentifier = get_identifier.identifier;
 
@@ -489,7 +489,7 @@ TEST_F(NegativeSubgroup, SubgroupSizeControlFeaturesWithIdentifierCompute) {
     VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     VkShaderModuleIdentifierEXT get_identifier = vku::InitStructHelper();
-    vk::GetShaderModuleIdentifierEXT(device(), cs.handle(), &get_identifier);
+    vk::GetShaderModuleIdentifierEXT(device(), cs, &get_identifier);
     sm_id_create_info.identifierSize = get_identifier.identifierSize;
     sm_id_create_info.pIdentifier = get_identifier.identifier;
 
@@ -695,7 +695,7 @@ TEST_F(NegativeSubgroup, MeshLocalWorkgroupSize) {
     VkPipelineShaderStageRequiredSubgroupSizeCreateInfo subgroup_size_control = vku::InitStructHelper();
     subgroup_size_control.requiredSubgroupSize = subgroup_properties.minSubgroupSize;
 
-    if (subgroup_size_control.requiredSubgroupSize * subgroup_properties.maxComputeWorkgroupSubgroups >
+    if (subgroup_size_control.requiredSubgroupSize * subgroup_properties.maxComputeWorkgroupSubgroups >=
         mesh_properties.maxTaskWorkGroupInvocations) {
         GTEST_SKIP() << "maxTaskWorkGroupSize smaller than required";
     }

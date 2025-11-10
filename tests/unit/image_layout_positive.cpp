@@ -63,7 +63,7 @@ TEST_F(PositiveImageLayout, BarriersAndImageUsage) {
 
         m_command_buffer.Begin();
         for (uint32_t i = 0; i < layout_count; ++i) {
-            img_barrier.image = buffer_layouts[i].image_obj.handle();
+            img_barrier.image = buffer_layouts[i].image_obj;
             const VkImageUsageFlags usage = buffer_layouts[i].image_obj.Usage();
             img_barrier.subresourceRange.aspectMask = (usage == VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                                                           ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
@@ -289,20 +289,20 @@ TEST_F(PositiveImageLayout, DescriptorSubresource) {
         image_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         image_barrier.newLayout = init_layout;
 
-        vk::CmdPipelineBarrier(cmd_buf.handle(), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &image_barrier);
+        vk::CmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0,
+                               nullptr, 1, &image_barrier);
 
         image_barrier.subresourceRange = first_range;
         image_barrier.oldLayout = init_layout;
         image_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        vk::CmdPipelineBarrier(cmd_buf.handle(), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &image_barrier);
+        vk::CmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0,
+                               nullptr, 1, &image_barrier);
 
         image_barrier.subresourceRange = view_range;
         image_barrier.oldLayout = init_layout;
         image_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        vk::CmdPipelineBarrier(cmd_buf.handle(), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &image_barrier);
+        vk::CmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0,
+                               nullptr, 1, &image_barrier);
 
         if (test_type == kExternal) {
             // The image layout is external to the command buffer we are recording to test.  Submit to push to instance scope.
@@ -312,11 +312,11 @@ TEST_F(PositiveImageLayout, DescriptorSubresource) {
         }
 
         cmd_buf.BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(cmd_buf.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-        vk::CmdBindDescriptorSets(cmd_buf.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
-                                  NULL);
+        vk::CmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+        vk::CmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                                  nullptr);
 
-        vk::CmdDraw(cmd_buf.handle(), 1, 0, 0, 0);
+        vk::CmdDraw(cmd_buf, 1, 0, 0, 0);
 
         cmd_buf.EndRenderPass();
         cmd_buf.End();
@@ -371,20 +371,17 @@ TEST_F(PositiveImageLayout, Descriptor3D2DSubresource) {
     //    of the selected mip level of the 3D image, automatic layout transitions apply
     //    to the entire subresource referenced which is the entire mip level in this case.
     VkImageSubresourceRange full_range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkt::ImageView view_2d, other_view;
     VkImageViewCreateInfo image_view_create_info = vku::InitStructHelper();
     image_view_create_info.image = image_3d;
     image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
     image_view_create_info.format = format;
     image_view_create_info.subresourceRange = view_range;
 
-    view_2d.init(*m_device, image_view_create_info);
-    ASSERT_TRUE(view_2d.initialized());
+    vkt::ImageView view_2d(*m_device, image_view_create_info);
 
-    image_view_create_info.image = other_image.handle();
+    image_view_create_info.image = other_image;
     image_view_create_info.subresourceRange = full_range;
-    other_view.init(*m_device, image_view_create_info);
-    ASSERT_TRUE(other_view.initialized());
+    vkt::ImageView other_view(*m_device, image_view_create_info);
 
     std::vector<VkAttachmentDescription> attachments = {
         {0, format, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
@@ -459,11 +456,11 @@ TEST_F(PositiveImageLayout, Descriptor3D2DSubresource) {
         image_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         image_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        vk::CmdPipelineBarrier(cmd_buf.handle(), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &image_barrier);
-        image_barrier.image = other_image.handle();
-        vk::CmdPipelineBarrier(cmd_buf.handle(), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &image_barrier);
+        vk::CmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0,
+                               nullptr, 1, &image_barrier);
+        image_barrier.image = other_image;
+        vk::CmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0,
+                               nullptr, 1, &image_barrier);
 
         if (test_type == kExternal) {
             // The image layout is external to the command buffer we are recording to test.  Submit to push to instance scope.
@@ -477,10 +474,10 @@ TEST_F(PositiveImageLayout, Descriptor3D2DSubresource) {
         m_renderPassBeginInfo.renderArea = {{0, 0}, {kWidth, kHeight}};
 
         cmd_buf.BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(cmd_buf.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-        vk::CmdBindDescriptorSets(cmd_buf.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+        vk::CmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+        vk::CmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
                                   nullptr);
-        vk::CmdDraw(cmd_buf.handle(), 1, 0, 0, 0);
+        vk::CmdDraw(cmd_buf, 1, 0, 0, 0);
 
         cmd_buf.EndRenderPass();
         cmd_buf.End();
@@ -544,7 +541,7 @@ TEST_F(PositiveImageLayout, DescriptorArray) {
     RETURN_IF_SKIP(Init());
     RETURN_IF_SKIP(InitRenderTarget());
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform UBO { uint index; };
@@ -646,4 +643,239 @@ TEST_F(PositiveImageLayout, MultipleLayoutChanges) {
     m_command_buffer.Barrier(barrier);
 
     m_command_buffer.End();
+}
+
+TEST_F(PositiveImageLayout, TimelineSemaphoreOrdering) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10185
+    TEST_DESCRIPTION("Timeline semaphore specifies the order of command buffer execution so it is different than submission order");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    RETURN_IF_SKIP(Init());
+
+    if (!m_second_queue) {
+        GTEST_SKIP() << "Two queues are needed";
+    }
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Buffer buffer(*m_device, 32 * 32 * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+
+    const VkImageSubresourceRange subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    layout_transition.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    layout_transition.srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    layout_transition.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    layout_transition.image = image;
+    layout_transition.subresourceRange = subresource_range;
+
+    VkClearColorValue clear_color{};
+
+    VkBufferImageCopy copy_region{};
+    copy_region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy_region.imageExtent = {32, 32, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(layout_transition);
+    vk::CmdClearColorImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &clear_color, 1, &subresource_range);
+    m_command_buffer.End();
+
+    m_second_command_buffer.Begin();
+    vk::CmdCopyImageToBuffer(m_second_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, buffer, 1, &copy_region);
+    m_second_command_buffer.End();
+
+    m_second_queue->Submit2(m_second_command_buffer, vkt::TimelineWait(semaphore, 1));
+    m_default_queue->Submit2(m_command_buffer, vkt::TimelineSignal(semaphore, 1));
+    m_device->Wait();
+}
+
+TEST_F(PositiveImageLayout, FramebufferAttachmentFrom3dImageSlice) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10330
+    TEST_DESCRIPTION("Subpass transitions arbitrary slice of 3d image");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance9);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    // Create 3d image with 2 slices
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
+    image_ci.imageType = VK_IMAGE_TYPE_3D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent = {32, 32, 2};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vkt::Image image_3d(*m_device, image_ci);
+
+    // Image view for slice 1
+    VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
+    image_view_ci.image = image_3d;
+    image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    image_view_ci.format = image_ci.format;
+    image_view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1, 1};
+    const vkt::ImageView image_view(*m_device, image_view_ci);
+
+    RenderPassSingleSubpass render_pass(*this);
+    render_pass.AddAttachmentDescription(image_ci.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    render_pass.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+    render_pass.AddColorAttachment(0);
+    render_pass.CreateRenderPass();
+
+    vkt::Framebuffer framebuffer(*m_device, render_pass, 1, &image_view.handle(), 32, 32);
+
+    // Transition slice 1
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    layout_transition.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    layout_transition.image = image_3d;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1, 1};
+
+    VkDependencyInfo dep_info = vku::InitStructHelper();
+    dep_info.imageMemoryBarrierCount = 1;
+    dep_info.pImageMemoryBarriers = &layout_transition;
+
+    m_command_buffer.Begin();
+    // Render pass transitions slice 1 to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL.
+    // The original issue was that layout transition worked only for slice 0.
+    m_command_buffer.BeginRenderPass(render_pass, framebuffer, 32, 32);
+    m_command_buffer.EndRenderPass();
+
+    // In case of regression the following transition will report layout mismatch error.
+    vk::CmdPipelineBarrier2(m_command_buffer, &dep_info);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveImageLayout, TransitionAll3dImageSlices) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10377
+    TEST_DESCRIPTION("Ensure that VK_REMAINING_ARRAY_LAYERS transitions all slices for 3d image slices");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance9);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
+    image_ci.imageType = VK_IMAGE_TYPE_3D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent = {4, 4, 2};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vkt::Image image(*m_device, image_ci);
+
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS};
+    barrier.image = image;
+
+    vkt::Buffer buffer_src(*m_device, 128, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    vkt::Buffer buffer_dst(*m_device, 128, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    VkBufferImageCopy region{};
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageExtent = {4, 2, 2};
+
+    m_command_buffer.Begin();
+
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+    barrier.srcAccessMask = VK_ACCESS_2_NONE;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    // The test checks that this barrier transitions both slices of 3d image.
+    // In the original issue only the first slice was transitioned in which case the rest of the test leads to validation error.
+    m_command_buffer.Barrier(barrier);
+
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer_src, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    m_command_buffer.Barrier(barrier);
+
+    vk::CmdCopyImageToBuffer(m_command_buffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer_dst, 1, &region);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveImageLayout, DepthSliceTransitionCriteriaNotMet) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10453
+    TEST_DESCRIPTION("Enabled maintenance9 but do not set image flag VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::image2DViewOf3D);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.flags = VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
+    image_ci.imageType = VK_IMAGE_TYPE_3D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent = {64, 64, 4};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_STORAGE_BIT;
+    vkt::Image image(*m_device, image_ci);
+
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1, 3, 1);
+
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    layout_transition.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    layout_transition.image = image;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    const char *cs_source = R"glsl(
+        #version 450 core
+        layout (rgba8, set = 0, binding = 0) uniform image2D verifyImage;
+        void main (void) {
+            imageStore(verifyImage, ivec2(1,1), vec4(0.5f));
+        }
+    )glsl";
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0u, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1u, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                       });
+    descriptor_set.WriteDescriptorImageInfo(0u, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                            VK_IMAGE_LAYOUT_GENERAL, 0);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(layout_transition);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1, &descriptor_set.set_,
+                              0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }

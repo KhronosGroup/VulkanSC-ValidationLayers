@@ -79,9 +79,6 @@ TEST_F(VkSCPortedNegativeImage, ImageMisc) {
     ASSERT_NO_FATAL_FAILURE(Init(&features));
 
     const VkImageCreateInfo safe_image_ci = DefaultImageInfo();
-
-    ASSERT_EQ(VK_SUCCESS, GPDIFPHelper(Gpu(), &safe_image_ci));
-
     {
         VkImageCreateInfo image_ci = safe_image_ci;
         image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;  // always has 4 samples support

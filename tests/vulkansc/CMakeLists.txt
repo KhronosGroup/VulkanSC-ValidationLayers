@@ -71,10 +71,10 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/render_pass_helper.cpp
     ../framework/feature_requirements.h
     ../framework/feature_requirements.cpp
-    ../framework/queue_submit_context.h
-    ../framework/queue_submit_context.cpp
     ../framework/sync_helper.h
     ../framework/sync_helper.cpp
+    ../framework/data_graph_objects.h
+    ../framework/data_graph_objects.cpp
     negative/command.cpp
     negative/device_create.cpp
     negative/implicit.cpp
@@ -95,7 +95,7 @@ target_sources(vksc_layer_validation_tests PRIVATE
 )
 
 add_dependencies(vksc_layer_validation_tests vvl)
-target_include_directories(vksc_layer_validation_tests PRIVATE . ..)
+target_include_directories(vksc_layer_validation_tests PRIVATE . .. ../framework)
 
 target_compile_options(vksc_layer_validation_tests PRIVATE "$<IF:$<CXX_COMPILER_ID:MSVC>,/wd4100,-Wno-unused-parameter>")
 
@@ -131,7 +131,7 @@ find_package(glslang CONFIG)
 target_link_libraries(vksc_layer_validation_tests PRIVATE
     VkLayer_utils
     glslang::SPIRV
-    glslang::SPVRemapper
+    SPIRV-Tools-static
     SPIRV-Headers::SPIRV-Headers
     GTest::gtest
     GTest::gtest_main

@@ -288,7 +288,7 @@ TEST_F(NegativeLayerSettings, DuplicateMessageLimitLastWarning) {
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError(
-        "Warning - This VUID has now been reported 3 times, which is the duplicated_message_limit value, this will be the last "
+        "Warning - This VUID has now been reported 3 times, which is the duplicate_message_limit value, this will be the last "
         "time reporting it");
     vk::GetPhysicalDeviceProperties2KHR(Gpu(), &properties2);
     m_errorMonitor->VerifyFound();
@@ -324,7 +324,7 @@ TEST_F(NegativeLayerSettings, VuidIdFilterString) {
                                                            nullptr, 1, &iaar};
     VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, &rpiaaci, 0, 1, &attach, 1, &subpass, 0, nullptr};
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderPassCreateInfo2-attachment-02525");
-    TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false, "VUID-VkInputAttachmentAspectReference-aspectMask-01964", nullptr);
+    CreateRenderPassTest(rpci, false, "VUID-VkInputAttachmentAspectReference-aspectMask-01964", nullptr);
 }
 
 TEST_F(NegativeLayerSettings, VuidFilterHexInt) {
@@ -357,7 +357,7 @@ TEST_F(NegativeLayerSettings, VuidFilterHexInt) {
                                                            nullptr, 1, &iaar};
     VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, &rpiaaci, 0, 1, &attach, 1, &subpass, 0, nullptr};
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderPassCreateInfo2-attachment-02525");
-    TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false, "VUID-VkInputAttachmentAspectReference-aspectMask-01964", nullptr);
+    CreateRenderPassTest(rpci, false, "VUID-VkInputAttachmentAspectReference-aspectMask-01964", nullptr);
 }
 
 TEST_F(NegativeLayerSettings, VuidFilterInt) {
@@ -389,7 +389,7 @@ TEST_F(NegativeLayerSettings, VuidFilterInt) {
                                                            nullptr, 1, &iaar};
     VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, &rpiaaci, 0, 1, &attach, 1, &subpass, 0, nullptr};
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderPassCreateInfo2-attachment-02525");
-    TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false, "VUID-VkInputAttachmentAspectReference-aspectMask-01964", nullptr);
+    CreateRenderPassTest(rpci, false, "VUID-VkInputAttachmentAspectReference-aspectMask-01964", nullptr);
 }
 
 TEST_F(NegativeLayerSettings, DebugAction) {
@@ -470,7 +470,7 @@ TEST_F(NegativeLayerSettings, NotRealSetting) {
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().ExpectSuccess(kErrorBit | kWarningBit);
     Monitor().SetDesiredWarning(
-        "The setting not_a_real_setting in VkLayerSettingsCreateInfoEXT was not recognize by the Validation Layers.");
+        "The setting \"not_a_real_setting\" in VkLayerSettingsCreateInfoEXT was not recognized by the Validation Layers.");
     RETURN_IF_SKIP(InitFramework(&create_info));
     RETURN_IF_SKIP(InitState());
     Monitor().VerifyFound();
@@ -483,7 +483,7 @@ TEST_F(NegativeLayerSettings, WrongSettingType) {
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().ExpectSuccess(kErrorBit | kWarningBit);
     Monitor().SetDesiredWarning(
-        "The setting enable_message_limit in VkLayerSettingsCreateInfoEXT was set to type VK_LAYER_SETTING_TYPE_UINT32_EXT but "
+        "The setting \"enable_message_limit\" in VkLayerSettingsCreateInfoEXT was set to type VK_LAYER_SETTING_TYPE_UINT32_EXT but "
         "requires type VK_LAYER_SETTING_TYPE_BOOL32_EXT and the value may be parsed incorrectly.");
     RETURN_IF_SKIP(InitFramework(&create_info));
     RETURN_IF_SKIP(InitState());
@@ -497,7 +497,8 @@ TEST_F(NegativeLayerSettings, WrongSettingType2) {
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().ExpectSuccess(kErrorBit | kWarningBit);
     Monitor().SetDesiredWarning(
-        "The setting thread_safety in VkLayerSettingsCreateInfoEXT was set to type VK_LAYER_SETTING_TYPE_UINT32_EXT but requires "
+        "The setting \"thread_safety\" in VkLayerSettingsCreateInfoEXT was set to type VK_LAYER_SETTING_TYPE_UINT32_EXT but "
+        "requires "
         "type VK_LAYER_SETTING_TYPE_BOOL32_EXT and the value may be parsed incorrectly.");
     RETURN_IF_SKIP(InitFramework(&create_info));
     RETURN_IF_SKIP(InitState());
@@ -513,7 +514,8 @@ TEST_F(NegativeLayerSettings, DuplicateSettings) {
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 2, settings};
     Monitor().ExpectSuccess(kErrorBit | kWarningBit);
     Monitor().SetDesiredWarning(
-        "The setting enable_message_limit in VkLayerSettingsCreateInfoEXT was listed twice and only the first one listed will be "
+        "The setting \"enable_message_limit\" in VkLayerSettingsCreateInfoEXT was listed twice and only the first one listed will "
+        "be "
         "recognized");
     RETURN_IF_SKIP(InitFramework(&create_info));
     RETURN_IF_SKIP(InitState());

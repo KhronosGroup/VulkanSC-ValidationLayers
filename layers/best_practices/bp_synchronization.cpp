@@ -55,22 +55,6 @@ bool BestPractices::CheckEventSignalingState(const bp_state::CommandBufferSubSta
     return skip;
 }
 
-void BestPractices::RecordCmdSetEvent(bp_state::CommandBufferSubState& command_buffer, VkEvent event) {
-    if (auto* signaling_info = vvl::Find(command_buffer.event_signaling_state, event)) {
-        signaling_info->signaled = true;
-    } else {
-        command_buffer.event_signaling_state.emplace(event, bp_state::CommandBufferSubState::SignalingInfo(true));
-    }
-}
-
-void BestPractices::RecordCmdResetEvent(bp_state::CommandBufferSubState& command_buffer, VkEvent event) {
-    if (auto* signaling_info = vvl::Find(command_buffer.event_signaling_state, event)) {
-        signaling_info->signaled = false;
-    } else {
-        command_buffer.event_signaling_state.emplace(event, bp_state::CommandBufferSubState::SignalingInfo(false));
-    }
-}
-
 bool BestPractices::PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                                const ErrorObject& error_obj) const {
     bool skip = false;
@@ -78,13 +62,6 @@ bool BestPractices::PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, Vk
     auto& sub_state = bp_state::SubState(*cb_state);
     skip |= CheckEventSignalingState(sub_state, event, error_obj.location.dot(Field::commandBuffer));
     return skip;
-}
-
-void BestPractices::PostCallRecordCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
-                                              const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& sub_state = bp_state::SubState(*cb_state);
-    RecordCmdSetEvent(sub_state, event);
 }
 
 bool BestPractices::PreCallValidateCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
@@ -102,40 +79,9 @@ bool BestPractices::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, V
     return skip;
 }
 
-void BestPractices::PostCallRecordCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
-                                                  const VkDependencyInfoKHR* pDependencyInfo, const RecordObject& record_obj) {
-    PostCallRecordCmdSetEvent2(commandBuffer, event, pDependencyInfo, record_obj);
-}
-
-void BestPractices::PostCallRecordCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event,
-                                               const VkDependencyInfo* pDependencyInfo, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& sub_state = bp_state::SubState(*cb_state);
-    RecordCmdSetEvent(sub_state, event);
-}
-
-void BestPractices::PostCallRecordCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
-                                                const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& sub_state = bp_state::SubState(*cb_state);
-    RecordCmdResetEvent(sub_state, event);
-}
-
 bool BestPractices::PreCallValidateCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
                                                      VkPipelineStageFlags2KHR stageMask, const ErrorObject& error_obj) const {
     return PreCallValidateCmdResetEvent2(commandBuffer, event, stageMask, error_obj);
-}
-
-void BestPractices::PostCallRecordCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
-                                                    VkPipelineStageFlags2KHR stageMask, const RecordObject& record_obj) {
-    PostCallRecordCmdResetEvent2(commandBuffer, event, stageMask, record_obj);
-}
-
-void BestPractices::PostCallRecordCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
-                                                 const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& sub_state = bp_state::SubState(*cb_state);
-    RecordCmdResetEvent(sub_state, event);
 }
 
 bool BestPractices::PreCallValidateCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
@@ -452,71 +398,12 @@ bool BestPractices::ValidateCmdPipelineBarrierImageBarrier(VkCommandBuffer comma
     return skip;
 }
 
-template <typename Func>
-static void ForEachSubresource(const vvl::Image& image, const VkImageSubresourceRange& range, Func&& func) {
-    const uint32_t layer_count =
-        (range.layerCount == VK_REMAINING_ARRAY_LAYERS) ? (image.full_range.layerCount - range.baseArrayLayer) : range.layerCount;
-    const uint32_t level_count =
-        (range.levelCount == VK_REMAINING_MIP_LEVELS) ? (image.full_range.levelCount - range.baseMipLevel) : range.levelCount;
-
-    for (uint32_t i = 0; i < layer_count; ++i) {
-        const uint32_t layer = range.baseArrayLayer + i;
-        for (uint32_t j = 0; j < level_count; ++j) {
-            const uint32_t level = range.baseMipLevel + j;
-            func(layer, level);
-        }
-    }
-}
-
-template <typename ImageMemoryBarrier>
-void BestPractices::RecordCmdPipelineBarrierImageBarrier(VkCommandBuffer commandBuffer, const ImageMemoryBarrier& barrier) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-
-    // Is a queue ownership acquisition barrier
-    if (barrier.srcQueueFamilyIndex != barrier.dstQueueFamilyIndex &&
-        barrier.dstQueueFamilyIndex == cb_state->command_pool->queueFamilyIndex) {
-        auto image = Get<vvl::Image>(barrier.image);
-        ASSERT_AND_RETURN(image);
-        auto subresource_range = barrier.subresourceRange;
-        cb_state->queue_submit_functions.emplace_back(
-            [image, subresource_range](const vvl::Queue& qs, const vvl::CommandBuffer& cbs) -> bool {
-                ForEachSubresource(*image, subresource_range, [&](uint32_t layer, uint32_t level) {
-                    // Update queue family index without changing usage, signifying a correct queue family transfer
-                    auto& sub_state = bp_state::SubState(*image);
-                    sub_state.UpdateUsage(layer, level, sub_state.GetUsageType(layer, level), qs.queue_family_index);
-                });
-                return false;
-            });
-    }
-
-    if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        auto& sub_state = bp_state::SubState(*cb_state);
-        RecordResetZcullDirection(sub_state, barrier.image, barrier.subresourceRange);
-    }
-}
-
 void BestPractices::PostCallRecordCmdPipelineBarrier(
     VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
     VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
     uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
     const VkImageMemoryBarrier* pImageMemoryBarriers, const RecordObject& record_obj) {
     num_barriers_objects_ += (memoryBarrierCount + imageMemoryBarrierCount + bufferMemoryBarrierCount);
-
-    for (uint32_t i = 0; i < imageMemoryBarrierCount; ++i) {
-        RecordCmdPipelineBarrierImageBarrier(commandBuffer, pImageMemoryBarriers[i]);
-    }
-}
-
-void BestPractices::PostCallRecordCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
-                                                      const RecordObject& record_obj) {
-    for (uint32_t i = 0; i < pDependencyInfo->imageMemoryBarrierCount; ++i) {
-        RecordCmdPipelineBarrierImageBarrier(commandBuffer, pDependencyInfo->pImageMemoryBarriers[i]);
-    }
-}
-
-void BestPractices::PostCallRecordCmdPipelineBarrier2KHR(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
-                                                         const RecordObject& record_obj) {
-    PostCallRecordCmdPipelineBarrier2(commandBuffer, pDependencyInfo, record_obj);
 }
 
 bool BestPractices::PreCallValidateCreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo,

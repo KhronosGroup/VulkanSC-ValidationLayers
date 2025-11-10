@@ -105,7 +105,7 @@ vksc::Pipeline PipelineBuilder::CreatePipeline(vkt::Device& device) {
 
     if (spirv_data_.empty() && !pipeline_cache_) {
         framework_.Monitor().SetAllowedFailureMsg("VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-05081");
-        pipeline_cache_.init(device, cache_builder_->MakeCreateInfo());
+        pipeline_cache_.Init(device, cache_builder_->MakeCreateInfo());
     }
 
     return vksc::Pipeline();

@@ -20,84 +20,7 @@
 #include "best_practices/best_practices_validation.h"
 #include "best_practices/bp_state.h"
 #include "state_tracker/render_pass_state.h"
-
-void BestPractices::PostCallRecordCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
-                                                      const VkClearAttachment* pClearAttachments, uint32_t rectCount,
-                                                      const VkClearRect* pRects, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto* rp_state = cb_state->active_render_pass.get();
-    auto* fb_state = cb_state->active_framebuffer.get();
-
-    if (rectCount == 0 || !rp_state) {
-        return;
-    }
-
-    if (!cb_state->IsSecondary() && !fb_state && !rp_state->UsesDynamicRendering()) {
-        return;
-    }
-    auto& sub_state = bp_state::SubState(*cb_state);
-    // If we have a rect which covers the entire frame buffer, we have a LOAD_OP_CLEAR-like command.
-    const bool full_clear = ClearAttachmentsIsFullClear(sub_state, rectCount, pRects);
-
-    if (rp_state->UsesDynamicRendering()) {
-        if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-            auto pColorAttachments = rp_state->dynamic_rendering_begin_rendering_info.pColorAttachments;
-
-            for (uint32_t i = 0; i < attachmentCount; i++) {
-                auto& clear_attachment = pClearAttachments[i];
-
-                if (clear_attachment.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
-                    RecordResetScopeZcullDirection(sub_state);
-                }
-                if ((clear_attachment.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) &&
-                    clear_attachment.colorAttachment != VK_ATTACHMENT_UNUSED && pColorAttachments) {
-                    const auto& attachment = pColorAttachments[clear_attachment.colorAttachment];
-                    if (attachment.imageView) {
-                        if (auto image_view_state = Get<vvl::ImageView>(attachment.imageView)) {
-                            const VkFormat format = image_view_state->create_info.format;
-                            RecordClearColor(format, clear_attachment.clearValue.color);
-                        }
-                    }
-                }
-            }
-        }
-
-        // TODO: Implement other best practices for dynamic rendering
-
-    } else {
-        auto& subpass = rp_state->create_info.pSubpasses[cb_state->GetActiveSubpass()];
-        for (uint32_t i = 0; i < attachmentCount; i++) {
-            auto& attachment = pClearAttachments[i];
-            uint32_t fb_attachment = VK_ATTACHMENT_UNUSED;
-            VkImageAspectFlags aspects = attachment.aspectMask;
-
-            if (aspects & VK_IMAGE_ASPECT_DEPTH_BIT) {
-                if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-                    RecordResetScopeZcullDirection(sub_state);
-                }
-            }
-            if (aspects & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
-                if (subpass.pDepthStencilAttachment) {
-                    fb_attachment = subpass.pDepthStencilAttachment->attachment;
-                }
-            } else if (aspects & VK_IMAGE_ASPECT_COLOR_BIT) {
-                fb_attachment = subpass.pColorAttachments[attachment.colorAttachment].attachment;
-            }
-            if (fb_attachment != VK_ATTACHMENT_UNUSED) {
-                if (full_clear) {
-                    RecordAttachmentClearAttachments(sub_state, fb_attachment, attachment.colorAttachment, aspects, rectCount,
-                                                     pRects);
-                } else {
-                    RecordAttachmentAccess(sub_state, fb_attachment, aspects);
-                }
-                if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-                    const VkFormat format = rp_state->create_info.pAttachments[fb_attachment].format;
-                    RecordClearColor(format, attachment.clearValue.color);
-                }
-            }
-        }
-    }
-}
+#include "utils/assert_utils.h"
 
 bool BestPractices::ClearAttachmentsIsFullClear(const bp_state::CommandBufferSubState& cb_state, uint32_t rectCount,
                                                 const VkClearRect* pRects) const {
@@ -155,7 +78,8 @@ bool BestPractices::ValidateClearAttachment(const bp_state::CommandBufferSubStat
         const LogObjectList objlist(cb_state.Handle(), rp->Handle());
         skip |=
             LogPerformanceWarning("BestPractices-vkCmdClearAttachments-clear-after-load-color", objlist, loc,
-                                  "issued on %s for color attachment #%u in this subpass, "
+                                  "issued on %s for color attachment %" PRIu32
+                                  " in this subpass, "
                                   "but LOAD_OP_LOAD was used. If you need to clear the framebuffer, always use LOAD_OP_CLEAR as "
                                   "it is more efficient.",
                                   FormatHandle(cb_state.Handle()).c_str(), color_attachment);
@@ -361,137 +285,6 @@ bool BestPractices::PreCallValidateCmdResolveImage2(VkCommandBuffer commandBuffe
     skip |= ValidateCmdResolveImage(commandBuffer, pResolveImageInfo->srcImage, pResolveImageInfo->dstImage,
                                     error_obj.location.dot(Field::pResolveImageInfo));
     return skip;
-}
-
-void BestPractices::PostCallRecordCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                                  VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                                  const VkImageResolve* pRegions, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<vvl::Image>(srcImage);
-    auto dst = Get<vvl::Image>(dstImage);
-
-    for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
-                           pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
-                           pRegions[i].dstSubresource);
-    }
-}
-
-void BestPractices::PostCallRecordCmdResolveImage2KHR(VkCommandBuffer commandBuffer,
-                                                      const VkResolveImageInfo2KHR* pResolveImageInfo,
-                                                      const RecordObject& record_obj) {
-    PostCallRecordCmdResolveImage2(commandBuffer, pResolveImageInfo, record_obj);
-}
-
-void BestPractices::PostCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo,
-                                                   const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<vvl::Image>(pResolveImageInfo->srcImage);
-    auto dst = Get<vvl::Image>(pResolveImageInfo->dstImage);
-    uint32_t region_count = pResolveImageInfo->regionCount;
-
-    for (uint32_t i = 0; i < region_count; i++) {
-        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
-                           pResolveImageInfo->pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
-                           pResolveImageInfo->pRegions[i].dstSubresource);
-    }
-}
-
-void BestPractices::PostCallRecordCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                                     const VkClearColorValue* pColor, uint32_t rangeCount,
-                                                     const VkImageSubresourceRange* pRanges, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& funcs = cb_state->queue_submit_functions;
-    auto dst = Get<vvl::Image>(image);
-
-    for (uint32_t i = 0; i < rangeCount; i++) {
-        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
-    }
-
-    if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        RecordClearColor(dst->create_info.format, *pColor);
-    }
-}
-
-void BestPractices::PostCallRecordCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
-                                                            const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount,
-                                                            const VkImageSubresourceRange* pRanges,
-                                                            const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& funcs = cb_state->queue_submit_functions;
-    auto dst = Get<vvl::Image>(image);
-
-    for (uint32_t i = 0; i < rangeCount; i++) {
-        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
-    }
-    if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        auto& sub_state = bp_state::SubState(*cb_state);
-        for (uint32_t i = 0; i < rangeCount; i++) {
-            RecordResetZcullDirection(sub_state, image, pRanges[i]);
-        }
-    }
-}
-
-void BestPractices::PostCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                               VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                               const VkImageCopy* pRegions, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<vvl::Image>(srcImage);
-    auto dst = Get<vvl::Image>(dstImage);
-
-    for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ,
-                           pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE,
-                           pRegions[i].dstSubresource);
-    }
-}
-
-void BestPractices::PostCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
-                                                       VkImageLayout dstImageLayout, uint32_t regionCount,
-                                                       const VkBufferImageCopy* pRegions, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& funcs = cb_state->queue_submit_functions;
-    auto dst = Get<vvl::Image>(dstImage);
-
-    for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE,
-                           pRegions[i].imageSubresource);
-    }
-}
-
-void BestPractices::PostCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage,
-                                                       VkImageLayout srcImageLayout, VkBuffer dstBuffer, uint32_t regionCount,
-                                                       const VkBufferImageCopy* pRegions, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<vvl::Image>(srcImage);
-
-    for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ,
-                           pRegions[i].imageSubresource);
-    }
-}
-
-void BestPractices::PostCallRecordCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                               VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                               const VkImageBlit* pRegions, VkFilter filter, const RecordObject& record_obj) {
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto& funcs = cb_state->queue_submit_functions;
-    auto src = Get<vvl::Image>(srcImage);
-    auto dst = Get<vvl::Image>(dstImage);
-
-    for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_READ,
-                           pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_WRITE,
-                           pRegions[i].dstSubresource);
-    }
 }
 
 template <typename RegionType>

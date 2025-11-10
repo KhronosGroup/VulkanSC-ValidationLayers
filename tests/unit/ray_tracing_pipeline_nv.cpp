@@ -23,10 +23,10 @@ TEST_F(NegativeRayTracingPipelineNV, BasicUsage) {
     AddRequiredExtensions(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME);
     RETURN_IF_SKIP(NvInitFrameworkForRayTracingTest());
 
-    VkPhysicalDevicePipelineCreationCacheControlFeaturesEXT pipleline_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(pipleline_features);
+    VkPhysicalDevicePipelineCreationCacheControlFeaturesEXT pipeline_features = vku::InitStructHelper();
+    auto features2 = GetPhysicalDeviceFeatures2(pipeline_features);
     // Set this to true as it is a required feature
-    pipleline_features.pipelineCreationCacheControl = VK_TRUE;
+    pipeline_features.pipelineCreationCacheControl = VK_TRUE;
     RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     const vkt::PipelineLayout empty_pipeline_layout(*m_device, {});
@@ -54,7 +54,7 @@ TEST_F(NegativeRayTracingPipelineNV, BasicUsage) {
         pipeline_ci.pStages = &stage_create_info;
         pipeline_ci.groupCount = 1;
         pipeline_ci.pGroups = &group_create_info;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
         pipeline_ci.flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
         pipeline_ci.basePipelineIndex = -1;
         constexpr uint64_t fake_pipeline_id = 0xCADECADE;
@@ -76,7 +76,7 @@ TEST_F(NegativeRayTracingPipelineNV, BasicUsage) {
         pipeline_ci.pStages = &stage_create_info;
         pipeline_ci.groupCount = 1;
         pipeline_ci.pGroups = &group_create_info;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
         pipeline_ci.flags = VK_PIPELINE_CREATE_DEFER_COMPILE_BIT_NV | VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT;
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingPipelineCreateInfoNV-flags-02957");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -88,7 +88,7 @@ TEST_F(NegativeRayTracingPipelineNV, BasicUsage) {
         pipeline_ci.pStages = &stage_create_info;
         pipeline_ci.groupCount = 1;
         pipeline_ci.pGroups = &group_create_info;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
         pipeline_ci.flags = VK_PIPELINE_CREATE_INDIRECT_BINDABLE_BIT_NV;
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingPipelineCreateInfoNV-None-09497");
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingPipelineCreateInfoNV-flags-02904");
@@ -147,7 +147,7 @@ TEST_F(NegativeRayTracingPipelineNV, BasicUsage) {
         pipeline_ci.pStages = &stage_create_info;
         pipeline_ci.groupCount = 1;
         pipeline_ci.pGroups = &group_create_info;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
         // appending twice as it is generated twice in auto-validation code
         m_errorMonitor->SetDesiredError("VUID-vkCreateRayTracingPipelinesNV-createInfoCount-arraylength");
         m_errorMonitor->SetDesiredError("VUID-vkCreateRayTracingPipelinesNV-createInfoCount-arraylength");
@@ -212,7 +212,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = &stage_create_info;
         pipeline_ci.groupCount = 1;
         pipeline_ci.pGroups = &group_create_info;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingPipelineCreateInfoNV-stage-06232");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -252,7 +252,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
         vk::DestroyPipeline(device(), pipeline, NULL);
@@ -277,7 +277,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = &stage_create_info;
         pipeline_ci.groupCount = 1;
         pipeline_ci.pGroups = &group_create_info;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-type-02413");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -317,7 +317,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-type-02413");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -357,7 +357,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-type-02414");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -397,7 +397,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-type-02415");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -437,7 +437,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-type-02415");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -477,7 +477,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-type-02416");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -517,7 +517,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-anyHitShader-02418");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -557,7 +557,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-anyHitShader-02418");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -597,7 +597,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-closestHitShader-02417");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -637,7 +637,7 @@ TEST_F(NegativeRayTracingPipelineNV, ShaderGroups) {
         pipeline_ci.pStages = stage_create_infos;
         pipeline_ci.groupCount = 2;
         pipeline_ci.pGroups = group_create_infos;
-        pipeline_ci.layout = empty_pipeline_layout.handle();
+        pipeline_ci.layout = empty_pipeline_layout;
 
         m_errorMonitor->SetDesiredError("VUID-VkRayTracingShaderGroupCreateInfoNV-closestHitShader-02417");
         vk::CreateRayTracingPipelinesNV(*m_device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &pipeline);
@@ -683,7 +683,7 @@ TEST_F(NegativeRayTracingPipelineNV, MissingEntrypoint) {
     RETURN_IF_SKIP(NvInitFrameworkForRayTracingTest());
     RETURN_IF_SKIP(InitState());
 
-    char const missShaderText[] = R"glsl(
+    const char missShaderText[] = R"glsl(
         #version 460 core
         #extension GL_EXT_ray_tracing : enable
         layout(location = 0) rayPayloadInEXT float hitValue;

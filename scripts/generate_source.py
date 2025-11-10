@@ -70,6 +70,7 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
     from generators.dispatch_vector_generator import DispatchVectorGenerator
     from generators.function_pointers_generator import FunctionPointersOutputGenerator
     from generators.best_practices_generator import BestPracticesOutputGenerator
+    from generators.deprecation_generator import DeprecationGenerator
     from generators.spirv_validation_generator import SpirvValidationHelperOutputGenerator
     from generators.spirv_grammar_generator import SpirvGrammarHelperOutputGenerator
     from generators.command_validation_generator import CommandValidationOutputGenerator
@@ -84,6 +85,7 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
     from generators.pnext_chain_extraction_generator import PnextChainExtractionGenerator
     from generators.device_features_generator import DeviceFeaturesOutputGenerator
     from generators.feature_requirements import FeatureRequirementsGenerator
+    from generators.feature_not_present import FeatureNotPresentGenerator
     from generators.test_icd_generator import TestIcdGenerator
 
     # These set fields that are needed by both OutputGenerator and BaseGenerator,
@@ -256,6 +258,14 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
             'generator' : BestPracticesOutputGenerator,
             'genCombined': True,
         },
+        'deprecation.cpp' : {
+            'generator' : DeprecationGenerator,
+            'genCombined': True,
+        },
+        'deprecation.h' : {
+            'generator' : DeprecationGenerator,
+            'genCombined': True,
+        },
         'sync_validation_types.h' : {
             'generator' : SyncValidationOutputGenerator,
             'genCombined': True,
@@ -288,6 +298,11 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
         'spirv_tools_commit_id.h' : {
             'genCombined': False,
             'generator' : SpirvToolCommitIdOutputGenerator,
+        },
+        'command_validation.h' : {
+            'generator' : CommandValidationOutputGenerator,
+            'genCombined': True,
+            'options' : [valid_usage_file],
         },
         'command_validation.cpp' : {
             'generator' : CommandValidationOutputGenerator,
@@ -324,6 +339,10 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
         },
         'feature_requirements_helper.cpp' : {
             'generator' : FeatureRequirementsGenerator,
+            'genCombined': True,
+        },
+        'feature_not_present.cpp' : {
+            'generator' : FeatureNotPresentGenerator,
             'genCombined': True,
         },
         'test_icd_helper.h' : {
@@ -410,7 +429,8 @@ def main(argv):
         'gpuav_offline_spirv.h',
         'gpuav_offline_spirv.cpp',
         'feature_requirements_helper.h', # https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8969
-        'feature_requirements_helper.cpp'
+        'feature_requirements_helper.cpp',
+        'feature_not_present.cpp', # this single funciton really fails with various clang-format versions
     ]
 
     parser = argparse.ArgumentParser(description='Generate source code for this repository')
@@ -541,6 +561,15 @@ def main(argv):
                not filecmp.cmp(temp_filename, repo_filename, shallow=False):
                 print('update', repo_filename)
                 shutil.copyfile(temp_filename, repo_filename)
+
+    # write out the header version used to generate the code to a checked in CMake file
+    if args.generated_version:
+        # Update the CMake project version
+        with open(repo_relative('CMakeLists.txt'), "r+") as f:
+            data = f.read()
+            f.seek(0)
+            f.write(re.sub("project.*VERSION.*", f"project(VVL VERSION {args.generated_version} LANGUAGES CXX)", data))
+            f.truncate()
 
     return 0
 

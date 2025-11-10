@@ -61,11 +61,10 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
     auto pipeline_layout_state = Get<vvl::PipelineLayout>(pCreateInfo->pipelineLayout);
     auto* dynamic_layout_create = vku::FindStructInPNextChain<VkPipelineLayoutCreateInfo>(pCreateInfo->pNext);
 
-    const uint32_t kNotFound = vvl::kU32Max;
-    uint32_t execution_set_token_index = kNotFound;
-    uint32_t vertex_buffer_token_index = kNotFound;
-    uint32_t index_buffer_token_index = kNotFound;
-    uint32_t sequence_index_token_index = kNotFound;
+    uint32_t execution_set_token_index = vvl::kNoIndex32;
+    uint32_t vertex_buffer_token_index = vvl::kNoIndex32;
+    uint32_t index_buffer_token_index = vvl::kNoIndex32;
+    uint32_t sequence_index_token_index = vvl::kNoIndex32;
 
     vvl::unordered_map<uint32_t, uint32_t> vertex_binding_unit_unique;
     vvl::unordered_map<uint32_t, VkPushConstantRange> token_ranges;
@@ -126,7 +125,7 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
         // Check for duplicate tokens
         if (token.type == VK_INDIRECT_COMMANDS_TOKEN_TYPE_EXECUTION_SET_EXT) {
             // currently these 2 VUs overlap but can be helpful to catch in different times
-            if (execution_set_token_index == kNotFound) {
+            if (execution_set_token_index == vvl::kNoIndex32) {
                 execution_set_token_index = i;
                 if (i != 0) {
                     skip |= LogError(
@@ -140,7 +139,7 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
                                  execution_set_token_index);
             }
         } else if (token.type == VK_INDIRECT_COMMANDS_TOKEN_TYPE_INDEX_BUFFER_EXT) {
-            if (index_buffer_token_index == kNotFound) {
+            if (index_buffer_token_index == vvl::kNoIndex32) {
                 index_buffer_token_index = i;
             } else {
                 skip |= LogError("VUID-VkIndirectCommandsLayoutCreateInfoEXT-pTokens-11094", device, token_loc.dot(Field::type),
@@ -149,7 +148,7 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
                                  index_buffer_token_index);
             }
         } else if (token.type == VK_INDIRECT_COMMANDS_TOKEN_TYPE_SEQUENCE_INDEX_EXT) {
-            if (sequence_index_token_index == kNotFound) {
+            if (sequence_index_token_index == vvl::kNoIndex32) {
                 sequence_index_token_index = i;
             } else {
                 skip |= LogError("VUID-VkIndirectCommandsLayoutCreateInfoEXT-pTokens-11145", device, token_loc.dot(Field::type),
@@ -204,7 +203,7 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
     } else {
         if (!IsValueIn(final_token_type, {VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_INDEXED_EXT,
                                           VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_INDEXED_COUNT_EXT}) &&
-            index_buffer_token_index != kNotFound) {
+            index_buffer_token_index != vvl::kNoIndex32) {
             skip |= LogError("VUID-VkIndirectCommandsLayoutCreateInfoEXT-pTokens-11095", device,
                              create_info_loc.dot(Field::pTokens, final_token_index).dot(Field::type),
                              "is %s (not an index draw token), but pTokens[%" PRIu32
@@ -214,7 +213,7 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
         if (!IsValueIn(final_token_type,
                        {VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_INDEXED_EXT, VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_EXT,
                         VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_INDEXED_COUNT_EXT, VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_COUNT_EXT}) &&
-            vertex_buffer_token_index != kNotFound) {
+            vertex_buffer_token_index != vvl::kNoIndex32) {
             skip |= LogError("VUID-VkIndirectCommandsLayoutCreateInfoEXT-pTokens-11096", device,
                              create_info_loc.dot(Field::pTokens, final_token_index).dot(Field::type),
                              "is %s (not a non-mesh draw token), but pTokens[%" PRIu32
@@ -466,7 +465,7 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
         if (generated_commands_info.preprocessSize < mem_reqs.memoryRequirements.size) {
             skip |= LogError(
                 "VUID-VkGeneratedCommandsInfoEXT-preprocessSize-11071", cb_state.Handle(), info_loc.dot(Field::preprocessSize),
-                "(%" PRIu64 ") is less then the size returned from vkGetGeneratedCommandsMemoryRequirementsEXT (%" PRIu64 ").",
+                "(%" PRIu64 ") is less than the size returned from vkGetGeneratedCommandsMemoryRequirementsEXT (%" PRIu64 ").",
                 generated_commands_info.preprocessSize, mem_reqs.memoryRequirements.size);
         }
     }
@@ -478,57 +477,37 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
             phys_dev_ext_props.device_generated_commands_props.maxIndirectSequenceCount);
     }
 
-    const auto preprocess_buffer_states = GetBuffersByAddress(generated_commands_info.preprocessAddress);
-    if (!preprocess_buffer_states.empty()) {
-        BufferAddressValidation<2> buffer_address_validator = {{{
-            {"VUID-VkGeneratedCommandsInfoEXT-preprocessAddress-11069",
-             [](vvl::Buffer* const buffer_state, std::string* out_error_msg) {
-                 if ((buffer_state->usage & VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT) == 0) {
-                     if (out_error_msg) {
-                         *out_error_msg += "buffer has usage " + string_VkBufferUsageFlags2(buffer_state->usage);
-                     }
-                     return false;
-                 }
-                 return true;
-             },
-             []() { return "The following buffers are missing VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT"; }},
-            {"VUID-VkGeneratedCommandsInfoEXT-preprocessAddress-11070",
-             [this](vvl::Buffer* const buffer_state, std::string* out_error_msg) {
-                 return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state, out_error_msg);
-             },
-             []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }},
-        }}};
+    {
+        BufferAddressValidation<1> buffer_address_validator = {
+            {{{"VUID-VkGeneratedCommandsInfoEXT-preprocessAddress-11069",
+               [](const vvl::Buffer& buffer_state) {
+                   return (buffer_state.usage & VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT) == 0;
+               },
+               []() { return "The following buffers are missing VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT"; },
+               [](const vvl::Buffer& buffer_state) {
+                   return "buffer has usage " + string_VkBufferUsageFlags2(buffer_state.usage);
+               }}}}};
 
-        skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(
-            *this, preprocess_buffer_states, info_loc.dot(Field::preprocessAddress), LogObjectList(cb_state.Handle()),
-            generated_commands_info.preprocessAddress);
+        skip |= buffer_address_validator.ValidateDeviceAddress(*this, info_loc.dot(Field::preprocessAddress),
+                                                               LogObjectList(cb_state.Handle()),
+                                                               generated_commands_info.preprocessAddress);
     }
 
-    const auto sequence_buffer_states = GetBuffersByAddress(generated_commands_info.sequenceCountAddress);
-    if (!sequence_buffer_states.empty()) {
-        BufferAddressValidation<2> buffer_address_validator = {{{
-            {"VUID-VkGeneratedCommandsInfoEXT-sequenceCountAddress-11072",
-             [](vvl::Buffer* const buffer_state, std::string* out_error_msg) {
-                 if ((buffer_state->usage & VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT) == 0) {
-                     if (out_error_msg) {
-                         *out_error_msg += "buffer has usage " + string_VkBufferUsageFlags2(buffer_state->usage);
-                     }
-                     return false;
-                 }
-                 return true;
-             },
-             []() { return "The following buffers are missing VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT"; }},
-            {"VUID-VkGeneratedCommandsInfoEXT-sequenceCountAddress-11075",
-             [this](vvl::Buffer* const buffer_state, std::string* out_error_msg) {
-                 return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state, out_error_msg);
-             },
-             []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }},
-        }}};
+    {
+        BufferAddressValidation<1> buffer_address_validator = {{{{
+            "VUID-VkGeneratedCommandsInfoEXT-sequenceCountAddress-11072",
+            [](const vvl::Buffer& buffer_state) { return (buffer_state.usage & VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT) == 0; },
+            []() { return "The following buffers are missing VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT"; },
+            [](const vvl::Buffer& buffer_state) { return "buffer has usage " + string_VkBufferUsageFlags2(buffer_state.usage); },
+        }}}};
 
-        skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(
-            *this, sequence_buffer_states, info_loc.dot(Field::sequenceCountAddress), LogObjectList(cb_state.Handle()),
-            generated_commands_info.sequenceCountAddress);
+        skip |= buffer_address_validator.ValidateDeviceAddress(*this, info_loc.dot(Field::sequenceCountAddress),
+                                                               LogObjectList(cb_state.Handle()),
+                                                               generated_commands_info.sequenceCountAddress);
     }
+
+    skip |= ValidateDeviceAddress(info_loc.dot(Field::indirectAddress), LogObjectList(cb_state.Handle()),
+                                  generated_commands_info.indirectAddress);
 
     return skip;
 }
@@ -561,8 +540,9 @@ bool CoreChecks::PreCallValidateCmdExecuteGeneratedCommandsEXT(VkCommandBuffer c
     }
 
     if (cb_state.begin_info_flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT) {
-        LogError("VUID-vkCmdExecuteGeneratedCommandsEXT-commandBuffer-11143", commandBuffer,
-                 error_obj.location.dot(Field::commandBuffer), "was created with VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT.");
+        skip |= LogError("VUID-vkCmdExecuteGeneratedCommandsEXT-commandBuffer-11143", commandBuffer,
+                         error_obj.location.dot(Field::commandBuffer),
+                         "was created with VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT.");
     }
 
     const Location info_loc = error_obj.location.dot(Field::pGeneratedCommandsInfo);
@@ -587,7 +567,7 @@ bool CoreChecks::PreCallValidateCmdExecuteGeneratedCommandsEXT(VkCommandBuffer c
     if (const vvl::RenderPass* rp_state = cb_state.active_render_pass.get()) {
         uint32_t view_mask = 0;
         if (rp_state->UsesDynamicRendering()) {
-            view_mask = rp_state->dynamic_rendering_begin_rendering_info.viewMask;
+            view_mask = rp_state->GetDynamicRenderingViewMask();
         } else {
             const auto* render_pass_info = rp_state->create_info.ptr();
             const auto subpass_desc = render_pass_info->pSubpasses[cb_state.GetActiveSubpass()];
@@ -671,16 +651,18 @@ bool CoreChecks::ValidatePreprocessGeneratedCommandsStateCommandBuffer(const vvl
                                                                        const vvl::CommandBuffer& state_command_buffer,
                                                                        const vvl::IndirectCommandsLayout& indirect_commands_layout,
                                                                        const VkGeneratedCommandsInfoEXT& generated_commands_info,
-                                                                       const Location loc) const {
+                                                                       const Location& loc) const {
     bool skip = false;
 
-    if (state_command_buffer.state == CbState::InvalidComplete || state_command_buffer.state == CbState::InvalidIncomplete) {
+    if (state_command_buffer.state == CbState::InvalidIncomplete) {
         skip |= ReportInvalidCommandBuffer(state_command_buffer, loc.dot(Field::stateCommandBuffer),
                                            "VUID-vkCmdPreprocessGeneratedCommandsEXT-stateCommandBuffer-11138");
-    } else if (CbState::Recording != state_command_buffer.state) {
+    } else if (!IsRecording(state_command_buffer.state)) {
         const LogObjectList objlist(command_buffer.Handle(), state_command_buffer.Handle());
         skip |= LogError("VUID-vkCmdPreprocessGeneratedCommandsEXT-stateCommandBuffer-11138", objlist,
-                         loc.dot(Field::stateCommandBuffer), "is not in a recording state.");
+                         loc.dot(Field::stateCommandBuffer),
+                         "(%s) is not in a recording state. vkBeginCommandBuffer() must first be called.",
+                         FormatHandle(state_command_buffer).c_str());
     }
 
     if (auto indirect_execution_set = Get<vvl::IndirectExecutionSet>(generated_commands_info.indirectExecutionSet)) {
@@ -1004,7 +986,7 @@ bool CoreChecks::PreCallValidateUpdateIndirectExecutionSetShaderEXT(VkDevice dev
         if (set_shader.index >= indirect_execution_set->max_shader_count) {
             skip |= LogError("VUID-VkWriteIndirectExecutionSetShaderEXT-index-11031", device, set_write_loc.dot(Field::index),
                              "(%" PRIu32
-                             ") is not less then the sum of VkIndirectExecutionSetShaderInfoEXT::maxShaderCount (%" PRIu32 ").",
+                             ") is not less than the sum of VkIndirectExecutionSetShaderInfoEXT::maxShaderCount (%" PRIu32 ").",
                              set_shader.index, indirect_execution_set->max_shader_count);
         }
 

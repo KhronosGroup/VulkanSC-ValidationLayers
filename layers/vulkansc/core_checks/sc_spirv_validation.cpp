@@ -113,7 +113,8 @@ bool Instance::ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device,
         spv_const_binary_t binary{code.data(), code.size()};
         spv_diagnostic diag = nullptr;
         spvtools::ValidatorOptions options;
-        AdjustValidatorOptions(extensions, stateless_spirv_validator.enabled_features, options, nullptr);
+        std::string spirv_val_command{};
+        AdjustValidatorOptions(extensions, stateless_spirv_validator.enabled_features, spirv_environment, options, nullptr, spirv_val_command);
         spv_valid = spvValidateWithOptions(ctx, options, &binary, &diag);
         if (spv_valid != SPV_SUCCESS) {
             if (spv_valid == SPV_WARNING) {
@@ -134,7 +135,7 @@ bool Instance::ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device,
 
         if (spv_valid == SPV_SUCCESS || spv_valid == SPV_WARNING) {
             spirv::StatelessData stateless_data{};
-            spirv::Module temp_module(code.size() * sizeof(uint32_t), code.data(), &stateless_data);
+            spirv::Module temp_module(code.size() * sizeof(uint32_t), code.data(), true, true, &stateless_data);
 
             if (stateless_data.atomic_inst.size() > 0 &&
                 (stateless_spirv_validator.enabled_features.shaderAtomicInstructions == VK_FALSE)) {
@@ -157,6 +158,11 @@ bool Device::ValidatePipelineStageInfo(uint32_t stage_index, const VkPipelineSha
                                        const vvl::sc::PipelineCache* pipeline_cache_state,
                                        const VkPipelineOfflineCreateInfo* offline_info, const Location& loc) const {
     bool skip = false;
+
+    if (disabled[shader_validation]) {
+        // If shader validation is disabled, then these are not expected to be validated
+        return skip;
+    }
 
     if (!pipeline_cache_state || !offline_info) return skip;
 

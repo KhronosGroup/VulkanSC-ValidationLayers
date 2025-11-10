@@ -2,6 +2,7 @@
  * Copyright (c) 2015-2016, 2020-2025 The Khronos Group Inc.
  * Copyright (c) 2015-2016, 2020-2025 Valve Corporation
  * Copyright (c) 2015-2016, 2020-2025 LunarG, Inc.
+ * Copyright (C) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,6 +57,7 @@ class CommandPool;
 class Swapchain;
 class IndirectCommandsLayout;
 class IndirectExecutionSet;
+class Tensor;
 
 std::vector<VkLayerProperties> GetGlobalLayers();
 std::vector<VkExtensionProperties> GetGlobalExtensions();
@@ -134,7 +136,7 @@ class NonDispHandle : public Handle<T> {
 
     void SetDevice(VkDevice device) { dev_handle_ = device; }
 
-    void destroy() noexcept { dev_handle_ = VK_NULL_HANDLE; }
+    void Destroy() noexcept { dev_handle_ = VK_NULL_HANDLE; }
 
   public:
     void SetName(VkObjectType object_type, const char *name) { Handle<T>::SetName(dev_handle_, object_type, name); }
@@ -239,6 +241,7 @@ class Device : public internal::Handle<VkDevice> {
     const std::vector<Queue *> &QueuesWithComputeCapability() const { return queues_[COMPUTE]; }
     const std::vector<Queue *> &QueuesWithTransferCapability() const { return queues_[TRANSFER]; }
     const std::vector<Queue *> &QueuesWithSparseCapability() const { return queues_[SPARSE]; }
+    const std::vector<Queue *> &QueuesWithDataGraphCapability() const { return queues_[DATA_GRAPH]; }
 
     using QueueFamilyQueues = std::vector<std::unique_ptr<Queue>>;
     const QueueFamilyQueues &QueuesFromFamily(uint32_t queue_family) const;
@@ -262,7 +265,7 @@ class Device : public internal::Handle<VkDevice> {
     std::optional<uint32_t> NonGraphicsQueueFamily() const;
     Queue *NonGraphicsQueue() const;
 
-    uint32_t graphics_queue_node_index_ = vvl::kU32Max;
+    uint32_t graphics_queue_node_index_ = vvl::kNoIndex32;
 
     const PhysicalDevice physical_device_;
 
@@ -305,7 +308,8 @@ class Device : public internal::Handle<VkDevice> {
         SPARSE = 3,
         VIDEO_DECODE = 4,
         VIDEO_ENCODE = 5,
-        QUEUE_CAPABILITY_COUNT = 6,
+        DATA_GRAPH = 6,
+        QUEUE_CAPABILITY_COUNT = 7,
     };
 
     void InitQueues(const VkDeviceCreateInfo &info);
@@ -320,14 +324,14 @@ class Device : public internal::Handle<VkDevice> {
 class DeviceMemory : public internal::NonDispHandle<VkDeviceMemory> {
   public:
     DeviceMemory() = default;
-    DeviceMemory(const Device &dev, const VkMemoryAllocateInfo &info) { init(dev, info); }
+    DeviceMemory(const Device &dev, const VkMemoryAllocateInfo &info) { Init(dev, info); }
     ~DeviceMemory() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
     DeviceMemory &operator=(DeviceMemory &&) = default;
 
     // vkAllocateMemory()
     // Fails the test when allocation is unsuccessful
-    void init(const Device &dev, const VkMemoryAllocateInfo &info);
+    void Init(const Device &dev, const VkMemoryAllocateInfo &info);
     // Does not fail the test when allocation is unsuccessful and instead returns error code
     VkResult TryInit(const Device &dev, const VkMemoryAllocateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkDeviceMemory>::SetName(VK_OBJECT_TYPE_DEVICE_MEMORY, name); }
@@ -356,7 +360,7 @@ class Fence : public internal::NonDispHandle<VkFence> {
     Fence(Fence &&rhs) noexcept : NonDispHandle(std::move(rhs)) {}
     Fence &operator=(Fence &&) noexcept;
     ~Fence() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateFence()
     void Init(const Device &dev, const VkFenceCreateInfo &info);
@@ -383,14 +387,14 @@ class Semaphore : public internal::NonDispHandle<VkSemaphore> {
   public:
     Semaphore() = default;
     Semaphore(const Device &dev, VkSemaphoreType type = VK_SEMAPHORE_TYPE_BINARY, uint64_t initial_value = 0);
-    Semaphore(const Device &dev, const VkSemaphoreCreateInfo &info) { init(dev, info); }
+    Semaphore(const Device &dev, const VkSemaphoreCreateInfo &info) { Init(dev, info); }
     Semaphore(Semaphore &&rhs) noexcept : NonDispHandle(std::move(rhs)) {}
     Semaphore &operator=(Semaphore &&) noexcept;
     ~Semaphore() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateSemaphore()
-    void init(const Device &dev, const VkSemaphoreCreateInfo &info);
+    void Init(const Device &dev, const VkSemaphoreCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkSemaphore>::SetName(VK_OBJECT_TYPE_SEMAPHORE, name); }
 
     VkResult Wait(uint64_t value, uint64_t timeout);
@@ -412,13 +416,13 @@ inline const Semaphore no_semaphore;  // equivalent to vkt::Semaphore{}
 class Event : public internal::NonDispHandle<VkEvent> {
   public:
     Event() = default;
-    Event(const Device &dev) { init(dev, CreateInfo(0)); }
-    Event(const Device &dev, const VkEventCreateInfo &info) { init(dev, info); }
+    Event(const Device &dev) { Init(dev, CreateInfo(0)); }
+    Event(const Device &dev, const VkEventCreateInfo &info) { Init(dev, info); }
     ~Event() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateEvent()
-    void init(const Device &dev, const VkEventCreateInfo &info);
+    void Init(const Device &dev, const VkEventCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkEvent>::SetName(VK_OBJECT_TYPE_EVENT, name); }
 
     // vkGetEventStatus()
@@ -526,16 +530,16 @@ class Queue : public internal::Handle<VkQueue> {
 class QueryPool : public internal::NonDispHandle<VkQueryPool> {
   public:
     QueryPool() = default;
-    QueryPool(const Device &dev, const VkQueryPoolCreateInfo &info) { init(dev, info); }
+    QueryPool(const Device &dev, const VkQueryPoolCreateInfo &info) { Init(dev, info); }
     QueryPool(const Device &dev, VkQueryType query_type, uint32_t query_count) {
         VkQueryPoolCreateInfo info = CreateInfo(query_type, query_count);
-        init(dev, info);
+        Init(dev, info);
     }
     ~QueryPool() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateQueryPool()
-    void init(const Device &dev, const VkQueryPoolCreateInfo &info);
+    void Init(const Device &dev, const VkQueryPoolCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkQueryPool>::SetName(VK_OBJECT_TYPE_QUERY_POOL, name); }
 
     // vkGetQueryPoolResults()
@@ -556,11 +560,11 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
     explicit Buffer() : NonDispHandle(), create_info_(vku::InitStruct<decltype(create_info_)>()) {}
     explicit Buffer(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props = 0,
                     void *alloc_info_pnext = nullptr) {
-        init(dev, info, mem_props, alloc_info_pnext);
+        Init(dev, info, mem_props, alloc_info_pnext);
     }
     explicit Buffer(const Device &dev, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags mem_props = 0,
                     void *alloc_info_pnext = nullptr) {
-        init(dev, size, usage, mem_props, alloc_info_pnext);
+        Init(dev, size, usage, mem_props, alloc_info_pnext);
     }
     explicit Buffer(const Device &dev, const VkBufferCreateInfo &info, NoMemT) { InitNoMemory(dev, info); }
 
@@ -569,7 +573,7 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
         usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;  // always add
         VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
         allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-        init(dev, CreateInfo(size, usage), VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        Init(dev, CreateInfo(size, usage), VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
              &allocate_flag_info);
     }
 
@@ -581,14 +585,14 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
     Buffer(Buffer &&rhs) noexcept;
     Buffer &operator=(Buffer &&rhs) noexcept;
     ~Buffer() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateBuffer()
-    void init(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props = 0,
+    void Init(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props = 0,
               void *alloc_info_pnext = nullptr);
-    void init(const Device &dev, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags mem_props = 0,
+    void Init(const Device &dev, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags mem_props = 0,
               void *alloc_info_pnext = nullptr, const vvl::span<uint32_t> &queue_families = {}) {
-        init(dev, CreateInfo(size, usage, queue_families), mem_props, alloc_info_pnext);
+        Init(dev, CreateInfo(size, usage, queue_families), mem_props, alloc_info_pnext);
     }
     void InitHostVisibleWithData(const Device &dev, VkBufferUsageFlags usage, const void *data, size_t data_size,
                                  const vvl::span<uint32_t> &queue_families = {});
@@ -657,16 +661,16 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
 class BufferView : public internal::NonDispHandle<VkBufferView> {
   public:
     BufferView() = default;
-    BufferView(const Device &dev, const VkBufferViewCreateInfo &info) { init(dev, info); }
+    BufferView(const Device &dev, const VkBufferViewCreateInfo &info) { Init(dev, info); }
     BufferView(const Device &dev, VkBuffer buffer, VkFormat format, VkDeviceSize offset = 0, VkDeviceSize range = VK_WHOLE_SIZE) {
         VkBufferViewCreateInfo buffer_view_ci = CreateInfo(buffer, format, offset, range);
-        init(dev, buffer_view_ci);
+        Init(dev, buffer_view_ci);
     }
     ~BufferView() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateBufferView()
-    void init(const Device &dev, const VkBufferViewCreateInfo &info);
+    void Init(const Device &dev, const VkBufferViewCreateInfo &info);
     static VkBufferViewCreateInfo CreateInfo(VkBuffer buffer, VkFormat format, VkDeviceSize offset = 0,
                                              VkDeviceSize range = VK_WHOLE_SIZE);
     void SetName(const char *name) { NonDispHandle<VkBufferView>::SetName(VK_OBJECT_TYPE_BUFFER_VIEW, name); }
@@ -695,7 +699,7 @@ class Image : public internal::NonDispHandle<VkImage> {
     Image &operator=(Image &&rhs) noexcept;
 
     ~Image() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     void Init(const Device &dev, const VkImageCreateInfo &info, VkMemoryPropertyFlags mem_props = 0,
               void *alloc_info_pnext = nullptr);
@@ -785,7 +789,7 @@ class Image : public internal::NonDispHandle<VkImage> {
 class ImageView : public internal::NonDispHandle<VkImageView> {
   public:
     explicit ImageView() = default;
-    explicit ImageView(const Device &dev, const VkImageViewCreateInfo &info) { init(dev, info); }
+    explicit ImageView(const Device &dev, const VkImageViewCreateInfo &info) { Init(dev, info); }
     ImageView(ImageView &&rhs) noexcept : NonDispHandle(std::move(rhs)) {}
     ImageView &operator=(ImageView &&src) noexcept {
         this->~ImageView();
@@ -793,23 +797,23 @@ class ImageView : public internal::NonDispHandle<VkImageView> {
         return *this;
     }
     ~ImageView() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateImageView()
-    void init(const Device &dev, const VkImageViewCreateInfo &info);
+    void Init(const Device &dev, const VkImageViewCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkImageView>::SetName(VK_OBJECT_TYPE_IMAGE_VIEW, name); }
 };
 
 class AccelerationStructureNV : public internal::NonDispHandle<VkAccelerationStructureNV> {
   public:
     explicit AccelerationStructureNV(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory = true) {
-        init(dev, info, init_memory);
+        Init(dev, info, init_memory);
     }
     ~AccelerationStructureNV() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateAccelerationStructureNV
-    void init(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory = true);
+    void Init(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory = true);
     void SetName(const char *name) {
         NonDispHandle<VkAccelerationStructureNV>::SetName(VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV, name);
     }
@@ -833,14 +837,14 @@ class AccelerationStructureNV : public internal::NonDispHandle<VkAccelerationStr
 class ShaderModule : public internal::NonDispHandle<VkShaderModule> {
   public:
     ShaderModule() = default;
-    ShaderModule(const Device &dev, const VkShaderModuleCreateInfo &info) { init(dev, info); }
+    ShaderModule(const Device &dev, const VkShaderModuleCreateInfo &info) { Init(dev, info); }
     ShaderModule(ShaderModule &&rhs) noexcept : NonDispHandle(std::move(rhs)) {}
     ShaderModule &operator=(ShaderModule &&rhs) noexcept;
     ~ShaderModule() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateShaderModule()
-    void init(const Device &dev, const VkShaderModuleCreateInfo &info);
+    void Init(const Device &dev, const VkShaderModuleCreateInfo &info);
     VkResult InitTry(const Device &dev, const VkShaderModuleCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkShaderModule>::SetName(VK_OBJECT_TYPE_SHADER_MODULE, name); }
 
@@ -851,7 +855,7 @@ class Shader : public internal::NonDispHandle<VkShaderEXT> {
   public:
     Shader() = default;
     Shader(const Device &dev, VkShaderEXT shader) { NonDispHandle::init(dev.handle(), shader); }
-    Shader(const Device &dev, const VkShaderCreateInfoEXT &info) { init(dev, info); }
+    Shader(const Device &dev, const VkShaderCreateInfoEXT &info) { Init(dev, info); }
     Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint32_t> &spv,
            const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange *pushConstRange = nullptr);
     Shader(const Device &dev, const VkShaderStageFlagBits stage, const char* code,
@@ -859,10 +863,10 @@ class Shader : public internal::NonDispHandle<VkShaderEXT> {
     Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint8_t> &binary,
            const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange *pushConstRange = nullptr);
     ~Shader() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateShaderModule()
-    void init(const Device &dev, const VkShaderCreateInfoEXT &info);
+    void Init(const Device &dev, const VkShaderCreateInfoEXT &info);
     VkResult InitTry(const Device &dev, const VkShaderCreateInfoEXT &info);
     void SetName(const char *name) { NonDispHandle<VkShaderEXT>::SetName(VK_OBJECT_TYPE_SHADER_EXT, name); }
 };
@@ -870,40 +874,43 @@ class Shader : public internal::NonDispHandle<VkShaderEXT> {
 class PipelineCache : public internal::NonDispHandle<VkPipelineCache> {
   public:
     PipelineCache() = default;
-    PipelineCache(const Device &dev, const VkPipelineCacheCreateInfo &info) { init(dev, info); }
+    PipelineCache(const Device &dev, const VkPipelineCacheCreateInfo &info) { Init(dev, info); }
     ~PipelineCache() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
-    void init(const Device &dev, const VkPipelineCacheCreateInfo &info);
+    void Init(const Device &dev, const VkPipelineCacheCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkPipelineCache>::SetName(VK_OBJECT_TYPE_PIPELINE_CACHE, name); }
 };
 
 class Pipeline : public internal::NonDispHandle<VkPipeline> {
   public:
     Pipeline() = default;
-    Pipeline(const Device &dev, const VkGraphicsPipelineCreateInfo &info) { init(dev, info); }
+    Pipeline(const Device &dev, const VkGraphicsPipelineCreateInfo &info) { Init(dev, info); }
     Pipeline(const Device &dev, const VkGraphicsPipelineCreateInfo &info, const VkPipeline basePipeline) {
-        init(dev, info, basePipeline);
+        Init(dev, info, basePipeline);
     }
-    Pipeline(const Device &dev, const VkComputePipelineCreateInfo &info) { init(dev, info); }
-    Pipeline(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info) { init(dev, info); }
+    Pipeline(const Device &dev, const VkComputePipelineCreateInfo &info) { Init(dev, info); }
+    Pipeline(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info) { Init(dev, info); }
+    Pipeline(const Device &dev, const VkDataGraphPipelineCreateInfoARM &info) { Init(dev, info); }
     ~Pipeline() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateGraphicsPipeline()
-    void init(const Device &dev, const VkGraphicsPipelineCreateInfo &info);
+    void Init(const Device &dev, const VkGraphicsPipelineCreateInfo &info);
     // vkCreateGraphicsPipelineDerivative()
-    void init(const Device &dev, const VkGraphicsPipelineCreateInfo &info, const VkPipeline basePipeline);
+    void Init(const Device &dev, const VkGraphicsPipelineCreateInfo &info, const VkPipeline basePipeline);
     // vkCreateComputePipeline()
-    void init(const Device &dev, const VkComputePipelineCreateInfo &info);
+    void Init(const Device &dev, const VkComputePipelineCreateInfo &info);
     // vkCreateRayTracingPipelinesKHR
-    void init(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info);
+    void Init(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info);
     // vkCreateRayTracingPipelinesKHR with deferredOperation
     void InitDeferred(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info, VkDeferredOperationKHR deferred_op);
+    // vkCreateDataGraphPipelinesARM
+    void Init(const Device &dev, const VkDataGraphPipelineCreateInfoARM &info);
     // vkLoadPipeline()
-    void init(const Device &dev, size_t size, const void *data);
+    void Init(const Device &dev, size_t size, const void *data);
     // vkLoadPipelineDerivative()
-    void init(const Device &dev, size_t size, const void *data, VkPipeline basePipeline);
+    void Init(const Device &dev, size_t size, const void *data, VkPipeline basePipeline);
 
     // vkCreateGraphicsPipeline with error return
     VkResult InitTry(const Device &dev, const VkGraphicsPipelineCreateInfo &info);
@@ -914,9 +921,9 @@ class PipelineLayout : public internal::NonDispHandle<VkPipelineLayout> {
   public:
     PipelineLayout() noexcept : NonDispHandle() {}
     PipelineLayout(const Device &dev, VkPipelineLayoutCreateInfo &info, const std::vector<const DescriptorSetLayout *> &layouts) {
-        init(dev, info, layouts);
+        Init(dev, info, layouts);
     }
-    PipelineLayout(const Device &dev, VkPipelineLayoutCreateInfo &info) { init(dev, info); }
+    PipelineLayout(const Device &dev, VkPipelineLayoutCreateInfo &info) { Init(dev, info); }
     PipelineLayout(const Device &dev, const std::vector<const DescriptorSetLayout *> &layouts = {},
                    const std::vector<VkPushConstantRange> &push_constant_ranges = {},
                    VkPipelineLayoutCreateFlags flags = static_cast<VkPipelineLayoutCreateFlags>(0)) {
@@ -925,10 +932,10 @@ class PipelineLayout : public internal::NonDispHandle<VkPipelineLayout> {
         info.pushConstantRangeCount = static_cast<uint32_t>(push_constant_ranges.size());
         info.pPushConstantRanges = push_constant_ranges.data();
 
-        init(dev, info, layouts);
+        Init(dev, info, layouts);
     }
     ~PipelineLayout() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // Move constructor for Visual Studio 2013
     PipelineLayout(PipelineLayout &&src) noexcept : NonDispHandle(std::move(src)){};
@@ -940,34 +947,34 @@ class PipelineLayout : public internal::NonDispHandle<VkPipelineLayout> {
     };
 
     // vCreatePipelineLayout()
-    void init(const Device &dev, VkPipelineLayoutCreateInfo &info, const std::vector<const DescriptorSetLayout *> &layouts);
-    void init(const Device &dev, VkPipelineLayoutCreateInfo &info);
+    void Init(const Device &dev, VkPipelineLayoutCreateInfo &info, const std::vector<const DescriptorSetLayout *> &layouts);
+    void Init(const Device &dev, VkPipelineLayoutCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkPipelineLayout>::SetName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, name); }
 };
 
 class Sampler : public internal::NonDispHandle<VkSampler> {
   public:
     Sampler() = default;
-    Sampler(const Device &dev, const VkSamplerCreateInfo &info) { init(dev, info); }
+    Sampler(const Device &dev, const VkSamplerCreateInfo &info) { Init(dev, info); }
     ~Sampler() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateSampler()
-    void init(const Device &dev, const VkSamplerCreateInfo &info);
+    void Init(const Device &dev, const VkSamplerCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkSampler>::SetName(VK_OBJECT_TYPE_SAMPLER, name); }
 };
 
 class DescriptorSetLayout : public internal::NonDispHandle<VkDescriptorSetLayout> {
   public:
     DescriptorSetLayout() = default;
-    DescriptorSetLayout(const Device &dev, const VkDescriptorSetLayoutCreateInfo &info) { init(dev, info); }
+    DescriptorSetLayout(const Device &dev, const VkDescriptorSetLayoutCreateInfo &info) { Init(dev, info); }
     DescriptorSetLayout(const Device &dev, const std::vector<VkDescriptorSetLayoutBinding> &descriptor_set_bindings = {},
                         VkDescriptorSetLayoutCreateFlags flags = 0, void *pNext = nullptr) {
         VkDescriptorSetLayoutCreateInfo info = vku::InitStructHelper(pNext);
         info.flags = flags;
         info.bindingCount = static_cast<uint32_t>(descriptor_set_bindings.size());
         info.pBindings = descriptor_set_bindings.data();
-        init(dev, info);
+        Init(dev, info);
     }
     DescriptorSetLayout(const Device &dev, const VkDescriptorSetLayoutBinding &descriptor_set_binding,
                         VkDescriptorSetLayoutCreateFlags flags = 0, void *pNext = nullptr) {
@@ -975,44 +982,43 @@ class DescriptorSetLayout : public internal::NonDispHandle<VkDescriptorSetLayout
         info.flags = flags;
         info.bindingCount = 1;
         info.pBindings = &descriptor_set_binding;
-        init(dev, info);
+        Init(dev, info);
     }
     ~DescriptorSetLayout() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     DescriptorSetLayout(DescriptorSetLayout &&src) noexcept : NonDispHandle(std::move(src)){};
 
     DescriptorSetLayout &operator=(DescriptorSetLayout &&src) noexcept {
-        destroy();
+        Destroy();
         this->NonDispHandle::operator=(std::move(src));
         return *this;
     }
 
     // vkCreateDescriptorSetLayout()
-    void init(const Device &dev, const VkDescriptorSetLayoutCreateInfo &info);
+    void Init(const Device &dev, const VkDescriptorSetLayoutCreateInfo &info);
+
+    // vkGetDescriptorSetLayoutSizeEXT
+    VkDeviceSize GetDescriptorBufferSize() const;
+    // vkGetDescriptorSetLayoutBindingOffsetEXT
+    VkDeviceSize GetDescriptorBufferBindingOffset(uint32_t binding) const;
 };
 
 class DescriptorPool : public internal::NonDispHandle<VkDescriptorPool> {
   public:
     DescriptorPool() = default;
-    DescriptorPool(const Device &dev, const VkDescriptorPoolCreateInfo &info) { init(dev, info); }
+    DescriptorPool(const Device &dev, const VkDescriptorPoolCreateInfo &info) { Init(dev, info); }
     ~DescriptorPool() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateDescriptorPool()
-    void init(const Device &dev, const VkDescriptorPoolCreateInfo &info);
+    void Init(const Device &dev, const VkDescriptorPoolCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkDescriptorPool>::SetName(VK_OBJECT_TYPE_DESCRIPTOR_POOL, name); }
 
     // vkResetDescriptorPool()
     void Reset();
 
-    // vkFreeDescriptorSet()
     bool GetDynamicUsage() { return dynamic_usage_; }
-
-    // vkAllocateDescriptorSets()
-    std::vector<DescriptorSet *> AllocateSets(const Device &dev, const std::vector<const DescriptorSetLayout *> &layouts);
-    std::vector<DescriptorSet *> AllocateSets(const Device &dev, const DescriptorSetLayout &layout, uint32_t count);
-    DescriptorSet *AllocateSets(const Device &dev, const DescriptorSetLayout &layout);
 
     template <typename PoolSizes>
     static VkDescriptorPoolCreateInfo CreateInfo(VkDescriptorPoolCreateFlags flags, uint32_t max_sets, const PoolSizes &pool_sizes);
@@ -1036,7 +1042,7 @@ inline VkDescriptorPoolCreateInfo DescriptorPool::CreateInfo(VkDescriptorPoolCre
 class DescriptorSet : public internal::NonDispHandle<VkDescriptorSet> {
   public:
     ~DescriptorSet() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     explicit DescriptorSet() : NonDispHandle() {}
     explicit DescriptorSet(const Device &dev, DescriptorPool *pool, VkDescriptorSet set) : NonDispHandle(dev.handle(), set) {
@@ -1051,7 +1057,7 @@ class DescriptorSet : public internal::NonDispHandle<VkDescriptorSet> {
 class DescriptorUpdateTemplate : public internal::NonDispHandle<VkDescriptorUpdateTemplate> {
   public:
     ~DescriptorUpdateTemplate() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     explicit DescriptorUpdateTemplate() : NonDispHandle() {}
     explicit DescriptorUpdateTemplate(const Device &dev, const VkDescriptorUpdateTemplateCreateInfo &info) { Init(dev, info); }
@@ -1064,7 +1070,7 @@ class DescriptorUpdateTemplate : public internal::NonDispHandle<VkDescriptorUpda
 class CommandPool : public internal::NonDispHandle<VkCommandPool> {
   public:
     ~CommandPool() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     explicit CommandPool() : NonDispHandle() {}
     explicit CommandPool(const Device &dev, const VkCommandPoolCreateInfo &info) { Init(dev, info); }
@@ -1077,12 +1083,11 @@ class CommandPool : public internal::NonDispHandle<VkCommandPool> {
 class CommandBuffer : public internal::Handle<VkCommandBuffer> {
   public:
     ~CommandBuffer() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     explicit CommandBuffer() : Handle() {}
-    explicit CommandBuffer(const Device &dev, const VkCommandBufferAllocateInfo &info) { init(dev, info); }
-    explicit CommandBuffer(const Device &dev, const CommandPool &pool,
-                           VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY) {
+    CommandBuffer(const Device &dev, const VkCommandBufferAllocateInfo &info) { Init(dev, info); }
+    CommandBuffer(const Device &dev, const CommandPool &pool, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY) {
         Init(dev, pool, level);
     }
     CommandBuffer(CommandBuffer &&rhs) noexcept : Handle(std::move(rhs)) {
@@ -1093,7 +1098,7 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     }
 
     // vkAllocateCommandBuffers()
-    void init(const Device &dev, const VkCommandBufferAllocateInfo &info);
+    void Init(const Device &dev, const VkCommandBufferAllocateInfo &info);
     void Init(const Device &dev, const CommandPool &pool, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     void SetName(const Device &device, const char *name) {
         Handle<VkCommandBuffer>::SetName(device.handle(), VK_OBJECT_TYPE_COMMAND_BUFFER, name);
@@ -1174,23 +1179,23 @@ class RenderPass : public internal::NonDispHandle<VkRenderPass> {
   public:
     RenderPass() = default;
     // vkCreateRenderPass()
-    RenderPass(const Device &dev, const VkRenderPassCreateInfo &info) { init(dev, info); }
+    RenderPass(const Device &dev, const VkRenderPassCreateInfo &info) { Init(dev, info); }
     // vkCreateRenderPass2()
-    RenderPass(const Device &dev, const VkRenderPassCreateInfo2 &info) { init(dev, info); }
+    RenderPass(const Device &dev, const VkRenderPassCreateInfo2 &info) { Init(dev, info); }
     ~RenderPass() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateRenderPass()
-    void init(const Device &dev, const VkRenderPassCreateInfo &info);
+    void Init(const Device &dev, const VkRenderPassCreateInfo &info);
     // vkCreateRenderPass2()
-    void init(const Device &dev, const VkRenderPassCreateInfo2 &info);
+    void Init(const Device &dev, const VkRenderPassCreateInfo2 &info);
     void SetName(const char *name) { NonDispHandle<VkRenderPass>::SetName(VK_OBJECT_TYPE_RENDER_PASS, name); }
 };
 
 class Framebuffer : public internal::NonDispHandle<VkFramebuffer> {
   public:
     Framebuffer() = default;
-    Framebuffer(const Device &dev, const VkFramebufferCreateInfo &info) { init(dev, info); }
+    Framebuffer(const Device &dev, const VkFramebufferCreateInfo &info) { Init(dev, info); }
     // The most common case, anything outside of this should create there own VkFramebufferCreateInfo
     Framebuffer(const Device &dev, VkRenderPass rp, uint32_t attchment_count, const VkImageView *attchments, uint32_t width = 32,
                 uint32_t height = 32) {
@@ -1201,25 +1206,25 @@ class Framebuffer : public internal::NonDispHandle<VkFramebuffer> {
         info.width = width;
         info.height = height;
         info.layers = 1;
-        init(dev, info);
+        Init(dev, info);
     }
     ~Framebuffer() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     // vkCreateFramebuffer()
-    void init(const Device &dev, const VkFramebufferCreateInfo &info);
+    void Init(const Device &dev, const VkFramebufferCreateInfo &info);
     void SetName(const char *name) { NonDispHandle<VkFramebuffer>::SetName(VK_OBJECT_TYPE_FRAMEBUFFER, name); }
 };
 
 class SamplerYcbcrConversion : public internal::NonDispHandle<VkSamplerYcbcrConversion> {
   public:
     SamplerYcbcrConversion() = default;
-    SamplerYcbcrConversion(const Device &dev, VkFormat format) { init(dev, DefaultConversionInfo(format)); }
-    SamplerYcbcrConversion(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info) { init(dev, info); }
+    SamplerYcbcrConversion(const Device &dev, VkFormat format) { Init(dev, DefaultConversionInfo(format)); }
+    SamplerYcbcrConversion(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info) { Init(dev, info); }
     ~SamplerYcbcrConversion() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
-    void init(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info);
+    void Init(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info);
     void SetName(const char *name) {
         NonDispHandle<VkSamplerYcbcrConversion>::SetName(VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION, name);
     }
@@ -1242,6 +1247,74 @@ inline VkBufferCreateInfo Buffer::CreateInfo(VkDeviceSize size, VkFlags usage, c
 
     return info;
 }
+
+class Tensor : public internal::NonDispHandle<VkTensorARM> {
+  public:
+    explicit Tensor();
+    explicit Tensor(const Device &dev, const bool is_copy_tensor = false);
+    explicit Tensor(const Device &dev, const VkTensorDescriptionARM &desc);
+    explicit Tensor(const Device &dev, const VkTensorCreateInfoARM &info);
+    ~Tensor() noexcept;
+    void Destroy() noexcept;
+
+    // vkCreateTensor()
+    void InitNoMem(const Device &dev, const VkTensorCreateInfoARM &info);
+
+    const VkMemoryRequirements2 &GetMemoryReqs();
+    void BindToMem(VkFlags required_flags = 0, VkFlags forbidden_flags = 0);
+    VkFormat Format() const { return description_.format; }
+    uint32_t DimensionCount() const { return description_.dimensionCount; }
+    const VkTensorDescriptionARM &Description() const { return description_; }
+
+  private:
+    const Device *device_ = nullptr;
+    VkTensorCreateInfoARM create_info_;
+    VkTensorDescriptionARM description_;
+    VkTensorMemoryRequirementsInfoARM mem_req_info_;
+    VkMemoryRequirements2 mem_reqs_;
+    std::vector<int64_t> dimensions_;
+    std::vector<int64_t> strides_;
+    vkt::DeviceMemory memory_;
+};
+
+class TensorView : public internal::NonDispHandle<VkTensorViewARM> {
+  public:
+    TensorView() = default;
+    explicit TensorView(const Device &dev, const VkTensorViewCreateInfoARM &info);
+    ~TensorView() noexcept;
+    void Destroy() noexcept;
+
+    // vkCreateTensorViewARM
+    void Init(const Device &dev, const VkTensorViewCreateInfoARM &info);
+
+  private:
+    const Device *device_ = nullptr;
+    VkTensorViewCreateInfoARM create_info_;
+};
+
+class DataGraphPipelineSession : public internal::NonDispHandle<VkDataGraphPipelineSessionARM> {
+  public:
+    explicit DataGraphPipelineSession(const Device &dev, const VkDataGraphPipelineSessionCreateInfoARM &info);
+    ~DataGraphPipelineSession() noexcept;
+    void Destroy() noexcept;
+
+    // CreateDataGraphPipelineSessionARM
+    void Init(const Device &dev);
+
+    void GetMemoryReqs();
+    void AllocSessionMem(std::vector<vkt::DeviceMemory> &device_mem, bool is_protected = false, size_t scale_factor = 1,
+                         int32_t size_modifier = 0);
+    size_t BindPointsCount() const { return bind_point_reqs_.size(); }
+
+    const std::vector<VkDataGraphPipelineSessionBindPointRequirementARM> &BindPointReqs() const { return bind_point_reqs_; }
+    const std::vector<VkMemoryRequirements2> &MemReqs() const { return mem_reqs_; }
+
+  private:
+    const Device *device_ = nullptr;
+    VkDataGraphPipelineSessionCreateInfoARM create_info_;
+    std::vector<VkDataGraphPipelineSessionBindPointRequirementARM> bind_point_reqs_;
+    std::vector<VkMemoryRequirements2> mem_reqs_;
+};
 
 inline VkEventCreateInfo Event::CreateInfo(VkFlags flags) {
     VkEventCreateInfo info = vku::InitStructHelper();
@@ -1327,7 +1400,7 @@ class Swapchain : public internal::NonDispHandle<VkSwapchainKHR> {
     Swapchain(Swapchain &&rhs) noexcept : NonDispHandle(std::move(rhs)) {}
     Swapchain &operator=(Swapchain &&) = default;
     ~Swapchain() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     void Init(const Device &dev, const VkSwapchainCreateInfoKHR &info);
     void SetName(const char *name) { NonDispHandle<VkSwapchainKHR>::SetName(VK_OBJECT_TYPE_SWAPCHAIN_KHR, name); }
@@ -1342,7 +1415,7 @@ class Swapchain : public internal::NonDispHandle<VkSwapchainKHR> {
 class IndirectCommandsLayout : public internal::NonDispHandle<VkIndirectCommandsLayoutEXT> {
   public:
     ~IndirectCommandsLayout() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     explicit IndirectCommandsLayout() : NonDispHandle() {}
     explicit IndirectCommandsLayout(const Device &dev, const VkIndirectCommandsLayoutCreateInfoEXT &info) { Init(dev, info); }
@@ -1352,7 +1425,7 @@ class IndirectCommandsLayout : public internal::NonDispHandle<VkIndirectCommands
 class IndirectExecutionSet : public internal::NonDispHandle<VkIndirectExecutionSetEXT> {
   public:
     ~IndirectExecutionSet() noexcept;
-    void destroy() noexcept;
+    void Destroy() noexcept;
 
     explicit IndirectExecutionSet() : NonDispHandle() {}
     explicit IndirectExecutionSet(const Device &dev, const VkIndirectExecutionSetCreateInfoEXT &info) { Init(dev, info); }
@@ -1415,4 +1488,7 @@ class Surface {
     VkInstance instance_ = VK_NULL_HANDLE;
     VkSurfaceKHR handle_ = VK_NULL_HANDLE;
 };
+
+const VkAllocationCallbacks *DefaultAllocator();
+
 }  // namespace vkt

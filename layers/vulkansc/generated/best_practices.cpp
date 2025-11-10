@@ -141,6 +141,10 @@ DeprecationData GetDeprecatedData(vvl::Extension extension_name) {
         {vvl::Extension::_VK_EXT_index_type_uint8, {DeprecationReason::Promoted, {vvl::Extension::_VK_KHR_index_type_uint8}}},
         {vvl::Extension::_VK_EXT_extended_dynamic_state, {DeprecationReason::Promoted, {vvl::Version::_VK_VERSION_1_3}}},
         {vvl::Extension::_VK_EXT_host_image_copy, {DeprecationReason::Promoted, {vvl::Version::_VK_VERSION_1_4}}},
+        {vvl::Extension::_VK_EXT_surface_maintenance1,
+         {DeprecationReason::Promoted, {vvl::Extension::_VK_KHR_surface_maintenance1}}},
+        {vvl::Extension::_VK_EXT_swapchain_maintenance1,
+         {DeprecationReason::Promoted, {vvl::Extension::_VK_KHR_swapchain_maintenance1}}},
         {vvl::Extension::_VK_EXT_shader_demote_to_helper_invocation,
          {DeprecationReason::Promoted, {vvl::Version::_VK_VERSION_1_3}}},
         {vvl::Extension::_VK_EXT_texel_buffer_alignment, {DeprecationReason::Promoted, {vvl::Version::_VK_VERSION_1_3}}},
@@ -154,6 +158,8 @@ DeprecationData GetDeprecatedData(vvl::Extension extension_name) {
          {DeprecationReason::Promoted, {vvl::Extension::_VK_EXT_rasterization_order_attachment_access}}},
         {vvl::Extension::_VK_VALVE_mutable_descriptor_type,
          {DeprecationReason::Promoted, {vvl::Extension::_VK_EXT_mutable_descriptor_type}}},
+        {vvl::Extension::_VK_EXT_present_mode_fifo_latest_ready,
+         {DeprecationReason::Promoted, {vvl::Extension::_VK_KHR_present_mode_fifo_latest_ready}}},
         {vvl::Extension::_VK_NV_external_sci_sync, {DeprecationReason::Deprecated, {vvl::Extension::_VK_NV_external_sci_sync2}}},
         {vvl::Extension::_VK_EXT_extended_dynamic_state2, {DeprecationReason::Promoted, {vvl::Version::_VK_VERSION_1_3}}},
         {vvl::Extension::_VK_EXT_global_priority_query, {DeprecationReason::Promoted, {vvl::Extension::_VK_KHR_global_priority}}},
@@ -164,6 +170,10 @@ DeprecationData GetDeprecatedData(vvl::Extension extension_name) {
          {DeprecationReason::Promoted, {vvl::Extension::_VK_KHR_depth_clamp_zero_one}}},
         {vvl::Extension::_VK_QCOM_fragment_density_map_offset,
          {DeprecationReason::Promoted, {vvl::Extension::_VK_EXT_fragment_density_map_offset}}},
+        {vvl::Extension::_VK_NV_copy_memory_indirect,
+         {DeprecationReason::Promoted, {vvl::Extension::_VK_KHR_copy_memory_indirect}}},
+        {vvl::Extension::_VK_NV_memory_decompression,
+         {DeprecationReason::Promoted, {vvl::Extension::_VK_EXT_memory_decompression}}},
         {vvl::Extension::_VK_EXT_pipeline_protected_access, {DeprecationReason::Promoted, {vvl::Version::_VK_VERSION_1_4}}},
         {vvl::Extension::_VK_EXT_vertex_attribute_robustness,
          {DeprecationReason::Promoted, {vvl::Extension::_VK_KHR_maintenance9}}},
@@ -262,6 +272,12 @@ void bp_state::Instance::PostCallRecordEnumerateInstanceLayerProperties(uint32_t
     bp_state::LogResult(*this, (VkInstance)VK_NULL_HANDLE, record_obj);
 }
 
+void bp_state::Instance::PostCallRecordEnumerateDeviceLayerProperties(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
+                                                                      VkLayerProperties* pProperties,
+                                                                      const RecordObject& record_obj) {
+    bp_state::LogResult(*this, physicalDevice, record_obj);
+}
+
 void BestPractices::PostCallRecordQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
                                               const RecordObject& record_obj) {
     ManualPostCallRecordQueueSubmit(queue, submitCount, pSubmits, fence, record_obj);
@@ -341,24 +357,6 @@ void BestPractices::PostCallRecordCreateSemaphore(VkDevice device, const VkSemap
     bp_state::LogResult(*this, device, record_obj);
 }
 
-void BestPractices::PostCallRecordCreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo,
-                                              const VkAllocationCallbacks* pAllocator, VkEvent* pEvent,
-                                              const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
-void BestPractices::PostCallRecordGetEventStatus(VkDevice device, VkEvent event, const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
-void BestPractices::PostCallRecordSetEvent(VkDevice device, VkEvent event, const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
-void BestPractices::PostCallRecordResetEvent(VkDevice device, VkEvent event, const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
 void BestPractices::PostCallRecordCreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo,
                                                   const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool,
                                                   const RecordObject& record_obj) {
@@ -377,12 +375,6 @@ void BestPractices::PostCallRecordCreateBuffer(VkDevice device, const VkBufferCr
     bp_state::LogResult(*this, device, record_obj);
 }
 
-void BestPractices::PostCallRecordCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
-                                                   const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
-                                                   const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
 void BestPractices::PostCallRecordCreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo,
                                               const VkAllocationCallbacks* pAllocator, VkImage* pImage,
                                               const RecordObject& record_obj) {
@@ -392,6 +384,60 @@ void BestPractices::PostCallRecordCreateImage(VkDevice device, const VkImageCrea
 void BestPractices::PostCallRecordCreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo,
                                                   const VkAllocationCallbacks* pAllocator, VkImageView* pView,
                                                   const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
+                                                    const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
+                                                    const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags,
+                                                   const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordAllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo,
+                                                         VkCommandBuffer* pCommandBuffers, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
+                                                     const RecordObject& record_obj) {
+    bp_state::LogResult(*this, commandBuffer, record_obj);
+}
+
+void BestPractices::PostCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, commandBuffer, record_obj);
+}
+
+void BestPractices::PostCallRecordResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags,
+                                                     const RecordObject& record_obj) {
+    bp_state::LogResult(*this, commandBuffer, record_obj);
+}
+
+void BestPractices::PostCallRecordCreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo,
+                                              const VkAllocationCallbacks* pAllocator, VkEvent* pEvent,
+                                              const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordGetEventStatus(VkDevice device, VkEvent event, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordSetEvent(VkDevice device, VkEvent event, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordResetEvent(VkDevice device, VkEvent event, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
+                                                   const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
+                                                   const RecordObject& record_obj) {
     bp_state::LogResult(*this, device, record_obj);
 }
 
@@ -414,16 +460,6 @@ void BestPractices::PostCallRecordGetPipelineCacheData(VkDevice device, VkPipeli
 
 void BestPractices::PostCallRecordMergePipelineCaches(VkDevice device, VkPipelineCache dstCache, uint32_t srcCacheCount,
                                                       const VkPipelineCache* pSrcCaches, const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
-void BestPractices::PostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
-                                                          const VkGraphicsPipelineCreateInfo* pCreateInfos,
-                                                          const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                          const RecordObject& record_obj, PipelineStates& pipeline_states,
-                                                          chassis::CreateGraphicsPipelines& chassis_state) {
-    ManualPostCallRecordCreateGraphicsPipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines,
-                                                record_obj, pipeline_states, chassis_state);
     bp_state::LogResult(*this, device, record_obj);
 }
 
@@ -461,9 +497,29 @@ void BestPractices::PostCallRecordCreateDescriptorPool(VkDevice device, const Vk
     bp_state::LogResult(*this, device, record_obj);
 }
 
+void BestPractices::PostCallRecordResetDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool,
+                                                      VkDescriptorPoolResetFlags flags, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
 void BestPractices::PostCallRecordAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
                                                          VkDescriptorSet* pDescriptorSets, const RecordObject& record_obj,
                                                          vvl::AllocateDescriptorSetsData& chassis_state) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount,
+                                                     const VkDescriptorSet* pDescriptorSets, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                          const VkGraphicsPipelineCreateInfo* pCreateInfos,
+                                                          const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                          const RecordObject& record_obj, PipelineStates& pipeline_states,
+                                                          chassis::CreateGraphicsPipelines& chassis_state) {
+    ManualPostCallRecordCreateGraphicsPipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines,
+                                                record_obj, pipeline_states, chassis_state);
     bp_state::LogResult(*this, device, record_obj);
 }
 
@@ -477,36 +533,6 @@ void BestPractices::PostCallRecordCreateRenderPass(VkDevice device, const VkRend
                                                    const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
                                                    const RecordObject& record_obj) {
     bp_state::LogResult(*this, device, record_obj);
-}
-
-void BestPractices::PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
-                                                    const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
-                                                    const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
-void BestPractices::PostCallRecordResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags,
-                                                   const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
-void BestPractices::PostCallRecordAllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo,
-                                                         VkCommandBuffer* pCommandBuffers, const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
-void BestPractices::PostCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
-                                                     const RecordObject& record_obj) {
-    bp_state::LogResult(*this, commandBuffer, record_obj);
-}
-
-void BestPractices::PostCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer, const RecordObject& record_obj) {
-    bp_state::LogResult(*this, commandBuffer, record_obj);
-}
-
-void BestPractices::PostCallRecordResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags,
-                                                     const RecordObject& record_obj) {
-    bp_state::LogResult(*this, commandBuffer, record_obj);
 }
 
 void BestPractices::PostCallRecordBindBufferMemory2(VkDevice device, uint32_t bindInfoCount,
@@ -533,14 +559,6 @@ void bp_state::Instance::PostCallRecordGetPhysicalDeviceImageFormatProperties2(
     bp_state::LogResult(*this, physicalDevice, record_obj);
 }
 
-void BestPractices::PostCallRecordCreateSamplerYcbcrConversion(VkDevice device,
-                                                               const VkSamplerYcbcrConversionCreateInfo* pCreateInfo,
-                                                               const VkAllocationCallbacks* pAllocator,
-                                                               VkSamplerYcbcrConversion* pYcbcrConversion,
-                                                               const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
-}
-
 void BestPractices::PostCallRecordCreateDescriptorUpdateTemplate(VkDevice device,
                                                                  const VkDescriptorUpdateTemplateCreateInfo* pCreateInfo,
                                                                  const VkAllocationCallbacks* pAllocator,
@@ -549,9 +567,11 @@ void BestPractices::PostCallRecordCreateDescriptorUpdateTemplate(VkDevice device
     bp_state::LogResult(*this, device, record_obj);
 }
 
-void BestPractices::PostCallRecordCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
-                                                    const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
-                                                    const RecordObject& record_obj) {
+void BestPractices::PostCallRecordCreateSamplerYcbcrConversion(VkDevice device,
+                                                               const VkSamplerYcbcrConversionCreateInfo* pCreateInfo,
+                                                               const VkAllocationCallbacks* pAllocator,
+                                                               VkSamplerYcbcrConversion* pYcbcrConversion,
+                                                               const RecordObject& record_obj) {
     bp_state::LogResult(*this, device, record_obj);
 }
 
@@ -567,6 +587,12 @@ void BestPractices::PostCallRecordWaitSemaphores(VkDevice device, const VkSemaph
 
 void BestPractices::PostCallRecordSignalSemaphore(VkDevice device, const VkSemaphoreSignalInfo* pSignalInfo,
                                                   const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
+                                                    const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
+                                                    const RecordObject& record_obj) {
     bp_state::LogResult(*this, device, record_obj);
 }
 
@@ -1141,6 +1167,17 @@ void BestPractices::PostCallRecordGetPipelineBinaryDataKHR(VkDevice device, cons
     bp_state::LogResult(*this, device, record_obj);
 }
 
+void BestPractices::PostCallRecordReleaseCapturedPipelineDataKHR(VkDevice device, const VkReleaseCapturedPipelineDataInfoKHR* pInfo,
+                                                                 const VkAllocationCallbacks* pAllocator,
+                                                                 const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordReleaseSwapchainImagesKHR(VkDevice device, const VkReleaseSwapchainImagesInfoKHR* pReleaseInfo,
+                                                            const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
 void bp_state::Instance::PostCallRecordGetPhysicalDeviceCooperativeMatrixPropertiesKHR(
     VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkCooperativeMatrixPropertiesKHR* pProperties,
     const RecordObject& record_obj) {
@@ -1234,6 +1271,11 @@ void bp_state::Instance::PostCallRecordCreateViSurfaceNN(VkInstance instance, co
     bp_state::LogResult(*this, instance, record_obj);
 }
 #endif  // VK_USE_PLATFORM_VI_NN
+
+void bp_state::Instance::PostCallRecordReleaseDisplayEXT(VkPhysicalDevice physicalDevice, VkDisplayKHR display,
+                                                         const RecordObject& record_obj) {
+    bp_state::LogResult(*this, physicalDevice, record_obj);
+}
 
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
 void bp_state::Instance::PostCallRecordAcquireXlibDisplayEXT(VkPhysicalDevice physicalDevice, Display* dpy, VkDisplayKHR display,
@@ -1572,9 +1614,9 @@ void BestPractices::PostCallRecordTransitionImageLayoutEXT(VkDevice device, uint
     PostCallRecordTransitionImageLayout(device, transitionCount, pTransitions, record_obj);
 }
 
-void BestPractices::PostCallRecordReleaseSwapchainImagesEXT(VkDevice device, const VkReleaseSwapchainImagesInfoEXT* pReleaseInfo,
+void BestPractices::PostCallRecordReleaseSwapchainImagesEXT(VkDevice device, const VkReleaseSwapchainImagesInfoKHR* pReleaseInfo,
                                                             const RecordObject& record_obj) {
-    bp_state::LogResult(*this, device, record_obj);
+    PostCallRecordReleaseSwapchainImagesKHR(device, pReleaseInfo, record_obj);
 }
 
 void BestPractices::PostCallRecordCreateIndirectCommandsLayoutNV(VkDevice device,
@@ -1919,6 +1961,12 @@ void BestPractices::PostCallRecordGetFramebufferTilePropertiesQCOM(VkDevice devi
     bp_state::LogResult(*this, device, record_obj);
 }
 
+void BestPractices::PostCallRecordGetDynamicRenderingTilePropertiesQCOM(VkDevice device, const VkRenderingInfo* pRenderingInfo,
+                                                                        VkTilePropertiesQCOM* pProperties,
+                                                                        const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
 #ifdef VK_USE_PLATFORM_SCI
 void BestPractices::PostCallRecordCreateSemaphoreSciSyncPoolNV(VkDevice device,
                                                                const VkSemaphoreSciSyncPoolCreateInfoNV* pCreateInfo,
@@ -1948,11 +1996,17 @@ void BestPractices::PostCallRecordSetLatencySleepModeNV(VkDevice device, VkSwapc
     bp_state::LogResult(*this, device, record_obj);
 }
 
+void BestPractices::PostCallRecordLatencySleepNV(VkDevice device, VkSwapchainKHR swapchain, const VkLatencySleepInfoNV* pSleepInfo,
+                                                 const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
 void BestPractices::PostCallRecordCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
                                                               VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                               const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
                                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                              const RecordObject& record_obj) {
+                                                              const RecordObject& record_obj, PipelineStates& pipeline_states,
+                                                              chassis::CreateDataGraphPipelinesARM& chassis_state) {
     bp_state::LogResult(*this, device, record_obj);
 }
 
@@ -2035,6 +2089,22 @@ void bp_state::Instance::PostCallRecordCreateSurfaceOHOS(VkInstance instance, co
                                                          const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface,
                                                          const RecordObject& record_obj) {
     bp_state::LogResult(*this, instance, record_obj);
+}
+
+void BestPractices::PostCallRecordGetSwapchainGrallocUsageOHOS(VkDevice device, VkFormat format, VkImageUsageFlags imageUsage,
+                                                               uint64_t* grallocUsage, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordAcquireImageOHOS(VkDevice device, VkImage image, int32_t nativeFenceFd, VkSemaphore semaphore,
+                                                   VkFence fence, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, device, record_obj);
+}
+
+void BestPractices::PostCallRecordQueueSignalReleaseImageOHOS(VkQueue queue, uint32_t waitSemaphoreCount,
+                                                              const VkSemaphore* pWaitSemaphores, VkImage image,
+                                                              int32_t* pNativeFenceFd, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, queue, record_obj);
 }
 #endif  // VK_USE_PLATFORM_OHOS
 

@@ -26,9 +26,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectBuffer) {
     }
 
     DebugUtilsLabelCheckData callback_data;
-    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, DebugUtilsLabelCheckData *data) {
-        data->count++;
-    };
+    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *, DebugUtilsLabelCheckData *data) { data->count++; };
     callback_data.count = 0;
     callback_data.callback = empty_callback;
 
@@ -63,9 +61,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectDevice) {
     }
 
     DebugUtilsLabelCheckData callback_data;
-    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, DebugUtilsLabelCheckData *data) {
-        data->count++;
-    };
+    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *, DebugUtilsLabelCheckData *data) { data->count++; };
     callback_data.count = 0;
     callback_data.callback = empty_callback;
 

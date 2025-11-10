@@ -16,10 +16,11 @@
  */
 
 #include "sync/sync_reporting.h"
-#include "sync/sync_image.h"
 #include "sync/sync_validation.h"
 #include "error_message/error_strings.h"
 #include "utils/math_utils.h"
+
+namespace syncval {
 
 constexpr VkAccessFlags2 kAllAccesses = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
 
@@ -328,6 +329,25 @@ static std::pair<bool, bool> GetPartialProtectedInfo(const SyncAccessInfo &acces
     return std::make_pair(is_stage_protected, is_access_protected);
 }
 
+static void ReportLayoutTransitionSynchronizationInsight(std::stringstream &ss, bool needs_execution_dependency,
+                                                         VkPipelineStageFlags2 read_barriers = 0) {
+    // TODO: analyse exact form of API is used (render pass layout transition, image barrier layout transition) and
+    // print instructions for specific situation. Now we describe all possibilities.
+    const std::string barrier_src_stage = string_VkPipelineStageFlags2(read_barriers);
+    if (needs_execution_dependency) {
+        ss << "\nVulkan insight: If the layout transition is done via an image barrier, consider including " << barrier_src_stage
+           << " in srcStageMask. If the transition occurs as part of the render pass begin operation, consider specifying an "
+              "external subpass dependency (VK_SUBPASS_EXTERNAL) with srcStageMask that includes "
+           << barrier_src_stage << ", or perform the transition in a separate image barrier before the render pass begins.";
+    } else {
+        ss << "\nVulkan insight: If the layout transition is done via an image barrier, ensure srcStageMask and srcAccessMask "
+              "synchronize with the accesses mentioned above. If the transition occurs as part of the render pass begin operation, "
+              "consider specifying an external subpass dependency (VK_SUBPASS_EXTERNAL) with srcStageMask and srcAccessMask that "
+              "synchronize with those accesses, or perform the transition in a separate image barrier before the render pass "
+              "begins.";
+    }
+}
+
 void ReportProperties::Add(std::string_view property_name, std::string_view value) {
     name_values.emplace_back(NameValue{std::string(property_name), std::string(value)});
 }
@@ -382,12 +402,16 @@ std::string FormatErrorMessage(const HazardResult &hazard, const CommandExecutio
     const SyncAccessInfo &prior_access = GetAccessInfo(hazard.State().prior_access_index);
 
     const SyncAccessFlags write_barriers = hazard.State().access_state->GetWriteBarriers();
-    const VkPipelineStageFlags2 read_barriers = hazard.State().access_state->GetReadBarriers(hazard.State().prior_access_index);
+    VkPipelineStageFlags2 read_barriers = hazard.State().access_state->GetReadBarriers(hazard.State().prior_access_index);
 
-    // TODO: BOTTOM_OF_PIPE part will go away when syncval switches internally to use NONE/ALL for everything
+    // TODO: BOTTOM_OF_PIPE part will go away when syncval switches internally to use NONE/ALL for everything.
+    // Remove this block then.
+    if (read_barriers & VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT) {
+        read_barriers &= ~VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+    }
+
     const bool missing_synchronization = (hazard_info.IsPriorWrite() && write_barriers.none()) ||
-                                         (hazard_info.IsPriorRead() && (read_barriers == VK_PIPELINE_STAGE_2_NONE ||
-                                                                        read_barriers == VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT));
+                                         (hazard_info.IsPriorRead() && read_barriers == VK_PIPELINE_STAGE_2_NONE);
 
     std::stringstream ss;
 
@@ -492,24 +516,28 @@ std::string FormatErrorMessage(const HazardResult &hazard, const CommandExecutio
     } else if (hazard_info.IsPriorWrite()) {  // RAW/WAW hazards
         ss << "The current synchronization allows ";
         ss << FormatSyncAccesses(write_barriers, context.GetSyncState(), context.GetQueueFlags(), false);
-        ss << ", but to prevent this hazard, ";
         auto [is_stage_protected, is_access_protected] = GetPartialProtectedInfo(access, write_barriers, context);
         if (is_access_protected) {
-            ss << "it must allow these accesses at ";
+            ss << ", but to prevent this hazard, it must allow these accesses at ";
             ss << string_VkPipelineStageFlagBits2(access.stage_mask) << ".";
         } else if (access.access_mask != VK_ACCESS_2_NONE) {
-            ss << "it must allow ";
+            ss << ", but to prevent this hazard, it must allow ";
             ss << string_VkAccessFlagBits2(access.access_mask) << " accesses at ";
             ss << string_VkPipelineStageFlagBits2(access.stage_mask) << ".";
         } else {
-            // TODO: analyse exact form of synchronization is needed or specific options to use
-            ss << "it must protect layout transition accesses.";
+            ss << ", but layout transition does synchronize with these accesses.";
+            ReportLayoutTransitionSynchronizationInsight(ss, false);
         }
     } else {  // WAR hazard
         ss << "The current synchronization defines the destination stage mask as ";
         ss << string_VkPipelineStageFlags2(read_barriers);
-        ss << ", but to prevent this hazard, it must include ";
-        ss << string_VkPipelineStageFlagBits2(access.stage_mask) << ".";
+        if (access.access_mask != VK_ACCESS_2_NONE) {
+            ss << ", but to prevent this hazard, it must include ";
+            ss << string_VkPipelineStageFlagBits2(access.stage_mask) << ".";
+        } else {
+            ss << ", but layout transition does not synchronize with these stages.";
+            ReportLayoutTransitionSynchronizationInsight(ss, true, read_barriers);
+        }
     }
 
     // Give a hint for WAR hazard
@@ -582,7 +610,7 @@ static ResourceUsageInfo GetResourceUsageInfoFromRecord(ResourceUsageTagEx tag_e
 
         // Associated resource
         if (tag_ex.handle_index != vvl::kNoIndex32) {
-            auto &cb_context = syncval_state::SubState(*record.cb_state);
+            auto &cb_context = SubState(*record.cb_state);
             const auto &handle_records = cb_context.access_context.GetHandleRecords();
 
             // Command buffer can be in inconsistent state due to unhandled core validation error (core validation is disabled).
@@ -604,7 +632,7 @@ static ResourceUsageInfo GetResourceUsageInfoFromRecord(ResourceUsageTagEx tag_e
 
 ResourceUsageInfo CommandBufferAccessContext::GetResourceUsageInfo(ResourceUsageTagEx tag_ex) const {
     const ResourceUsageRecord &record = (*access_log_)[tag_ex.tag];
-    const auto debug_name_provider = (record.label_command_index == vvl::kU32Max) ? nullptr : this;
+    const auto debug_name_provider = (record.label_command_index == vvl::kNoIndex32) ? nullptr : this;
     return GetResourceUsageInfoFromRecord(tag_ex, record, debug_name_provider);
 }
 
@@ -625,3 +653,5 @@ ResourceUsageInfo QueueBatchContext::GetResourceUsageInfo(ResourceUsageTagEx tag
     }
     return info;
 }
+
+}  // namespace syncval

@@ -60,7 +60,7 @@ void NegativeGpuAVShaderDebugInfo::BasicSingleStorageBufferComputeOOB(const char
 TEST_F(NegativeGpuAVShaderDebugInfo, OpLine) {
     TEST_DESCRIPTION("Make sure basic OpLine works");
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -112,7 +112,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, OpLine) {
 TEST_F(NegativeGpuAVShaderDebugInfo, OpLineColumn) {
     TEST_DESCRIPTION("Make sure the column in OpLine will add value to show which part the error occured");
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -171,7 +171,7 @@ void main() {
 TEST_F(NegativeGpuAVShaderDebugInfo, OpSourceContinued) {
     TEST_DESCRIPTION("Make sure can find source in OpSourceContinued");
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -230,7 +230,7 @@ layout(buffer_reference, std430) readonly buffer IndexBuffer { int indices[]; };
 TEST_F(NegativeGpuAVShaderDebugInfo, BadLineNumber) {
     TEST_DESCRIPTION("OpLine gives a line number not in the source");
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -291,7 +291,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslang) {
 
     // Manually ran:
     //   glslangValidator -V -g in.comp -o out.spv --target-env vulkan1.2
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -362,14 +362,13 @@ void main() {
                OpFunctionEnd
     )";
 
-    BasicSingleStorageBufferComputeOOB(
-        shader_source, "SPIR-V Instruction Index = 52\nShader validation error occurred at a.comp:11\n\n    x = data.indices[16];");
+    BasicSingleStorageBufferComputeOOB(shader_source, "Shader validation error occurred at a.comp:11\n\n    x = data.indices[16];");
 }
 
 TEST_F(NegativeGpuAVShaderDebugInfo, GlslLineDerective) {
     TEST_DESCRIPTION("Use the #line derective in GLSL");
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -441,7 +440,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslangShaderDebugInfo) {
 
     // Manually ran:
     //   glslangValidator -V -gV in.comp -o out.spv --target-env vulkan1.2
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                        OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -545,14 +544,13 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslangShaderDebugInfo) {
                OpFunctionEnd
     )";
 
-    BasicSingleStorageBufferComputeOOB(
-        shader_source,
-        "SPIR-V Instruction Index = 95\nShader validation error occurred at a.comp:11\nNo Text operand found in DebugSource");
+    BasicSingleStorageBufferComputeOOB(shader_source,
+                                       "Shader validation error occurred at a.comp:11\nNo Text operand found in DebugSource");
 }
 
 // Manually ran:
 //   glslangValidator -V -gVS in.comp -o out.spv --target-env vulkan1.2
-static char const *kBasicGlslShaderSource = R"(
+static const char *kBasicGlslShaderSource = R"(
               OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -674,9 +672,8 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslangShaderDebugInfoWithSource) {
     AddRequiredExtensions(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderRelaxedExtendedInstruction);
 
-    BasicSingleStorageBufferComputeOOB(
-        kBasicGlslShaderSource,
-        "SPIR-V Instruction Index = 96\nShader validation error occurred at a.comp:11\n\n11:     x = data.indices[16];");
+    BasicSingleStorageBufferComputeOOB(kBasicGlslShaderSource,
+                                       "Shader validation error occurred at a.comp:11\n\n11:     x = data.indices[16];");
 }
 
 TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslangShaderDebugInfoWithSourceShaderObject) {
@@ -715,8 +712,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslangShaderDebugInfoWithSourceShader
     m_command_buffer.End();
 
     // UNASSIGNED-Device address out of bounds
-    m_errorMonitor->SetDesiredError(
-        "SPIR-V Instruction Index = 96\nShader validation error occurred at a.comp:11\n\n11:     x = data.indices[16];");
+    m_errorMonitor->SetDesiredError("Shader validation error occurred at a.comp:11\n\n11:     x = data.indices[16];");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -725,7 +721,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderDebugInfoColumns) {
     TEST_DESCRIPTION("DebugLine has a Column Start and Column End");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -803,7 +799,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderDebugSourceContinued) {
     TEST_DESCRIPTION("Make sure can find source in DebugSourceContinued");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -883,7 +879,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderDebugLineMultiLine) {
     TEST_DESCRIPTION("DebugLine has a Line Start and Line End");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -960,7 +956,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BadShaderDebugLineStart) {
     TEST_DESCRIPTION("DebugLine Line Start has bad value");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -1036,7 +1032,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BadShaderDebugLineEnd) {
     TEST_DESCRIPTION("DebugLine Line End has bad value");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -1123,7 +1119,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicDXC) {
     // Manually ran:
     //   dxc -spirv -T cs_6_0 -E main -fspv-target-env=vulkan1.2 -fspv-extension=SPV_KHR_non_semantic_info
     //   -fspv-debug=vulkan-with-source in.hlsl
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
           %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
@@ -1233,7 +1229,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, NoLineInFunctionFirst) {
     TEST_DESCRIPTION("Test if first function listed, has no debug info, we don't use the functions after it");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -1352,14 +1348,15 @@ void main() { // has no debug info
                OpFunctionEnd
     )";
 
-    BasicSingleStorageBufferComputeOOB(shader_source, "Unable to source. Build shader with debug info to get source information.");
+    BasicSingleStorageBufferComputeOOB(shader_source,
+                                       "(Unable to find shader source, build shader with debug info to get source information)");
 }
 
 TEST_F(NegativeGpuAVShaderDebugInfo, NoLineInFunctionLast) {
     TEST_DESCRIPTION("Test if last function listed, has no debug info, we don't use the functions before it");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    char const *shader_source = R"(
+    const char *shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -1477,7 +1474,8 @@ void main() { // has no debug info
                OpFunctionEnd
     )";
 
-    BasicSingleStorageBufferComputeOOB(shader_source, "Unable to source. Build shader with debug info to get source information.");
+    BasicSingleStorageBufferComputeOOB(shader_source,
+                                       "(Unable to find shader source, build shader with debug info to get source information)");
 }
 
 TEST_F(NegativeGpuAVShaderDebugInfo, PipelineHandles) {
@@ -1491,7 +1489,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PipelineHandles) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1511,11 +1509,17 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PipelineHandles) {
     pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     pipe.CreateComputePipeline();
 
-    const char *object_name = "bad_pipeline";
+    const char *pipe_name = "bad_pipeline";
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
     name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
     name_info.objectHandle = (uint64_t)pipe.Handle();
-    name_info.pObjectName = object_name;
+    name_info.pObjectName = pipe_name;
+    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
+
+    const char *cb_name = "bad_command_buffer";
+    name_info.objectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
+    name_info.objectHandle = (uint64_t)m_command_buffer.handle();
+    name_info.pObjectName = cb_name;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
@@ -1534,7 +1538,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PipelineHandles) {
     m_command_buffer.End();
 
     // UNASSIGNED-Device address out of bounds
-    m_errorMonitor->SetDesiredError("Pipeline (bad_pipeline)");
+    m_errorMonitor->SetDesiredErrorRegex("", "VkCommandBuffer.*bad_command_buffer.*\n.*VkPipeline.*bad_pipeline");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -1552,7 +1556,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderObjectHandle) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    static const char comp_src[] = R"glsl(
+    const char comp_src[] = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1612,7 +1616,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, CommandBufferCommandIndex) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1676,7 +1680,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfo) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1730,7 +1734,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel1) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1791,7 +1795,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel2) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1854,7 +1858,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel3) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1931,7 +1935,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel4) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -2018,7 +2022,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, DISABLED_StageInfoWithDebugLabel5) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -2112,7 +2116,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel6) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -2202,7 +2206,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel7) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -2273,6 +2277,149 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel7) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeGpuAVShaderDebugInfo, PostProcessingDebugLabelMultipleCommandBuffers) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const char *cs_source = R"glsl(
+        #version 460
+        #extension GL_EXT_samplerless_texture_functions : require
+
+        layout(set = 0, binding = 0) uniform texture2DMS BaseTextureMS;
+        layout(set = 0, binding = 1) uniform sampler BaseTextureSampler;
+        layout(set = 0, binding = 2) buffer SSBO { vec4 dummy; };
+
+        void main() {
+            dummy = texelFetch(BaseTextureMS, ivec2(0), 0); // invalid
+        }
+    )glsl";
+
+    OneOffDescriptorIndexingSet descriptor_set(
+        m_device,
+        {
+            {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT},
+            {1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr, 0},
+            {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr, 0},
+        });
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView image_view = image.CreateView();
+
+    descriptor_set.WriteDescriptorImageInfo(0, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
+    descriptor_set.WriteDescriptorImageInfo(1, VK_NULL_HANDLE, sampler, VK_DESCRIPTOR_TYPE_SAMPLER);
+    descriptor_set.WriteDescriptorBufferInfo(2, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    vkt::CommandBuffer cb_2_label_beginnings(*m_device, m_command_pool);
+
+    cb_2_label_beginnings.Begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
+    VkDebugUtilsLabelEXT region_0_label = vku::InitStructHelper();
+    region_0_label.pLabelName = "region_0";
+    vk::CmdBeginDebugUtilsLabelEXT(cb_2_label_beginnings, &region_0_label);
+
+    VkDebugUtilsLabelEXT region_1_label = vku::InitStructHelper();
+    region_1_label.pLabelName = "region_1";
+    vk::CmdBeginDebugUtilsLabelEXT(cb_2_label_beginnings, &region_1_label);
+
+    cb_2_label_beginnings.End();
+
+    vkt::CommandBuffer cb_4_label_ends(*m_device, m_command_pool);
+    cb_4_label_ends.Begin();
+
+    vk::CmdBindDescriptorSets(cb_4_label_ends, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdBindPipeline(cb_4_label_ends, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(cb_4_label_ends, 1, 1, 1);
+
+    vk::CmdEndDebugUtilsLabelEXT(cb_4_label_ends);
+    vk::CmdEndDebugUtilsLabelEXT(cb_4_label_ends);
+    vk::CmdEndDebugUtilsLabelEXT(cb_4_label_ends);
+    vk::CmdEndDebugUtilsLabelEXT(cb_4_label_ends);
+    cb_4_label_ends.End();
+
+    // VUID-RuntimeSpirv-samples-08726
+    m_errorMonitor->SetDesiredError("region_0::region_1::region_0::region_1");
+    m_default_queue->Submit({cb_2_label_beginnings, cb_2_label_beginnings, cb_4_label_ends});
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVShaderDebugInfo, IndirectCommandDebugLabel) {
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
+    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
+    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
+        GTEST_SKIP() << "Failed to load device profile layer.";
+    }
+
+    VkPhysicalDeviceProperties props;
+    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+    props.limits.maxComputeWorkGroupCount[0] = 2;
+    props.limits.maxComputeWorkGroupCount[1] = 2;
+    props.limits.maxComputeWorkGroupCount[2] = 2;
+    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Buffer indirect_buffer(*m_device, 1024, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
+    VkDispatchIndirectCommand *ptr = static_cast<VkDispatchIndirectCommand *>(indirect_buffer.Memory().Map());
+    ptr[0].x = 1;
+    ptr[0].y = 1;
+    ptr[0].z = 1;
+    ptr[1].x = 1;
+    ptr[1].y = 1;
+    ptr[1].z = 1;
+    ptr[2].x = 4;  // over
+    ptr[2].y = 2;
+    ptr[2].z = 1;
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.CreateComputePipeline();
+
+    VkDebugUtilsLabelEXT region_0_label = vku::InitStructHelper();
+    region_0_label.pLabelName = "region_0";
+    VkDebugUtilsLabelEXT region_1_label = vku::InitStructHelper();
+    region_1_label.pLabelName = "region_1";
+    VkDebugUtilsLabelEXT region_2_label = vku::InitStructHelper();
+    region_2_label.pLabelName = "region_2";
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatchIndirect(m_command_buffer, indirect_buffer, 0);
+
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &region_0_label);
+    vk::CmdDispatchIndirect(m_command_buffer, indirect_buffer, sizeof(VkDispatchIndirectCommand));
+
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &region_1_label);
+    vk::CmdDispatchIndirect(m_command_buffer, indirect_buffer, sizeof(VkDispatchIndirectCommand) * 2);  // bad
+
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &region_2_label);
+    vk::CmdDispatchIndirect(m_command_buffer, indirect_buffer, 0);
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+    m_command_buffer.End();
+
+    // VUID-VkDispatchIndirectCommand-x-00417
+    m_errorMonitor->SetDesiredError("Debug region: region_0::region_1");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeGpuAVShaderDebugInfo, ShaderInternalId) {
     TEST_DESCRIPTION("Make sure we print the shader id used internally correctly");
     RETURN_IF_SKIP(InitGpuAvFramework());
@@ -2312,6 +2459,436 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderInternalId) {
 
     // VUID-vkCmdDispatch-uniformBuffers-06935
     m_errorMonitor->SetDesiredError("(internal ID 17)");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVShaderDebugInfo, PostProcess) {
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingSampledImageUpdateAfterBind);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    const char *fs_source = R"(
+               OpCapability Shader
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %color
+               OpExecutionMode %main OriginUpperLeft
+
+               ; Debug Information
+          %1 = OpString "bad_code.glsl"
+               OpSource GLSL 450 %1 "#version 450
+layout(set=0, binding=0) uniform sampler3D x;
+layout(set=0, binding=1) uniform sampler2D y;
+layout(location=0) out vec4 color;
+void main() {
+    color = texture(y, vec2(0)); // valid
+    color += texture(x, vec3(0));
+    color += texture(y, vec2(1)); // valid
+}"
+               OpName %main "main"                  ; id %5
+               OpName %color "color"                ; id %10
+               OpName %y "y"                        ; id %14
+               OpName %x "x"                        ; id %23
+               OpModuleProcessed "client vulkan100"
+               OpModuleProcessed "target-env spirv1.3"
+               OpModuleProcessed "target-env vulkan1.1"
+               OpModuleProcessed "entry-point main"
+
+               ; Annotations
+               OpDecorate %color Location 0
+               OpDecorate %y Binding 1
+               OpDecorate %y DescriptorSet 0
+               OpDecorate %x Binding 0
+               OpDecorate %x DescriptorSet 0
+
+               ; Types, variables and constants
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+      %color = OpVariable %_ptr_Output_v4float Output   ; Location 0
+         %11 = OpTypeImage %float 2D 0 0 0 1 Unknown
+         %12 = OpTypeSampledImage %11
+%_ptr_UniformConstant_12 = OpTypePointer UniformConstant %12
+          %y = OpVariable %_ptr_UniformConstant_12 UniformConstant  ; Binding 1, DescriptorSet 0
+    %v2float = OpTypeVector %float 2
+    %float_0 = OpConstant %float 0
+         %18 = OpConstantComposite %v2float %float_0 %float_0
+         %20 = OpTypeImage %float 3D 0 0 0 1 Unknown
+         %21 = OpTypeSampledImage %20
+%_ptr_UniformConstant_21 = OpTypePointer UniformConstant %21
+          %x = OpVariable %_ptr_UniformConstant_21 UniformConstant  ; Binding 0, DescriptorSet 0
+    %v3float = OpTypeVector %float 3
+         %26 = OpConstantComposite %v3float %float_0 %float_0 %float_0
+    %float_1 = OpConstant %float 1
+         %32 = OpConstantComposite %v2float %float_1 %float_1
+               OpLine %1 5 11
+
+               ; Function main
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+               OpLine %1 6 0
+         %15 = OpLoad %12 %y
+         %19 = OpImageSampleImplicitLod %v4float %15 %18
+               OpStore %color %19
+               OpLine %1 7 0
+         %24 = OpLoad %21 %x
+         %27 = OpImageSampleImplicitLod %v4float %24 %26
+         %28 = OpLoad %v4float %color
+         %29 = OpFAdd %v4float %28 %27
+               OpStore %color %29
+               OpLine %1 8 0
+         %30 = OpLoad %12 %y
+         %33 = OpImageSampleImplicitLod %v4float %30 %32
+         %34 = OpLoad %v4float %color
+         %35 = OpFAdd %v4float %34 %33
+               OpStore %color %35
+               OpLine %1 9 0
+               OpReturn
+               OpFunctionEnd
+    )";
+    VkShaderObj vs(this, kVertexDrawPassthroughGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
+
+    vkt::Image image(*m_device, 16, 16, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkt::ImageView image_view = image.CreateView();
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    OneOffDescriptorIndexingSet descriptor_set(m_device, {
+                                                             {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL,
+                                                              nullptr, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT},
+                                                             {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL,
+                                                              nullptr, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT},
+                                                         });
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler);
+    descriptor_set.WriteDescriptorImageInfo(1, image_view, sampler);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.layout = pipeline_layout;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("bad_code.glsl:7\n\n    color += texture(x, vec3(0));");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVShaderDebugInfo, PostProcessSlangGPL) {
+    TEST_DESCRIPTION("Use both GPL and Slang to generate shader debug info");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    AddRequiredFeature(vkt::Feature::descriptorBindingSampledImageUpdateAfterBind);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    const char *fs_source = R"(
+               OpCapability Shader
+               OpExtension "SPV_KHR_non_semantic_info"
+          %2 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %y %s %x %entryPointParam_main
+               OpExecutionMode %main OriginUpperLeft
+
+               ; Debug Information
+          %1 = OpString "Texture3D x : register(t0, space0);
+Texture2D y : register(t1, space0);
+SamplerState s : register(s0, space0);
+
+[shader(\"fragment\")]
+float4 main() : SV_Target {
+    float4 color = y.Sample(s, float2(0.0f, 0.0f)); // valid
+    color += x.Sample(s, float3(0.0f, 0.0f, 0.0f));
+    color += y.Sample(s, float2(1.0f, 1.0f)); // valid
+    return color;
+}
+"
+          %5 = OpString "bad_code.slang"
+               OpSource Slang 1
+         %21 = OpString "main"
+         %27 = OpString "slangc"
+         %28 = OpString "-target spirv -matrix-layout-column-major -stage pixel -entry main -g2"
+         %34 = OpString "float"
+         %41 = OpString "color"
+               OpName %color "color"                ; id %40
+               OpName %y "y"                        ; id %48
+               OpName %s "s"                        ; id %52
+               OpName %sampledImage "sampledImage"  ; id %54
+               OpName %sampled "sampled"            ; id %55
+               OpName %x "x"                        ; id %66
+               OpName %sampledImage_0 "sampledImage"    ; id %68
+               OpName %sampled_0 "sampled"              ; id %69
+               OpName %color_0 "color"                  ; id %73
+               OpName %sampledImage_1 "sampledImage"    ; id %79
+               OpName %sampled_1 "sampled"              ; id %80
+               OpName %color_1 "color"                  ; id %84
+               OpName %entryPointParam_main "entryPointParam_main"  ; id %89
+               OpName %main "main"                                  ; id %11
+
+               ; Annotations
+               OpDecorate %y Binding 1
+               OpDecorate %y DescriptorSet 0
+               OpDecorate %s Binding 0
+               OpDecorate %s DescriptorSet 0
+               OpDecorate %x Binding 0
+               OpDecorate %x DescriptorSet 0
+               OpDecorate %entryPointParam_main Location 0
+
+               ; Types, variables and constants
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+    %uint_11 = OpConstant %uint 11
+     %uint_5 = OpConstant %uint 5
+   %uint_100 = OpConstant %uint 100
+         %12 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Function_v4float = OpTypePointer Function %v4float
+     %uint_0 = OpConstant %uint 0
+     %uint_6 = OpConstant %uint 6
+     %uint_8 = OpConstant %uint 8
+     %uint_7 = OpConstant %uint 7
+    %uint_32 = OpConstant %uint 32
+     %uint_3 = OpConstant %uint 3
+%uint_131072 = OpConstant %uint 131072
+     %uint_4 = OpConstant %uint 4
+    %uint_12 = OpConstant %uint 12
+         %45 = OpTypeImage %float 2D 2 0 0 1 Unknown
+%_ptr_UniformConstant_45 = OpTypePointer UniformConstant %45
+         %49 = OpTypeSampler
+%_ptr_UniformConstant_49 = OpTypePointer UniformConstant %49
+         %53 = OpTypeSampledImage %45
+    %v2float = OpTypeVector %float 2
+    %float_0 = OpConstant %float 0
+         %57 = OpConstantComposite %v2float %float_0 %float_0
+         %63 = OpTypeImage %float 3D 2 0 0 1 Unknown
+%_ptr_UniformConstant_63 = OpTypePointer UniformConstant %63
+         %67 = OpTypeSampledImage %63
+    %v3float = OpTypeVector %float 3
+         %71 = OpConstantComposite %v3float %float_0 %float_0 %float_0
+     %uint_9 = OpConstant %uint 9
+    %float_1 = OpConstant %float 1
+         %81 = OpConstantComposite %v2float %float_1 %float_1
+    %uint_10 = OpConstant %uint 10
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+          %y = OpVariable %_ptr_UniformConstant_45 UniformConstant  ; Binding 1, DescriptorSet 0
+          %s = OpVariable %_ptr_UniformConstant_49 UniformConstant  ; Binding 0, DescriptorSet 0
+          %x = OpVariable %_ptr_UniformConstant_63 UniformConstant  ; Binding 0, DescriptorSet 0
+%entryPointParam_main = OpVariable %_ptr_Output_v4float Output      ; Location 0
+         %43 = OpExtInst %void %2 DebugExpression
+          %4 = OpExtInst %void %2 DebugSource %5 %1
+         %10 = OpExtInst %void %2 DebugCompilationUnit %uint_100 %uint_5 %4 %uint_11
+         %18 = OpExtInst %void %2 DebugTypeFunction %uint_0 %void
+         %20 = OpExtInst %void %2 DebugFunction %21 %18 %4 %uint_6 %uint_8 %10 %21 %uint_0 %uint_6
+         %26 = OpExtInst %void %2 DebugEntryPoint %20 %10 %27 %28
+         %33 = OpExtInst %void %2 DebugTypeBasic %34 %uint_32 %uint_3 %uint_131072
+         %38 = OpExtInst %void %2 DebugTypeVector %33 %uint_4
+      %color = OpExtInst %void %2 DebugLocalVariable %41 %38 %4 %uint_7 %uint_12 %20 %uint_0
+
+               ; Function main
+       %main = OpFunction %void None %12
+         %13 = OpLabel
+         %17 = OpVariable %_ptr_Function_v4float Function
+         %24 = OpExtInst %void %2 DebugFunctionDefinition %20 %main
+        %114 = OpExtInst %void %2 DebugScope %20
+         %29 = OpExtInst %void %2 DebugLine %4 %uint_7 %uint_7 %uint_5 %uint_6
+         %44 = OpExtInst %void %2 DebugDeclare %color %17 %43
+         %46 = OpLoad %45 %y
+         %50 = OpLoad %49 %s
+%sampledImage = OpSampledImage %53 %46 %50
+    %sampled = OpImageSampleImplicitLod %v4float %sampledImage %57 None
+               OpStore %17 %sampled
+         %61 = OpExtInst %void %2 DebugLine %4 %uint_8 %uint_8 %uint_5 %uint_6
+         %62 = OpLoad %49 %s
+         %64 = OpLoad %63 %x
+%sampledImage_0 = OpSampledImage %67 %64 %62
+  %sampled_0 = OpImageSampleImplicitLod %v4float %sampledImage_0 %71 None
+    %color_0 = OpFAdd %v4float %sampled %sampled_0
+               OpStore %17 %color_0
+         %75 = OpExtInst %void %2 DebugLine %4 %uint_9 %uint_9 %uint_5 %uint_6
+         %77 = OpLoad %45 %y
+         %78 = OpLoad %49 %s
+%sampledImage_1 = OpSampledImage %53 %77 %78
+  %sampled_1 = OpImageSampleImplicitLod %v4float %sampledImage_1 %81 None
+    %color_1 = OpFAdd %v4float %color_0 %sampled_1
+               OpStore %17 %color_1
+         %86 = OpExtInst %void %2 DebugLine %4 %uint_10 %uint_10 %uint_5 %uint_6
+               OpStore %entryPointParam_main %color_1
+               OpReturn
+        %115 = OpExtInst %void %2 DebugNoScope
+               OpFunctionEnd
+    )";
+    VkShaderObj vs(this, kVertexDrawPassthroughGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
+
+    vkt::Image image(*m_device, 16, 16, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkt::ImageView image_view = image.CreateView();
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    OneOffDescriptorIndexingSet descriptor_set(m_device, {
+                                                             {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL,
+                                                              nullptr, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT},
+                                                             {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL,
+                                                              nullptr, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT},
+                                                         });
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler);
+    descriptor_set.WriteDescriptorImageInfo(1, image_view, sampler);
+    descriptor_set.UpdateDescriptorSets();
+    CreatePipelineHelper vertex_input_lib(*this);
+    vertex_input_lib.InitVertexInputLibInfo();
+    vertex_input_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper pre_raster_lib(*this);
+    pre_raster_lib.InitPreRasterLibInfo(&vs.GetStageCreateInfo());
+    pre_raster_lib.gp_ci_.layout = pipeline_layout;
+    pre_raster_lib.CreateGraphicsPipeline();
+
+    CreatePipelineHelper frag_shader_lib(*this);
+    frag_shader_lib.InitFragmentLibInfo(&fs.GetStageCreateInfo());
+    frag_shader_lib.gp_ci_.layout = pipeline_layout;
+    frag_shader_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo();
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    VkPipeline libraries[4] = {
+        vertex_input_lib,
+        pre_raster_lib,
+        frag_shader_lib,
+        frag_out_lib,
+    };
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = size32(libraries);
+    link_info.pLibraries = libraries;
+
+    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
+    exe_pipe_ci.layout = pipeline_layout;
+    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("bad_code.slang:8:5\n\n8:     color += x.Sample(s, float3(0.0f, 0.0f, 0.0f));");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVShaderDebugInfo, ReachMaxActionsCommandValidationLimitUnknown) {
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    const char *cs_source = R"glsl(
+        #version 450
+
+        layout(set = 0, binding = 0) buffer foo {
+            uint x[32];
+        };
+
+        void main() {
+            x[31] = 0;
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.CreateComputePipeline();
+
+    CreateComputePipelineHelper pipe_empty(*this);
+    pipe_empty.CreateComputePipeline();
+
+    vkt::Buffer buffer(*m_device, 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_empty);
+    for (int i = 0; i < 20000; ++i) {
+        vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    }
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    // VUID-vkCmdDispatch-storageBuffers-06936
+    m_errorMonitor->SetDesiredError("Compute Dispatch Index Unknown");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVShaderDebugInfo, ReachMaxErrorLoggerLimitUnkown) {
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
+    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
+    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
+        GTEST_SKIP() << "Failed to load device profile layer.";
+    }
+
+    VkPhysicalDeviceProperties props;
+    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+    props.limits.maxComputeWorkGroupCount[0] = 2;
+    props.limits.maxComputeWorkGroupCount[1] = 2;
+    props.limits.maxComputeWorkGroupCount[2] = 2;
+    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Buffer indirect_buffer(*m_device, 1024, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
+    VkDispatchIndirectCommand *ptr = static_cast<VkDispatchIndirectCommand *>(indirect_buffer.Memory().Map());
+    ptr[0].x = 1;
+    ptr[0].y = 1;
+    ptr[0].z = 1;
+    ptr[1].x = 4;  // over
+    ptr[1].y = 2;
+    ptr[1].z = 1;
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    for (int i = 0; i < 10000; ++i) {
+        vk::CmdDispatchIndirect(m_command_buffer, indirect_buffer, 0);
+    }
+
+    vk::CmdDispatchIndirect(m_command_buffer, indirect_buffer, sizeof(VkDispatchIndirectCommand));  // bad
+    m_command_buffer.End();
+
+    // VUID-VkDispatchIndirectCommand-x-00417
+    m_errorMonitor->SetDesiredError("GPUAV-Overflow-Unknown");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }

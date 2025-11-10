@@ -2,6 +2,7 @@
 # Copyright (c) 2014-2025 Valve Corporation
 # Copyright (c) 2014-2025 LunarG, Inc.
 # Copyright (c) 2023-2025 RasterGrid Kft.
+# Copyright (C) 2025 Arm Limited.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +32,7 @@ target_sources(VkLayer_utils PRIVATE
     containers/custom_containers.h
     containers/limits.h
     containers/small_container.h
+    containers/small_range_map.h
     containers/small_vector.h
     containers/span.h
     containers/tls_guard.h
@@ -183,7 +185,6 @@ else()
 endif()
 
 target_sources(vvl PRIVATE
-    best_practices/best_practices_utils.cpp
     best_practices/bp_buffer.cpp
     best_practices/bp_cmd_buffer.cpp
     best_practices/bp_cmd_buffer_nv.cpp
@@ -202,6 +203,8 @@ target_sources(vvl PRIVATE
     best_practices/bp_state.h
     best_practices/bp_state.cpp
     best_practices/bp_synchronization.cpp
+    best_practices/bp_utils.cpp
+    best_practices/bp_utils.h
     best_practices/bp_video.cpp
     best_practices/bp_wsi.cpp
     best_practices/best_practices_validation.h
@@ -219,6 +222,7 @@ target_sources(vvl PRIVATE
     core_checks/cc_cmd_buffer.cpp
     core_checks/cc_copy_blit_resolve.cpp
     core_checks/core_validation.h
+    core_checks/cc_data_graph.cpp
     core_checks/cc_descriptor.cpp
     core_checks/cc_device.cpp
     core_checks/cc_device_memory.cpp
@@ -246,6 +250,7 @@ target_sources(vvl PRIVATE
     core_checks/cc_sync_vuid_maps.cpp
     core_checks/cc_synchronization.h
     core_checks/cc_synchronization.cpp
+    core_checks/cc_tensor.cpp
     core_checks/cc_video.cpp
     core_checks/cc_vuid_maps.cpp
     core_checks/cc_vuid_maps.h
@@ -265,11 +270,15 @@ target_sources(vvl PRIVATE
     ${API_TYPE}/generated/valid_enum_values.h
     ${API_TYPE}/generated/valid_flag_values.cpp
     ${API_TYPE}/generated/command_validation.cpp
+    ${API_TYPE}/generated/command_validation.h
+    ${API_TYPE}/generated/deprecation.cpp
+    ${API_TYPE}/generated/deprecation.h
     ${API_TYPE}/generated/device_features.cpp
     ${API_TYPE}/generated/device_features.h
     ${API_TYPE}/generated/dynamic_state_helper.cpp
     ${API_TYPE}/generated/dynamic_state_helper.h
     ${API_TYPE}/generated/enum_flag_bits.h
+    ${API_TYPE}/generated/feature_not_present.cpp
     ${API_TYPE}/generated/dispatch_vector.cpp
     ${API_TYPE}/generated/dispatch_object.cpp
     ${API_TYPE}/generated/validation_object_device_methods.h
@@ -338,10 +347,14 @@ target_sources(vvl PRIVATE
     gpuav/shaders/validation_cmd/push_data.h
     object_tracker/object_lifetime_validation.h
     object_tracker/object_tracker_utils.cpp
+    state_tracker/bind_point.h
     state_tracker/buffer_state.cpp
     state_tracker/buffer_state.h
     state_tracker/cmd_buffer_state.cpp
     state_tracker/cmd_buffer_state.h
+    state_tracker/data_graph_pipeline_session_state.cpp
+    state_tracker/data_graph_pipeline_session_state.h
+    state_tracker/descriptor_mode.h
     state_tracker/descriptor_sets.cpp
     state_tracker/descriptor_sets.h
     state_tracker/device_generated_commands_state.cpp
@@ -363,15 +376,18 @@ target_sources(vvl PRIVATE
     state_tracker/pipeline_layout_state.h
     state_tracker/pipeline_state.cpp
     state_tracker/pipeline_state.h
-    state_tracker/pipeline_sub_state.cpp
-    state_tracker/pipeline_sub_state.h
+    state_tracker/pipeline_library_state.cpp
+    state_tracker/pipeline_library_state.h
     state_tracker/push_constant_data.h
-    state_tracker/query_state.h
     state_tracker/semaphore_state.cpp
     state_tracker/semaphore_state.h
     state_tracker/special_supported.h
     state_tracker/state_object.cpp
     state_tracker/state_object.h
+    state_tracker/query_state.cpp
+    state_tracker/query_state.h
+    state_tracker/tensor_state.cpp
+    state_tracker/tensor_state.h
     state_tracker/queue_state.cpp
     state_tracker/queue_state.h
     state_tracker/ray_tracing_state.h
@@ -411,6 +427,7 @@ target_sources(vvl PRIVATE
     stateless/sl_spirv.cpp
     stateless/sl_spirv.h
     stateless/sl_synchronization.cpp
+    stateless/sl_tensor.cpp
     stateless/sl_utils.cpp
     stateless/sl_vuid_maps.cpp
     stateless/sl_vuid_maps.h
@@ -418,8 +435,11 @@ target_sources(vvl PRIVATE
     stateless/stateless_validation.h
     sync/sync_access_context.cpp
     sync/sync_access_context.h
+    sync/sync_access_flags.h
     sync/sync_access_state.cpp
     sync/sync_access_state.h
+    sync/sync_barrier.cpp
+    sync/sync_barrier.h
     sync/sync_commandbuffer.cpp
     sync/sync_commandbuffer.h
     sync/sync_common.cpp
@@ -447,6 +467,7 @@ target_sources(vvl PRIVATE
     utils/shader_utils.h
     layer_options.cpp
     layer_options.h
+    layer_options_validation.h
     profiling/profiling.h
 )
 get_target_property(LAYER_SOURCES vvl SOURCES)
@@ -482,6 +503,15 @@ if(VULKANSC)
         jsoncpp_static
     )
 endif()
+
+set(GPUAV_SHADERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/gpuav/shaders")
+file(GLOB_RECURSE GPUAV_SHADERS
+    "${GPUAV_SHADERS_DIR}/*.vert"
+    "${GPUAV_SHADERS_DIR}/*.comp"
+    "${GPUAV_SHADERS_DIR}/*.h"
+)
+add_custom_target(Shaders ALL SOURCES ${GPUAV_SHADERS})
+source_group(TREE ${GPUAV_SHADERS_DIR} PREFIX "GPU-AV Shaders" FILES ${GPUAV_SHADERS})
 
 option(BUILD_SELF_VVL "Setup a VVL build that will be used for self validation" FALSE)
 if (BUILD_SELF_VVL)

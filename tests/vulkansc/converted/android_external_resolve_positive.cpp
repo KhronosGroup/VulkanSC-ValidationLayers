@@ -99,18 +99,16 @@ TEST_F(PositiveAndroidExternalResolve, RenderPassAndFramebuffer) {
     vkt::SamplerYcbcrConversion ycbcr_conv(*m_device, sycci);
 
     VkSamplerYcbcrConversionInfo syci = vku::InitStructHelper();
-    syci.conversion = ycbcr_conv.handle();
+    syci.conversion = ycbcr_conv;
 
     VkImageViewCreateInfo ivci = vku::InitStructHelper(&syci);
-    ivci.image = resolve_image.handle();
+    ivci.image = resolve_image;
     ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     ivci.format = VK_FORMAT_UNDEFINED;
     ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     const vkt::ImageView resolve_view(*m_device, ivci);
 
-    VkImageView attachments[2];
-    attachments[0] = color_view.handle();
-    attachments[1] = resolve_view.handle();
+    VkImageView attachments[2] = {color_view, resolve_view};
 
     vkt::Framebuffer framebuffer(*m_device, rp, 2, attachments);
 
@@ -176,18 +174,16 @@ TEST_F(PositiveAndroidExternalResolve, ImagelessFramebuffer) {
     vkt::SamplerYcbcrConversion ycbcr_conv(*m_device, sycci);
 
     VkSamplerYcbcrConversionInfo syci = vku::InitStructHelper();
-    syci.conversion = ycbcr_conv.handle();
+    syci.conversion = ycbcr_conv;
 
     VkImageViewCreateInfo ivci = vku::InitStructHelper(&syci);
-    ivci.image = resolve_image.handle();
+    ivci.image = resolve_image;
     ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     ivci.format = VK_FORMAT_UNDEFINED;
     ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     const vkt::ImageView resolve_view(*m_device, ivci);
 
-    VkImageView attachments[2];
-    attachments[0] = color_view.handle();
-    attachments[1] = resolve_view.handle();
+    VkImageView attachments[2] = {color_view, resolve_view};
 
     VkFramebufferAttachmentImageInfo framebuffer_attachment_image_info[2];
     framebuffer_attachment_image_info[0] = vku::InitStructHelper();
@@ -282,20 +278,20 @@ TEST_F(PositiveAndroidExternalResolve, DynamicRendering) {
     vkt::SamplerYcbcrConversion ycbcr_conv(*m_device, sycci);
 
     VkSamplerYcbcrConversionInfo syci = vku::InitStructHelper();
-    syci.conversion = ycbcr_conv.handle();
+    syci.conversion = ycbcr_conv;
 
     VkImageViewCreateInfo ivci = vku::InitStructHelper(&syci);
-    ivci.image = resolve_image.handle();
+    ivci.image = resolve_image;
     ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     ivci.format = VK_FORMAT_UNDEFINED;
     ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     const vkt::ImageView resolve_view(*m_device, ivci);
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
-    color_attachment.imageView = color_view.handle();
+    color_attachment.imageView = color_view;
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment.resolveMode = VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_ANDROID;
-    color_attachment.resolveImageView = resolve_view.handle();
+    color_attachment.resolveMode = VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_BIT_ANDROID;
+    color_attachment.resolveImageView = resolve_view;
     color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
@@ -369,18 +365,16 @@ TEST_F(PositiveAndroidExternalResolve, PipelineBarrier) {
     vkt::SamplerYcbcrConversion ycbcr_conv(*m_device, sycci);
 
     VkSamplerYcbcrConversionInfo syci = vku::InitStructHelper();
-    syci.conversion = ycbcr_conv.handle();
+    syci.conversion = ycbcr_conv;
 
     VkImageViewCreateInfo ivci = vku::InitStructHelper(&syci);
-    ivci.image = resolve_image.handle();
+    ivci.image = resolve_image;
     ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     ivci.format = VK_FORMAT_UNDEFINED;
     ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     const vkt::ImageView resolve_view(*m_device, ivci);
 
-    VkImageView attachments[2];
-    attachments[0] = color_view.handle();
-    attachments[1] = resolve_view.handle();
+    VkImageView attachments[2] = {color_view, resolve_view};
 
     vkt::Framebuffer framebuffer(*m_device, rp, 2, attachments);
 
@@ -397,7 +391,7 @@ TEST_F(PositiveAndroidExternalResolve, PipelineBarrier) {
     image_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     image_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     image_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    image_barrier.image = resolve_image.handle();
+    image_barrier.image = resolve_image;
     image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 

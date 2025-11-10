@@ -459,7 +459,7 @@ TEST_F(NegativeSampler, LinearReductionModeMinMax) {
     sampler_ci.compareEnable = VK_FALSE;
     vkt::Sampler sampler(*m_device, sampler_ci);
 
-    char const *fs_source = R"glsl(
+    const char *fs_source = R"glsl(
         #version 450
         layout (set=0, binding=0) uniform sampler2D bad;
         layout(location=0) out vec4 color;
@@ -561,7 +561,7 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
     image_ci.tiling = VK_IMAGE_TILING_LINEAR;
 
     // Verify formats
-    bool supported = ImageFormatIsSupported(instance(), Gpu(), image_ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
+    bool supported = IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
     if (!supported) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
@@ -582,52 +582,43 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
     ycbcr_create_info.yChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
     ycbcr_create_info.chromaFilter = VK_FILTER_NEAREST;
     ycbcr_create_info.forceExplicitReconstruction = false;
-    vkt::SamplerYcbcrConversion conversions[2];
-    conversions[0].init(*m_device, ycbcr_create_info);
+    vkt::SamplerYcbcrConversion conversions_0(*m_device, ycbcr_create_info);
     ycbcr_create_info.components.a = VK_COMPONENT_SWIZZLE_ZERO;  // Just anything different than above
-    conversions[1].init(*m_device, ycbcr_create_info);
+    vkt::SamplerYcbcrConversion conversions_1(*m_device, ycbcr_create_info);
 
     VkSamplerYcbcrConversionInfo ycbcr_info = vku::InitStructHelper();
-    ycbcr_info.conversion = conversions[0];
+    ycbcr_info.conversion = conversions_0;
 
     // Create a sampler using conversion
     VkSamplerCreateInfo sci = SafeSaneSamplerCreateInfo(&ycbcr_info);
     // Create two samplers with two different conversions, such that one will mismatch
     // It will make the second sampler fail to see if the log prints the second sampler or the first sampler.
-    vkt::Sampler samplers[2];
-    samplers[0].init(*m_device, sci);
-    ycbcr_info.conversion = conversions[1];  // Need two samplers with different conversions
-    samplers[1].init(*m_device, sci);
+    vkt::Sampler samplers_0(*m_device, sci);
+    ycbcr_info.conversion = conversions_1;  // Need two samplers with different conversions
+    vkt::Sampler samplers_1(*m_device, sci);
 
-    vkt::Sampler BadSampler;
     sci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-addressModeU-01646");
-    BadSampler.init(*m_device, sci);
-    m_errorMonitor->VerifyFound();
+    CreateSamplerTest(sci, "VUID-VkSamplerCreateInfo-addressModeU-01646");
 
     sci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     sci.unnormalizedCoordinates = VK_TRUE;
     sci.minLod = 0.0;
     sci.maxLod = 0.0;
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-addressModeU-01646");
-    BadSampler.init(*m_device, sci);
-    m_errorMonitor->VerifyFound();
+    CreateSamplerTest(sci, "VUID-VkSamplerCreateInfo-addressModeU-01646");
 
     {
         // samplerAnisotropy
         sci.unnormalizedCoordinates = VK_FALSE;
         sci.anisotropyEnable = VK_TRUE;
-        m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-addressModeU-01646");
-        BadSampler.init(*m_device, sci);
-        m_errorMonitor->VerifyFound();
+        CreateSamplerTest(sci, "VUID-VkSamplerCreateInfo-addressModeU-01646");
     }
 
     // Create an image without a Ycbcr conversion
     vkt::Image mpimage(*m_device, image_ci, vkt::set_layout);
-    ycbcr_info.conversion = conversions[0];  // Need two samplers with different conversions
+    ycbcr_info.conversion = conversions_0;  // Need two samplers with different conversions
     vkt::ImageView view = mpimage.CreateView(VK_IMAGE_ASPECT_PLANE_0_BIT, &ycbcr_info);
 
-    VkSampler vksamplers[2] = {samplers[0], samplers[1]};
+    VkSampler vksamplers[2] = {samplers_0, samplers_1};
     // Use the image and sampler together in a descriptor set
     OneOffDescriptorSet descriptor_set(m_device,
                                        {
@@ -639,12 +630,8 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
     }
 
     // Use the same image view twice, using the same sampler, with the *second* mismatched with the *second* immutable sampler
-    VkDescriptorImageInfo image_infos[2];
-    image_infos[0] = {};
-    image_infos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image_infos[0].imageView = view;
-    image_infos[0].sampler = samplers[0];
-    image_infos[1] = image_infos[0];
+    VkDescriptorImageInfo image_infos[2] = {{samplers_0, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                                            {samplers_0, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
     // Update the descriptor set expecting to get an error
     VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
@@ -683,7 +670,7 @@ TEST_F(NegativeSampler, ImageSamplerConversionNullImageView) {
     auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     image_ci.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;  // need for multi-planar
     image_ci.tiling = VK_IMAGE_TILING_LINEAR;
-    if (!ImageFormatIsSupported(instance(), Gpu(), image_ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+    if (!IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
     if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
@@ -763,7 +750,6 @@ TEST_F(NegativeSampler, CustomBorderColor) {
     TEST_DESCRIPTION("Tests for VUs for VK_EXT_custom_border_color");
     AddRequiredExtensions(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::customBorderColors);
-
     RETURN_IF_SKIP(Init());
 
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
@@ -840,7 +826,7 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
     descriptor_set.WriteDescriptorImageInfo(0, view, sampler);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler2D s;
         layout(location=0) out vec4 x;
@@ -895,7 +881,7 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefinedNonCombined) {
     descriptor_set.WriteDescriptorImageInfo(1, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
     descriptor_set.UpdateDescriptorSets();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler s;
         layout(set=0, binding=1) uniform texture2D t;
@@ -954,7 +940,7 @@ TEST_F(NegativeSampler, DISABLED_CustomBorderColorFormatUndefinedNonCombinedMult
     descriptor_set1.WriteDescriptorImageInfo(3, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
     descriptor_set1.UpdateDescriptorSets();
 
-    char const *fsSource = R"glsl(
+    const char *fsSource = R"glsl(
         #version 450
         layout(set=0, binding=2) uniform sampler s;
         layout(set=1, binding=3) uniform texture2D t;
@@ -998,7 +984,7 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesCombinedSampler) {
     // Verify that it is allowed on this implementation if
     // VK_KHR_format_feature_flags2 is available.
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
-        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
 
         vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);
@@ -1093,7 +1079,7 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSampler) {
     // Verify that it is allowed on this implementation if
     // VK_KHR_format_feature_flags2 is available.
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
-        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
 
         vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);

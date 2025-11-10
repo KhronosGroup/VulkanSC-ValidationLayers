@@ -72,7 +72,7 @@ vvl::PreSubmitResult vvl::Queue::PreSubmit(std::vector<vvl::QueueSubmission> &&s
                 secondary_cmd_buffer->submit_count++;
             }
             cb_submission.cb->submit_count++;
-            cb_submission.cb->Submit(*this, submission.perf_submit_pass, submission.loc.Get());
+            cb_submission.cb->SubmitTimeValidate(*this, submission.perf_submit_pass, submission.loc.Get());
         }
         // seq_ is atomic so we don't need a lock until updating the deque below.
         // Note that this relies on the external synchonization requirements for the
@@ -132,11 +132,10 @@ void vvl::Queue::Wait(const Location &loc, uint64_t until_seq) {
     }
     auto wait_status = waiter.wait_until(GetCondWaitTimeout());
     if (wait_status != std::future_status::ready) {
-        dev_data_.LogError(
-            "INTERNAL-ERROR-VkQueue-state-timeout", Handle(), loc,
-            "The Validation Layers hit a timeout waiting for queue state to update (this is most likely a validation bug)."
-            " seq=%" PRIu64 " until=%" PRIu64,
-            seq_.load(), until_seq);
+        dev_data_.LogError("INTERNAL-ERROR-VkQueue-state-timeout", Handle(), loc,
+                           "The Validation Layers hit a timeout waiting for queue state to update."
+                           " seq=%" PRIu64 " until=%" PRIu64,
+                           seq_.load(), until_seq);
     }
 }
 
@@ -296,41 +295,13 @@ vvl::QueueSubmission *vvl::Queue::NextSubmission() {
 }
 
 void vvl::Queue::Retire(QueueSubmission &submission) {
-    auto is_query_updated_after = [this](const QueryObject &query_object) {
-        auto guard = this->Lock();
-        bool first_queue_submission = true;
-        for (const QueueSubmission &queue_submission : this->submissions_) {
-            // The current submission is still on the deque, so skip it
-            if (first_queue_submission) {
-                first_queue_submission = false;
-                continue;
-            }
-            for (const CommandBufferSubmission &cb_submission : queue_submission.cb_submissions) {
-                if (query_object.perf_pass != queue_submission.perf_submit_pass) {
-                    continue;
-                }
-                if (cb_submission.cb->UpdatesQuery(query_object)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    };
-    for (auto &item : sub_states_) {
-        item.second->Retire(submission);
-    }
     submission.EndUse();
     for (auto &wait : submission.wait_semaphores) {
         wait.semaphore->RetireWait(this, wait.payload, submission.loc.Get(), true);
         timeline_wait_count_ -= (wait.semaphore->type == VK_SEMAPHORE_TYPE_TIMELINE) ? 1 : 0;
     }
-    for (CommandBufferSubmission &cb_submission : submission.cb_submissions) {
-        auto cb_guard = cb_submission.cb->WriteLock();
-        for (CommandBuffer *secondary_cmd_buffer : cb_submission.cb->linked_command_buffers) {
-            auto secondary_guard = secondary_cmd_buffer->WriteLock();
-            secondary_cmd_buffer->Retire(submission.perf_submit_pass, is_query_updated_after);
-        }
-        cb_submission.cb->Retire(submission.perf_submit_pass, is_query_updated_after);
+    for (auto &item : sub_states_) {
+        item.second->Retire(submission);
     }
     for (auto &signal : submission.signal_semaphores) {
         signal.semaphore->RetireSignal(signal.payload);

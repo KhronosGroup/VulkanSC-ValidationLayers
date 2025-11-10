@@ -149,7 +149,7 @@ TEST_F(PositiveGpuAVIndirectBuffer, Mesh) {
     uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
     *count_ptr = 3;
 
-    char const *mesh_shader_source = R"glsl(
+    const char *mesh_shader_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
@@ -210,7 +210,7 @@ TEST_F(PositiveGpuAVIndirectBuffer, MeshSingleCommand) {
     vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
     uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
     *count_ptr = 3;
-    char const *mesh_shader_source = R"glsl(
+    const char *mesh_shader_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
@@ -298,10 +298,10 @@ TEST_F(PositiveGpuAVIndirectBuffer, PipelineAndShaderObjectComputeDispatchIndire
     m_command_buffer.Begin();
 
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
-    vk::CmdDispatchIndirect(m_command_buffer, dispatch_params_buffer.handle(), 0u);
+    vk::CmdDispatchIndirect(m_command_buffer, dispatch_params_buffer, 0u);
 
     vk::CmdBindShadersEXT(m_command_buffer, 1u, &stage, &comp_shader.handle());
-    vk::CmdDispatchIndirect(m_command_buffer, dispatch_params_buffer.handle(), 0u);
+    vk::CmdDispatchIndirect(m_command_buffer, dispatch_params_buffer, 0u);
 
     m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -327,7 +327,7 @@ TEST_F(PositiveGpuAVIndirectBuffer, RestoreStress) {
     indirect_dispatch_parameters.z = 1u;
 
     // used for all stage types
-    char const *shader_source = R"glsl(
+    const char *shader_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer Input {
             uint x;

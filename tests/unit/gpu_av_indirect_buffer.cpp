@@ -91,7 +91,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DrawCountDeviceLimit) {
     }
 
     if (mesh_shader_enabled) {
-        char const *mesh_shader_source = R"glsl(
+        const char *mesh_shader_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
@@ -292,7 +292,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DrawCount) {
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
     if (mesh_shader_enabled) {
-        char const *mesh_shader_source = R"glsl(
+        const char *mesh_shader_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
@@ -384,7 +384,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, Mesh) {
     uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
     *count_ptr = 3;
 
-    char const *mesh_shader_source = R"glsl(
+    const char *mesh_shader_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
@@ -410,7 +410,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, Mesh) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    if (mesh_shader_props.maxMeshWorkGroupCount[0] < std::numeric_limits<uint32_t>::max()) {
+    if (mesh_shader_props.maxMeshWorkGroupCount[0] < vvl::kU32Max) {
         draw_ptr[8] = mesh_shader_props.maxMeshWorkGroupCount[0] + 1;
         m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07326");
         if (mesh_shader_props.maxMeshWorkGroupCount[0] + 1 >= mesh_shader_props.maxMeshWorkGroupTotalCount) {
@@ -422,7 +422,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, Mesh) {
     }
 
     // Set y in second draw
-    if (mesh_shader_props.maxMeshWorkGroupCount[1] < std::numeric_limits<uint32_t>::max()) {
+    if (mesh_shader_props.maxMeshWorkGroupCount[1] < vvl::kU32Max) {
         draw_ptr[5] = mesh_shader_props.maxMeshWorkGroupCount[1] + 1;
         m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07327");
         if (mesh_shader_props.maxMeshWorkGroupCount[1] + 1 >= mesh_shader_props.maxMeshWorkGroupTotalCount) {
@@ -434,7 +434,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, Mesh) {
     }
 
     // Set z in first draw
-    if (mesh_shader_props.maxMeshWorkGroupCount[2] < std::numeric_limits<uint32_t>::max()) {
+    if (mesh_shader_props.maxMeshWorkGroupCount[2] < vvl::kU32Max) {
         draw_ptr[2] = mesh_shader_props.maxMeshWorkGroupCount[2] + 1;
         m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07328");
         if (mesh_shader_props.maxMeshWorkGroupCount[2] + 1 >= mesh_shader_props.maxMeshWorkGroupTotalCount) {
@@ -446,7 +446,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, Mesh) {
     }
 // total count can end up being really high, draw takes too long and times out
 #if 0
-    if (mesh_shader_props.maxMeshWorkGroupTotalCount < std::numeric_limits<uint32_t>::max()) {
+    if (mesh_shader_props.maxMeshWorkGroupTotalCount < vvl::kU32Max) {
         const uint32_t half_total = (mesh_shader_props.maxMeshWorkGroupTotalCount + 2) / 2;
         if (half_total < mesh_shader_props.maxMeshWorkGroupCount[0]) {
             draw_ptr[2] = 1;
@@ -498,7 +498,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DISABLED_MeshTask) {
     uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
     *count_ptr = 3;
 
-    char const *mesh_shader_source = R"glsl(
+    const char *mesh_shader_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
@@ -512,7 +512,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DISABLED_MeshTask) {
         )glsl";
     VkShaderObj mesh_shader(this, mesh_shader_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
-    char const *task_shader_source = R"glsl(
+    const char *task_shader_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         layout (local_size_x=1, local_size_y=1, local_size_z=1) in;
@@ -534,7 +534,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DISABLED_MeshTask) {
     m_command_buffer.End();
 
     // Set x in second draw
-    if (mesh_shader_props.maxTaskWorkGroupCount[0] < std::numeric_limits<uint32_t>::max()) {
+    if (mesh_shader_props.maxTaskWorkGroupCount[0] < vvl::kU32Max) {
         draw_ptr[4] = mesh_shader_props.maxTaskWorkGroupCount[0] + 1;
         m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07322");
         m_default_queue->SubmitAndWait(m_command_buffer);
@@ -543,7 +543,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DISABLED_MeshTask) {
     }
 
     // Set y in first draw
-    if (mesh_shader_props.maxTaskWorkGroupCount[1] < std::numeric_limits<uint32_t>::max()) {
+    if (mesh_shader_props.maxTaskWorkGroupCount[1] < vvl::kU32Max) {
         draw_ptr[1] = mesh_shader_props.maxTaskWorkGroupCount[1] + 1;
         m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07323");
         m_default_queue->SubmitAndWait(m_command_buffer);
@@ -552,7 +552,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DISABLED_MeshTask) {
     }
 
     // Set z in third draw
-    if (mesh_shader_props.maxTaskWorkGroupCount[2] < std::numeric_limits<uint32_t>::max()) {
+    if (mesh_shader_props.maxTaskWorkGroupCount[2] < vvl::kU32Max) {
         draw_ptr[10] = mesh_shader_props.maxTaskWorkGroupCount[2] + 1;
         m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07324");
         m_default_queue->SubmitAndWait(m_command_buffer);
@@ -560,7 +560,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DISABLED_MeshTask) {
         draw_ptr[10] = 1;
     }
 
-    if (mesh_shader_props.maxTaskWorkGroupTotalCount < std::numeric_limits<uint32_t>::max()) {
+    if (mesh_shader_props.maxTaskWorkGroupTotalCount < vvl::kU32Max) {
         const uint32_t half_total = (mesh_shader_props.maxTaskWorkGroupTotalCount + 2) / 2;
         if (half_total < mesh_shader_props.maxTaskWorkGroupCount[0]) {
             draw_ptr[2] = 1;

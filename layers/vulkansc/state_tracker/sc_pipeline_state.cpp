@@ -51,7 +51,7 @@ PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const
 
         if (code.size() > 0) {
             spirv::StatelessData stateless_data{};
-            auto spirv_module = std::make_shared<spirv::Module>(code.size() * sizeof(uint32_t), code.data(), &stateless_data);
+            auto spirv_module = vvl::CreateSpirvModuleState(code.size() * sizeof(uint32_t), code.data(), state_data.global_settings, &stateless_data);
 
             if (stateless_data.has_group_decoration) {
                 // Run optimizer to flatten group decorations
