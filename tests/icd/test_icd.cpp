@@ -24,6 +24,11 @@
 
 namespace icd {
 
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8776
+// things like shaderGroupBaseAlignment can be as big as 64, since these values are dynamically set in the Profile JSON, we need
+// to create the large alignment possible to satisfy them all
+static constexpr size_t memory_alignment = 64;
+
 static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetPhysicalDeviceProcAddr(VkInstance instance, const char* funcName) {
     const auto& item = name_to_func_ptr_map.find(funcName);
     if (item != name_to_func_ptr_map.end()) {
@@ -556,11 +561,7 @@ static VKAPI_ATTR void VKAPI_CALL DestroyDevice(VkDevice device, const VkAllocat
     // Vulkan SC does not support vkFreeMemory therefore all mapped memory is implicitly unmapped during device destruction
     for (auto it : mapped_memory_map) {
         for (auto map_addr : it.second) {
-#if defined(_WIN32)
-            _aligned_free(map_addr);
-#else
-            free(map_addr);
-#endif
+            ::operator delete(map_addr, std::align_val_t(memory_alignment));
         }
     }
     mapped_memory_map.clear();
@@ -674,11 +675,6 @@ static VKAPI_ATTR void VKAPI_CALL FreeMemory(VkDevice device, VkDeviceMemory mem
     allocated_memory_size_map.erase(memory);
 }
 #endif
-
-// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8776
-// things like shaderGroupBaseAlignment can be as big as 64, since these values are dynamically set in the Profile JSON, we need
-// to create the large alignment possible to satisfy them all
-static constexpr size_t memory_alignment = 64;
 
 static VKAPI_ATTR VkResult VKAPI_CALL MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size,
                                                 VkMemoryMapFlags flags, void** ppData) {
@@ -904,6 +900,7 @@ static VKAPI_ATTR void VKAPI_CALL GetImageMemoryRequirements2(VkDevice device, c
     GetImageMemoryRequirements(device, pInfo->image, &pMemoryRequirements->memoryRequirements);
 }
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_ARM_tensors
 static VKAPI_ATTR void VKAPI_CALL GetTensorMemoryRequirementsARM(VkDevice device, const VkTensorMemoryRequirementsInfoARM* pInfo,
                                                                  VkMemoryRequirements2* pMemoryRequirements)
 {
@@ -937,6 +934,7 @@ static VKAPI_ATTR void VKAPI_CALL GetDataGraphPipelineSessionMemoryRequirementsA
     // 3 is arbitrary, any value in [0,5] is acceptable, see GetPhysicalDeviceMemoryProperties.
     memReq.memoryTypeBits = 0xFFFF & ~(0x1 << 3);
 }
+#endif  // VULKANSC
 
 static VKAPI_ATTR void VKAPI_CALL GetBufferMemoryRequirements2(VkDevice device, const VkBufferMemoryRequirementsInfo2* pInfo,
                                                                VkMemoryRequirements2* pMemoryRequirements) {
@@ -1513,6 +1511,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFormatProperties2(VkPhysicalD
     }
 }
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_ARM_tensors
 static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceExternalTensorPropertiesARM(
     VkPhysicalDevice physicalDevice, const VkPhysicalDeviceExternalTensorInfoARM* pExternalTensorInfo,
     VkExternalTensorPropertiesARM* pExternalTensorProperties) {
@@ -1534,6 +1533,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceExternalTensorPropertiesARM(
         pExternalTensorProperties->externalMemoryProperties.compatibleHandleTypes = 0;
     }
 }
+#endif  // VULKANSC
 
 static VKAPI_ATTR VkResult VKAPI_CALL
 GetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2* pImageFormatInfo,
