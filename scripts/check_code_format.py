@@ -301,6 +301,11 @@ def main():
         commit_message = check_output(['git', 'log', '--pretty="%h %s"', diff_range]).decode('utf-8')
         CPrint('CONTENT', "\nChecking commit: " + commit_message)
 
+        # Skip code format check if downstreaming
+        if 'build: Downstream Vulkan-ValidationLayers' in commit_message:
+            print('Skipping format check when downstreaming')
+            exit(0)
+
         subprocess.run(['git', 'checkout', '-q', commit])
 
         # Get list of files involved in this commit
