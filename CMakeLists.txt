@@ -17,12 +17,17 @@
 # ~~~
 cmake_minimum_required(VERSION 3.22.1)
 
+option(VULKANSC "Build Vulkan SC validation layers" ON)
+
 # The VERSION field is generated with the "--generated-version" flag in the generate_source.py script
 #
 # If working with unreleased extensions, make sure the header and validation version are all on the same header version
-project(VVL VERSION 1.4.330 LANGUAGES CXX)
+if(VULKANSC)
+    project(VVL VERSION 1.0.20 LANGUAGES CXX) # vulkansc
+else()
+    project(VVL VERSION 1.4.330 LANGUAGES CXX) # vulkan
+endif()
 
-option(VULKANSC "Build Vulkan SC validation layers" ON)
 option(BUILD_WSI_SCREEN_QNX_SUPPORT "Build QNX screen support" OFF)
 option(BUILD_WSI_SCI_SUPPORT "Build SCI WSI support" OFF)
 

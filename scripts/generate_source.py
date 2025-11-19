@@ -568,7 +568,7 @@ def main(argv):
         with open(repo_relative('CMakeLists.txt'), "r+") as f:
             data = f.read()
             f.seek(0)
-            f.write(re.sub("project.*VERSION.*", f"project(VVL VERSION {args.generated_version} LANGUAGES CXX)", data))
+            f.write(re.sub(f"project.*VERSION.*# {args.api}", f"project(VVL VERSION {args.generated_version} LANGUAGES CXX) # {args.api}", data))
             f.truncate()
 
     return 0
