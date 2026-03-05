@@ -41,10 +41,10 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/debug_printf.cpp
     converted/debug_printf_ray_tracing.cpp
     converted/debug_printf_shader_debug_info.cpp
-    converted/deprecation.cpp
-    converted/deprecation_positive.cpp
     converted/descriptor_buffer.cpp
     converted/descriptor_buffer_positive.cpp
+    converted/descriptor_heap.cpp
+    converted/descriptor_heap_positive.cpp
     converted/descriptor_indexing.cpp
     converted/descriptor_indexing_positive.cpp
     converted/descriptors.cpp
@@ -75,9 +75,13 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_cooperative_vector_positive.cpp
     converted/gpu_av_copies.cpp
     converted/gpu_av_copies_positive.cpp
+    converted/gpu_av_copy_memory_indirect.cpp
+    converted/gpu_av_copy_memory_indirect_positive.cpp
     converted/gpu_av_debug_printf.cpp
     converted/gpu_av_descriptor_buffer_positive.cpp
     converted/gpu_av_descriptor_class_general_buffer.cpp
+    converted/gpu_av_descriptor_class_general_buffer_coop_mat.cpp
+    converted/gpu_av_descriptor_class_general_buffer_coop_mat_positive.cpp
     converted/gpu_av_descriptor_class_general_buffer_positive.cpp
     converted/gpu_av_descriptor_class_texel_buffer.cpp
     converted/gpu_av_descriptor_class_texel_buffer_positive.cpp
@@ -89,13 +93,19 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_index_buffer_positive.cpp
     converted/gpu_av_indirect_buffer.cpp
     converted/gpu_av_indirect_buffer_positive.cpp
+    converted/gpu_av_mesh.cpp
+    converted/gpu_av_mesh_positive.cpp
     converted/gpu_av_positive.cpp
+    converted/gpu_av_ray_hit_object.cpp
+    converted/gpu_av_ray_hit_object_positive.cpp
     converted/gpu_av_ray_query.cpp
     converted/gpu_av_ray_query_positive.cpp
     converted/gpu_av_ray_tracing.cpp
     converted/gpu_av_ray_tracing_positive.cpp
     converted/gpu_av_shader_debug_info.cpp
     converted/gpu_av_shader_object_positive.cpp
+    converted/gpu_av_shader_sanitizer.cpp
+    converted/gpu_av_shader_sanitizer_positive.cpp
     converted/gpu_av_spirv.cpp
     converted/gpu_av_spirv_positive.cpp
     converted/gpu_av_vertex_attribute_fetch.cpp
@@ -117,6 +127,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/layer_settings.cpp
     converted/layer_settings_positive.cpp
     converted/layer_utils_positive.cpp
+    converted/legacy.cpp
+    converted/legacy_positive.cpp
     converted/memory.cpp
     converted/memory_positive.cpp
     converted/mesh.cpp
@@ -153,6 +165,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/ray_tracing_pipeline_positive.cpp
     converted/ray_tracing_pipeline_positive_nv.cpp
     converted/ray_tracing_positive.cpp
+    converted/ray_tracing_spheres.cpp
+    converted/ray_tracing_spheres_positive.cpp
     converted/render_pass.cpp
     converted/render_pass_positive.cpp
     converted/robustness.cpp
@@ -161,6 +175,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/sampler_positive.cpp
     converted/secondary_command_buffer.cpp
     converted/secondary_command_buffer_positive.cpp
+    converted/shader_64bit_indexing.cpp
+    converted/shader_64bit_indexing_positive.cpp
     converted/shader_compute.cpp
     converted/shader_compute_positive.cpp
     converted/shader_cooperative_matrix.cpp
@@ -201,6 +217,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/sync_val_positive.cpp
     converted/sync_val_ray_tracing.cpp
     converted/sync_val_ray_tracing_positive.cpp
+    converted/sync_val_render_pass.cpp
+    converted/sync_val_render_pass_positive.cpp
     converted/sync_val_reporting.cpp
     converted/sync_val_semaphore.cpp
     converted/sync_val_semaphore_positive.cpp
@@ -212,6 +230,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/tensor_positive.cpp
     converted/threading.cpp
     converted/threading_positive.cpp
+    converted/tile_memory_heap.cpp
+    converted/tile_memory_heap_positive.cpp
     converted/tooling.cpp
     converted/tooling_positive.cpp
     converted/transform_feedback.cpp

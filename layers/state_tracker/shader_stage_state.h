@@ -1,6 +1,7 @@
-/* Copyright (c) 2024-2025 The Khronos Group Inc.
- * Copyright (c) 2024-2025 Valve Corporation
- * Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 The Khronos Group Inc.
+ * Copyright (c) 2024-2026 Valve Corporation
+ * Copyright (c) 2024-2026 LunarG, Inc.
+ * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +30,7 @@ struct safe_VkSpecializationInfo;
 
 namespace vvl {
 struct ShaderModule;
+struct DescriptorSetLayoutList;
 }  // namespace vvl
 
 namespace spirv {
@@ -38,26 +40,48 @@ class Instruction;
 }  // namespace spirv
 
 // This is a wrapper around the Shader as it may come from a Pipeline or Shader Object.
+//
+// TODO - This class has some very nasty flaws...
+// A good example is Descriptor Heap flags, we have a nice |descriptor_heap_mode| member we want to query, because it requires the
+// pipelineFlags2 pNext struct. Because we don't have the Pipeline/ShaderObject state object we have to basically reimplement
+// various state.
+// The core issue with this is we use it everything for Pipeline, but for ShaderObject, we only use at vkCreateShadersEXT()
+// Also for Pipeline, we create the state object prior to validating the vkCreatePipeline call
 struct ShaderStageState {
     // We use this over a spirv::Module because there are times we need to create empty objects
     std::shared_ptr<const vvl::ShaderModule> module_state;
     std::shared_ptr<const spirv::Module> spirv_state;
     const vku::safe_VkPipelineShaderStageCreateInfo *pipeline_create_info;
     const vku::safe_VkShaderCreateInfoEXT *shader_object_create_info;
+    // Can be null because GPL
+    const vvl::DescriptorSetLayoutList *descriptor_set_layouts;
+    // Will be NULL if coming from ShaderObject or Descriptor Heaps
+    VkPipelineLayout pipeline_layout;
     // If null, means it is an empty object, no SPIR-V backing it
     std::shared_ptr<const spirv::EntryPoint> entrypoint;
+    // Because this can come from a different struct depending on the Pipeline type, have it passed on creation
+    const bool descriptor_heap_mode;
+    const bool uses_resource_heap;
+    const bool uses_sampler_heap;
 
-    ShaderStageState(const vku::safe_VkPipelineShaderStageCreateInfo *pipeline_create_info,
-                     const vku::safe_VkShaderCreateInfoEXT *shader_object_create_info,
-                     std::shared_ptr<const vvl::ShaderModule> module_state, std::shared_ptr<const spirv::Module> spirv_state);
+    ShaderStageState(const vku::safe_VkPipelineShaderStageCreateInfo* pipeline_create_info,
+                     const vku::safe_VkShaderCreateInfoEXT* shader_object_create_info,
+                     const vvl::DescriptorSetLayoutList* descriptor_set_layouts,
+                     std::shared_ptr<const vvl::ShaderModule> module_state, std::shared_ptr<const spirv::Module> spirv_state,
+                     const VkPipelineLayout pipeline_layout, bool descriptor_heap_mode);
 
     bool HasPipeline() const { return pipeline_create_info != nullptr; }
     const char *GetPName() const;
     VkShaderStageFlagBits GetStage() const;
     vku::safe_VkSpecializationInfo *GetSpecializationInfo() const;
-    const void *GetPNext() const;
-    bool GetInt32ConstantValue(const spirv::Instruction &insn, uint32_t *value) const;
-    bool GetBooleanConstantValue(const spirv::Instruction &insn, bool *value) const;
+    const void* GetPNext() const;
+
+    // Handles things like VK_EXT_shader_module_identifier and VK_SHADER_CODE_TYPE_SPIRV_EXT
+    bool HasSpirv() const { return spirv_state.get() != nullptr && entrypoint.get() != nullptr; }
+
+  private:
+    bool ResourceHeapIsUsed();
+    bool SamplerHeapIsUsed();
 };
 
 namespace spirv {

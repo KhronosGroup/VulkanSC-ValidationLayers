@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,22 +21,20 @@
 #include "../framework/thread_helper.h"
 
 void VkBestPracticesLayerTest::InitBestPracticesFramework(const char *vendor_checks_to_enable) {
-    // Enable the vendor-specific checks spcified by vendor_checks_to_enable
-    const char *input_values[] = {vendor_checks_to_enable};
-    const VkLayerSettingEXT settings[] = {{OBJECT_LAYER_NAME, "enables", VK_LAYER_SETTING_TYPE_STRING_EXT,
-                                           static_cast<uint32_t>(std::size(input_values)), input_values}};
+    const VkLayerSettingEXT settings = {OBJECT_LAYER_NAME, vendor_checks_to_enable, VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
+    const VkLayerSettingsCreateInfoEXT layer_settings_create_info{VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                                  &settings};
 
-    const VkLayerSettingsCreateInfoEXT layer_settings_create_info{VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr,
-                                                                  static_cast<uint32_t>(std::size(settings)), settings};
-
-    features_.pNext = &layer_settings_create_info;
+    if (vendor_checks_to_enable) {
+        features_.pNext = &layer_settings_create_info;
+    }
 
     AddRequiredExtensions(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
     InitFramework(&features_);
 }
 
-void VkBestPracticesLayerTest::InitBestPractices(const char *ValidationChecksToEnable) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(ValidationChecksToEnable));
+void VkBestPracticesLayerTest::InitBestPractices(const char* vendor_checks_to_enable) {
+    RETURN_IF_SKIP(InitBestPracticesFramework(vendor_checks_to_enable));
     RETURN_IF_SKIP(InitState());
 }
 
@@ -71,7 +69,7 @@ TEST_F(VkBestPracticesLayerTest, ReturnCodes) {
     // Force a non-success success code by only asking for a subset of query results
     uint32_t format_count;
     std::vector<VkSurfaceFormatKHR> formats;
-    result = vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface.Handle(), &format_count, NULL);
+    result = vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface, &format_count, NULL);
     if (result != VK_SUCCESS || format_count <= 1) {
         GTEST_SKIP() << "test requires 2 or more extensions available";
     }
@@ -79,102 +77,35 @@ TEST_F(VkBestPracticesLayerTest, ReturnCodes) {
     formats.resize(format_count);
 
     m_errorMonitor->SetDesiredFailureMsg(kVerboseBit, "BestPractices-Verbose-Success-Logging");
-    result = vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface.Handle(), &format_count, formats.data());
+    result = vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface, &format_count, formats.data());
     ASSERT_TRUE(result > VK_SUCCESS);
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkBestPracticesLayerTest, UseDeprecatedInstanceExtensions) {
-    TEST_DESCRIPTION("Create an instance with a deprecated extension.");
-
-    // We need to explicitly allow promoted extensions to be enabled as this test relies on this behavior
-    AllowPromotedExtensions();
-
+TEST_F(VkBestPracticesLayerTest, SpecialUseExtensionsInstance) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    if (IsPlatformMockICD()) {
-        GTEST_SKIP() << "Test not supported by MockICD - currently can't create 2 concurrent instances";
+    if (!InstanceExtensionSupported(VK_GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME)) {
+        GTEST_SKIP() << "Did not find required instance extension";
     }
+    m_instance_extension_names.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
+    m_instance_extension_names.emplace_back(VK_GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME);
 
-    // Create a 1.1 vulkan instance and request an extension promoted to core in 1.1
-    if (IsExtensionsEnabled(VK_EXT_DEBUG_REPORT_EXTENSION_NAME)) {
-        // Extra error if VK_EXT_debug_report is used on Android still
-        m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");
-    }
+    const VkLayerSettingEXT settings = {OBJECT_LAYER_NAME, "validate_best_practices", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
+                                        &kVkTrue};
+    const VkLayerSettingsCreateInfoEXT layer_settings_create_info{VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                                  &settings};
 
-    m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");  // VK_KHR_get_physical_device_properties2
-    m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");  // VK_EXT_validation_features
-    m_errorMonitor->SetDesiredWarning("BestPractices-specialuse-extension");  // VK_EXT_debug_utils
-    m_errorMonitor->SetDesiredWarning("BestPractices-specialuse-extension");  // VK_EXT_validation_features
+    // GetDebugCreateInfo() is last pNext chain set in GetInstanceCreateInfo()
+    const_cast<VkDebugUtilsMessengerCreateInfoEXT*>(m_errorMonitor->GetDebugCreateInfo())->pNext = &layer_settings_create_info;
 
-    VkInstance dummy = VK_NULL_HANDLE;
-    auto features = features_;
+    Monitor().SetDesiredWarning("BestPractices-specialuse-extension");
+    VkInstance dummy_instance;
     auto ici = GetInstanceCreateInfo();
-    features.pNext = ici.pNext;
-    ici.pNext = &features;
-    vk::CreateInstance(&ici, nullptr, &dummy);
-    m_errorMonitor->VerifyFound();
-
-    VkApplicationInfo new_info{};
-    new_info.apiVersion = VK_API_VERSION_1_0;
-    new_info.pApplicationName = ici.pApplicationInfo->pApplicationName;
-    new_info.applicationVersion = ici.pApplicationInfo->applicationVersion;
-    new_info.pEngineName = ici.pApplicationInfo->pEngineName;
-    new_info.engineVersion = ici.pApplicationInfo->engineVersion;
-    ici.pApplicationInfo = &new_info;
-
-    // Create a 1.0 vulkan instance and request an extension promoted to core in 1.1
-    if (IsExtensionsEnabled(VK_EXT_DEBUG_REPORT_EXTENSION_NAME)) {
-        // Extra error if VK_EXT_debug_report is used on Android still
-        m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");
-    }
-    m_errorMonitor->SetUnexpectedError("khronos-Validation-debug-build-warning-message");
-    m_errorMonitor->SetUnexpectedError("khronos-Validation-fine-grained-locking-warning-message");
-    m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");  // VK_EXT_validation_features
-    m_errorMonitor->SetDesiredWarning("BestPractices-specialuse-extension");  // VK_EXT_debug_utils
-    m_errorMonitor->SetDesiredWarning("BestPractices-specialuse-extension");  // VK_EXT_validation_features
-    vk::CreateInstance(&ici, nullptr, &dummy);
-    m_errorMonitor->VerifyFound();
-    if (dummy != VK_NULL_HANDLE) {
-        vk::DestroyInstance(dummy, nullptr);
-    }
+    vk::CreateInstance(&ici, nullptr, &dummy_instance);
+    Monitor().VerifyFound();
 }
 
-TEST_F(VkBestPracticesLayerTest, UseDeprecatedDeviceExtensions) {
-    TEST_DESCRIPTION("Create a device with a deprecated extension.");
-
-    // We need to explicitly allow promoted extensions to be enabled as this test relies on this behavior
-    AllowPromotedExtensions();
-
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-
-    VkDevice local_device;
-    VkDeviceCreateInfo dev_info = vku::InitStructHelper();
-    VkDeviceQueueCreateInfo queue_info = vku::InitStructHelper();
-    queue_info.queueFamilyIndex = 0;
-    queue_info.queueCount = 1;
-    float qp = 1;
-    queue_info.pQueuePriorities = &qp;
-    dev_info.queueCreateInfoCount = 1;
-    dev_info.pQueueCreateInfos = &queue_info;
-    dev_info.enabledLayerCount = 0;
-    dev_info.ppEnabledLayerNames = NULL;
-    dev_info.enabledExtensionCount = m_device_extension_names.size();
-    dev_info.ppEnabledExtensionNames = m_device_extension_names.data();
-
-    // One for VK_KHR_buffer_device_address
-    // One for the dependency extension VK_KHR_device_group
-    m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension", 2);
-    vk::CreateDevice(this->Gpu(), &dev_info, NULL, &local_device);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(VkBestPracticesLayerTest, SpecialUseExtensions) {
-    TEST_DESCRIPTION("Create a device with a 'specialuse' extension.");
-
+TEST_F(VkBestPracticesLayerTest, SpecialUseExtensionsDevice) {
     AddRequiredExtensions(VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBestPracticesFramework());
 
@@ -506,8 +437,7 @@ TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoad) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                 VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
     vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), m_width, m_height);
 
@@ -555,8 +485,7 @@ TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoadSecondary) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
                                 VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
     vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), m_width, m_height);
 
@@ -585,8 +514,7 @@ TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoadSecondary) {
     render_pass_begin_info.renderPass = rp;
     render_pass_begin_info.framebuffer = fb;
     // need full clear
-    render_pass_begin_info.renderArea.extent.width = m_width;
-    render_pass_begin_info.renderArea.extent.height = m_height;
+    render_pass_begin_info.renderArea.extent = {m_width, m_height};
 
     // Plain clear after load.
     m_command_buffer.BeginRenderPass(render_pass_begin_info);
@@ -685,7 +613,7 @@ TEST_F(VkBestPracticesLayerTest, TripleBufferingTest) {
     InitSwapchainInfo();
 
     VkBool32 supported;
-    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface.Handle(), &supported);
+    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
     if (!supported) {
         GTEST_SKIP() << "Graphics queue does not support present";
     }
@@ -705,7 +633,7 @@ TEST_F(VkBestPracticesLayerTest, TripleBufferingTest) {
     VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
     VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
-    swapchain_create_info.surface = m_surface.Handle();
+    swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = 2;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
     swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
@@ -750,7 +678,7 @@ TEST_F(VkBestPracticesLayerTest, SwapchainCreationTest) {
     VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
     VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
-    swapchain_create_info.surface = m_surface.Handle();
+    swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = 3;
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = imageUsage;
@@ -764,13 +692,13 @@ TEST_F(VkBestPracticesLayerTest, SwapchainCreationTest) {
     // Test for successful swapchain creation when GetPhysicalDeviceSurfaceCapabilitiesKHR() and
     // GetPhysicalDeviceSurfaceFormatsKHR() are queried as expected and GetPhysicalDeviceSurfacePresentModesKHR() is not called but
     // the present mode is VK_PRESENT_MODE_FIFO_KHR
-    vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(Gpu(), m_surface.Handle(), &m_surface_capabilities);
+    vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(Gpu(), m_surface, &m_surface_capabilities);
 
     uint32_t format_count;
-    vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface.Handle(), &format_count, nullptr);
+    vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface, &format_count, nullptr);
     if (format_count != 0) {
         m_surface_formats.resize(format_count);
-        vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface.Handle(), &format_count, m_surface_formats.data());
+        vk::GetPhysicalDeviceSurfaceFormatsKHR(Gpu(), m_surface, &format_count, m_surface_formats.data());
     }
 
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -905,8 +833,8 @@ TEST_F(VkBestPracticesLayerTest, CreatePipelineVsFsTypeMismatchArraySize) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -943,8 +871,8 @@ TEST_F(VkBestPracticesLayerTest, WorkgroupSizeDeprecated) {
                OpFunctionEnd
         )";
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = VkShaderObj(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
+        helper.cs_ = VkShaderObj(*m_device, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kWarningBit, "BestPractices-SpirvDeprecated_WorkgroupSize");
 }
@@ -1032,11 +960,7 @@ TEST_F(VkBestPracticesLayerTest, TransitionFromUndefinedToReadOnly) {
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     img_barrier.image = image;
-    img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    img_barrier.subresourceRange.baseArrayLayer = 0;
-    img_barrier.subresourceRange.baseMipLevel = 0;
-    img_barrier.subresourceRange.layerCount = 1;
-    img_barrier.subresourceRange.levelCount = 1;
+    img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     m_command_buffer.Begin();
 
@@ -1165,8 +1089,7 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearWithoutLoadOpClear) {
     begin_info.clearValueCount = 1;  // Pass one clearValue, in conflict with attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE
     begin_info.pClearValues = &cv;
     begin_info.renderPass = rp;
-    begin_info.renderArea.extent.width = w;
-    begin_info.renderArea.extent.height = h;
+    begin_info.renderArea.extent = {w, h};
     begin_info.framebuffer = fb;
 
     m_errorMonitor->SetDesiredWarning("BestPractices-ClearValueWithoutLoadOpClear");
@@ -1237,8 +1160,7 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearValueCountHigherThanAttachmentCo
                                      // second clearValue will be ignored
     begin_info.pClearValues = cv;
     begin_info.renderPass = rp;
-    begin_info.renderArea.extent.width = w;
-    begin_info.renderArea.extent.height = h;
+    begin_info.renderArea.extent = {w, h};
     begin_info.framebuffer = fb;
 
     m_errorMonitor->SetDesiredWarning("BestPractices-ClearValueCountHigherThanAttachmentCount");
@@ -1324,45 +1246,6 @@ TEST_F(VkBestPracticesLayerTest, DontCareThenLoad) {
     m_default_queue->Wait();
 }
 
-TEST_F(VkBestPracticesLayerTest, LoadDeprecatedExtension) {
-    TEST_DESCRIPTION("Test for loading a vk1.3 deprecated extension with a 1.3 instance on a 1.2 or less device");
-
-    SetTargetApiVersion(VK_API_VERSION_1_3);
-
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-
-    const char *extension = VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME;
-
-    if (!DeviceExtensionSupported(extension)) {
-        GTEST_SKIP() << extension << " not supported.";
-    }
-
-    VkDeviceQueueCreateInfo qci = vku::InitStructHelper();
-    qci.queueFamilyIndex = 0;
-    float priority = 1;
-    qci.pQueuePriorities = &priority;
-    qci.queueCount = 1;
-
-    VkDeviceCreateInfo dev_info = vku::InitStructHelper();
-    dev_info.queueCreateInfoCount = 1;
-    dev_info.pQueueCreateInfos = &qci;
-    dev_info.enabledExtensionCount = 1;
-    dev_info.ppEnabledExtensionNames = &extension;
-
-    m_errorMonitor->SetDesiredWarning("BestPractices-deprecated-extension");
-    // api version != device version
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-vkCreateDevice-API-version-mismatch");
-
-    VkDevice device = VK_NULL_HANDLE;
-    vk::CreateDevice(Gpu(), &dev_info, nullptr, &device);
-
-    if (DeviceValidationVersion() >= VK_API_VERSION_1_3) {
-        m_errorMonitor->VerifyFound();
-    }
-
-    if (device) vk::DestroyDevice(device, nullptr);
-}
-
 TEST_F(VkBestPracticesLayerTest, ExclusiveImageMultiQueueUsage) {
     TEST_DESCRIPTION("Test for using a queue exclusive image on multiple queues");
 
@@ -1432,8 +1315,7 @@ TEST_F(VkBestPracticesLayerTest, ExclusiveImageMultiQueueUsage) {
     begin_info.clearValueCount = 1;
     begin_info.pClearValues = &cv;
     begin_info.renderPass = rp;
-    begin_info.renderArea.extent.width = w;
-    begin_info.renderArea.extent.height = h;
+    begin_info.renderArea.extent = {w, h};
     begin_info.framebuffer = fb;
 
     // Prepare compute
@@ -1447,7 +1329,7 @@ TEST_F(VkBestPracticesLayerTest, ExclusiveImageMultiQueueUsage) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, cs, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.dsl_bindings_[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     pipe.dsl_bindings_[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     pipe.CreateComputePipeline();
@@ -1574,11 +1456,7 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     img_barrier.image = image;
-    img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    img_barrier.subresourceRange.baseArrayLayer = 0;
-    img_barrier.subresourceRange.baseMipLevel = 0;
-    img_barrier.subresourceRange.layerCount = 1;
-    img_barrier.subresourceRange.levelCount = 1;
+    img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     m_command_buffer.Begin();
 
@@ -1620,11 +1498,7 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
         img_barrier2.srcAccessMask = 0;
         img_barrier2.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         img_barrier2.image = image;
-        img_barrier2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        img_barrier2.subresourceRange.baseArrayLayer = 0;
-        img_barrier2.subresourceRange.baseMipLevel = 0;
-        img_barrier2.subresourceRange.layerCount = 1;
-        img_barrier2.subresourceRange.levelCount = 1;
+        img_barrier2.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
         img_barrier2.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
         img_barrier2.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -1684,7 +1558,7 @@ TEST_F(VkBestPracticesLayerTest, NoCreateSwapchainPresentModes) {
     RETURN_IF_SKIP(InitSurface());
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");  // skip core checks
     m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateSwapchainKHR-no-VkSwapchainPresentModesCreateInfoKHR-provided");
-    m_swapchain = CreateSwapchain(m_surface.Handle(), VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
+    m_swapchain = CreateSwapchain(m_surface, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1799,8 +1673,8 @@ TEST_F(VkBestPracticesLayerTest, PartialPushConstantSetEnd) {
         }
     )glsl";
 
-    VkShaderObj const vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     uint32_t data[2] = {1u, 2u};
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(data)};
@@ -1845,8 +1719,8 @@ TEST_F(VkBestPracticesLayerTest, PartialPushConstantSetMiddle) {
         }
     )glsl";
 
-    VkShaderObj const vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     uint32_t data = 1u;
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(uint32_t) * 3};
@@ -2108,7 +1982,7 @@ TEST_F(VkBestPracticesLayerTest, PartialPushConstantSetEndCompute) {
     descriptor_set.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_}, {push_constant_range});
     pipe.CreateComputePipeline();
 
@@ -2219,16 +2093,13 @@ TEST_F(VkBestPracticesLayerTest, BadDestroy) {
     vk::AllocateCommandBuffers(leaky_device, &command_buffer_allocate_info, &command_buffer);
 
     m_errorMonitor->SetDesiredError("VUID-vkDestroyDevice-device-05137");
-    m_errorMonitor->SetDesiredError("VUID-vkDestroyDevice-device-05137");
     // Those 2 will come from self validation if it is enabled
-    m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
     vk::DestroyDevice(leaky_device, nullptr);
     m_errorMonitor->VerifyFound();
 
     // There's no way we can destroy the command pool at this point. Even though DestroyDevice failed, the loader has already
     // removed references to the device
-    m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkDestroyInstance-instance-00629");
 }
@@ -2254,4 +2125,59 @@ TEST_F(VkBestPracticesLayerTest, MutableDescriptors) {
     m_errorMonitor->SetDesiredWarning("BestPractices-MutableDescriptor-TypeListCount");
     vkt::DescriptorPool pool(*m_device, ds_pool_ci);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkBestPracticesLayerTest, MaxPreferredWorkGroupInvocations) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    AddRequiredFeature(vkt::Feature::taskShader);
+    RETURN_IF_SKIP(InitBestPractices());
+    InitRenderTarget();
+
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(mesh_shader_properties);
+
+    if (mesh_shader_properties.maxPreferredTaskWorkGroupInvocations >= 32 ||
+        mesh_shader_properties.maxPreferredMeshWorkGroupInvocations >= 32) {
+        GTEST_SKIP() << "Preferred values are too high";
+    }
+
+    const char* task_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : enable
+        layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+        void main() {
+            EmitMeshTasksEXT(1u, 1u, 1u);
+        }
+    )glsl";
+
+    const char* mesh_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : enable
+        layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+        layout(max_vertices = 3, max_primitives=1) out;
+        layout(triangles) out;
+        void main() {
+            SetMeshOutputsEXT(3,1);
+        }
+    )glsl";
+
+    {
+        VkShaderObj ts_over(*m_device, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+        VkShaderObj ms(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+        CreatePipelineHelper pipe(*this);
+        pipe.shader_stages_ = {ts_over.GetStageCreateInfo(), ms.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-Mesh-MaxPreferredWorkGroupInvocations");
+        pipe.CreateGraphicsPipeline();
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        VkShaderObj ms_over(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+        CreatePipelineHelper pipe(*this);
+        pipe.shader_stages_ = {ms_over.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-Mesh-MaxPreferredWorkGroupInvocations");
+        pipe.CreateGraphicsPipeline();
+        m_errorMonitor->VerifyFound();
+    }
 }

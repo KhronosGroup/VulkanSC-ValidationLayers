@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -47,7 +47,7 @@ TEST_F(NegativeThreading, CommandBufferCollision) {
     ASSERT_EQ(VK_SUCCESS, err);
 
     ThreadTestData data;
-    data.commandBuffer = commandBuffer.handle();
+    data.commandBuffer = commandBuffer;
     data.event = event;
     std::atomic<bool> bailout{false};
     data.bailout = &bailout;
@@ -123,4 +123,5 @@ TEST_F(NegativeThreading, UpdateDescriptorCollision) {
 
     m_errorMonitor->VerifyFound();
 }
+
 #endif  // GTEST_IS_THREADSAFE

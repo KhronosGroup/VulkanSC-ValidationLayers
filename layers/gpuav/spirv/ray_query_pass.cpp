@@ -1,4 +1,4 @@
-/* Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ namespace spirv {
 const static OfflineModule kOfflineModule = {instrumentation_ray_query_comp, instrumentation_ray_query_comp_size,
                                              UseErrorPayloadVariable};
 
-const static OfflineFunction kOfflineFunction = {"inst_ray_query", instrumentation_ray_query_comp_function_0_offset};
+const static OfflineFunction kOfflineFunction = {"inst_ray_query_comp", instrumentation_ray_query_comp_function_0_offset};
 
 RayQueryPass::RayQueryPass(Module& module) : Pass(module, kOfflineModule) { module.use_bda_ = true; }
 
@@ -36,7 +36,7 @@ uint32_t RayQueryPass::GetLinkFunctionId() { return GetLinkFunction(link_functio
 uint32_t RayQueryPass::CreateFunctionCall(BasicBlock& block, InstructionIt* inst_it, const InstructionMeta& meta) {
     const uint32_t function_result = module_.TakeNextId();
     const uint32_t function_def = GetLinkFunctionId();
-    const uint32_t bool_type = module_.type_manager_.GetTypeBool().Id();
+    const uint32_t bool_type = type_manager_.GetTypeBool().Id();
 
     const uint32_t ray_flags_id = meta.target_instruction->Operand(2);
     const uint32_t ray_origin_id = meta.target_instruction->Operand(4);
@@ -45,7 +45,7 @@ uint32_t RayQueryPass::CreateFunctionCall(BasicBlock& block, InstructionIt* inst
     const uint32_t ray_tmax_id = meta.target_instruction->Operand(7);
 
     const uint32_t inst_position = meta.target_instruction->GetPositionOffset();
-    const uint32_t inst_position_id = module_.type_manager_.CreateConstantUInt32(inst_position).Id();
+    const uint32_t inst_position_id = type_manager_.CreateConstantUInt32(inst_position).Id();
 
     block.CreateInstruction(spv::OpFunctionCall,
                             {bool_type, function_result, function_def, inst_position_id, ray_flags_id, ray_origin_id, ray_tmin_id,
@@ -55,8 +55,7 @@ uint32_t RayQueryPass::CreateFunctionCall(BasicBlock& block, InstructionIt* inst
     return function_result;
 }
 
-bool RayQueryPass::RequiresInstrumentation(const Function& function, const Instruction& inst, InstructionMeta& meta) {
-    (void)function;
+bool RayQueryPass::RequiresInstrumentation(const Instruction& inst, InstructionMeta& meta) {
     const uint32_t opcode = inst.Opcode();
     if (opcode != spv::OpRayQueryInitializeKHR) {
         return false;
@@ -67,13 +66,17 @@ bool RayQueryPass::RequiresInstrumentation(const Function& function, const Instr
 
 bool RayQueryPass::Instrument() {
     // Can safely loop function list as there is no injecting of new Functions until linking time
-    for (const auto& function : module_.functions_) {
-        if (function->instrumentation_added_) continue;
-        for (auto block_it = function->blocks_.begin(); block_it != function->blocks_.end(); ++block_it) {
+    for (Function& function : module_.functions_) {
+        if (!function.called_from_target_) {
+            continue;
+        }
+        for (auto block_it = function.blocks_.begin(); block_it != function.blocks_.end(); ++block_it) {
             BasicBlock& current_block = **block_it;
 
             cf_.Update(current_block);
-            if (debug_disable_loops_ && cf_.in_loop) continue;
+            if (debug_disable_loops_ && cf_.in_loop) {
+                continue;
+            }
 
             if (current_block.IsLoopHeader()) {
                 continue;  // Currently can't properly handle injecting CFG logic into a loop header block
@@ -83,15 +86,19 @@ bool RayQueryPass::Instrument() {
             for (auto inst_it = block_instructions.begin(); inst_it != block_instructions.end(); ++inst_it) {
                 InstructionMeta meta;
                 // Every instruction is analyzed by the specific pass and lets us know if we need to inject a function or not
-                if (!RequiresInstrumentation(*function, *(inst_it->get()), meta)) continue;
+                if (!RequiresInstrumentation(*(inst_it->get()), meta)) {
+                    continue;
+                }
 
-                if (IsMaxInstrumentationsCount()) continue;
+                if (IsMaxInstrumentationsCount()) {
+                    continue;
+                }
                 instrumentations_count_++;
 
                 if (!module_.settings_.safe_mode) {
                     CreateFunctionCall(current_block, &inst_it, meta);
                 } else {
-                    InjectConditionalData ic_data = InjectFunctionPre(*function.get(), block_it, inst_it);
+                    InjectConditionalData ic_data = InjectFunctionPre(function, block_it, inst_it);
                     ic_data.function_result_id = CreateFunctionCall(current_block, nullptr, meta);
                     InjectFunctionPost(current_block, ic_data);
                     // Skip the newly added valid and invalid block. Start searching again from newly split merge block

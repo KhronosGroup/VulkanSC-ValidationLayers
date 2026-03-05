@@ -13,9 +13,11 @@
  * limitations under the License.
  */
 
+#include <spirv/unified1/spirv.hpp>
 #include <sstream>
 #include "state_tracker/shader_instruction.h"
 #include "generated/spirv_grammar_helper.h"
+#include "state_tracker/shader_module.h"
 
 namespace spirv {
 
@@ -141,8 +143,8 @@ uint32_t Instruction::GetConstantValue() const {
     // This should be a OpConstant (not a OpSpecConstant), if this asserts then 2 things are happening
     // 1. This function is being used where we don't actually know it is a constant and is a bug in the validation layers
     // 2. The CreateFoldSpecConstantOpAndCompositePass didn't fully fold everything and is a bug in spirv-opt
-    assert(Opcode() == spv::OpConstant);
-    return Word(3);
+    assert(Opcode() == spv::OpConstant || Opcode() == spv::OpConstantNull);
+    return Opcode() == spv::OpConstantNull ? 0 : Word(3);
 }
 
 // The idea of this function is to not have to constantly lookup which operand for the width
@@ -177,11 +179,13 @@ spv::BuiltIn Instruction::GetBuiltIn() const {
         return static_cast<spv::BuiltIn>(Word(4));
     } else {
         assert(false);  // non valid Opcode
-        return spv::BuiltInMax;
+        return spirv::kInvalidBuiltIn;
     }
 }
 
 bool Instruction::IsArray() const { return (Opcode() == spv::OpTypeArray || Opcode() == spv::OpTypeRuntimeArray); }
+
+bool Instruction::IsVector() const { return (Opcode() == spv::OpTypeVector || Opcode() == spv::OpTypeVectorIdEXT); }
 
 bool Instruction::IsNonPtrAccessChain() const {
     const uint32_t opcode = Opcode();
@@ -203,6 +207,43 @@ bool Instruction::IsImageMultisampled() const {
     return (Opcode() == spv::OpTypeImage) && (Word(6) != 0);
 }
 
+bool Instruction::IsTensor() const { return (Opcode() == spv::OpTypeTensorARM); }
+
+// Returns "any" constant
+bool Instruction::IsConstant() const {
+    switch (Opcode()) {
+        case spv::OpConstantTrue:
+        case spv::OpConstantFalse:
+        case spv::OpConstant:
+        case spv::OpConstantComposite:
+        case spv::OpConstantSampler:
+        case spv::OpConstantNull:
+        case spv::OpSpecConstantTrue:
+        case spv::OpSpecConstantFalse:
+        case spv::OpSpecConstant:
+        case spv::OpSpecConstantComposite:
+        case spv::OpSpecConstantOp:
+            return true;
+        default:
+            break;
+    }
+    return false;
+}
+
+bool Instruction::IsSpecConstant() const {
+    switch (Opcode()) {
+        case spv::OpSpecConstantTrue:
+        case spv::OpSpecConstantFalse:
+        case spv::OpSpecConstant:
+        case spv::OpSpecConstantComposite:
+        case spv::OpSpecConstantOp:
+            return true;
+        default:
+            break;
+    }
+    return false;
+}
+
 spv::StorageClass Instruction::StorageClass() const {
     spv::StorageClass storage_class = spv::StorageClassMax;
     switch (Opcode()) {
@@ -220,6 +261,19 @@ spv::StorageClass Instruction::StorageClass() const {
             break;
     }
     return storage_class;
+}
+
+// OpEntryPoint are annoying because the offset to the interface variable requires you to first detect how big the "Name" string is
+uint32_t Instruction::GetEntryPointInterfaceStart() const {
+    assert(Opcode() == spv::OpEntryPoint || Opcode() == spv::OpGraphEntryPointARM);
+    uint32_t word = 3;  // operand Name operand starts
+    // Find the end of the entrypoint's name string. additional zero bytes follow the actual null terminator, to fill out the rest
+    // of the word - so we only need to look at the last byte in the word to determine which word contains the terminator.
+    while (Word(word) & 0xff000000u) {
+        ++word;
+    }
+    ++word;
+    return word;
 }
 
 void Instruction::Fill(const std::vector<uint32_t>& words) {
@@ -244,7 +298,7 @@ void Instruction::AppendWord(uint32_t word) {
     UpdateDebugInfo();
 }
 
-void Instruction::ToBinary(std::vector<uint32_t>& out) {
+void Instruction::ToBinary(std::vector<uint32_t>& out) const {
     for (auto word : words_) {
         out.push_back(word);
     }
@@ -320,6 +374,7 @@ void Instruction::ReplaceLinkedId(vvl::unordered_map<uint32_t, uint32_t>& id_swa
         case spv::OpConvertSToF:
         case spv::OpConvertUToF:
         case spv::OpConvertUToPtr:
+        case spv::OpGroupNonUniformElect:
             swap(1);
             swap(3);
             break;

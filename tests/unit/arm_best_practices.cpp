@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +18,7 @@
 #include "binding.h"
 #include <algorithm>
 
-const char* kEnableArmValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_ARM";
+const char* kEnableArmValidation = "validate_best_practices_arm";
 
 class VkArmBestPracticesLayerTest : public VkBestPracticesLayerTest {};
 
@@ -169,8 +169,7 @@ TEST_F(VkArmBestPracticesLayerTest, AttachmentNeedsReadback) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                 VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
     vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle());
 
@@ -457,7 +456,7 @@ TEST_F(VkArmBestPracticesLayerTest, PresentModeTest) {
     InitSwapchainInfo();
 
     VkBool32 supported;
-    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface.Handle(), &supported);
+    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
     if (!supported) {
         GTEST_SKIP() << "Graphics queue does not support present, skipping test";
     }
@@ -466,7 +465,7 @@ TEST_F(VkArmBestPracticesLayerTest, PresentModeTest) {
     VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
     VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
-    swapchain_create_info.surface = m_surface.Handle();
+    swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
     swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
@@ -653,7 +652,7 @@ TEST_F(VkArmBestPracticesLayerTest, ComputeShaderBadWorkGroupThreadAlignmentTest
         )glsl";
 
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         pipe.CreateComputePipeline();
     }
 
@@ -665,7 +664,7 @@ TEST_F(VkArmBestPracticesLayerTest, ComputeShaderBadWorkGroupThreadAlignmentTest
         )glsl";
 
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         // this pipeline should cause a warning due to bad work group alignment
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                              "BestPractices-Arm-vkCreateComputePipelines-compute-thread-group-alignment");
@@ -681,7 +680,7 @@ TEST_F(VkArmBestPracticesLayerTest, ComputeShaderBadWorkGroupThreadAlignmentTest
         )glsl";
 
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                              "BestPractices-Arm-vkCreateComputePipelines-compute-thread-group-alignment");
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
@@ -707,7 +706,7 @@ TEST_F(VkArmBestPracticesLayerTest, ComputeShaderBadWorkGroupThreadCountTest) {
         )glsl";
 
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         pipe.CreateComputePipeline();
     }
 
@@ -718,7 +717,7 @@ TEST_F(VkArmBestPracticesLayerTest, ComputeShaderBadWorkGroupThreadCountTest) {
             void main(){}
         )glsl";
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                              "BestPractices-Arm-vkCreateComputePipelines-compute-thread-group-alignment");
         pipe.CreateComputePipeline();
@@ -735,7 +734,7 @@ TEST_F(VkArmBestPracticesLayerTest, ComputeShaderBadWorkGroupThreadCountTest) {
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                              "BestPractices-Arm-vkCreateComputePipelines-compute-work-group-size");
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         pipe.CreateComputePipeline();
         m_errorMonitor->VerifyFound();
     }
@@ -784,19 +783,19 @@ TEST_F(VkArmBestPracticesLayerTest, ComputeShaderBadSpatialLocality) {
     {
         CreateComputePipelineHelper pipe(*this);
         pipe.cp_ci_.layout = pipeline_layout;
-        pipe.cs_ = VkShaderObj(this, compute_sampler_2d_8_8_1, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, compute_sampler_2d_8_8_1, VK_SHADER_STAGE_COMPUTE_BIT);
         pipe.CreateComputePipeline();
     }
     {
         CreateComputePipelineHelper pipe(*this);
         pipe.cp_ci_.layout = pipeline_layout;
-        pipe.cs_ = VkShaderObj(this, compute_sampler_1d_64_1_1, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, compute_sampler_1d_64_1_1, VK_SHADER_STAGE_COMPUTE_BIT);
         pipe.CreateComputePipeline();
     }
     {
         CreateComputePipelineHelper pipe(*this);
         pipe.cp_ci_.layout = pipeline_layout;
-        pipe.cs_ = VkShaderObj(this, compute_sampler_2d_64_1_1, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, compute_sampler_2d_64_1_1, VK_SHADER_STAGE_COMPUTE_BIT);
         m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                              "BestPractices-Arm-vkCreateComputePipelines-compute-spatial-locality");
         pipe.CreateComputePipeline();
@@ -865,7 +864,7 @@ TEST_F(VkArmBestPracticesLayerTest, ComputeShaderBadSpatialLocalityMultiEntrypoi
 
     CreateComputePipelineHelper pipe(*this);
     pipe.cp_ci_.layout = pipeline_layout;
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
     pipe.CreateComputePipeline();
 }
 
@@ -883,15 +882,13 @@ TEST_F(VkArmBestPracticesLayerTest, RedundantRenderPassStore) {
     RenderPassSingleSubpass rp0(*this);
     rp0.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
                                  VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-    rp0.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp0.AddColorAttachment(0);
+    rp0.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp0.CreateRenderPass();
 
     RenderPassSingleSubpass rp1(*this);
     rp1.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
                                  VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
-    rp1.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp1.AddColorAttachment(0);
+    rp1.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp1.CreateRenderPass();
 
     vkt::Image image0(*m_device, 512, 512, format,
@@ -998,8 +995,7 @@ TEST_F(VkArmBestPracticesLayerTest, RedundantRenderPassClear) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
                                 VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     vkt::Framebuffer fb(*m_device, rp, 1, &view0.handle(), 512, 512);

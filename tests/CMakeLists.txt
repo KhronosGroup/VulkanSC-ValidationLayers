@@ -1,7 +1,8 @@
 # ~~~
-# Copyright (c) 2014-2025 Valve Corporation
-# Copyright (c) 2014-2025 LunarG, Inc.
+# Copyright (c) 2014-2026 Valve Corporation
+# Copyright (c) 2014-2026 LunarG, Inc.
 # Copyright (C) 2025 Arm Limited.
+# Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,11 +57,12 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/debug_printf.cpp
     unit/debug_printf_shader_debug_info.cpp
     unit/debug_printf_ray_tracing.cpp
-    # Off until WG decides on naming
-    # unit/deprecation.cpp
-    # unit/deprecation_positive.cpp
+    unit/legacy.cpp
+    unit/legacy_positive.cpp
     unit/descriptor_buffer.cpp
     unit/descriptor_buffer_positive.cpp
+    unit/descriptor_heap.cpp
+    unit/descriptor_heap_positive.cpp
     unit/descriptor_indexing.cpp
     unit/descriptor_indexing_positive.cpp
     unit/descriptors.cpp
@@ -91,10 +93,14 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_cooperative_vector_positive.cpp
     unit/gpu_av_copies.cpp
     unit/gpu_av_copies_positive.cpp
+    unit/gpu_av_copy_memory_indirect.cpp
+    unit/gpu_av_copy_memory_indirect_positive.cpp
     unit/gpu_av_debug_printf.cpp
     unit/gpu_av_descriptor_buffer_positive.cpp
     unit/gpu_av_descriptor_class_general_buffer.cpp
     unit/gpu_av_descriptor_class_general_buffer_positive.cpp
+    unit/gpu_av_descriptor_class_general_buffer_coop_mat.cpp
+    unit/gpu_av_descriptor_class_general_buffer_coop_mat_positive.cpp
     unit/gpu_av_descriptor_class_texel_buffer.cpp
     unit/gpu_av_descriptor_class_texel_buffer_positive.cpp
     unit/gpu_av_descriptor_indexing.cpp
@@ -105,13 +111,19 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_indirect_buffer_positive.cpp
     unit/gpu_av_index_buffer.cpp
     unit/gpu_av_index_buffer_positive.cpp
+    unit/gpu_av_mesh.cpp
+    unit/gpu_av_mesh_positive.cpp
     unit/gpu_av_positive.cpp
     unit/gpu_av_shader_object_positive.cpp
     unit/gpu_av_shader_debug_info.cpp
+    unit/gpu_av_shader_sanitizer.cpp
+    unit/gpu_av_shader_sanitizer_positive.cpp
     unit/gpu_av_spirv.cpp
     unit/gpu_av_spirv_positive.cpp
     unit/gpu_av_ray_query.cpp
     unit/gpu_av_ray_query_positive.cpp
+    unit/gpu_av_ray_hit_object.cpp
+    unit/gpu_av_ray_hit_object_positive.cpp
     unit/gpu_av_ray_tracing.cpp
     unit/gpu_av_ray_tracing_positive.cpp
     unit/gpu_av_vertex_attribute_fetch.cpp
@@ -177,6 +189,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/sampler_positive.cpp
     unit/secondary_command_buffer.cpp
     unit/secondary_command_buffer_positive.cpp
+    unit/shader_64bit_indexing.cpp
+    unit/shader_64bit_indexing_positive.cpp
     unit/shader_compute.cpp
     unit/shader_compute_positive.cpp
     unit/shader_cooperative_matrix.cpp
@@ -218,6 +232,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/sync_val_reporting.cpp
     unit/sync_val_ray_tracing.cpp
     unit/sync_val_ray_tracing_positive.cpp
+    unit/sync_val_render_pass.cpp
+    unit/sync_val_render_pass_positive.cpp
     unit/sync_val_semaphore.cpp
     unit/sync_val_semaphore_positive.cpp
     unit/sync_val_video.cpp
@@ -228,6 +244,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/tensor_positive.cpp
     unit/threading.cpp
     unit/threading_positive.cpp
+    unit/tile_memory_heap.cpp
+    unit/tile_memory_heap_positive.cpp
     unit/tooling.cpp
     unit/tooling_positive.cpp
     unit/transform_feedback.cpp
@@ -262,6 +280,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/wsi_positive.cpp
     unit/ycbcr.cpp
     unit/ycbcr_positive.cpp
+    unit/ray_tracing_spheres.cpp
+    unit/ray_tracing_spheres_positive.cpp
     vvl_utils/small_vector.cpp
     vvl_utils/pnext_chain_extraction.cpp
 )
@@ -307,5 +327,6 @@ if(NOT VVL_SKIP_GTEST_DISCOVERY)
 endif()
 
 add_subdirectory(stress)
+add_subdirectory(undefined)
 add_subdirectory(layers)
 add_subdirectory(icd)

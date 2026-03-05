@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (C) 2015-2025 Google Inc.
+/* Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (C) 2015-2026 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +22,7 @@
 #include <vector>
 #include <memory>
 #include "state_tracker/state_object.h"
+#include "state_tracker/descriptor_set_layouts.h"
 #include "utils/hash_util.h"
 #include "utils/hash_vk_types.h"
 #include "containers/span.h"
@@ -32,9 +33,6 @@ class DeviceState;
 class DescriptorSetLayout;
 class DescriptorSetLayoutDef;
 }  // namespace vvl
-namespace spirv {
-struct ResourceInterfaceVariable;
-}  // namespace spirv
 
 // Canonical dictionary for the pipeline layout's layout of descriptorsetlayouts
 using DescriptorSetLayoutDef = vvl::DescriptorSetLayoutDef;
@@ -77,13 +75,14 @@ namespace vvl {
 // Store layouts and pushconstants for PipelineLayout
 class PipelineLayout : public StateObject {
   public:
-    using SetLayoutVector = std::vector<std::shared_ptr<vvl::DescriptorSetLayout const>>;
-    const SetLayoutVector set_layouts;
+    const DescriptorSetLayoutList set_layouts;
     // canonical form IDs for the "compatible for set" contents
     const PushConstantRangesId push_constant_ranges_layout;
     VkPipelineLayoutCreateFlags create_flags;
     // table of "compatible for set N" canonical forms for trivial accept validation
     const std::vector<PipelineLayoutCompatId> set_compat_ids;
+    // When the sets are using VK_EXT_descriptor_buffer
+    bool has_descriptor_buffer;
     // Way to quick prevent searching if we know there are no immutable samplers
     bool has_immutable_samplers;
 
@@ -97,12 +96,10 @@ class PipelineLayout : public StateObject {
 
     VkPipelineLayoutCreateFlags CreateFlags() const { return create_flags; }
     bool IsIndependentSets() const { return (create_flags & VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT) != 0; }
-
-    const VkDescriptorSetLayoutBinding *FindBinding(const spirv::ResourceInterfaceVariable &variable) const;
 };
 
 }  // namespace vvl
 
-std::vector<PipelineLayoutCompatId> GetCompatForSet(const std::vector<std::shared_ptr<vvl::DescriptorSetLayout const>> &set_layouts,
+std::vector<PipelineLayoutCompatId> GetCompatForSet(const vvl::DescriptorSetLayoutList &set_layouts,
                                                     const PushConstantRangesId &push_constant_ranges,
                                                     VkPipelineLayoutCreateFlags pipeline_layout_create_flags);

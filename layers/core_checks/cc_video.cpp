@@ -52,8 +52,15 @@ bool CoreChecks::OutsideVideoCodingScope(const vvl::CommandBuffer &cb_state, con
 
 std::vector<VkVideoFormatPropertiesKHR> CoreChecks::GetVideoFormatProperties(VkImageUsageFlags image_usage,
                                                                              const VkVideoProfileListInfoKHR *profile_list) const {
+    // NOTE: We have to mask out any usage that is not video related
+    const VkImageUsageFlags video_usage_mask = VK_IMAGE_USAGE_VIDEO_DECODE_SRC_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR |
+                                               VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR |
+                                               VK_IMAGE_USAGE_VIDEO_ENCODE_DST_BIT_KHR | VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR |
+                                               VK_IMAGE_USAGE_VIDEO_ENCODE_EMPHASIS_MAP_BIT_KHR |
+                                               VK_IMAGE_USAGE_VIDEO_ENCODE_QUANTIZATION_DELTA_MAP_BIT_KHR;
+
     VkPhysicalDeviceVideoFormatInfoKHR format_info = vku::InitStructHelper();
-    format_info.imageUsage = image_usage;
+    format_info.imageUsage = image_usage & video_usage_mask;
     format_info.pNext = profile_list;
 
     uint32_t format_count = 0;
@@ -4199,6 +4206,16 @@ bool CoreChecks::PreCallValidateCreateVideoSessionKHR(VkDevice device, const VkV
                 break;
         }
 
+        auto qf_ext_props = device_state->queue_family_ext_props[pCreateInfo->queueFamilyIndex];
+        if ((pCreateInfo->pVideoProfile->videoCodecOperation & qf_ext_props.video_props.videoCodecOperations) == 0) {
+            skip |= LogError("VUID-VkVideoSessionCreateInfoKHR-pVideoProfile-11759", device,
+                             create_info_loc.dot(Field::pVideoProfile).dot(Field::videoCodecOperation),
+                             "(%s) is not supported by the queue family index specified to create the video session.\n"
+                             "Supported video codec operations by the queue family: %s.",
+                             string_VkVideoCodecOperationFlagBitsKHR(pCreateInfo->pVideoProfile->videoCodecOperation),
+                             string_VkVideoCodecOperationFlagsKHR(qf_ext_props.video_props.videoCodecOperations).c_str());
+        }
+
         if (profile_desc.IsEncode()) {
             auto ir_create_info = vku::FindStructInPNextChain<VkVideoEncodeSessionIntraRefreshCreateInfoKHR>(pCreateInfo);
             if (ir_create_info) {
@@ -4301,7 +4318,7 @@ bool CoreChecks::PreCallValidateBindVideoSessionMemoryKHR(VkDevice device, VkVid
                     }
                 }
 
-                if (SafeModulo(bind_info.memoryOffset, mem_binding_info->requirements.alignment) != 0) {
+                if (!IsIntegerMultipleOf(bind_info.memoryOffset, mem_binding_info->requirements.alignment)) {
                     skip |= LogError("VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07199", videoSession,
                                      error_obj.location.dot(Field::pBindSessionMemoryInfos, i).dot(Field::memoryOffset),
                                      "(%" PRIuLEAST64 ") but must be an integer multiple of the alignment value %" PRIuLEAST64
@@ -5029,16 +5046,13 @@ bool CoreChecks::PreCallValidateCmdBeginVideoCodingKHR(VkCommandBuffer commandBu
 
     const Location begin_info_loc = error_obj.location.dot(Field::pBeginInfo);
 
-    auto qf_ext_props = device_state->queue_family_ext_props[cb_state->command_pool->queueFamilyIndex];
-
-    if ((qf_ext_props.video_props.videoCodecOperations & vs_state->GetCodecOp()) == 0) {
+    if (vs_state->create_info.queueFamilyIndex != cb_state->command_pool->queueFamilyIndex) {
         const LogObjectList objlist(commandBuffer, pBeginInfo->videoSession, cb_state->command_pool->Handle());
-        skip |= LogError("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07231", objlist, begin_info_loc.dot(Field::videoSession),
-                         "%s does not support video codec operation %s "
-                         "that %s specified in pBeginInfo->videoSession was created with.",
-                         FormatHandle(cb_state->command_pool->Handle()).c_str(),
-                         string_VkVideoCodecOperationFlagBitsKHR(vs_state->GetCodecOp()),
-                         FormatHandle(pBeginInfo->videoSession).c_str());
+        skip |= LogError("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-11760", objlist, begin_info_loc.dot(Field::videoSession),
+                         "%s (queue family index %" PRIu32 ") and %s (queue family index %" PRIu32
+                         ") are not created with the same queue family index.",
+                         FormatHandle(pBeginInfo->videoSession).c_str(), vs_state->create_info.queueFamilyIndex,
+                         FormatHandle(cb_state->command_pool->Handle()).c_str(), cb_state->command_pool->queueFamilyIndex);
     }
 
     if (vs_state->GetUnboundMemoryBindingCount() > 0) {
@@ -5155,10 +5169,11 @@ bool CoreChecks::PreCallValidateCmdBeginVideoCodingKHR(VkCommandBuffer commandBu
                         skip |= LogError("VUID-VkVideoBeginCodingInfoKHR-slotIndex-07245", objlist, reference_image_view_loc,
                                          "(%s created from %s) was not created "
                                          "with VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR thus it cannot be used as "
-                                         "a reference picture with %s that was created with a decode operation.",
+                                         "a reference picture with %s that was created with a decode operation.\n%s",
                                          FormatHandle(reference_resource.image_view_state->Handle()).c_str(),
                                          FormatHandle(reference_resource.image_state->Handle()).c_str(),
-                                         FormatHandle(pBeginInfo->videoSession).c_str());
+                                         FormatHandle(pBeginInfo->videoSession).c_str(),
+                                         reference_resource.image_view_state->DescribeImageUsage(*this).c_str());
                     }
 
                     if (vs_state->IsEncode() && (supported_usage & VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR) == 0) {
@@ -5168,10 +5183,11 @@ bool CoreChecks::PreCallValidateCmdBeginVideoCodingKHR(VkCommandBuffer commandBu
                         skip |= LogError("VUID-VkVideoBeginCodingInfoKHR-slotIndex-07246", objlist, reference_image_view_loc,
                                          "(%s created from %s) was not created "
                                          "with VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR thus it cannot be used as "
-                                         "a reference picture with %s that was created with an encode operation.",
+                                         "a reference picture with %s that was created with an encode operation.\n%s",
                                          FormatHandle(reference_resource.image_view_state->Handle()).c_str(),
                                          FormatHandle(reference_resource.image_state->Handle()).c_str(),
-                                         FormatHandle(pBeginInfo->videoSession).c_str());
+                                         FormatHandle(pBeginInfo->videoSession).c_str(),
+                                         reference_resource.image_view_state->DescribeImageUsage(*this).c_str());
                     }
 
                     last_dpb_image = reference_resource.image_state.get();
@@ -5598,9 +5614,10 @@ bool CoreChecks::PreCallValidateCmdDecodeVideoKHR(VkCommandBuffer commandBuffer,
             skip |= LogError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07146", objlist, dst_image_view_loc,
                              "(%s created from %s) was not created with VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR "
                              "thus it cannot be used as a decode output picture with the bound video session %s "
-                             "that was created with a decode operation.",
+                             "that was created with a decode operation.\n%s",
                              FormatHandle(dst_resource.image_view_state->Handle()).c_str(),
-                             FormatHandle(dst_resource.image_state->Handle()).c_str(), FormatHandle(*vs_state).c_str());
+                             FormatHandle(dst_resource.image_state->Handle()).c_str(), FormatHandle(*vs_state).c_str(),
+                             dst_resource.image_view_state->DescribeImageUsage(*this).c_str());
         }
 
         bool dst_same_as_setup = (setup_resource == dst_resource);
@@ -5877,11 +5894,11 @@ bool CoreChecks::PreCallValidateCmdEncodeVideoKHR(VkCommandBuffer commandBuffer,
                 const LogObjectList objlist(commandBuffer, iv_state->Handle());
                 skip |= LogError(
                     valid_usage.image_view_mismatch_vuid, objlist, encode_info_loc.dot(Field::flags),
-                    "contains %s but the image view specified in %s (%s created from %s) was not created with %s.",
+                    "contains %s but the image view specified in %s (%s created from %s) was not created with %s.\n%s",
                     string_VkVideoEncodeFlagBitsKHR(valid_usage.encode_flag),
                     encode_info_loc.pNext(Struct::VkVideoEncodeQuantizationMapInfoKHR, Field::quantizationMap).Fields().c_str(),
                     FormatHandle(*iv_state).c_str(), FormatHandle(*iv_state->image_state).c_str(),
-                    string_VkImageUsageFlagBits(valid_usage.image_usage_flag));
+                    string_VkImageUsageFlagBits(valid_usage.image_usage_flag), iv_state->DescribeImageUsage(*this).c_str());
             }
         }
     }
@@ -6086,9 +6103,10 @@ bool CoreChecks::PreCallValidateCmdEncodeVideoKHR(VkCommandBuffer commandBuffer,
             skip |= LogError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08210", objlist, src_image_view_loc,
                              "(%s created from %s) was not created with VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR "
                              "thus it cannot be used as an encode input picture with the bound video session %s "
-                             "that was created with an encode operation.",
+                             "that was created with an encode operation.\n%s",
                              FormatHandle(src_resource.image_view_state->Handle()).c_str(),
-                             FormatHandle(src_resource.image_state->Handle()).c_str(), FormatHandle(*vs_state).c_str());
+                             FormatHandle(src_resource.image_state->Handle()).c_str(), FormatHandle(*vs_state).c_str(),
+                             src_resource.image_view_state->DescribeImageUsage(*this).c_str());
         }
 
         skip |=

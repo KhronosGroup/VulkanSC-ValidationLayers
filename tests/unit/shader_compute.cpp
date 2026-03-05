@@ -26,7 +26,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryOverLimit) {
     const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream csSource;
+    std::ostringstream csSource;
     // Make sure compute pipeline has a compute shader stage set
     csSource << R"glsl(
         #version 450
@@ -38,7 +38,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryOverLimit) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
@@ -53,7 +53,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryBooleanOverLimit) {
     // "Boolean values considered as 32-bit integer values for the purpose of this calculation."
     const uint32_t max_shared_bools = max_shared_memory_size / 4;
 
-    std::stringstream csSource;
+    std::ostringstream csSource;
     // Make sure compute pipeline has a compute shader stage set
     csSource << R"glsl(
         #version 450
@@ -65,7 +65,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryBooleanOverLimit) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
@@ -84,7 +84,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryOverLimitWorkgroupMemoryExplicitLayout
     const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream csSource;
+    std::ostringstream csSource;
     csSource << R"glsl(
         #version 450
         #extension GL_EXT_shared_memory_block : enable
@@ -107,7 +107,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryOverLimitWorkgroupMemoryExplicitLayout
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cs_ = VkShaderObj(*m_device, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
@@ -121,7 +121,7 @@ TEST_F(NegativeShaderCompute, SharedMemorySpecConstantDefault) {
     const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream cs_source;
+    std::ostringstream cs_source;
     cs_source << R"glsl(
         #version 450
         layout(constant_id = 0) const uint Condition = 1;
@@ -134,8 +134,8 @@ TEST_F(NegativeShaderCompute, SharedMemorySpecConstantDefault) {
         void main(){}
     )glsl";
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = VkShaderObj(this, cs_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
+        helper.cs_ = VkShaderObj(*m_device, cs_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-Workgroup-06530");
 }
@@ -148,7 +148,7 @@ TEST_F(NegativeShaderCompute, SharedMemorySpecConstantSet) {
     const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream cs_source;
+    std::ostringstream cs_source;
     cs_source << R"glsl(
         #version 450
         layout(constant_id = 0) const uint Condition = 0;
@@ -174,9 +174,9 @@ TEST_F(NegativeShaderCompute, SharedMemorySpecConstantSet) {
     specialization_info.dataSize = sizeof(uint32_t);
     specialization_info.pData = &data;
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = VkShaderObj(this, cs_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_GLSL, &specialization_info);
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
+        helper.cs_ = VkShaderObj(*m_device, cs_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
+                                 SPV_SOURCE_GLSL, &specialization_info);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-Workgroup-06530");
 }
@@ -213,9 +213,9 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstant) {
     specialization_info.dataSize = sizeof(uint32_t) * 2;
     specialization_info.pData = data;
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_GLSL, &specialization_info);
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
+        helper.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
+                                 &specialization_info);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-y-06430");
@@ -239,7 +239,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeConstantDefault) {
 
     uint32_t x_size_limit = m_device->Physical().limits_.maxComputeWorkGroupSize[0];
 
-    std::stringstream spv_source;
+    std::ostringstream spv_source;
     spv_source << R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
@@ -263,9 +263,9 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeConstantDefault) {
                OpFunctionEnd
         )";
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_ASM);
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
+        helper.cs_ =
+            VkShaderObj(*m_device, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -278,7 +278,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstantDefault) {
 
     uint32_t x_size_limit = m_device->Physical().limits_.maxComputeWorkGroupSize[0];
 
-    std::stringstream spv_source;
+    std::ostringstream spv_source;
     spv_source << R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
@@ -303,9 +303,9 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstantDefault) {
                OpFunctionEnd
         )";
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                   SPV_SOURCE_ASM);
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
+        helper.cs_ =
+            VkShaderObj(*m_device, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -319,7 +319,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeId) {
 
     uint32_t x_size_limit = m_device->Physical().limits_.maxComputeWorkGroupSize[0];
 
-    std::stringstream spv_source;
+    std::ostringstream spv_source;
     spv_source << R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
@@ -340,9 +340,9 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeId) {
                OpFunctionEnd
         )";
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
-                                                   SPV_SOURCE_ASM);
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
+        helper.cs_ =
+            VkShaderObj(*m_device, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -358,7 +358,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeIdSpecConstantDefault) {
 
     // layout(local_size_x_id = 18, local_size_z_id = 19) in;
     // layout(local_size_x = 32) in;
-    std::stringstream spv_source;
+    std::ostringstream spv_source;
     spv_source << R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
@@ -382,9 +382,9 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeIdSpecConstantDefault) {
                OpFunctionEnd
         )";
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
-                                                   SPV_SOURCE_ASM);
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
+        helper.cs_ =
+            VkShaderObj(*m_device, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -400,7 +400,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeIdSpecConstantSet) {
 
     // layout(local_size_x_id = 18, local_size_z_id = 19) in;
     // layout(local_size_x = 32) in;
-    std::stringstream spv_source;
+    std::ostringstream spv_source;
     spv_source << R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
@@ -435,9 +435,9 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeIdSpecConstantSet) {
     specialization_info.dataSize = sizeof(uint32_t);
     specialization_info.pData = &data;
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
-        helper.cs_ = VkShaderObj(this, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
-                                                   SPV_SOURCE_ASM, &specialization_info);
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
+        helper.cs_ = VkShaderObj(*m_device, spv_source.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3,
+                                 SPV_SOURCE_ASM, &specialization_info);
     };
     m_errorMonitor->SetUnexpectedError("VUID-RuntimeSpirv-x-06432");
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
@@ -737,7 +737,7 @@ TEST_F(NegativeShaderCompute, CmdDispatchExceedLimits) {
                 OpFunctionEnd)");
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, spv_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    pipe.cs_ = VkShaderObj(*m_device, spv_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-x-06429");
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-y-06430");
@@ -758,14 +758,14 @@ TEST_F(NegativeShaderCompute, CmdDispatchExceedLimits) {
     invocations_limit /= y_size_limit;
     z_size_limit = (z_size_limit > invocations_limit) ? invocations_limit : z_size_limit;
 
-    std::stringstream cs_text;
+    std::ostringstream cs_text;
     cs_text << "#version 450\n";
     cs_text << "layout(local_size_x = " << x_size_limit << ", ";
     cs_text << "local_size_y = " << y_size_limit << ",";
     cs_text << "local_size_z = " << z_size_limit << ") in;\n";
     cs_text << "void main() {}\n";
 
-    pipe.cs_ = VkShaderObj(this, cs_text.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, cs_text.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.flags = VK_PIPELINE_CREATE_DISPATCH_BASE;
     pipe.CreateComputePipeline();
 

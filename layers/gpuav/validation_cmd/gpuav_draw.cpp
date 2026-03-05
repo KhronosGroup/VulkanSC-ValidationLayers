@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2025 The Khronos Group Inc.
- * Copyright (c) 2018-2025 Valve Corporation
- * Copyright (c) 2018-2025 LunarG, Inc.
+/* Copyright (c) 2018-2026 The Khronos Group Inc.
+ * Copyright (c) 2018-2026 Valve Corporation
+ * Copyright (c) 2018-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
  */
 
 #include "gpuav/validation_cmd/gpuav_draw.h"
+#include <vulkan/vulkan_core.h>
 
 #include "gpuav/core/gpuav.h"
 #include "gpuav/core/gpuav_validation_pipeline.h"
@@ -28,8 +29,6 @@
 #include "gpuav/shaders/gpuav_error_header.h"
 #include "gpuav/shaders/validation_cmd/push_data.h"
 #include "generated/gpuav_offline_spirv.h"
-
-#include "profiling/profiling.h"
 
 namespace gpuav {
 namespace valcmd {
@@ -46,11 +45,11 @@ struct SharedDrawValidationResources {
         dummy_buffer_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         VmaAllocationCreateInfo alloc_info = {};
         alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
-        if (gpuav.phys_dev_props.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU) {
+        if (gpuav.IsAllDeviceLocalMappable()) {
             alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
         }
-        const bool success = dummy_buffer.Create(&dummy_buffer_info, &alloc_info);
-        if (!success) {
+        const VkResult result = dummy_buffer.Create(&dummy_buffer_info, &alloc_info);
+        if (result != VK_SUCCESS) {
             valid = false;
             return;
         }
@@ -89,21 +88,14 @@ struct FirstInstanceValidationShader {
     valpipe::BoundStorageBuffer count_buffer_binding = {glsl::kPreDrawBinding_CountBuffer};
 
     static std::vector<VkDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() {
-        std::vector<VkDescriptorSetLayoutBinding> bindings = {
-            {glsl::kPreDrawBinding_IndirectBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT,
-             nullptr},  // indirect buffer
-            {glsl::kPreDrawBinding_CountBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT,
-             nullptr},  // count buffer
-        };
-
-        return bindings;
+        return {{glsl::kPreDrawBinding_IndirectBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                {glsl::kPreDrawBinding_CountBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
     }
 
-    std::vector<VkWriteDescriptorSet> GetDescriptorWrites(VkDescriptorSet desc_set) const {
+    std::vector<VkWriteDescriptorSet> GetDescriptorWrites() const {
         std::vector<VkWriteDescriptorSet> desc_writes(2);
 
         desc_writes[0] = vku::InitStructHelper();
-        desc_writes[0].dstSet = desc_set;
         desc_writes[0].dstBinding = draw_buffer_binding.binding;
         desc_writes[0].dstArrayElement = 0;
         desc_writes[0].descriptorCount = 1;
@@ -111,7 +103,6 @@ struct FirstInstanceValidationShader {
         desc_writes[0].pBufferInfo = &draw_buffer_binding.info;
 
         desc_writes[1] = vku::InitStructHelper();
-        desc_writes[1].dstSet = desc_set;
         desc_writes[1].dstBinding = count_buffer_binding.binding;
         desc_writes[1].dstArrayElement = 0;
         desc_writes[1].descriptorCount = 1;
@@ -122,18 +113,17 @@ struct FirstInstanceValidationShader {
     }
 };
 
-// Use "api_" prefix to make it clear which buffer/offset/etc we are talking about
-// "api" helps to distinguish it is input from the user at the API level
 void FirstInstance(Validator &gpuav, CommandBufferSubState &cb_state, const Location &loc, const LastBound &last_bound,
                    VkBuffer api_buffer, VkDeviceSize api_offset, uint32_t api_stride, vvl::Struct api_struct_name,
                    uint32_t first_instance_member_pos, uint32_t api_draw_count, VkBuffer api_count_buffer,
-                   VkDeviceSize api_count_buffer_offset, const char *vuid) {
+                   VkDeviceSize api_count_buffer_offset, const FirstInstanceValidationVuidSelector &vuid_selector) {
     if (!gpuav.gpuav_settings.validate_indirect_draws_buffers) {
         return;
     }
 
-    if (gpuav.enabled_features.drawIndirectFirstInstance) {
-        return;
+    const char* vuid = vuid_selector(gpuav, last_bound);
+    if (!vuid) {
+        return;  // No reason to validate, there is no possible VUID to report
     }
 
     ValidationCommandFunc validation_cmd = [api_buffer, api_offset, api_stride, first_instance_member_pos, api_draw_count,
@@ -141,16 +131,18 @@ void FirstInstance(Validator &gpuav, CommandBufferSubState &cb_state, const Loca
                                             error_logger_i = cb_state.GetErrorLoggerIndex(),
                                             loc](Validator &gpuav, CommandBufferSubState &cb_state) {
         SharedDrawValidationResources &shared_draw_validation_resources =
-            gpuav.shared_resources_manager.GetOrCreate<SharedDrawValidationResources>(gpuav);
+            gpuav.shared_resources_cache.GetOrCreate<SharedDrawValidationResources>(gpuav);
         if (!shared_draw_validation_resources.valid) {
+            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create SharedDrawValidationResources.");
             return;
         }
-        ValidationCommandsCommon &val_cmd_common =
-            cb_state.shared_resources_cache.GetOrCreate<ValidationCommandsCommon>(gpuav, cb_state, loc);
+        ValidationCommandsGpuavState &val_cmd_gpuav_state =
+            gpuav.shared_resources_cache.GetOrCreate<ValidationCommandsGpuavState>(gpuav, loc);
         valpipe::ComputePipeline<FirstInstanceValidationShader> &validation_pipeline =
-            gpuav.shared_resources_manager.GetOrCreate<valpipe::ComputePipeline<FirstInstanceValidationShader>>(
-                gpuav, loc, val_cmd_common.error_logging_desc_set_layout_);
+            gpuav.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<FirstInstanceValidationShader>>(
+                gpuav, loc, val_cmd_gpuav_state.error_logging_desc_set_layout_);
         if (!validation_pipeline.valid) {
+            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create FirstInstanceValidationShader.");
             return;
         }
 
@@ -182,6 +174,7 @@ void FirstInstance(Validator &gpuav, CommandBufferSubState &cb_state, const Loca
             }
 
             if (!BindShaderResources(validation_pipeline, gpuav, cb_state, draw_i, error_logger_i, shader_resources)) {
+                gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to GetManagedDescriptorSet in BindShaderResources");
                 return;
             }
         }
@@ -209,7 +202,6 @@ void FirstInstance(Validator &gpuav, CommandBufferSubState &cb_state, const Loca
                 return;
             }
 
-            VVL_TracyPlot("gpuav::valcmd::FirstInstance Dispatch size", int64_t(work_group_count));
             DispatchCmdDispatch(cb_state.VkHandle(), work_group_count, 1, 1);
 
             // synchronize draw buffer validation (read) against subsequent writes
@@ -249,23 +241,19 @@ void FirstInstance(Validator &gpuav, CommandBufferSubState &cb_state, const Loca
         bool skip = false;
         using namespace glsl;
 
-        const uint32_t error_group = error_record[kHeaderShaderIdErrorOffset] >> kErrorGroupShift;
-        if (error_group != kErrorGroupGpuPreDraw) {
-            assert(false);
+        if (GetErrorGroup(error_record) != kErrorGroup_GpuPreDraw) {
             return skip;
         }
 
-        assert(((error_record[kHeaderShaderIdErrorOffset] & kErrorSubCodeMask) >> kErrorSubCodeShift) ==
-               kErrorSubCodePreDrawFirstInstance);
+        assert(GetSubError(error_record) == kErrorSubCode_PreDraw_FirstInstance);
 
-        const uint32_t index = error_record[kValCmdErrorPayloadDword_0];
-        const uint32_t invalid_first_instance = error_record[kValCmdErrorPayloadDword_1];
+        const uint32_t index = error_record[kValCmd_ErrorPayloadDword_0];
+        const uint32_t invalid_first_instance = error_record[kValCmd_ErrorPayloadDword_1];
 
-        skip |= gpuav.LogError(
-            vuid, objlist, loc_with_debug_region,
-            "The drawIndirectFirstInstance feature is not enabled, but the firstInstance member of the %s structure at "
-            "index %" PRIu32 " is %" PRIu32 ".",
-            vvl::String(api_struct_name), index, invalid_first_instance);
+        skip |= gpuav.LogError(vuid, objlist, loc_with_debug_region,
+                               "The firstInstance member of the %s structure at "
+                               "index %" PRIu32 " is %" PRIu32 ".",
+                               vvl::String(api_struct_name), index, invalid_first_instance);
 
         return skip;
     };
@@ -273,21 +261,71 @@ void FirstInstance(Validator &gpuav, CommandBufferSubState &cb_state, const Loca
     cb_state.AddCommandErrorLogger(loc, &last_bound, std::move(error_logger));
 }
 
+struct FirstInstanceVUIDs {
+    const char *vuid_09461{};
+    const char *vuid_09462{};
+    const char *vuid_00501_00554{};
+};
+
+static FirstInstanceValidationVuidSelector GetFirstInstanceValidationVuidSelector(const FirstInstanceVUIDs &first_instance_vuids) {
+    FirstInstanceValidationVuidSelector vuid_selector = [first_instance_vuids](Validator& gpuav, const LastBound& last_bound) {
+        if (!gpuav.phys_dev_props_core14.supportsNonZeroFirstInstance) {
+            if (last_bound.IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_EXT)) {
+                for (const auto& [binding, binding_state] : last_bound.cb_state.dynamic_state_value.vertex_bindings) {
+                    if (binding_state.desc.divisor != 1) {
+                        return first_instance_vuids.vuid_09462;
+                    }
+                }
+            } else if (last_bound.pipeline_state && last_bound.pipeline_state->GraphicsCreateInfo().pVertexInputState) {
+                if (auto divisor_state_ci = vku::FindStructInPNextChain<VkPipelineVertexInputDivisorStateCreateInfo>(
+                        last_bound.pipeline_state->GraphicsCreateInfo().pVertexInputState->pNext)) {
+                    for (const VkVertexInputBindingDivisorDescription& divisor :
+                         vvl::make_span(divisor_state_ci->pVertexBindingDivisors, divisor_state_ci->vertexBindingDivisorCount)) {
+                        if (divisor.divisor != 1u) {
+                            return first_instance_vuids.vuid_09461;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!gpuav.enabled_features.drawIndirectFirstInstance) {
+            return first_instance_vuids.vuid_00501_00554;
+        }
+
+        // Return null to show |firstInstance| could be anything and it will still be valid
+        return (const char *)nullptr;
+    };
+
+    return vuid_selector;
+}
+
 template <>
 void FirstInstance<VkDrawIndirectCommand>(Validator &gpuav, CommandBufferSubState &cb_state, const Location &loc,
                                           const LastBound &last_bound, VkBuffer buffer, VkDeviceSize offset, uint32_t draw_count,
-                                          VkBuffer count_buffer, VkDeviceSize count_buffer_offset, const char *vuid) {
+                                          VkBuffer count_buffer, VkDeviceSize count_buffer_offset) {
+    FirstInstanceVUIDs vuids;
+    vuids.vuid_09461 = "VUID-VkDrawIndirectCommand-pNext-09461";
+    vuids.vuid_09462 = "VUID-VkDrawIndirectCommand-None-09462";
+    vuids.vuid_00501_00554 = "VUID-VkDrawIndirectCommand-firstInstance-00501";
+
+    FirstInstanceValidationVuidSelector vuid_selector = GetFirstInstanceValidationVuidSelector(vuids);
     FirstInstance(gpuav, cb_state, loc, last_bound, buffer, offset, sizeof(VkDrawIndirectCommand),
-                  vvl::Struct::VkDrawIndirectCommand, 3, draw_count, count_buffer, count_buffer_offset, vuid);
+                  vvl::Struct::VkDrawIndirectCommand, 3, draw_count, count_buffer, count_buffer_offset, vuid_selector);
 }
 
 template <>
 void FirstInstance<VkDrawIndexedIndirectCommand>(Validator &gpuav, CommandBufferSubState &cb_state, const Location &loc,
                                                  const LastBound &last_bound, VkBuffer buffer, VkDeviceSize offset,
-                                                 uint32_t draw_count, VkBuffer count_buffer, VkDeviceSize count_buffer_offset,
-                                                 const char *vuid) {
+                                                 uint32_t draw_count, VkBuffer count_buffer, VkDeviceSize count_buffer_offset) {
+    FirstInstanceVUIDs vuids;
+    vuids.vuid_09461 = "VUID-VkDrawIndexedIndirectCommand-pNext-09461";
+    vuids.vuid_09462 = "VUID-VkDrawIndexedIndirectCommand-None-09462";
+    vuids.vuid_00501_00554 = "VUID-VkDrawIndexedIndirectCommand-firstInstance-00554";
+
+    FirstInstanceValidationVuidSelector vuid_selector = GetFirstInstanceValidationVuidSelector(vuids);
     FirstInstance(gpuav, cb_state, loc, last_bound, buffer, offset, sizeof(VkDrawIndexedIndirectCommand),
-                  vvl::Struct::VkDrawIndexedIndirectCommand, 4, draw_count, count_buffer, count_buffer_offset, vuid);
+                  vvl::Struct::VkDrawIndexedIndirectCommand, 4, draw_count, count_buffer, count_buffer_offset, vuid_selector);
 }
 
 struct CountBufferValidationShader {
@@ -298,19 +336,13 @@ struct CountBufferValidationShader {
     valpipe::BoundStorageBuffer count_buffer_binding = {glsl::kPreDrawBinding_CountBuffer};
 
     static std::vector<VkDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() {
-        std::vector<VkDescriptorSetLayoutBinding> bindings = {
-            {glsl::kPreDrawBinding_CountBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT,
-             nullptr},  // count buffer
-        };
-
-        return bindings;
+        return {{glsl::kPreDrawBinding_CountBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
     }
 
-    std::vector<VkWriteDescriptorSet> GetDescriptorWrites(VkDescriptorSet desc_set) const {
+    std::vector<VkWriteDescriptorSet> GetDescriptorWrites() const {
         std::vector<VkWriteDescriptorSet> desc_writes(1);
 
         desc_writes[0] = vku::InitStructHelper();
-        desc_writes[0].dstSet = desc_set;
         desc_writes[0].dstBinding = count_buffer_binding.binding;
         desc_writes[0].dstArrayElement = 0;
         desc_writes[0].descriptorCount = 1;
@@ -328,10 +360,6 @@ void CountBuffer(Validator &gpuav, CommandBufferSubState &cb_state, const Locati
         return;
     }
 
-    if (!gpuav.modified_features.shaderInt64) {
-        return;
-    }
-
     auto draw_buffer_state = gpuav.Get<vvl::Buffer>(api_buffer);
     if (!draw_buffer_state) {
         gpuav.InternalError(LogObjectList(cb_state.VkHandle(), api_buffer), loc, "buffer must be a valid VkBuffer handle");
@@ -343,17 +371,18 @@ void CountBuffer(Validator &gpuav, CommandBufferSubState &cb_state, const Locati
                                             draw_i = cb_state.draw_index, error_logger_i = cb_state.GetErrorLoggerIndex(),
                                             loc](Validator &gpuav, CommandBufferSubState &cb_state) {
         SharedDrawValidationResources &shared_draw_validation_resources =
-            gpuav.shared_resources_manager.GetOrCreate<SharedDrawValidationResources>(gpuav);
+            gpuav.shared_resources_cache.GetOrCreate<SharedDrawValidationResources>(gpuav);
         if (!shared_draw_validation_resources.valid) {
+            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create SharedDrawValidationResources.");
             return;
         }
-        ValidationCommandsCommon &val_cmd_common =
-            cb_state.shared_resources_cache.GetOrCreate<ValidationCommandsCommon>(gpuav, cb_state, loc);
-
+        ValidationCommandsGpuavState &val_cmd_gpuav_state =
+            gpuav.shared_resources_cache.GetOrCreate<ValidationCommandsGpuavState>(gpuav, loc);
         valpipe::ComputePipeline<CountBufferValidationShader> &validation_pipeline =
-            gpuav.shared_resources_manager.GetOrCreate<valpipe::ComputePipeline<CountBufferValidationShader>>(
-                gpuav, loc, val_cmd_common.error_logging_desc_set_layout_);
+            gpuav.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<CountBufferValidationShader>>(
+                gpuav, loc, val_cmd_gpuav_state.error_logging_desc_set_layout_);
         if (!validation_pipeline.valid) {
+            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create CountBufferValidationShader.");
             return;
         }
 
@@ -371,6 +400,7 @@ void CountBuffer(Validator &gpuav, CommandBufferSubState &cb_state, const Locati
             shader_resources.push_constants.api_count_buffer_offset_dwords = uint32_t(api_count_buffer_offset / sizeof(uint32_t));
 
             if (!BindShaderResources(validation_pipeline, gpuav, cb_state, draw_i, error_logger_i, shader_resources)) {
+                gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to GetManagedDescriptorSet in BindShaderResources");
                 return;
             }
         }
@@ -406,10 +436,10 @@ void CountBuffer(Validator &gpuav, CommandBufferSubState &cb_state, const Locati
         bool skip = false;
         using namespace glsl;
 
-        const uint32_t error_sub_code = (error_record[kHeaderShaderIdErrorOffset] & kErrorSubCodeMask) >> kErrorSubCodeShift;
+        const uint32_t error_sub_code = GetSubError(error_record);
         switch (error_sub_code) {
-            case kErrorSubCodePreDraw_DrawBufferSize: {
-                const uint32_t count = error_record[kValCmdErrorPayloadDword_0];
+            case kErrorSubCode_PreDraw_DrawBufferSize: {
+                const uint32_t count = error_record[kValCmd_ErrorPayloadDword_0];
 
                 const VkDeviceSize draw_size = (api_stride * (count - 1) + api_offset + api_struct_size_byte);
 
@@ -425,8 +455,8 @@ void CountBuffer(Validator &gpuav, CommandBufferSubState &cb_state, const Locati
                                          vvl::String(api_struct_name), draw_size);
                 break;
             }
-            case kErrorSubCodePreDraw_DrawCountLimit: {
-                const uint32_t count = error_record[kValCmdErrorPayloadDword_0];
+            case kErrorSubCode_PreDraw_DrawCountLimit: {
+                const uint32_t count = error_record[kValCmd_ErrorPayloadDword_0];
                 skip |= gpuav.LogError(vuid, objlist, loc_with_debug_region,
                                        "Indirect draw count of %" PRIu32 " would exceed maxDrawIndirectCount limit of %" PRIu32 ".",
                                        count, gpuav.phys_dev_props.limits.maxDrawIndirectCount);
@@ -452,21 +482,14 @@ struct MeshValidationShader {
     valpipe::BoundStorageBuffer count_buffer_binding = {glsl::kPreDrawBinding_CountBuffer};
 
     static std::vector<VkDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() {
-        std::vector<VkDescriptorSetLayoutBinding> bindings = {
-            {glsl::kPreDrawBinding_IndirectBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT,
-             nullptr},  // indirect buffer
-            {glsl::kPreDrawBinding_CountBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT,
-             nullptr},  // count buffer
-        };
-
-        return bindings;
+        return {{glsl::kPreDrawBinding_IndirectBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                {glsl::kPreDrawBinding_CountBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
     }
 
-    std::vector<VkWriteDescriptorSet> GetDescriptorWrites(VkDescriptorSet desc_set) const {
+    std::vector<VkWriteDescriptorSet> GetDescriptorWrites() const {
         std::vector<VkWriteDescriptorSet> desc_writes(2);
 
         desc_writes[0] = vku::InitStructHelper();
-        desc_writes[0].dstSet = desc_set;
         desc_writes[0].dstBinding = draw_buffer_binding.binding;
         desc_writes[0].dstArrayElement = 0;
         desc_writes[0].descriptorCount = 1;
@@ -474,7 +497,6 @@ struct MeshValidationShader {
         desc_writes[0].pBufferInfo = &draw_buffer_binding.info;
 
         desc_writes[1] = vku::InitStructHelper();
-        desc_writes[1].dstSet = desc_set;
         desc_writes[1].dstBinding = count_buffer_binding.binding;
         desc_writes[1].dstArrayElement = 0;
         desc_writes[1].descriptorCount = 1;
@@ -506,16 +528,18 @@ void DrawMeshIndirect(Validator &gpuav, CommandBufferSubState &cb_state, const L
          api_count_buffer_offset, api_draw_count, is_task_shader, draw_i = cb_state.draw_index,
          error_logger_i = cb_state.GetErrorLoggerIndex(), loc](Validator &gpuav, CommandBufferSubState &cb_state) {
             SharedDrawValidationResources &shared_draw_validation_resources =
-                gpuav.shared_resources_manager.GetOrCreate<SharedDrawValidationResources>(gpuav);
+                gpuav.shared_resources_cache.GetOrCreate<SharedDrawValidationResources>(gpuav);
             if (!shared_draw_validation_resources.valid) {
+                gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create SharedDrawValidationResources.");
                 return;
             }
-            ValidationCommandsCommon &val_cmd_common =
-                cb_state.shared_resources_cache.GetOrCreate<ValidationCommandsCommon>(gpuav, cb_state, loc);
+            ValidationCommandsGpuavState &val_cmd_gpuav_state =
+                gpuav.shared_resources_cache.GetOrCreate<ValidationCommandsGpuavState>(gpuav, loc);
             valpipe::ComputePipeline<MeshValidationShader> &validation_pipeline =
-                gpuav.shared_resources_manager.GetOrCreate<valpipe::ComputePipeline<MeshValidationShader>>(
-                    gpuav, loc, val_cmd_common.error_logging_desc_set_layout_);
+                gpuav.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<MeshValidationShader>>(
+                    gpuav, loc, val_cmd_gpuav_state.error_logging_desc_set_layout_);
             if (!validation_pipeline.valid) {
+                gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create MeshValidationShader.");
                 return;
             }
 
@@ -570,7 +594,6 @@ void DrawMeshIndirect(Validator &gpuav, CommandBufferSubState &cb_state, const L
                     }
                 }
                 const uint32_t work_group_count = std::min(api_draw_count, max_held_draw_cmds);
-                VVL_TracyPlot("gpuav::valcmd::DrawMeshIndirect Dispatch size", int64_t(work_group_count));
                 DispatchCmdDispatch(cb_state.VkHandle(), work_group_count, 1, 1);
 
                 // synchronize draw buffer validation (read) against subsequent writes
@@ -618,16 +641,16 @@ void DrawMeshIndirect(Validator &gpuav, CommandBufferSubState &cb_state, const L
         const char *vuid_mesh_group_count_exceeds_max_z = "VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07328";
         const char *vuid_mesh_group_count_exceeds_max_total = "VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07329";
 
-        const uint32_t draw_i = error_record[kValCmdErrorPayloadDword_1];
+        const uint32_t draw_i = error_record[kValCmd_ErrorPayloadDword_1];
         const char *group_count_name = is_task_shader ? "maxTaskWorkGroupCount" : "maxMeshWorkGroupCount";
         const char *group_count_total_name = is_task_shader ? "maxTaskWorkGroupTotalCount" : "maxMeshWorkGroupTotalCount";
 
-        const uint32_t error_sub_code = (error_record[kHeaderShaderIdErrorOffset] & kErrorSubCodeMask) >> kErrorSubCodeShift;
+        const uint32_t error_sub_code = GetSubError(error_record);
         switch (error_sub_code) {
-            case kErrorSubCodePreDrawGroupCountX: {
+            case kErrorSubCode_PreDraw_GroupCountX: {
                 const char *vuid_group_count_exceeds_max =
                     is_task_shader ? vuid_task_group_count_exceeds_max_x : vuid_mesh_group_count_exceeds_max_x;
-                const uint32_t group_count_x = error_record[kValCmdErrorPayloadDword_0];
+                const uint32_t group_count_x = error_record[kValCmd_ErrorPayloadDword_0];
                 const uint32_t limit = is_task_shader ? gpuav.phys_dev_ext_props.mesh_shader_props_ext.maxTaskWorkGroupCount[0]
                                                       : gpuav.phys_dev_ext_props.mesh_shader_props_ext.maxMeshWorkGroupCount[0];
                 skip |= gpuav.LogError(vuid_group_count_exceeds_max, objlist, loc_with_debug_region,
@@ -638,10 +661,10 @@ void DrawMeshIndirect(Validator &gpuav, CommandBufferSubState &cb_state, const L
                 break;
             }
 
-            case kErrorSubCodePreDrawGroupCountY: {
+            case kErrorSubCode_PreDraw_GroupCountY: {
                 const char *vuid_group_count_exceeds_max =
                     is_task_shader ? vuid_task_group_count_exceeds_max_y : vuid_mesh_group_count_exceeds_max_y;
-                const uint32_t group_count_y = error_record[kValCmdErrorPayloadDword_0];
+                const uint32_t group_count_y = error_record[kValCmd_ErrorPayloadDword_0];
                 const uint32_t limit = is_task_shader ? gpuav.phys_dev_ext_props.mesh_shader_props_ext.maxTaskWorkGroupCount[1]
                                                       : gpuav.phys_dev_ext_props.mesh_shader_props_ext.maxMeshWorkGroupCount[1];
                 skip |= gpuav.LogError(vuid_group_count_exceeds_max, objlist, loc_with_debug_region,
@@ -652,10 +675,10 @@ void DrawMeshIndirect(Validator &gpuav, CommandBufferSubState &cb_state, const L
                 break;
             }
 
-            case kErrorSubCodePreDrawGroupCountZ: {
+            case kErrorSubCode_PreDraw_GroupCountZ: {
                 const char *vuid_group_count_exceeds_max =
                     is_task_shader ? vuid_task_group_count_exceeds_max_z : vuid_mesh_group_count_exceeds_max_z;
-                const uint32_t group_count_z = error_record[kValCmdErrorPayloadDword_0];
+                const uint32_t group_count_z = error_record[kValCmd_ErrorPayloadDword_0];
                 const uint32_t limit = is_task_shader ? gpuav.phys_dev_ext_props.mesh_shader_props_ext.maxTaskWorkGroupCount[2]
                                                       : gpuav.phys_dev_ext_props.mesh_shader_props_ext.maxMeshWorkGroupCount[2];
                 skip |= gpuav.LogError(vuid_group_count_exceeds_max, objlist, loc_with_debug_region,
@@ -666,10 +689,10 @@ void DrawMeshIndirect(Validator &gpuav, CommandBufferSubState &cb_state, const L
                 break;
             }
 
-            case kErrorSubCodePreDrawGroupCountTotal: {
+            case kErrorSubCode_PreDraw_GroupCountTotal: {
                 const char *vuid_group_count_exceeds_max =
                     is_task_shader ? vuid_task_group_count_exceeds_max_total : vuid_mesh_group_count_exceeds_max_total;
-                const uint32_t group_count_total = error_record[kValCmdErrorPayloadDword_0];
+                const uint32_t group_count_total = error_record[kValCmd_ErrorPayloadDword_0];
                 const uint32_t limit = is_task_shader ? gpuav.phys_dev_ext_props.mesh_shader_props_ext.maxTaskWorkGroupTotalCount
                                                       : gpuav.phys_dev_ext_props.mesh_shader_props_ext.maxMeshWorkGroupTotalCount;
                 skip |= gpuav.LogError(vuid_group_count_exceeds_max, objlist, loc_with_debug_region,
@@ -700,19 +723,15 @@ struct DrawIndexedIndirectIndexBufferShader {
     valpipe::BoundStorageBuffer count_buffer_binding = {glsl::kPreDrawBinding_CountBuffer};
 
     static std::vector<VkDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() {
-        std::vector<VkDescriptorSetLayoutBinding> bindings = {
-            {glsl::kPreDrawBinding_IndirectBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-            {glsl::kPreDrawBinding_CountBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-            {glsl::kPreDrawBinding_IndexBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
-
-        return bindings;
+        return {{glsl::kPreDrawBinding_IndirectBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                {glsl::kPreDrawBinding_CountBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                {glsl::kPreDrawBinding_IndexBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
     }
 
-    std::vector<VkWriteDescriptorSet> GetDescriptorWrites(VkDescriptorSet desc_set) const {
+    std::vector<VkWriteDescriptorSet> GetDescriptorWrites() const {
         std::vector<VkWriteDescriptorSet> desc_writes(2);
 
         desc_writes[0] = vku::InitStructHelper();
-        desc_writes[0].dstSet = desc_set;
         desc_writes[0].dstBinding = draw_buffer_binding.binding;
         desc_writes[0].dstArrayElement = 0;
         desc_writes[0].descriptorCount = 1;
@@ -720,7 +739,6 @@ struct DrawIndexedIndirectIndexBufferShader {
         desc_writes[0].pBufferInfo = &draw_buffer_binding.info;
 
         desc_writes[1] = vku::InitStructHelper();
-        desc_writes[1].dstSet = desc_set;
         desc_writes[1].dstBinding = count_buffer_binding.binding;
         desc_writes[1].dstArrayElement = 0;
         desc_writes[1].descriptorCount = 1;
@@ -749,11 +767,10 @@ struct SetupDrawCountDispatchIndirectShader {
         return bindings;
     }
 
-    std::vector<VkWriteDescriptorSet> GetDescriptorWrites(VkDescriptorSet desc_set) const {
+    std::vector<VkWriteDescriptorSet> GetDescriptorWrites() const {
         std::vector<VkWriteDescriptorSet> desc_writes(2);
 
         desc_writes[0] = vku::InitStructHelper();
-        desc_writes[0].dstSet = desc_set;
         desc_writes[0].dstBinding = count_buffer_binding.binding;
         desc_writes[0].dstArrayElement = 0;
         desc_writes[0].descriptorCount = 1;
@@ -761,7 +778,6 @@ struct SetupDrawCountDispatchIndirectShader {
         desc_writes[0].pBufferInfo = &count_buffer_binding.info;
 
         desc_writes[1] = vku::InitStructHelper();
-        desc_writes[1].dstSet = desc_set;
         desc_writes[1].dstBinding = dispatch_indirect_buffer_binding.binding;
         desc_writes[1].dstArrayElement = 0;
         desc_writes[1].descriptorCount = 1;
@@ -800,7 +816,7 @@ void DrawIndexedIndirectIndexBuffer(Validator &gpuav, CommandBufferSubState &cb_
         return;
     }
 
-    if (!cb_state.base.index_buffer_binding.buffer) {
+    if (!cb_state.base.index_buffer_binding.HasNonNullBuffer()) {
         return;
     }
 
@@ -809,33 +825,32 @@ void DrawIndexedIndirectIndexBuffer(Validator &gpuav, CommandBufferSubState &cb_
                                             draw_i = cb_state.draw_index, error_logger_i = cb_state.GetErrorLoggerIndex(),
                                             loc](Validator &gpuav, CommandBufferSubState &cb_state) {
         SharedDrawValidationResources &shared_draw_validation_resources =
-            gpuav.shared_resources_manager.GetOrCreate<SharedDrawValidationResources>(gpuav);
+            gpuav.shared_resources_cache.GetOrCreate<SharedDrawValidationResources>(gpuav);
         if (!shared_draw_validation_resources.valid) {
+            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create SharedDrawValidationResources.");
             return;
         }
         valpipe::ComputePipeline<SetupDrawCountDispatchIndirectShader> &setup_validation_dispatch_pipeline =
-            gpuav.shared_resources_manager.GetOrCreate<valpipe::ComputePipeline<SetupDrawCountDispatchIndirectShader>>(gpuav, loc);
+            gpuav.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<SetupDrawCountDispatchIndirectShader>>(gpuav, loc);
         if (!setup_validation_dispatch_pipeline.valid) {
+            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create SetupDrawCountDispatchIndirectShader.");
             return;
         }
-        ValidationCommandsCommon &val_cmd_common =
-            cb_state.shared_resources_cache.GetOrCreate<ValidationCommandsCommon>(gpuav, cb_state, loc);
+        ValidationCommandsGpuavState &val_cmd_gpuav_state =
+            gpuav.shared_resources_cache.GetOrCreate<ValidationCommandsGpuavState>(gpuav, loc);
         valpipe::ComputePipeline<DrawIndexedIndirectIndexBufferShader> &validation_pipeline =
-            gpuav.shared_resources_manager.GetOrCreate<valpipe::ComputePipeline<DrawIndexedIndirectIndexBufferShader>>(
-                gpuav, loc, val_cmd_common.error_logging_desc_set_layout_);
+            gpuav.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<DrawIndexedIndirectIndexBufferShader>>(
+                gpuav, loc, val_cmd_gpuav_state.error_logging_desc_set_layout_);
         if (!validation_pipeline.valid) {
+            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create DrawIndexedIndirectIndexBufferShader.");
             return;
         }
 
-        const uint32_t index_bits_size = GetIndexBitsSize(index_buffer_binding.index_type);
-        const uint32_t max_indices_in_buffer = static_cast<uint32_t>(index_buffer_binding.size / (index_bits_size / 8u));
+        const uint32_t index_byte_size = IndexTypeSize(index_buffer_binding.index_type);
+        const uint32_t max_indices_in_buffer = static_cast<uint32_t>(index_buffer_binding.size / index_byte_size);
 
         vko::BufferRange validation_dispatch_params_buffer_range =
             cb_state.gpu_resources_manager.GetDeviceLocalIndirectBufferRange(3 * sizeof(uint32_t));
-
-        if (validation_dispatch_params_buffer_range.buffer == VK_NULL_HANDLE) {
-            return;
-        }
 
         glsl::DrawIndexedIndirectIndexBufferPushData push_constants{};
         if (api_count_buffer != VK_NULL_HANDLE) {
@@ -859,11 +874,11 @@ void DrawIndexedIndirectIndexBuffer(Validator &gpuav, CommandBufferSubState &cb_
                     shared_draw_validation_resources.dummy_buffer.VkHandle(), 0, VK_WHOLE_SIZE};
             }
 
-            setup_validation_shader_resources.dispatch_indirect_buffer_binding.info = {
-                validation_dispatch_params_buffer_range.buffer, validation_dispatch_params_buffer_range.offset,
-                validation_dispatch_params_buffer_range.size};
+            setup_validation_shader_resources.dispatch_indirect_buffer_binding.info =
+                validation_dispatch_params_buffer_range.GetDescriptorBufferInfo();
 
             if (!setup_validation_dispatch_pipeline.BindShaderResources(gpuav, cb_state, setup_validation_shader_resources)) {
+                gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to GetManagedDescriptorSet in BindShaderResources");
                 return;
             }
 
@@ -915,6 +930,7 @@ void DrawIndexedIndirectIndexBuffer(Validator &gpuav, CommandBufferSubState &cb_
             validation_shader_resources.draw_buffer_binding.info = {api_buffer, 0, VK_WHOLE_SIZE};
 
             if (!BindShaderResources(validation_pipeline, gpuav, cb_state, draw_i, error_logger_i, validation_shader_resources)) {
+                gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to GetManagedDescriptorSet in BindShaderResources");
                 return;
             }
 
@@ -959,15 +975,16 @@ void DrawIndexedIndirectIndexBuffer(Validator &gpuav, CommandBufferSubState &cb_
         bool skip = false;
         using namespace glsl;
 
-        const uint32_t error_sub_code = (error_record[kHeaderShaderIdErrorOffset] & kErrorSubCodeMask) >> kErrorSubCodeShift;
+        const uint32_t error_sub_code = GetSubError(error_record);
         switch (error_sub_code) {
             case kErrorSubCode_OobIndexBuffer: {
-                const uint32_t draw_i = error_record[kValCmdErrorPayloadDword_0];
-                const uint32_t first_index = error_record[kValCmdErrorPayloadDword_1];
-                const uint32_t index_count = error_record[kValCmdErrorPayloadDword_2];
+                const uint32_t draw_i = error_record[kValCmd_ErrorPayloadDword_0];
+                const uint32_t first_index = error_record[kValCmd_ErrorPayloadDword_1];
+                const uint32_t index_count = error_record[kValCmd_ErrorPayloadDword_2];
                 const uint32_t highest_accessed_index = first_index + index_count;
-                const uint32_t index_bits_size = GetIndexBitsSize(index_buffer_binding.index_type);
-                const uint32_t max_indices_in_buffer = static_cast<uint32_t>(index_buffer_binding.size / (index_bits_size / 8u));
+                const uint32_t index_byte_size = IndexTypeSize(index_buffer_binding.index_type);
+                assert(index_byte_size != 0);  // Should never be VK_INDEX_TYPE_NONE_KHR
+                const uint32_t max_indices_in_buffer = static_cast<uint32_t>(index_buffer_binding.size / index_byte_size);
 
                 skip |= gpuav.LogError(
                     vuid, objlist, loc_with_debug_region,
@@ -996,8 +1013,8 @@ void DrawIndexedIndirectIndexBuffer(Validator &gpuav, CommandBufferSubState &cb_
                     gpuav.FormatHandle(api_buffer).c_str(), api_offset,
 
                     // Index buffer binding info
-                    gpuav.FormatHandle(index_buffer_binding.buffer).c_str(), string_VkIndexType(index_buffer_binding.index_type),
-                    index_buffer_binding.offset, index_buffer_binding.size, max_indices_in_buffer,
+                    gpuav.FormatHandle(index_buffer_binding.Buffer()).c_str(), string_VkIndexType(index_buffer_binding.index_type),
+                    index_buffer_binding.BufferOffset(), index_buffer_binding.size, max_indices_in_buffer,
                     string_VkIndexType(index_buffer_binding.index_type),
 
                     // VkDrawIndexedIndirectCommand info

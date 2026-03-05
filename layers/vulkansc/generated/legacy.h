@@ -1,0 +1,198 @@
+// *** THIS FILE IS GENERATED - DO NOT EDIT ***
+// See legacy_generator.py for modifications
+
+/***************************************************************************
+ *
+ * Copyright (c) 2025-2026 The Khronos Group Inc.
+ * Copyright (c) 2025-2026 Valve Corporation
+ * Copyright (c) 2025-2026 LunarG, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ****************************************************************************/
+
+// NOLINTBEGIN
+
+#pragma once
+
+#include <vulkan/vulkan.h>
+#include "chassis/validation_object.h"
+
+namespace legacy {
+
+enum class Reason {
+    Empty = 0,
+    Promoted,
+    Obsoleted,
+    Superseded,
+};
+
+struct ExtensionData {
+    Reason reason;
+    vvl::Requirement target;
+};
+
+ExtensionData GetExtensionData(vvl::Extension extension);
+
+// We currently only check if the extension is enabled, if we decide in the future to check for support, instance extensions
+// we can try and use DispatchEnumerateInstanceExtensionProperties, but will likely run into many loader related issues.
+class Instance : public vvl::base::Instance {
+    using BaseClass = vvl::base::Instance;
+
+  public:
+    Instance(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch, LayerObjectTypeLegacy) {}
+
+    // Special functions done in legacy_manual.cpp
+    bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
+                                       VkInstance* pInstance, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
+                                     const VkAllocationCallbacks* pAllocator, VkDevice* pDevice,
+                                     const ErrorObject& error_obj) const override;
+    bool ValidateLegacyExtensions(const Location& loc, vvl::Extension extension, APIVersion version) const;
+
+    bool PreCallValidateGetPhysicalDeviceFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures* pFeatures,
+                                                  const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format,
+                                                          VkFormatProperties* pFormatProperties,
+                                                          const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format, VkImageType type,
+                                                               VkImageTiling tiling, VkImageUsageFlags usage,
+                                                               VkImageCreateFlags flags,
+                                                               VkImageFormatProperties* pImageFormatProperties,
+                                                               const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceProperties(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties* pProperties,
+                                                    const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, uint32_t* pQueueFamilyPropertyCount,
+                                                               VkQueueFamilyProperties* pQueueFamilyProperties,
+                                                               const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceMemoryProperties(VkPhysicalDevice physicalDevice,
+                                                          VkPhysicalDeviceMemoryProperties* pMemoryProperties,
+                                                          const ErrorObject& error_obj) const override;
+    bool PreCallValidateEnumerateDeviceLayerProperties(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
+                                                       VkLayerProperties* pProperties, const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format,
+                                                                     VkImageType type, VkSampleCountFlagBits samples,
+                                                                     VkImageUsageFlags usage, VkImageTiling tiling,
+                                                                     uint32_t* pPropertyCount,
+                                                                     VkSparseImageFormatProperties* pProperties,
+                                                                     const ErrorObject& error_obj) const override;
+};
+
+class Device : public vvl::base::Device {
+    using BaseClass = vvl::base::Device;
+
+  public:
+    Device(vvl::dispatch::Device* dev, Instance* instance_vo)
+        : BaseClass(dev, instance_vo, LayerObjectTypeLegacy), instance(instance_vo) {}
+    ~Device() {}
+    Instance* instance;
+
+    bool PreCallValidateCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
+                                         const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
+                                         const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo,
+                                             const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout,
+                                             const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreateSampler(VkDevice device, const VkSamplerCreateInfo* pCreateInfo,
+                                      const VkAllocationCallbacks* pAllocator, VkSampler* pSampler,
+                                      const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreateDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo,
+                                                  const VkAllocationCallbacks* pAllocator, VkDescriptorSetLayout* pSetLayout,
+                                                  const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreateDescriptorPool(VkDevice device, const VkDescriptorPoolCreateInfo* pCreateInfo,
+                                             const VkAllocationCallbacks* pAllocator, VkDescriptorPool* pDescriptorPool,
+                                             const ErrorObject& error_obj) const override;
+    bool PreCallValidateResetDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, VkDescriptorPoolResetFlags flags,
+                                            const ErrorObject& error_obj) const override;
+    bool PreCallValidateAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
+                                               VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj) const override;
+    bool PreCallValidateFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount,
+                                           const VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj) const override;
+    bool PreCallValidateUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount,
+                                             const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount,
+                                             const VkCopyDescriptorSet* pDescriptorCopies,
+                                             const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
+                                              VkPipelineLayout layout, uint32_t firstSet, uint32_t descriptorSetCount,
+                                              const VkDescriptorSet* pDescriptorSets, uint32_t dynamicOffsetCount,
+                                              const uint32_t* pDynamicOffsets, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags,
+                                         uint32_t offset, uint32_t size, const void* pValues,
+                                         const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo,
+                                          const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer,
+                                          const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
+                                         const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
+                                         const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetRenderAreaGranularity(VkDevice device, VkRenderPass renderPass, VkExtent2D* pGranularity,
+                                                 const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
+                                           VkSubpassContents contents, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents,
+                                       const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdEndRenderPass(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
+                                          const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
+                                          const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBeginRenderPass2(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
+                                            const VkSubpassBeginInfo* pSubpassBeginInfo,
+                                            const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdNextSubpass2(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo* pSubpassBeginInfo,
+                                        const VkSubpassEndInfo* pSubpassEndInfo, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdEndRenderPass2(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
+                                          const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
+                                               const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo,
+                                               const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdPushConstants2(VkCommandBuffer commandBuffer, const VkPushConstantsInfo* pPushConstantsInfo,
+                                          const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdSetDescriptorBufferOffsets2EXT(
+        VkCommandBuffer commandBuffer, const VkSetDescriptorBufferOffsetsInfoEXT* pSetDescriptorBufferOffsetsInfo,
+        const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBindDescriptorBufferEmbeddedSamplers2EXT(
+        VkCommandBuffer commandBuffer,
+        const VkBindDescriptorBufferEmbeddedSamplersInfoEXT* pBindDescriptorBufferEmbeddedSamplersInfo,
+        const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetDescriptorSetLayoutSizeEXT(VkDevice device, VkDescriptorSetLayout layout,
+                                                      VkDeviceSize* pLayoutSizeInBytes,
+                                                      const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetDescriptorSetLayoutBindingOffsetEXT(VkDevice device, VkDescriptorSetLayout layout, uint32_t binding,
+                                                               VkDeviceSize* pOffset, const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetDescriptorEXT(VkDevice device, const VkDescriptorGetInfoEXT* pDescriptorInfo, size_t dataSize,
+                                         void* pDescriptor, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBindDescriptorBuffersEXT(VkCommandBuffer commandBuffer, uint32_t bufferCount,
+                                                    const VkDescriptorBufferBindingInfoEXT* pBindingInfos,
+                                                    const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdSetDescriptorBufferOffsetsEXT(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
+                                                         VkPipelineLayout layout, uint32_t firstSet, uint32_t setCount,
+                                                         const uint32_t* pBufferIndices, const VkDeviceSize* pOffsets,
+                                                         const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBindDescriptorBufferEmbeddedSamplersEXT(VkCommandBuffer commandBuffer,
+                                                                   VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout,
+                                                                   uint32_t set, const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetBufferOpaqueCaptureDescriptorDataEXT(VkDevice device, const VkBufferCaptureDescriptorDataInfoEXT* pInfo,
+                                                                void* pData, const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetImageOpaqueCaptureDescriptorDataEXT(VkDevice device, const VkImageCaptureDescriptorDataInfoEXT* pInfo,
+                                                               void* pData, const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetImageViewOpaqueCaptureDescriptorDataEXT(VkDevice device,
+                                                                   const VkImageViewCaptureDescriptorDataInfoEXT* pInfo,
+                                                                   void* pData, const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetSamplerOpaqueCaptureDescriptorDataEXT(VkDevice device,
+                                                                 const VkSamplerCaptureDescriptorDataInfoEXT* pInfo, void* pData,
+                                                                 const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetAccelerationStructureOpaqueCaptureDescriptorDataEXT(
+        VkDevice device, const VkAccelerationStructureCaptureDescriptorDataInfoEXT* pInfo, void* pData,
+        const ErrorObject& error_obj) const override;
+};
+}  // namespace legacy
+// NOLINTEND

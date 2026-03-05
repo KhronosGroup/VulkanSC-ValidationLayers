@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2025 The Khronos Group Inc.
- * Copyright (c) 2018-2025 Valve Corporation
- * Copyright (c) 2018-2025 LunarG, Inc.
+/* Copyright (c) 2018-2026 The Khronos Group Inc.
+ * Copyright (c) 2018-2026 Valve Corporation
+ * Copyright (c) 2018-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,7 +75,8 @@ class Validator : public GpuShaderInstrumentor {
     Validator(vvl::dispatch::Device* dev, Instance* instance_vo)
         : BaseClass(dev, instance_vo, LayerObjectTypeGpuAssisted),
           global_indices_buffer_(*this),
-          global_resource_descriptor_buffer_(*this) {}
+          global_resource_descriptor_buffer_(*this),
+          global_resource_descriptor_heap_(*this) {}
 
     // gpuav_setup.cpp
     // -------------
@@ -83,6 +84,7 @@ class Validator : public GpuShaderInstrumentor {
     void FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) final;
 
     void InternalVmaError(LogObjectList objlist, VkResult result, const char* const specific_message) const;
+    bool IsAllDeviceLocalMappable() const;
 
   private:
     void InitSettings(const Location& loc);
@@ -172,6 +174,10 @@ class Validator : public GpuShaderInstrumentor {
     void PreCallRecordCmdDispatchBaseKHR(VkCommandBuffer commandBuffer, uint32_t baseGroupX, uint32_t baseGroupY,
                                          uint32_t baseGroupZ, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ,
                                          const RecordObject& record_obj) final;
+    void PreCallRecordCmdBuildAccelerationStructuresKHR(VkCommandBuffer commandBuffer, uint32_t infoCount,
+                                                        const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
+                                                        const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos,
+                                                        const RecordObject& record_obj) final;
     void PreCallRecordCmdTraceRaysNV(VkCommandBuffer commandBuffer, VkBuffer raygenShaderBindingTableBuffer,
                                      VkDeviceSize raygenShaderBindingOffset, VkBuffer missShaderBindingTableBuffer,
                                      VkDeviceSize missShaderBindingOffset, VkDeviceSize missShaderBindingStride,
@@ -204,6 +210,14 @@ class Validator : public GpuShaderInstrumentor {
                                                const RecordObject&) final;
     void PreCallRecordCmdCopyBufferToImage2(VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo,
                                             const RecordObject&) final;
+    void PreCallRecordCmdCopyMemoryIndirectKHR(VkCommandBuffer commandBuffer,
+                                               const VkCopyMemoryIndirectInfoKHR* pCopyMemoryIndirectInfo,
+                                               const RecordObject& record_obj) final;
+    void PreCallRecordCmdCopyMemoryToImageIndirectKHR(VkCommandBuffer commandBuffer,
+                                                      const VkCopyMemoryToImageIndirectInfoKHR* pCopyMemoryToImageIndirectInfo,
+                                                      const RecordObject& record_obj) final;
+    bool PreCallValidateCmdPushDataEXT(VkCommandBuffer commandBuffer, const VkPushDataInfoEXT* pPushDataInfo,
+                                       const ErrorObject& error_obj) const override;
 
     bool ValidateProtectedImage(const vvl::CommandBuffer& cb_state, const vvl::Image& image_state, const Location& image_loc,
                                 const char* vuid, const char* more_message = "") const final;
@@ -239,7 +253,7 @@ class Validator : public GpuShaderInstrumentor {
     // We find ourselves constantly needing to create some resource for the "lifetime of GPU-AV"
     // We don't want a messy global space to managae it and use this to allow each check to manage the resource where it is used.
     // The goal is the first time we need the resource, we create it then, and afterwards, its cached and we can regain
-    vko::SharedResourcesCache shared_resources_manager;
+    vko::SharedResourcesCache<true> shared_resources_cache;
 
     PFN_vkSetDeviceLoaderData vk_set_device_loader_data_;
 
@@ -247,22 +261,34 @@ class Validator : public GpuShaderInstrumentor {
     std::unique_ptr<vko::DescriptorSetManager> desc_set_manager_;
 
     // This is so universally used, that we decided currently to not be in vko::SharedResourcesCache
-    // This is just a buffer with a uint32_t value from [0, cts::indices_count - 1] so we can update prior to an action command
+    // This is just a buffer with a uint32_t value from [0, GpuAVSettings::indices_count - 1] so we can update prior to an action command
     // (draw/dispatch) to know where it came from
     vko::Buffer global_indices_buffer_;
     uint32_t indices_buffer_alignment_ = 0;
 
     // VK_EXT_descriptor_buffer global tracking
-    //
-    // Our internal Descriptor Buffer we will use
-    vko::Buffer global_resource_descriptor_buffer_;
-    // TODO - These are not needed for DebugPrintf, but will be needed for GPU-AV to track the descriptor used
-    // Most common apps will have few, but large descriptor buffers
-    vvl::unordered_set<VkBuffer> resource_descriptor_buffer_handles_;
-    // We need to track handles in order to adjust vkMapMemory calls
-    vvl::unordered_set<VkDeviceMemory> resource_descriptor_buffer_memory_handles_;
+    struct DescriptorBuffer {
+        // TODO - These are not needed for DebugPrintf, but will be needed for GPU-AV to track the descriptor used
+        // Most common apps will have few, but large descriptor buffers
+        vvl::unordered_set<VkBuffer> resource_handles_;
+        // We need to track handles in order to adjust vkMapMemory calls
+        vvl::unordered_set<VkDeviceMemory> resource_memory_handles_;
+    } descriptor_buffer;
+
+    // VK_EXT_descriptor_heap global tracking
+    struct ResourceHeap {
+        const vvl::Buffer* buffer_state_ = nullptr;
+        VkDeviceSize reserved_offset_ = 0;
+    } resource_heap;
+
+    vko::Buffer& GetGlobalDescriptorBuffer();
+    vko::Buffer& GetGlobalDescriptorHeap();
 
   private:
+    // For Descriptor Buffer/Heap we have our own global buffer, but lazily allocate it when first used
+    vko::Buffer global_resource_descriptor_buffer_;
+    vko::Buffer global_resource_descriptor_heap_;
+
     std::string instrumented_shader_cache_path_{};
 
     // Make sure we call the right versions of any timeline semaphore functions.

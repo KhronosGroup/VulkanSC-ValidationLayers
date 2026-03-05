@@ -1,6 +1,6 @@
-/* Copyright (c) 2019-2025 The Khronos Group Inc.
- * Copyright (c) 2019-2025 Valve Corporation
- * Copyright (c) 2019-2025 LunarG, Inc.
+/* Copyright (c) 2019-2026 The Khronos Group Inc.
+ * Copyright (c) 2019-2026 Valve Corporation
+ * Copyright (c) 2019-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,16 @@
 
 namespace syncval {
 
-// Action for validating resolve operations
+static void UpdateAttachmentAccessState(AccessContext &access_context, const AttachmentViewGen &view_gen,
+                                        AttachmentViewGen::Gen gen_type, SyncAccessIndex current_usage,
+                                        const AttachmentAccess &attachment_access, const ResourceUsageTag tag) {
+    const std::optional<ImageRangeGen> &attachment_gen = view_gen.GetRangeGen(gen_type);
+    if (attachment_gen) {
+        ImageRangeGen range_gen = *attachment_gen;
+        access_context.UpdateAccessState(range_gen, current_usage, attachment_access, ResourceUsageTagEx{tag});
+    }
+}
+
 class ValidateResolveAction {
   public:
     ValidateResolveAction(VkRenderPass render_pass, uint32_t subpass, const AccessContext &context,
@@ -39,20 +48,18 @@ class ValidateResolveAction {
 
     void operator()(const char *aspect_name, const char *resolve_action_name, uint32_t src_at, uint32_t dst_at,
                     const AttachmentViewGen &view_gen, AttachmentViewGen::Gen gen_type, SyncAccessIndex current_usage,
-                    SyncOrdering ordering_rule) {
-        const HazardResult hazard = context_.DetectHazard(view_gen, gen_type, current_usage, ordering_rule);
+                    const AttachmentAccess &attachment_access) {
+        ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(gen_type);
+        const HazardResult hazard = context_.DetectAttachmentHazard(attachment_range_gen, current_usage, attachment_access);
         if (hazard.IsHazard()) {
             const Location loc(command_);
 
             const SyncValidator &validator = cb_context_.GetSyncState();
 
-            // TODO: this error message is not triggered by the tests
-            std::stringstream ss;
-            ss << view_gen.GetViewState()->Handle();
-            ss << " (" << aspect_name << " " << resolve_action_name;
-            ss << ", attachment " << src_at;
-            ss << ", resolve attachment " << dst_at;
-            ss << ", subpass " << subpass_ << " of " << validator.FormatHandle(render_pass_) << ")";
+            std::ostringstream ss;
+            ss << validator.FormatHandle(view_gen.GetViewState()->Handle());
+            ss << " (" << resolve_action_name << " of " << aspect_name << " multisample attachment " << src_at;
+            ss << " in subpass " << subpass_ << " of " << validator.FormatHandle(render_pass_) << ")";
             const std::string resource_description = ss.str();
             const auto error =
                 validator.error_messages_.RenderPassResolveError(hazard, cb_context_, command_, resource_description);
@@ -71,14 +78,12 @@ class ValidateResolveAction {
     bool skip_;
 };
 
-// Update action for resolve operations
 class UpdateStateResolveAction {
   public:
     UpdateStateResolveAction(AccessContext &context, ResourceUsageTag tag) : context_(context), tag_(tag) {}
     void operator()(const char *, const char *, uint32_t, uint32_t, const AttachmentViewGen &view_gen,
-                    AttachmentViewGen::Gen gen_type, SyncAccessIndex current_usage, SyncOrdering ordering_rule) {
-        // Ignores validation only arguments...
-        context_.UpdateAccessState(view_gen, gen_type, current_usage, ordering_rule, tag_);
+                    AttachmentViewGen::Gen gen_type, SyncAccessIndex current_usage, const AttachmentAccess &attachment_access) {
+        UpdateAttachmentAccessState(context_, view_gen, gen_type, current_usage, attachment_access, tag_);
     }
 
   private:
@@ -87,12 +92,14 @@ class UpdateStateResolveAction {
 };
 
 std::unique_ptr<AccessContext[]> InitSubpassContexts(VkQueueFlags queue_flags, const vvl::RenderPass &rp_state,
-                                                     const AccessContext *external_context) {
+                                                     const AccessContext &external_context) {
     const uint32_t subpass_count = rp_state.create_info.subpassCount;
     auto subpass_contexts = std::make_unique<AccessContext[]>(subpass_count);
     // Add this for all subpasses here so that they exsist during next subpass validation
     for (uint32_t pass = 0; pass < subpass_count; pass++) {
-        subpass_contexts[pass].InitFrom(pass, queue_flags, rp_state.subpass_dependencies, subpass_contexts.get(), external_context);
+        subpass_contexts[pass].validator = external_context.validator;
+        subpass_contexts[pass].InitFrom(pass, queue_flags, rp_state.subpass_dependencies, subpass_contexts.get(),
+                                        &external_context);
     }
     return subpass_contexts;
 }
@@ -132,19 +139,23 @@ static SyncAccessIndex DepthStencilLoadUsage(VkAttachmentLoadOp load_op) {
 
 // Caller must manage returned pointer
 static AccessContext *CreateStoreResolveProxyContext(const AccessContext &context, const vvl::RenderPass &rp_state,
-                                                     uint32_t subpass, const AttachmentViewGenVector &attachment_views) {
-    auto *proxy = new AccessContext();
+                                                     uint32_t render_pass_instance_id, uint32_t subpass,
+                                                     const AttachmentViewGenVector &attachment_views) {
+    auto *proxy = new AccessContext(*context.validator);
     proxy->InitFrom(context);
-    RenderPassAccessContext::UpdateAttachmentResolveAccess(rp_state, attachment_views, subpass, kInvalidTag, *proxy);
-    RenderPassAccessContext::UpdateAttachmentStoreAccess(rp_state, attachment_views, subpass, kInvalidTag, *proxy);
+    RenderPassAccessContext::UpdateAttachmentResolveAccess(rp_state, attachment_views, render_pass_instance_id, subpass,
+                                                           kInvalidTag, *proxy);
+    RenderPassAccessContext::UpdateAttachmentStoreAccess(rp_state, attachment_views, render_pass_instance_id, subpass, kInvalidTag,
+                                                         *proxy);
     return proxy;
 }
 
 // Layout transitions are handled as if the were occuring in the beginning of the next subpass
 bool RenderPassAccessContext::ValidateLayoutTransitions(const CommandBufferAccessContext &cb_context,
                                                         const AccessContext &access_context, const vvl::RenderPass &rp_state,
-                                                        const VkRect2D &render_area, uint32_t subpass,
-                                                        const AttachmentViewGenVector &attachment_views, vvl::Func command) {
+                                                        const VkRect2D &render_area, uint32_t render_pass_instance_id,
+                                                        uint32_t subpass, const AttachmentViewGenVector &attachment_views,
+                                                        vvl::Func command) {
     bool skip = false;
     // As validation methods are const and precede the record/update phase, for any tranistions from the immediately
     // previous subpass, we have to validate them against a copy of the AccessContext, with resolve operations applied, as
@@ -163,8 +174,8 @@ bool RenderPassAccessContext::ValidateLayoutTransitions(const CommandBufferAcces
         assert(track_back);
         if (prev_needs_proxy) {
             if (!proxy_for_prev) {
-                proxy_for_prev.reset(
-                    CreateStoreResolveProxyContext(*track_back->source_subpass, rp_state, transition.prev_pass, attachment_views));
+                proxy_for_prev.reset(CreateStoreResolveProxyContext(*track_back->source_subpass, rp_state, render_pass_instance_id,
+                                                                    transition.prev_pass, attachment_views));
                 proxy_track_back = *track_back;
                 proxy_track_back.source_subpass = proxy_for_prev.get();
             }
@@ -176,7 +187,7 @@ bool RenderPassAccessContext::ValidateLayoutTransitions(const CommandBufferAcces
             const Location loc(command);
 
             const vvl::ImageView *attachment_view = attachment_views[transition.attachment].GetViewState();
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "in subpass " << subpass << " of " << sync_state.FormatHandle(rp_state.Handle());
             ss << " on attachment " << transition.attachment << " (";
             ss << sync_state.FormatHandle(attachment_view->Handle());
@@ -203,16 +214,19 @@ bool RenderPassAccessContext::ValidateLayoutTransitions(const CommandBufferAcces
 
 bool RenderPassAccessContext::ValidateLoadOperation(const CommandBufferAccessContext &cb_context,
                                                     const AccessContext &access_context, const vvl::RenderPass &rp_state,
-                                                    const VkRect2D &render_area, uint32_t subpass,
+                                                    const VkRect2D &render_area, uint32_t render_pass_instance_id, uint32_t subpass,
                                                     const AttachmentViewGenVector &attachment_views, vvl::Func command) {
     bool skip = false;
-    const auto *attachment_ci = rp_state.create_info.pAttachments;
+
+    AttachmentAccess attachment_access;
+    attachment_access.type = AttachmentAccessType::LoadOp;
+    attachment_access.render_pass_instance_id = render_pass_instance_id;
+    attachment_access.subpass = subpass;
 
     for (uint32_t i = 0; i < rp_state.create_info.attachmentCount; i++) {
         if (subpass == rp_state.attachment_first_subpass[i]) {
             const auto &view_gen = attachment_views[i];
-            if (!view_gen.IsValid()) continue;
-            const auto &ci = attachment_ci[i];
+            const auto &ci = rp_state.create_info.pAttachments[i];
 
             // Need check in the following way
             // 1) if the usage bit isn't in the dest_access_scope, and there is layout traniition for initial use, report hazard
@@ -232,18 +246,21 @@ bool RenderPassAccessContext::ValidateLoadOperation(const CommandBufferAccessCon
 
             bool checked_stencil = false;
             if (is_color && (load_index != SYNC_ACCESS_INDEX_NONE)) {
-                hazard = access_context.DetectHazard(view_gen, AttachmentViewGen::Gen::kRenderArea, load_index,
-                                                     SyncOrdering::kColorAttachment);
+                ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kRenderArea);
+                attachment_access.ordering = SyncOrdering::kColorAttachment;
+                hazard = access_context.DetectAttachmentHazard(attachment_range_gen, load_index, attachment_access);
                 aspect = "color";
             } else {
                 if (has_depth && (load_index != SYNC_ACCESS_INDEX_NONE)) {
-                    hazard = access_context.DetectHazard(view_gen, AttachmentViewGen::Gen::kDepthOnlyRenderArea, load_index,
-                                                         SyncOrdering::kDepthStencilAttachment);
+                    ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kDepthOnlyRenderArea);
+                    attachment_access.ordering = SyncOrdering::kDepthStencilAttachment;
+                    hazard = access_context.DetectAttachmentHazard(attachment_range_gen, load_index, attachment_access);
                     aspect = "depth";
                 }
                 if (!hazard.IsHazard() && has_stencil && (stencil_load_index != SYNC_ACCESS_INDEX_NONE)) {
-                    hazard = access_context.DetectHazard(view_gen, AttachmentViewGen::Gen::kStencilOnlyRenderArea,
-                                                         stencil_load_index, SyncOrdering::kDepthStencilAttachment);
+                    ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kStencilOnlyRenderArea);
+                    attachment_access.ordering = SyncOrdering::kDepthStencilAttachment;
+                    hazard = access_context.DetectAttachmentHazard(attachment_range_gen, stencil_load_index, attachment_access);
                     aspect = "stencil";
                     checked_stencil = true;
                 }
@@ -254,7 +271,7 @@ bool RenderPassAccessContext::ValidateLoadOperation(const CommandBufferAccessCon
                 const SyncValidator &sync_state = cb_context.GetSyncState();
                 const Location loc(command);
 
-                std::stringstream ss;
+                std::ostringstream ss;
                 ss << "the " << aspect << " aspect of attachment " << i;
                 ss << " (" << sync_state.FormatHandle(view_gen.GetViewState()->Handle()) << ")";
                 ss << " in subpass " << subpass;
@@ -283,13 +300,13 @@ bool RenderPassAccessContext::ValidateLoadOperation(const CommandBufferAccessCon
 // The latter is handled in layout transistion validation directly
 bool RenderPassAccessContext::ValidateStoreOperation(const CommandBufferAccessContext &cb_context, vvl::Func command) const {
     bool skip = false;
-    const auto *attachment_ci = rp_state_->create_info.pAttachments;
+
+    const AttachmentAccess attachment_access = GetAttachmentAccess(SyncOrdering::kRaster, AttachmentAccessType::StoreOp);
 
     for (uint32_t i = 0; i < rp_state_->create_info.attachmentCount; i++) {
         if (current_subpass_ == rp_state_->attachment_last_subpass[i]) {
             const AttachmentViewGen &view_gen = attachment_views_[i];
-            if (!view_gen.IsValid()) continue;
-            const auto &ci = attachment_ci[i];
+            const auto &ci = rp_state_->create_info.pAttachments[i];
 
             // The spec states that "don't care" is an operation with VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
             // so we assume that an implementation is *free* to write in that case, meaning that for correctness
@@ -304,35 +321,34 @@ bool RenderPassAccessContext::ValidateStoreOperation(const CommandBufferAccessCo
             const char *aspect = nullptr;
             bool checked_stencil = false;
             if (is_color) {
-                hazard = CurrentContext().DetectHazard(view_gen, AttachmentViewGen::Gen::kRenderArea,
-                                                       SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, SyncOrdering::kRaster,
-                                                       SyncFlag::kStoreOp);
+                ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kRenderArea);
+                hazard = CurrentContext().DetectAttachmentHazard(
+                    attachment_range_gen, SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, attachment_access);
                 aspect = "color";
             } else {
                 const bool stencil_op_stores = ci.stencilStoreOp != VK_ATTACHMENT_STORE_OP_NONE;
                 if (has_depth && store_op_stores) {
-                    hazard = CurrentContext().DetectHazard(view_gen, AttachmentViewGen::Gen::kDepthOnlyRenderArea,
-                                                           SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                                                           SyncOrdering::kRaster, SyncFlag::kStoreOp);
+                    ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kDepthOnlyRenderArea);
+                    hazard = CurrentContext().DetectAttachmentHazard(
+                        attachment_range_gen, SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE, attachment_access);
                     aspect = "depth";
                 }
                 if (!hazard.IsHazard() && has_stencil && stencil_op_stores) {
-                    hazard = CurrentContext().DetectHazard(view_gen, AttachmentViewGen::Gen::kStencilOnlyRenderArea,
-                                                           SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                                                           SyncOrdering::kRaster, SyncFlag::kStoreOp);
+                    ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kStencilOnlyRenderArea);
+                    hazard = CurrentContext().DetectAttachmentHazard(
+                        attachment_range_gen, SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE, attachment_access);
                     aspect = "stencil";
                     checked_stencil = true;
                 }
             }
 
-            // TODO: this hazard is not triggered by the tests
             if (hazard.IsHazard()) {
                 const SyncValidator &sync_state = cb_context.GetSyncState();
                 const char *const op_type_string = checked_stencil ? "stencilStoreOp" : "storeOp";
                 const VkAttachmentStoreOp store_op = checked_stencil ? ci.stencilStoreOp : ci.storeOp;
                 const Location loc(command);
 
-                std::stringstream ss;
+                std::ostringstream ss;
                 ss << sync_state.FormatHandle(view_gen.GetViewState()->Handle());
                 ss << " (subpass " << current_subpass_ << " of " << sync_state.FormatHandle(rp_state_->Handle());
                 ss << ", attachment " << i;
@@ -349,31 +365,17 @@ bool RenderPassAccessContext::ValidateStoreOperation(const CommandBufferAccessCo
     return skip;
 }
 
-bool IsImageLayoutDepthWritable(VkImageLayout image_layout) {
-    return (image_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ||
-            image_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL ||
-            image_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-}
-
-bool IsImageLayoutStencilWritable(VkImageLayout image_layout) {
-    return (image_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ||
-            image_layout == VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL ||
-            image_layout == VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL);
-}
-
 bool IsDepthAttachmentWriteable(const LastBound &last_bound_state, const VkFormat format, const VkImageLayout layout) {
-    // PHASE1 TODO: These validation should be in core_checks.
-    const bool depth_write_enable = last_bound_state.IsDepthWriteEnable();  // implicitly means DepthTestEnable is set
-    return !vkuFormatIsStencilOnly(format) && depth_write_enable && IsImageLayoutDepthWritable(layout);
+    const bool depth_write_enable = last_bound_state.IsDepthWriteEnable();
+    return (vkuFormatIsDepthAndStencil(format) || vkuFormatIsDepthOnly(format)) && depth_write_enable;
 }
 
 bool IsStencilAttachmentWriteable(const LastBound &last_bound_state, const VkFormat format, const VkImageLayout layout) {
     // PHASE1 TODO: It needs to check if stencil is writable.
     //              If failOp, passOp, or depthFailOp are not KEEP, and writeMask isn't 0, it's writable.
     //              If depth test is disable, it's considered depth test passes, and then depthFailOp doesn't run.
-    // PHASE1 TODO: These validation should be in core_checks.
     const bool stencil_test_enable = last_bound_state.IsStencilTestEnable();
-    return !vkuFormatIsDepthOnly(format) && stencil_test_enable && IsImageLayoutStencilWritable(layout);
+    return (vkuFormatIsDepthAndStencil(format) || vkuFormatIsStencilOnly(format)) && stencil_test_enable;
 }
 
 // Traverse the attachment resolves for this a specific subpass, and do action() to them.
@@ -382,25 +384,29 @@ bool IsStencilAttachmentWriteable(const LastBound &last_bound_state, const VkFor
 // The signature for Action() reflect the needs of both uses.
 template <typename Action>
 void ResolveOperation(Action &action, const vvl::RenderPass &rp_state, const AttachmentViewGenVector &attachment_views,
-                      uint32_t subpass) {
+                      uint32_t render_pass_instance_id, uint32_t subpass) {
     const auto &rp_ci = rp_state.create_info;
     const auto *attachment_ci = rp_ci.pAttachments;
     const auto &subpass_ci = rp_ci.pSubpasses[subpass];
 
-    // Color resolves -- require an inuse color attachment and a matching inuse resolve attachment
-    const auto *color_attachments = subpass_ci.pColorAttachments;
-    const auto *color_resolve = subpass_ci.pResolveAttachments;
-    if (color_resolve && color_attachments) {
+    AttachmentAccess attachment_access;
+    attachment_access.render_pass_instance_id = render_pass_instance_id;
+    attachment_access.subpass = subpass;
+
+    // Color resolve requires an inuse color attachment and a matching inuse resolve attachment
+    if (subpass_ci.pResolveAttachments && subpass_ci.pColorAttachments) {
+        attachment_access.ordering = SyncOrdering::kColorAttachment;
         for (uint32_t i = 0; i < subpass_ci.colorAttachmentCount; i++) {
-            const auto &color_attach = color_attachments[i].attachment;
-            const auto &resolve_attach = subpass_ci.pResolveAttachments[i].attachment;
-            if ((color_attach != VK_ATTACHMENT_UNUSED) && (resolve_attach != VK_ATTACHMENT_UNUSED)) {
+            const uint32_t color_attach = subpass_ci.pColorAttachments[i].attachment;
+            const uint32_t resolve_attach = subpass_ci.pResolveAttachments[i].attachment;
+            if (color_attach != VK_ATTACHMENT_UNUSED && resolve_attach != VK_ATTACHMENT_UNUSED) {
+                attachment_access.type  = AttachmentAccessType::ResolveRead;
                 action("color", "resolve read", color_attach, resolve_attach, attachment_views[color_attach],
-                       AttachmentViewGen::Gen::kRenderArea, SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_READ,
-                       SyncOrdering::kColorAttachment);
+                       AttachmentViewGen::Gen::kRenderArea, SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_READ, attachment_access);
+
+                attachment_access.type = AttachmentAccessType::ResolveWrite;
                 action("color", "resolve write", color_attach, resolve_attach, attachment_views[resolve_attach],
-                       AttachmentViewGen::Gen::kRenderArea, SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE,
-                       SyncOrdering::kColorAttachment);
+                       AttachmentViewGen::Gen::kRenderArea, SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, attachment_access);
             }
         }
     }
@@ -433,74 +439,70 @@ void ResolveOperation(Action &action, const vvl::RenderPass &rp_state, const Att
         }
 
         if (aspect_string) {
+            attachment_access.ordering = SyncOrdering::kRaster;
+
+            attachment_access.type = AttachmentAccessType::ResolveRead;
             action(aspect_string, "resolve read", src_at, dst_at, attachment_views[src_at], gen_type,
-                   SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_READ, SyncOrdering::kRaster);
+                   SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_READ, attachment_access);
+
+            attachment_access.type = AttachmentAccessType::ResolveWrite;
             action(aspect_string, "resolve write", src_at, dst_at, attachment_views[dst_at], gen_type,
-                   SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, SyncOrdering::kRaster);
+                   SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, attachment_access);
         }
     }
 }
 
 bool RenderPassAccessContext::ValidateResolveOperations(const CommandBufferAccessContext &cb_context, vvl::Func command) const {
     ValidateResolveAction validate_action(rp_state_->VkHandle(), current_subpass_, CurrentContext(), cb_context, command);
-    ResolveOperation(validate_action, *rp_state_, attachment_views_, current_subpass_);
+    ResolveOperation(validate_action, *rp_state_, attachment_views_, render_pass_instance_id_, current_subpass_);
     return validate_action.GetSkip();
 }
 
 void RenderPassAccessContext::UpdateAttachmentResolveAccess(const vvl::RenderPass &rp_state,
-                                                            const AttachmentViewGenVector &attachment_views, uint32_t subpass,
+                                                            const AttachmentViewGenVector &attachment_views,
+                                                            uint32_t render_pass_instance_id, uint32_t subpass,
                                                             const ResourceUsageTag tag, AccessContext &access_context) {
     UpdateStateResolveAction update(access_context, tag);
-    ResolveOperation(update, rp_state, attachment_views, subpass);
+    ResolveOperation(update, rp_state, attachment_views, render_pass_instance_id, subpass);
 }
 
 void RenderPassAccessContext::UpdateAttachmentStoreAccess(const vvl::RenderPass &rp_state,
-                                                          const AttachmentViewGenVector &attachment_views, uint32_t subpass,
+                                                          const AttachmentViewGenVector &attachment_views,
+                                                          uint32_t render_pass_instance_id, uint32_t subpass,
                                                           const ResourceUsageTag tag, AccessContext &access_context) {
-    const auto *attachment_ci = rp_state.create_info.pAttachments;
+    AttachmentAccess attachment_access;
+    attachment_access.type = AttachmentAccessType::StoreOp;
+    attachment_access.ordering = SyncOrdering::kRaster;
+    attachment_access.render_pass_instance_id = render_pass_instance_id;
+    attachment_access.subpass = subpass;
 
     for (uint32_t i = 0; i < rp_state.create_info.attachmentCount; i++) {
         if (rp_state.attachment_last_subpass[i] == subpass) {
             const auto &view_gen = attachment_views[i];
-            if (!view_gen.IsValid()) continue;  // UNUSED
 
-            const auto &ci = attachment_ci[i];
+            const auto &ci = rp_state.create_info.pAttachments[i];
             const bool has_depth = vkuFormatHasDepth(ci.format);
             const bool has_stencil = vkuFormatHasStencil(ci.format);
             const bool is_color = !(has_depth || has_stencil);
             const bool store_op_stores = ci.storeOp != VK_ATTACHMENT_STORE_OP_NONE;
 
             if (is_color && store_op_stores) {
-                access_context.UpdateAccessState(view_gen, AttachmentViewGen::Gen::kRenderArea,
-                                                 SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, SyncOrdering::kRaster, tag,
-                                                 SyncFlag::kStoreOp);
+                UpdateAttachmentAccessState(access_context, view_gen, AttachmentViewGen::Gen::kRenderArea,
+                                            SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, attachment_access, tag);
             } else {
                 if (has_depth && store_op_stores) {
-                    access_context.UpdateAccessState(view_gen, AttachmentViewGen::Gen::kDepthOnlyRenderArea,
-                                                     SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE, SyncOrdering::kRaster,
-                                                     tag, SyncFlag::kStoreOp);
+                    UpdateAttachmentAccessState(access_context, view_gen, AttachmentViewGen::Gen::kDepthOnlyRenderArea,
+                                                SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE, attachment_access, tag);
                 }
                 const bool stencil_op_stores = ci.stencilStoreOp != VK_ATTACHMENT_STORE_OP_NONE;
                 if (has_stencil && stencil_op_stores) {
-                    access_context.UpdateAccessState(view_gen, AttachmentViewGen::Gen::kStencilOnlyRenderArea,
-                                                     SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE, SyncOrdering::kRaster,
-                                                     tag, SyncFlag::kStoreOp);
+                    UpdateAttachmentAccessState(access_context, view_gen, AttachmentViewGen::Gen::kStencilOnlyRenderArea,
+                                                SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE, attachment_access, tag);
                 }
             }
         }
     }
 }
-
-struct ApplySubpassTransitionBarriersAction {
-    explicit ApplySubpassTransitionBarriersAction(const std::vector<SyncBarrier> &barriers, ResourceUsageTag layout_transition_tag)
-        : barriers(barriers), layout_transition_tag(layout_transition_tag) {}
-    void operator()(AccessState *access) const {
-        assert(access);
-        ApplyBarriers(*access, barriers, true, layout_transition_tag);
-    }
-    const std::vector<SyncBarrier> &barriers;
-    const ResourceUsageTag layout_transition_tag;
-};
 
 void RenderPassAccessContext::RecordLayoutTransitions(const vvl::RenderPass &rp_state, uint32_t subpass,
                                                       const AttachmentViewGenVector &attachment_views, const ResourceUsageTag tag,
@@ -509,7 +511,6 @@ void RenderPassAccessContext::RecordLayoutTransitions(const vvl::RenderPass &rp_
     for (const auto &transition : transitions) {
         const auto prev_pass = transition.prev_pass;
         const auto &view_gen = attachment_views[transition.attachment];
-        if (!view_gen.IsValid()) continue;
 
         const auto *trackback = access_context.GetTrackBackFromSubpass(prev_pass);
         assert(trackback);
@@ -519,11 +520,7 @@ void RenderPassAccessContext::RecordLayoutTransitions(const vvl::RenderPass &rp_
         assert(prev_context);
         ApplySubpassTransitionBarriersAction barrier_action(trackback->barriers, tag);
         const std::optional<ImageRangeGen> &attachment_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kViewSubresource);
-        assert(attachment_gen);
-
-        access_context.ResolveFromContext(barrier_action, *prev_context, *attachment_gen, true /* infill */,
-                                          true /* recur to infill */);
-        assert(attachment_gen);
+        access_context.ResolveFromSubpassContext(barrier_action, *prev_context, *attachment_gen);
     }
 }
 
@@ -538,7 +535,7 @@ bool RenderPassAccessContext::ValidateDrawSubpassAttachment(const CommandBufferA
         return skip;
     }
 
-    const auto &list = pipe->fragmentShader_writable_output_location_list;
+    const auto& list = pipe->fs_writable_output_location_list;
     const auto &subpass = rp_state_->create_info.pSubpasses[current_subpass_];
     const auto &current_context = CurrentContext();
     const SyncValidator &sync_state = cb_context.GetSyncState();
@@ -550,7 +547,7 @@ bool RenderPassAccessContext::ValidateDrawSubpassAttachment(const CommandBufferA
         LogObjectList objlist(cb_context.GetCBState().Handle(), attachment_view.Handle(), attachment_image.Handle());
         const Location loc(command);
 
-        std::stringstream ss;
+        std::ostringstream ss;
         ss << attachment_description;
         ss << " (" << sync_state.FormatHandle(attachment_view.Handle());
         ss << ", " << sync_state.FormatHandle(attachment_image.Handle()) << ")";
@@ -568,13 +565,13 @@ bool RenderPassAccessContext::ValidateDrawSubpassAttachment(const CommandBufferA
                 subpass.pColorAttachments[location].attachment == VK_ATTACHMENT_UNUSED) {
                 continue;
             }
+            const AttachmentAccess attachment_access = GetAttachmentAccess(SyncOrdering::kColorAttachment);
             const AttachmentViewGen &view_gen = attachment_views_[subpass.pColorAttachments[location].attachment];
-            if (!view_gen.IsValid()) continue;
-            HazardResult hazard =
-                current_context.DetectHazard(view_gen, AttachmentViewGen::Gen::kRenderArea,
-                                             SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, SyncOrdering::kColorAttachment);
+            ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kRenderArea);
+            HazardResult hazard = current_context.DetectAttachmentHazard(
+                attachment_range_gen, SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, attachment_access);
             if (hazard.IsHazard()) {
-                std::stringstream ss;
+                std::ostringstream ss;
                 ss << "color attachment " << location << " in subpass " << cmd_buffer.GetActiveSubpass();
                 const std::string attachment_description = ss.str();
                 skip |= report_atachment_hazard(hazard, *view_gen.GetViewState(), attachment_description);
@@ -587,7 +584,7 @@ bool RenderPassAccessContext::ValidateDrawSubpassAttachment(const CommandBufferA
     const auto ds_state = pipe->DepthStencilState();
     const uint32_t depth_stencil_attachment = GetSubpassDepthStencilAttachmentIndex(ds_state, subpass.pDepthStencilAttachment);
 
-    if ((depth_stencil_attachment != VK_ATTACHMENT_UNUSED) && attachment_views_[depth_stencil_attachment].IsValid()) {
+    if (depth_stencil_attachment != VK_ATTACHMENT_UNUSED) {
         const AttachmentViewGen &view_gen = attachment_views_[depth_stencil_attachment];
         const vvl::ImageView &view_state = *view_gen.GetViewState();
         const VkImageLayout ds_layout = subpass.pDepthStencilAttachment->layout;
@@ -601,22 +598,24 @@ bool RenderPassAccessContext::ValidateDrawSubpassAttachment(const CommandBufferA
         //              If depth test is disable, it's considered depth test passes, and then depthFailOp doesn't run.
         // const bool early_fragment_test = pipe->fragment_shader_state->early_fragment_test;
         if (depth_write) {
-            HazardResult hazard = current_context.DetectHazard(view_gen, AttachmentViewGen::Gen::kDepthOnlyRenderArea,
-                                                               SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                                                               SyncOrdering::kDepthStencilAttachment);
+            const AttachmentAccess attachment_access = GetAttachmentAccess(SyncOrdering::kDepthStencilAttachment);
+            ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kDepthOnlyRenderArea);
+            HazardResult hazard = current_context.DetectAttachmentHazard(
+                attachment_range_gen, SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE, attachment_access);
             if (hazard.IsHazard()) {
-                std::stringstream ss;
+                std::ostringstream ss;
                 ss << "depth aspect of depth-stencil attachment  in subpass " << cmd_buffer.GetActiveSubpass();
                 const std::string attachment_description = ss.str();
                 skip |= report_atachment_hazard(hazard, view_state, attachment_description);
             }
         }
         if (stencil_write) {
-            HazardResult hazard = current_context.DetectHazard(view_gen, AttachmentViewGen::Gen::kStencilOnlyRenderArea,
-                                                               SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                                                               SyncOrdering::kDepthStencilAttachment);
+            const AttachmentAccess attachment_access = GetAttachmentAccess(SyncOrdering::kDepthStencilAttachment);
+            ImageRangeGen attachment_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kStencilOnlyRenderArea);
+            HazardResult hazard = current_context.DetectAttachmentHazard(
+                attachment_range_gen, SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE, attachment_access);
             if (hazard.IsHazard()) {
-                std::stringstream ss;
+                std::ostringstream ss;
                 ss << "stencil aspect of depth-stencil attachment  in subpass " << cmd_buffer.GetActiveSubpass();
                 const std::string attachment_description = ss.str();
                 skip |= report_atachment_hazard(hazard, view_state, attachment_description);
@@ -631,7 +630,7 @@ void RenderPassAccessContext::RecordDrawSubpassAttachment(const vvl::CommandBuff
     const auto *pipe = last_bound_state.pipeline_state;
     if (!pipe || pipe->RasterizationDisabled()) return;
 
-    const auto &list = pipe->fragmentShader_writable_output_location_list;
+    const auto& list = pipe->fs_writable_output_location_list;
     const auto &subpass = rp_state_->create_info.pSubpasses[current_subpass_];
 
     auto &current_context = CurrentContext();
@@ -642,10 +641,10 @@ void RenderPassAccessContext::RecordDrawSubpassAttachment(const vvl::CommandBuff
                 subpass.pColorAttachments[location].attachment == VK_ATTACHMENT_UNUSED) {
                 continue;
             }
+            const AttachmentAccess attachment_access = GetAttachmentAccess(SyncOrdering::kColorAttachment);
             const AttachmentViewGen &view_gen = attachment_views_[subpass.pColorAttachments[location].attachment];
-            current_context.UpdateAccessState(view_gen, AttachmentViewGen::Gen::kRenderArea,
-                                              SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, SyncOrdering::kColorAttachment,
-                                              tag);
+            UpdateAttachmentAccessState(current_context, view_gen, AttachmentViewGen::Gen::kRenderArea,
+                                        SYNC_COLOR_ATTACHMENT_OUTPUT_COLOR_ATTACHMENT_WRITE, attachment_access, tag);
         }
     }
 
@@ -653,7 +652,7 @@ void RenderPassAccessContext::RecordDrawSubpassAttachment(const vvl::CommandBuff
     // PHASE1 TODO: Read operations for both depth and stencil are possible in the future.
     const auto *ds_state = pipe->DepthStencilState();
     const uint32_t depth_stencil_attachment = GetSubpassDepthStencilAttachmentIndex(ds_state, subpass.pDepthStencilAttachment);
-    if ((depth_stencil_attachment != VK_ATTACHMENT_UNUSED) && attachment_views_[depth_stencil_attachment].IsValid()) {
+    if (depth_stencil_attachment != VK_ATTACHMENT_UNUSED) {
         const AttachmentViewGen &view_gen = attachment_views_[depth_stencil_attachment];
         const vvl::ImageView &view_state = *view_gen.GetViewState();
         bool depth_write = false, stencil_write = false;
@@ -664,22 +663,23 @@ void RenderPassAccessContext::RecordDrawSubpassAttachment(const vvl::CommandBuff
         const bool stencil_test_enable = last_bound_state.IsStencilTestEnable();
 
         // PHASE1 TODO: These validation should be in core_checks.
-        if (has_depth && depth_write_enable && IsImageLayoutDepthWritable(subpass.pDepthStencilAttachment->layout)) {
+        if (has_depth && depth_write_enable) {
             depth_write = true;
         }
         // PHASE1 TODO: It needs to check if stencil is writable.
         //              If failOp, passOp, or depthFailOp are not KEEP, and writeMask isn't 0, it's writable.
         //              If depth test is disable, it's considered depth test passes, and then depthFailOp doesn't run.
         // PHASE1 TODO: These validation should be in core_checks.
-        if (has_stencil && stencil_test_enable && IsImageLayoutStencilWritable(subpass.pDepthStencilAttachment->layout)) {
+        if (has_stencil && stencil_test_enable) {
             stencil_write = true;
         }
 
         if (depth_write || stencil_write) {
             const auto ds_gentype = view_gen.GetDepthStencilRenderAreaGenType(depth_write, stencil_write);
+            const AttachmentAccess attachment_access = GetAttachmentAccess(SyncOrdering::kDepthStencilAttachment);
             // PHASE1 TODO: Add EARLY stage detection based on ExecutionMode.
-            current_context.UpdateAccessState(view_gen, ds_gentype, SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                                              SyncOrdering::kDepthStencilAttachment, tag);
+            UpdateAttachmentAccessState(current_context, view_gen, ds_gentype,
+                                        SYNC_LATE_FRAGMENT_TESTS_DEPTH_STENCIL_ATTACHMENT_WRITE, attachment_access, tag);
         }
     }
 }
@@ -714,15 +714,17 @@ bool RenderPassAccessContext::ValidateNextSubpass(const CommandBufferAccessConte
         return skip;
     }
     const auto &next_context = subpass_contexts_[next_subpass];
-    skip |= ValidateLayoutTransitions(cb_context, next_context, *rp_state_, render_area_, next_subpass, attachment_views_, command);
+    skip |= ValidateLayoutTransitions(cb_context, next_context, *rp_state_, render_area_, render_pass_instance_id_, next_subpass,
+                                      attachment_views_, command);
     if (!skip) {
         // To avoid complex (and buggy) duplication of the affect of layout transitions on load operations, we'll record them
         // on a copy of the (empty) next context.
         // Note: The resource access map should be empty so hopefully this copy isn't too horrible from a perf POV.
-        AccessContext temp_context;
+        AccessContext temp_context(cb_context.GetSyncState());
         temp_context.InitFrom(next_context);
         RecordLayoutTransitions(*rp_state_, next_subpass, attachment_views_, kInvalidTag, temp_context);
-        skip |= ValidateLoadOperation(cb_context, temp_context, *rp_state_, render_area_, next_subpass, attachment_views_, command);
+        skip |= ValidateLoadOperation(cb_context, temp_context, *rp_state_, render_area_, render_pass_instance_id_, next_subpass,
+                                      attachment_views_, command);
     }
     return skip;
 }
@@ -736,7 +738,8 @@ bool RenderPassAccessContext::ValidateEndRenderPass(const CommandBufferAccessCon
 }
 
 AccessContext *RenderPassAccessContext::CreateStoreResolveProxy() const {
-    return CreateStoreResolveProxyContext(CurrentContext(), *rp_state_, current_subpass_, attachment_views_);
+    return CreateStoreResolveProxyContext(CurrentContext(), *rp_state_, render_pass_instance_id_, current_subpass_,
+                                          attachment_views_);
 }
 
 bool RenderPassAccessContext::ValidateFinalSubpassLayoutTransitions(const CommandBufferAccessContext &cb_context,
@@ -773,7 +776,7 @@ bool RenderPassAccessContext::ValidateFinalSubpassLayoutTransitions(const Comman
             const SyncValidator &sync_state = cb_context.GetSyncState();
             const Location loc(command);
 
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "on attachment " << transition.attachment << " (";
             ss << sync_state.FormatHandle(view_gen.GetViewState()->Handle());
             ss << ", " << sync_state.FormatHandle(view_gen.GetViewState()->image_state->Handle());
@@ -809,7 +812,6 @@ void RenderPassAccessContext::RecordLoadOperations(const ResourceUsageTag tag) {
     for (uint32_t i = 0; i < rp_state_->create_info.attachmentCount; i++) {
         if (rp_state_->attachment_first_subpass[i] == current_subpass_) {
             const AttachmentViewGen &view_gen = attachment_views_[i];
-            if (!view_gen.IsValid()) continue;  // UNUSED
 
             const auto &ci = attachment_ci[i];
             const bool has_depth = vkuFormatHasDepth(ci.format);
@@ -819,28 +821,33 @@ void RenderPassAccessContext::RecordLoadOperations(const ResourceUsageTag tag) {
             if (is_color) {
                 const SyncAccessIndex load_op = ColorLoadUsage(ci.loadOp);
                 if (load_op != SYNC_ACCESS_INDEX_NONE) {
-                    subpass_context.UpdateAccessState(view_gen, AttachmentViewGen::Gen::kRenderArea, load_op,
-                                                      SyncOrdering::kColorAttachment, tag, SyncFlag::kLoadOp);
+                    const AttachmentAccess attachment_access =
+                        GetAttachmentAccess(SyncOrdering::kColorAttachment, AttachmentAccessType::LoadOp);
+                    UpdateAttachmentAccessState(subpass_context, view_gen, AttachmentViewGen::Gen::kRenderArea, load_op,
+                                                attachment_access, tag);
                 }
             } else {
+                const AttachmentAccess attachment_access =
+                    GetAttachmentAccess(SyncOrdering::kDepthStencilAttachment, AttachmentAccessType::LoadOp);
                 if (has_depth) {
                     const SyncAccessIndex load_op = DepthStencilLoadUsage(ci.loadOp);
                     if (load_op != SYNC_ACCESS_INDEX_NONE) {
-                        subpass_context.UpdateAccessState(view_gen, AttachmentViewGen::Gen::kDepthOnlyRenderArea, load_op,
-                                                          SyncOrdering::kDepthStencilAttachment, tag, SyncFlag::kLoadOp);
+                        UpdateAttachmentAccessState(subpass_context, view_gen, AttachmentViewGen::Gen::kDepthOnlyRenderArea,
+                                                    load_op, attachment_access, tag);
                     }
                 }
                 if (has_stencil) {
                     const SyncAccessIndex load_op = DepthStencilLoadUsage(ci.stencilLoadOp);
                     if (load_op != SYNC_ACCESS_INDEX_NONE) {
-                        subpass_context.UpdateAccessState(view_gen, AttachmentViewGen::Gen::kStencilOnlyRenderArea, load_op,
-                                                          SyncOrdering::kDepthStencilAttachment, tag, SyncFlag::kLoadOp);
+                        UpdateAttachmentAccessState(subpass_context, view_gen, AttachmentViewGen::Gen::kStencilOnlyRenderArea,
+                                                    load_op, attachment_access, tag);
                     }
                 }
             }
         }
     }
 }
+
 AttachmentViewGenVector RenderPassAccessContext::CreateAttachmentViewGen(
     const VkRect2D &render_area, const std::vector<const vvl::ImageView *> &attachment_views) {
     AttachmentViewGenVector view_gens;
@@ -852,15 +859,18 @@ AttachmentViewGenVector RenderPassAccessContext::CreateAttachmentViewGen(
     }
     return view_gens;
 }
+
 RenderPassAccessContext::RenderPassAccessContext(const vvl::RenderPass &rp_state, const VkRect2D &render_area,
                                                  VkQueueFlags queue_flags,
                                                  const std::vector<const vvl::ImageView *> &attachment_views,
-                                                 const AccessContext *external_context)
-    : rp_state_(&rp_state), render_area_(render_area), current_subpass_(0U), attachment_views_() {
-    // Add this for all subpasses here so that they exist during next subpass validation
-    subpass_contexts_ = InitSubpassContexts(queue_flags, rp_state, external_context);
-    attachment_views_ = CreateAttachmentViewGen(render_area, attachment_views);
-}
+                                                 const AccessContext &external_context, uint32_t render_pass_instance_id)
+    : rp_state_(&rp_state),
+      render_area_(render_area),
+      attachment_views_(CreateAttachmentViewGen(render_area, attachment_views)),
+      subpass_contexts_(InitSubpassContexts(queue_flags, rp_state, external_context)),
+      render_pass_instance_id_(render_pass_instance_id),
+      current_subpass_(0) {}
+
 void RenderPassAccessContext::RecordBeginRenderPass(const ResourceUsageTag barrier_tag, const ResourceUsageTag load_tag) {
     assert(0 == current_subpass_);
     AccessContext &current_context = CurrentContext();
@@ -873,8 +883,10 @@ void RenderPassAccessContext::RecordBeginRenderPass(const ResourceUsageTag barri
 void RenderPassAccessContext::RecordNextSubpass(const ResourceUsageTag store_tag, const ResourceUsageTag barrier_tag,
                                                 const ResourceUsageTag load_tag) {
     // Resolves are against *prior* subpass context and thus *before* the subpass increment
-    UpdateAttachmentResolveAccess(*rp_state_, attachment_views_, current_subpass_, store_tag, CurrentContext());
-    UpdateAttachmentStoreAccess(*rp_state_, attachment_views_, current_subpass_, store_tag, CurrentContext());
+    UpdateAttachmentResolveAccess(*rp_state_, attachment_views_, render_pass_instance_id_, current_subpass_, store_tag,
+                                  CurrentContext());
+    UpdateAttachmentStoreAccess(*rp_state_, attachment_views_, render_pass_instance_id_, current_subpass_, store_tag,
+                                CurrentContext());
 
     if (current_subpass_ + 1 >= rp_state_->create_info.subpassCount) {
         return;
@@ -892,8 +904,10 @@ void RenderPassAccessContext::RecordNextSubpass(const ResourceUsageTag store_tag
 void RenderPassAccessContext::RecordEndRenderPass(AccessContext *external_context, const ResourceUsageTag store_tag,
                                                   const ResourceUsageTag barrier_tag) {
     // Add the resolve and store accesses
-    UpdateAttachmentResolveAccess(*rp_state_, attachment_views_, current_subpass_, store_tag, CurrentContext());
-    UpdateAttachmentStoreAccess(*rp_state_, attachment_views_, current_subpass_, store_tag, CurrentContext());
+    UpdateAttachmentResolveAccess(*rp_state_, attachment_views_, render_pass_instance_id_, current_subpass_, store_tag,
+                                  CurrentContext());
+    UpdateAttachmentStoreAccess(*rp_state_, attachment_views_, render_pass_instance_id_, current_subpass_, store_tag,
+                                CurrentContext());
 
     // Export the accesses from the renderpass...
     external_context->ResolveChildContexts(GetSubpassContexts());
@@ -910,20 +924,19 @@ void RenderPassAccessContext::RecordEndRenderPass(AccessContext *external_contex
         assert(&subpass_contexts_[transition.prev_pass] == last_trackback.source_subpass);
 
         const std::optional<ImageRangeGen> &ref_range_gen = view_gen.GetRangeGen(AttachmentViewGen::Gen::kViewSubresource);
-        if (ref_range_gen) {
-            ImageRangeGen markup_range_gen(*ref_range_gen);
-            ApplyMarkupFunctor markup_action(true);
-            external_context->UpdateMemoryAccessState(markup_action, markup_range_gen);
+        ImageRangeGen markup_range_gen(*ref_range_gen);
+        ApplyMarkupFunctor markup_action(true);
+        external_context->UpdateMemoryAccessState(markup_action, markup_range_gen);
 
-            ImageRangeGen range_gen(*ref_range_gen);
-            PendingBarriers pending_barriers;
-            for (const auto &barrier : last_trackback.barriers) {
-                const BarrierScope barrier_scope(barrier);
-                CollectBarriersFunctor collect_barriers(barrier_scope, barrier, true, vvl::kNoIndex32, pending_barriers);
-                external_context->UpdateMemoryAccessState(collect_barriers, range_gen);
-            }
-            pending_barriers.Apply(barrier_tag);
+        ImageRangeGen range_gen(*ref_range_gen);
+        PendingBarriers pending_barriers;
+        for (const auto &barrier : last_trackback.barriers) {
+            const BarrierScope barrier_scope(barrier);
+            CollectBarriersFunctor collect_barriers(*external_context, barrier_scope, barrier, true, vvl::kNoIndex32,
+                                                    pending_barriers);
+            external_context->UpdateMemoryAccessState(collect_barriers, range_gen);
         }
+        pending_barriers.Apply(barrier_tag);
     }
 }
 
@@ -943,6 +956,15 @@ vvl::span<const AccessContext> RenderPassAccessContext::GetSubpassContexts() con
 
 vvl::span<AccessContext> RenderPassAccessContext::GetSubpassContexts() {
     return vvl::make_span<AccessContext>(subpass_contexts_.get(), rp_state_->create_info.subpassCount);
+}
+
+AttachmentAccess RenderPassAccessContext::GetAttachmentAccess(SyncOrdering ordering, AttachmentAccessType type) const {
+    AttachmentAccess attachment_access;
+    attachment_access.type = type;
+    attachment_access.ordering = ordering;
+    attachment_access.render_pass_instance_id = render_pass_instance_id_;
+    attachment_access.subpass = current_subpass_;
+    return attachment_access;
 }
 
 void BeginRenderingCmdState::AddRenderingInfo(const SyncValidator &state, const VkRenderingInfo &rendering_info) {

@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -214,7 +214,12 @@ TEST_F(NegativeDynamicState, ScissorNotBound) {
 TEST_F(NegativeDynamicState, BlendConstantsNotBound) {
     TEST_DESCRIPTION(
         "Run a simple draw calls to validate failure when Blend Constants dynamic state is required but not correctly bound.");
-    RETURN_IF_SKIP(Init());
+    // Should work without looking at the SPIR-V
+    const VkLayerSettingEXT settings[] = {{OBJECT_LAYER_NAME, "check_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse}};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, settings};
+
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
@@ -777,7 +782,7 @@ TEST_F(NegativeDynamicState, ExtendedDynamicStateSetViewportScissor) {
         layout(location=0) in vec4 x;
         void main(){}
     )glsl";
-    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
@@ -1085,8 +1090,8 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState2PatchControlPointsEnabled) {
     {
         VkPipelineTessellationStateCreateInfo tess_ci = vku::InitStructHelper();
 
-        VkShaderObj tcs(this, kTessellationControlMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
-        VkShaderObj tes(this, kTessellationEvalMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+        VkShaderObj tcs(*m_device, kTessellationControlMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
+        VkShaderObj tes(*m_device, kTessellationEvalMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 
         CreatePipelineHelper pipe(*this);
         pipe.AddDynamicState(VK_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT);
@@ -1527,6 +1532,25 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState3CmdSetFeatureDisabled) {
     command_buffer.End();
 }
 
+TEST_F(NegativeDynamicState, NullSampleMask) {
+    TEST_DESCRIPTION("Call vkCmdSetSampleMaskEXT with a NULL pSampleMask and without maintenance10");
+
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3SampleMask);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    // Check feature is enable for each set command.
+    vkt::CommandBuffer command_buffer(*m_device, m_command_pool);
+    command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdSetSampleMaskEXT-pSampleMask-10999");
+    vk::CmdSetSampleMaskEXT(command_buffer, VK_SAMPLE_COUNT_1_BIT, nullptr);
+    m_errorMonitor->VerifyFound();
+    command_buffer.End();
+}
+
 TEST_F(NegativeDynamicState, ExtendedDynamicState3DuplicateStatePipeline) {
     TEST_DESCRIPTION("VK_EXT_extended_dynamic_state3 Duplicate state in pipeline");
 
@@ -1592,8 +1616,8 @@ TEST_F(NegativeDynamicState, DrawNotSetTessellationDomainOrigin) {
     VkPipelineTessellationStateCreateInfo tess_ci = vku::InitStructHelper(&tess_domain_ci);
     tess_ci.patchControlPoints = 4u;
 
-    VkShaderObj tcs(this, kTessellationControlMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
-    VkShaderObj tes(this, kTessellationEvalMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+    VkShaderObj tcs(*m_device, kTessellationControlMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
+    VkShaderObj tes(*m_device, kTessellationEvalMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_TESSELLATION_DOMAIN_ORIGIN_EXT);
@@ -1936,7 +1960,7 @@ TEST_F(NegativeDynamicState, DrawNotSetRasterizationStream) {
     VkPhysicalDeviceTransformFeedbackPropertiesEXT transform_feedback_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(transform_feedback_props);
 
-    VkShaderObj gs(this, kGeometryMinimalGlsl, VK_SHADER_STAGE_GEOMETRY_BIT);
+    VkShaderObj gs(*m_device, kGeometryMinimalGlsl, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT);
@@ -2146,7 +2170,7 @@ TEST_F(NegativeDynamicState, DrawNotSetLineStippleEnableGeometry) {
            EmitVertex();
         }
     )glsl";
-    VkShaderObj gs(this, geom_src, VK_SHADER_STAGE_GEOMETRY_BIT);
+    VkShaderObj gs(*m_device, geom_src, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT);
@@ -2479,7 +2503,7 @@ TEST_F(NegativeDynamicState, ColorBlendAttchment) {
     constexpr uint32_t color_attachments = 2;
     InitRenderTarget(color_attachments);
 
-    std::stringstream fsSource;
+    std::ostringstream fsSource;
     fsSource << "#version 450\n";
     for (uint32_t i = 0; i < color_attachments; ++i) {
         fsSource << "layout(location = " << i << ") out vec4 c" << i << ";\n";
@@ -2490,7 +2514,7 @@ TEST_F(NegativeDynamicState, ColorBlendAttchment) {
     }
 
     fsSource << "}";
-    VkShaderObj fs(this, fsSource.str().c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource.str().c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineColorBlendAttachmentState cb_attachments[color_attachments];
     memset(cb_attachments, 0, sizeof(VkPipelineColorBlendAttachmentState) * color_attachments);
@@ -2705,7 +2729,7 @@ TEST_F(NegativeDynamicState, MaxFragmentDualSrcAttachmentsDynamicBlendEnable) {
             c1 = vec4(0.0f);
         }
     )glsl";
-    VkShaderObj fs(this, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // This is all ignored, but checking it will be ignored
     VkPipelineColorBlendAttachmentState cb_attachments = DefaultColorBlendAttachmentState();
@@ -2768,7 +2792,13 @@ TEST_F(NegativeDynamicState, ColorWriteNotSet) {
 
     AddRequiredExtensions(VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::colorWriteEnable);
-    RETURN_IF_SKIP(Init());
+    // Should work without looking at the SPIR-V
+    const VkLayerSettingEXT settings[] = {{OBJECT_LAYER_NAME, "check_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse}};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, settings};
+
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+
     InitRenderTarget(2);
 
     VkPipelineColorBlendAttachmentState color_blend[2] = {};
@@ -3222,9 +3252,7 @@ TEST_F(NegativeDynamicState, SampleLocations) {
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.extent.width = 128;
-    image_create_info.extent.height = 128;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {128, 128, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -3251,10 +3279,8 @@ TEST_F(NegativeDynamicState, SampleLocations) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.AddAttachmentDescription(depth_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
-    rp.AddColorAttachment(0);
-    rp.AddDepthStencilAttachment(1);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddDepthStencilAttachment(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     rp.CreateRenderPass();
 
     // Create a framebuffer
@@ -3596,10 +3622,8 @@ TEST_F(NegativeDynamicState, CmdSetDiscardRectangleEXTOffsets) {
     }
 
     VkRect2D discard_rectangles = {};
-    discard_rectangles.offset.x = -1;
-    discard_rectangles.offset.y = 0;
-    discard_rectangles.extent.width = 64;
-    discard_rectangles.extent.height = 64;
+    discard_rectangles.offset = {-1, 0};
+    discard_rectangles.extent = {64, 64};
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetDiscardRectangleEXT-x-00587");
@@ -3620,20 +3644,16 @@ TEST_F(NegativeDynamicState, CmdSetDiscardRectangleEXTRectangleCountOverflow) {
     AddRequiredExtensions(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     VkRect2D discard_rectangles = {};
-    discard_rectangles.offset.x = 1;
-    discard_rectangles.offset.y = 0;
-    discard_rectangles.extent.width = vvl::kU32Max;
-    discard_rectangles.extent.height = 64;
+    discard_rectangles.offset = {1, 0};
+    discard_rectangles.extent = {vvl::kU32Max, 64};
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetDiscardRectangleEXT-offset-00588");
     vk::CmdSetDiscardRectangleEXT(m_command_buffer, 0, 1, &discard_rectangles);
     m_errorMonitor->VerifyFound();
 
-    discard_rectangles.offset.x = 0;
-    discard_rectangles.offset.y = vvl::kI32Max;
-    discard_rectangles.extent.width = 64;
-    discard_rectangles.extent.height = 1;
+    discard_rectangles.offset = {0, vvl::kI32Max};
+    discard_rectangles.extent = {64, 1};
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetDiscardRectangleEXT-offset-00589");
     vk::CmdSetDiscardRectangleEXT(m_command_buffer, 0, 1, &discard_rectangles);
     m_errorMonitor->VerifyFound();
@@ -3649,10 +3669,8 @@ TEST_F(NegativeDynamicState, CmdSetDiscardRectangleEXTRectangleCount) {
     GetPhysicalDeviceProperties2(discard_rectangle_properties);
 
     VkRect2D discard_rectangles = {};
-    discard_rectangles.offset.x = 0;
-    discard_rectangles.offset.y = 0;
-    discard_rectangles.extent.width = 64;
-    discard_rectangles.extent.height = 64;
+    discard_rectangles.offset = {0, 0};
+    discard_rectangles.extent = {64, 64};
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetDiscardRectangleEXT-firstDiscardRectangle-00585");
@@ -4676,7 +4694,7 @@ TEST_F(NegativeDynamicState, AlphaToCoverageOutputNoAlpha) {
            x = vec3(1);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineMultisampleStateCreateInfo ms_state_ci = vku::InitStructHelper();
     ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -4914,7 +4932,7 @@ TEST_F(NegativeDynamicState, VertexInputLocationMissing) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
@@ -5131,8 +5149,7 @@ TEST_F(NegativeDynamicState, MissingColorAttachmentBlendBit) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(format, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.CreateRenderPass();
 
     vkt::Framebuffer framebuffer(*m_device, rp, 1, &image_view.handle());
@@ -5391,8 +5408,7 @@ TEST_F(NegativeDynamicState, InvalidSampleMaskSamples) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_2_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.CreateRenderPass();
 
     vkt::Framebuffer framebuffer(*m_device, rp, 1, &image_view.handle());
@@ -5501,8 +5517,7 @@ TEST_F(NegativeDynamicState, DynamicSampleLocationsEnable) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(format, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
-    rp.AddDepthStencilAttachment(0);
+    rp.AddDepthStencilAttachment(0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     rp.CreateRenderPass();
 
     vkt::Framebuffer framebuffer(*m_device, rp, 1, &image_view.handle());
@@ -5702,8 +5717,8 @@ TEST_F(NegativeDynamicState, InterpolateAtSample) {
             uFragColor = vec4(0.1f);
         }
     )glsl";
-    VkShaderObj vs(this, vs_src, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vs_src, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -5753,10 +5768,13 @@ TEST_F(NegativeDynamicState, DynamicRasterizationSamplesWithMSRTSS) {
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView();
 
-    CreatePipelineHelper pipe(*this);
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 1u;
+    pipeline_rendering_info.pColorAttachmentFormats = &image_ci.format;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT);
     pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
-    pipe.cb_ci_.attachmentCount = 0;
     pipe.CreateGraphicsPipeline();
 
     VkMultisampledRenderToSingleSampledInfoEXT msrtss_info = vku::InitStructHelper();
@@ -5769,6 +5787,8 @@ TEST_F(NegativeDynamicState, DynamicRasterizationSamplesWithMSRTSS) {
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     color_attachment.clearValue.color = m_clear_color;
+    color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+    color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkRenderingInfo rendering_info = vku::InitStructHelper(&msrtss_info);
     rendering_info.renderArea = {{0, 0}, {32, 32}};
@@ -5899,8 +5919,7 @@ TEST_F(NegativeDynamicState, ColorBlendEnableNotSet) {
 
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     vkt::Image image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
@@ -5952,8 +5971,7 @@ TEST_F(NegativeDynamicState, ColorWriteMaskNotSet) {
 
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     vkt::Image image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
@@ -6331,7 +6349,7 @@ TEST_F(NegativeDynamicState, MeshPipelineInvalidtion) {
     pipe.AddDynamicState(VK_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT);  // tied to the frag shader
     pipe.CreateGraphicsPipeline();
 
-    VkShaderObj ms(this, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj ms(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
     CreatePipelineHelper mesh_pipe(*this);
     mesh_pipe.shader_stages_ = {ms.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     mesh_pipe.CreateGraphicsPipeline();

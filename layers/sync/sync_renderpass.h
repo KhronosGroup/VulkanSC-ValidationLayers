@@ -1,6 +1,6 @@
-/* Copyright (c) 2019-2025 The Khronos Group Inc.
- * Copyright (c) 2019-2025 Valve Corporation
- * Copyright (c) 2019-2025 LunarG, Inc.
+/* Copyright (c) 2019-2026 The Khronos Group Inc.
+ * Copyright (c) 2019-2026 Valve Corporation
+ * Copyright (c) 2019-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 #include "sync/sync_common.h"
 #include "sync/sync_access_context.h"
 #include "sync/sync_op.h"
+#include <optional>
 
 struct LastBound;
 
@@ -76,32 +77,40 @@ struct BeginRenderingCmdState {
 };
 
 std::unique_ptr<AccessContext[]> InitSubpassContexts(VkQueueFlags queue_flags, const vvl::RenderPass &rp_state,
-                                                     const AccessContext *external_context);
+                                                     const AccessContext &external_context);
+
+using AttachmentViewGenVector = std::vector<AttachmentViewGen>;
 
 class RenderPassAccessContext {
   public:
     static AttachmentViewGenVector CreateAttachmentViewGen(const VkRect2D &render_area,
                                                            const std::vector<const vvl::ImageView *> &attachment_views);
-    RenderPassAccessContext() : rp_state_(nullptr), render_area_(VkRect2D()), current_subpass_(0) {}
+    RenderPassAccessContext()
+        : rp_state_(nullptr), render_area_(VkRect2D()), render_pass_instance_id_(vvl::kNoIndex32), current_subpass_(0) {}
     RenderPassAccessContext(const vvl::RenderPass &rp_state, const VkRect2D &render_area, VkQueueFlags queue_flags,
-                            const std::vector<const vvl::ImageView *> &attachment_views, const AccessContext *external_context);
+                            const std::vector<const vvl::ImageView *> &attachment_views, const AccessContext &external_context,
+                            uint32_t render_pass_instance_id);
 
     static bool ValidateLayoutTransitions(const CommandBufferAccessContext &cb_context, const AccessContext &access_context,
-                                          const vvl::RenderPass &rp_state, const VkRect2D &render_area, uint32_t subpass,
+                                          const vvl::RenderPass &rp_state, const VkRect2D &render_area,
+                                          uint32_t render_pass_instance_id, uint32_t subpass,
                                           const AttachmentViewGenVector &attachment_views, vvl::Func command);
 
     static bool ValidateLoadOperation(const CommandBufferAccessContext &cb_context, const AccessContext &access_context,
-                                      const vvl::RenderPass &rp_state, const VkRect2D &render_area, uint32_t subpass,
+                                      const vvl::RenderPass &rp_state, const VkRect2D &render_area,
+                                      uint32_t render_pass_instance_id, uint32_t subpass,
                                       const AttachmentViewGenVector &attachment_views, vvl::Func command);
 
     bool ValidateStoreOperation(const CommandBufferAccessContext &cb_context, vvl::Func command) const;
     bool ValidateResolveOperations(const CommandBufferAccessContext &cb_context, vvl::Func command) const;
 
     static void UpdateAttachmentResolveAccess(const vvl::RenderPass &rp_state, const AttachmentViewGenVector &attachment_views,
-                                              uint32_t subpass, const ResourceUsageTag tag, AccessContext &access_context);
+                                              uint32_t render_pass_instance_id, uint32_t subpass, const ResourceUsageTag tag,
+                                              AccessContext &access_context);
 
     static void UpdateAttachmentStoreAccess(const vvl::RenderPass &rp_state, const AttachmentViewGenVector &attachment_views,
-                                            uint32_t subpass, const ResourceUsageTag tag, AccessContext &access_context);
+                                            uint32_t render_pass_instance_id, uint32_t subpass, const ResourceUsageTag tag,
+                                            AccessContext &access_context);
 
     static void RecordLayoutTransitions(const vvl::RenderPass &rp_state, uint32_t subpass,
                                         const AttachmentViewGenVector &attachment_views, const ResourceUsageTag tag,
@@ -130,12 +139,16 @@ class RenderPassAccessContext {
     const vvl::RenderPass *GetRenderPassState() const { return rp_state_; }
     AccessContext *CreateStoreResolveProxy() const;
 
+private:
+    AttachmentAccess GetAttachmentAccess(SyncOrdering ordering, AttachmentAccessType type = AttachmentAccessType::Access) const;
+
   private:
     const vvl::RenderPass *rp_state_;
     const VkRect2D render_area_;
+    const AttachmentViewGenVector attachment_views_;
+    const std::unique_ptr<AccessContext[]> subpass_contexts_;
+    const uint32_t render_pass_instance_id_;
     uint32_t current_subpass_;
-    std::unique_ptr<AccessContext[]> subpass_contexts_;
-    AttachmentViewGenVector attachment_views_;
 };
 
 }  // namespace syncval

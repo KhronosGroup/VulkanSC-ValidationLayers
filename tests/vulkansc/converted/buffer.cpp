@@ -2,11 +2,11 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
- * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
+ * Modifications Copyright (C) 2020,2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -150,8 +150,8 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoEntries) {
     TEST_DESCRIPTION("Attempt to create a buffer view with invalid create info.");
     RETURN_IF_SKIP(Init());
     const VkPhysicalDeviceLimits &dev_limits = m_device->Physical().limits_;
-    const VkDeviceSize minTexelBufferOffsetAlignment = dev_limits.minTexelBufferOffsetAlignment;
-    if (minTexelBufferOffsetAlignment == 1) {
+    const VkDeviceSize min_alignment = dev_limits.minTexelBufferOffsetAlignment;
+    if (min_alignment == 1) {
         GTEST_SKIP() << "Test requires minTexelOffsetAlignment to not be equal to 1";
     }
 
@@ -179,11 +179,11 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoEntries) {
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-00925");
 
     // Offset must be a multiple of VkPhysicalDeviceLimits::minTexelBufferOffsetAlignment so add 1 to ensure it is not
-    buff_view_ci.offset = minTexelBufferOffsetAlignment + 1;
-    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-02749");
+    buff_view_ci.offset = min_alignment + 1;
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-buffer-02751");
 
     // Set offset to acceptable value for range tests
-    buff_view_ci.offset = minTexelBufferOffsetAlignment;
+    buff_view_ci.offset = min_alignment;
     // Setting range equal to 0 will cause an error to occur
     buff_view_ci.range = 0;
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-range-00928");
@@ -198,9 +198,25 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoEntries) {
     buff_view_ci.range = 2 * static_cast<VkDeviceSize>(format_size) * static_cast<VkDeviceSize>(dev_limits.maxTexelBufferElements);
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-range-00930");
 
-    buff_view_ci.offset = minTexelBufferOffsetAlignment;
+    buff_view_ci.offset = min_alignment;
     buff_view_ci.range = buffer_size;
     CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-00931");
+}
+
+TEST_F(NegativeBuffer, BufferViewYcbCr2Plane) {
+    TEST_DESCRIPTION("Attempt to create a buffer view with invalid create info.");
+    RETURN_IF_SKIP(Init());
+
+    vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
+    VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
+    buff_view_ci.buffer = buffer;
+    buff_view_ci.offset = 0;
+    buff_view_ci.format = VK_FORMAT_G16_B16R16_2PLANE_444_UNORM;
+    buff_view_ci.range = VK_WHOLE_SIZE;
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkBufferViewCreateInfo-format-parameter");
+    m_errorMonitor->SetDesiredError("VUID-VkBufferViewCreateInfo-None-12278");
+    vkt::BufferView view(*m_device, buff_view_ci);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeBuffer, BufferViewCreateInfoFeatures) {
@@ -208,8 +224,8 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoFeatures) {
     RETURN_IF_SKIP(Init());
 
     const VkPhysicalDeviceLimits &dev_limits = m_device->Physical().limits_;
-    const VkDeviceSize minTexelBufferOffsetAlignment = dev_limits.minTexelBufferOffsetAlignment;
-    if (minTexelBufferOffsetAlignment == 1) {
+    const VkDeviceSize min_alignment = dev_limits.minTexelBufferOffsetAlignment;
+    if (min_alignment == 1) {
         GTEST_SKIP() << "Test requires minTexelOffsetAlignment to not be equal to 1";
     }
 
@@ -280,8 +296,8 @@ TEST_F(NegativeBuffer, TexelBufferAlignmentIn12) {
         GTEST_SKIP() << "Vulkan version 1.2 or less is required";
     }
 
-    const VkDeviceSize minTexelBufferOffsetAlignment = m_device->Physical().limits_.minTexelBufferOffsetAlignment;
-    if (minTexelBufferOffsetAlignment == 1) {
+    const VkDeviceSize min_alignment = m_device->Physical().limits_.minTexelBufferOffsetAlignment;
+    if (min_alignment == 1) {
         GTEST_SKIP() << "Test requires minTexelOffsetAlignment to not be equal to 1";
     }
     if (!BufferFormatAndFeaturesSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)) {
@@ -294,8 +310,8 @@ TEST_F(NegativeBuffer, TexelBufferAlignmentIn12) {
     buff_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     buff_view_ci.range = VK_WHOLE_SIZE;
     buff_view_ci.buffer = buffer;
-    buff_view_ci.offset = minTexelBufferOffsetAlignment + 1;
-    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-offset-02749");
+    buff_view_ci.offset = min_alignment + 1;
+    CreateBufferViewTest(buff_view_ci, "VUID-VkBufferViewCreateInfo-buffer-02751");
 }
 
 TEST_F(NegativeBuffer, TexelBufferAlignment) {
@@ -623,7 +639,7 @@ TEST_F(NegativeBuffer, BufferUsageFlagsUsage) {
     buffer_ci.usage = 0;
     CreateBufferTest(buffer_ci, "VUID-VkBufferCreateInfo-None-09500");
 
-    buffer_ci.usage = 0xBAD0000;
+    buffer_ci.usage = 0x3AD0000;
     CreateBufferTest(buffer_ci, "VUID-VkBufferCreateInfo-None-09499");
 }
 
@@ -898,4 +914,67 @@ TEST_F(NegativeBuffer, BindNullVertexBufferWithOffset) {
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
+}
+
+// Not supported in Vulkan SC: VK_EXT_descriptor_heap
+TEST_F(NegativeBuffer, DISABLED_DescriptorHeapSparse) {
+    TEST_DESCRIPTION("Verify that sparse buffer usage flags correctly handled with descriptor usage flags");
+    AddRequiredFeature(vkt::Feature::sparseBinding);
+    RETURN_IF_SKIP(Init());
+
+    {
+        VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
+        buffer_create_info.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
+        buffer_create_info.size = 1024;
+        buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT;
+        // We must allow next, because we do not add DescriptorHeap extention, to force sparseDescriptorHeaps == VK_FALSE,
+        // that is required vuid 11277 to trigger
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkBufferCreateInfo-None-09499");
+        CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-11279");
+    }
+    {
+        VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
+        buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT;
+
+        VkBufferCreateInfo buffer_create_info = vku::InitStructHelper(&buffer_usage_flags);
+        buffer_create_info.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
+        buffer_create_info.size = 1024;
+        buffer_create_info.usage = 0;
+        // We must allow next vuid, because we do not add DescriptorHeap extention, to force sparseDescriptorHeaps == VK_FALSE,
+        // that is required vuid 11278 to trigger
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkBufferUsageFlags2CreateInfo-usage-parameter");
+        CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-11279");
+    }
+}
+
+// Not supported in Vulkan SC: VK_EXT_descriptor_heap
+TEST_F(NegativeBuffer, DISABLED_DescriptorHeapProtected) {
+    TEST_DESCRIPTION("Verify that protected buffer usage flags correctly handled with descriptor usage flags");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::protectedMemory);
+    RETURN_IF_SKIP(Init());
+
+    {
+        VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
+        buffer_create_info.flags = VK_BUFFER_CREATE_PROTECTED_BIT;
+        buffer_create_info.size = 1024;
+        buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT;
+        // We must allow next, because we do not add DescriptorHeap extention, to force protectedDescriptorHeaps == VK_FALSE,
+        // that is required vuid 11279 to trigger
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkBufferCreateInfo-None-09499");
+        CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-11277");
+    }
+    {
+        VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
+        buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT;
+
+        VkBufferCreateInfo buffer_create_info = vku::InitStructHelper(&buffer_usage_flags);
+        buffer_create_info.flags = VK_BUFFER_CREATE_PROTECTED_BIT;
+        buffer_create_info.size = 1024;
+        buffer_create_info.usage = 0;
+        // We must allow next vuid, because we do not add DescriptorHeap extention, to force protectedDescriptorHeaps == VK_FALSE,
+        // that is required vuid 11280 to trigger
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkBufferUsageFlags2CreateInfo-usage-parameter");
+        CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-11277");
+    }
 }

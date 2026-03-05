@@ -1,7 +1,7 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2023-2025 The Khronos Group Inc.
-# Copyright (c) 2023-2025 LunarG, Inc.
+# Copyright (c) 2023-2026 The Khronos Group Inc.
+# Copyright (c) 2023-2026 LunarG, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,9 +70,17 @@ class SyncValidationOutputGenerator(BaseGenerator):
         self.stageAccessCombo = []
 
         # fake stages and accesses for acquire present support
-        self.pipelineStagePresentEngine = Flag('VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL', [], 0, False, False, None, None, [])
-        self.accessAcquireRead = Flag('VK_ACCESS_2_PRESENT_ACQUIRE_READ_BIT_SYNCVAL', [], 0, False, False, None, None, [])
-        self.accessPresented = Flag('VK_ACCESS_2_PRESENT_PRESENTED_BIT_SYNCVAL', [], 0, False, False, None, None, [])
+        def make_flag(name):
+            return Flag(name = name,
+                        aliases = [],
+                        protect = None,
+                        value = 0,
+                        valueStr = "",
+                        bitpos = None,
+                        multiBit = False,
+                        zero = False,
+                        extensions = [])
+        self.pipelineStagePresentEngine = make_flag('VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL')
 
     def generate(self):
         self.write(f'''// *** THIS FILE IS GENERATED - DO NOT EDIT ***
@@ -80,8 +88,8 @@ class SyncValidationOutputGenerator(BaseGenerator):
 
             /***************************************************************************
             *
-            * Copyright (c) 2015-2025 Valve Corporation
-            * Copyright (c) 2015-2025 LunarG, Inc.
+            * Copyright (c) 2015-2026 Valve Corporation
+            * Copyright (c) 2015-2026 LunarG, Inc.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.
@@ -99,13 +107,9 @@ class SyncValidationOutputGenerator(BaseGenerator):
 
         # Set value to be at end of bitmask
         self.pipelineStagePresentEngine.value = max([x.value for x in self.vk.bitmasks['VkPipelineStageFlagBits2'].flags]) << 1
-        self.accessAcquireRead.value = max([x.value for x in self.vk.bitmasks['VkAccessFlagBits2'].flags]) << 1
-        self.accessPresented.value = max([x.value for x in self.vk.bitmasks['VkAccessFlagBits2'].flags]) << 2
 
         # Add into the VulkanObject so logic works as if they were in the XML
         self.vk.bitmasks['VkPipelineStageFlagBits2'].flags.append(self.pipelineStagePresentEngine)
-        self.vk.bitmasks['VkAccessFlagBits2'].flags.append(self.accessAcquireRead)
-        self.vk.bitmasks['VkAccessFlagBits2'].flags.append(self.accessPresented)
 
         present_stage = 'VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL'
 
@@ -172,8 +176,6 @@ class SyncValidationOutputGenerator(BaseGenerator):
         out.append(f'''
 // Fake stages and accesses for acquire present support
 static const VkPipelineStageFlagBits2 VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL = 0x{(self.pipelineStagePresentEngine.value):016X}ULL;
-static const VkAccessFlagBits2 VK_ACCESS_2_PRESENT_ACQUIRE_READ_BIT_SYNCVAL = 0x{(self.accessAcquireRead.value):016X}ULL;
-static const VkAccessFlagBits2 VK_ACCESS_2_PRESENT_PRESENTED_BIT_SYNCVAL = 0x{(self.accessPresented.value):016X}ULL;
 ''')
 
         out.append('// Unique number for each  stage/access combination\n')
@@ -311,7 +313,7 @@ const vvl::unordered_map<VkPipelineStageFlagBits2, VkPipelineStageFlags2>& syncL
         stage_to_access = {}
         for stageAccess_info in self.stageAccessCombo:
             stage = stageAccess_info['stage']
-            if stage == 'VK_PIPELINE_STAGE_2_NONE':
+            if stage == 'VK_PIPELINE_STAGE_2_NONE' or stage == 'VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL':
                 continue
             stage_to_access[stage] = stage_to_access.get(stage, []) + [stageAccess_info['access']]
 
@@ -469,22 +471,24 @@ const vvl::unordered_map<VkPipelineStageFlagBits2, VkPipelineStageFlags2>& syncL
 
     # Create the stage/access combination from the legal uses of access with stages
     def createStageAccessCombinations(self):
-        index = 1
+        index = 0
         enum_prefix = 'SYNC_'
         stage_accesses = []
+
+        # NONE stage/access
         none_stage_access = enum_prefix + 'ACCESS_INDEX_NONE'
         stage_accesses.append({
                         'stage_access': none_stage_access,
                         'stage_access_string' : '"' + none_stage_access + '"',
                         'access_bit': None,
-                        'index': 0,
+                        'index': index,
                         'stage': 'VK_PIPELINE_STAGE_2_NONE',
                         'access': 'VK_ACCESS_2_NONE',
-                        'is_read': None}) #tri-state logic hack...
+                        'is_read': None})
+        index += 1
 
         # < stage, [accesses] >
         stageToAccessMap = dict()
-        stageToAccessMap['VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL'] = ['VK_ACCESS_2_PRESENT_ACQUIRE_READ_BIT_SYNCVAL', 'VK_ACCESS_2_PRESENT_PRESENTED_BIT_SYNCVAL']
 
         # In general, syncval algorithms work only with 'base' accesses
         # and skip aliases/multi-accesses, or expands multi-accesses when necessary
@@ -531,6 +535,28 @@ const vvl::unordered_map<VkPipelineStageFlagBits2, VkPipelineStageFlags2>& syncL
                 index += 1
 
         # Add synthetic stage/access
+        present_acquire_read_stage_access = enum_prefix + 'PRESENT_ENGINE_SYNCVAL_PRESENT_ACQUIRE_READ_SYNCVAL'
+        stage_accesses.append({
+                        'stage_access': present_acquire_read_stage_access,
+                        'stage_access_string' : '"' + present_acquire_read_stage_access + '"',
+                        'access_bit': 'SYNC_PRESENT_ENGINE_BIT_SYNCVAL_PRESENT_ACQUIRE_READ_BIT_SYNCVAL',
+                        'index': index,
+                        'stage': 'VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL',
+                        'access': 'VK_ACCESS_2_NONE',
+                        'is_read': 'true'})
+        index += 1
+
+        present_presented_stage_access = enum_prefix + 'PRESENT_ENGINE_SYNCVAL_PRESENT_PRESENTED_SYNCVAL'
+        stage_accesses.append({
+                        'stage_access': present_presented_stage_access,
+                        'stage_access_string' : '"' + present_presented_stage_access + '"',
+                        'access_bit': 'SYNC_PRESENT_ENGINE_BIT_SYNCVAL_PRESENT_PRESENTED_BIT_SYNCVAL',
+                        'index': index,
+                        'stage': 'VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL',
+                        'access': 'VK_ACCESS_2_NONE',
+                        'is_read': 'false'})
+        index += 1
+
         synth_stage_access = [ 'IMAGE_LAYOUT_TRANSITION', 'QUEUE_FAMILY_OWNERSHIP_TRANSFER']
         stage = 'VK_PIPELINE_STAGE_2_NONE'
         access = 'VK_ACCESS_2_NONE'

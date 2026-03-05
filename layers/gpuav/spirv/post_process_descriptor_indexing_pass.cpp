@@ -1,4 +1,4 @@
-/* Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 
 #include "post_process_descriptor_indexing_pass.h"
 
+#include "containers/container_utils.h"
 #include "module.h"
 #include "generated/gpuav_offline_spirv.h"
 #include "gpuav/shaders/gpuav_shaders_constants.h"
@@ -39,20 +40,21 @@ PostProcessDescriptorIndexingPass::PostProcessDescriptorIndexingPass(Module& mod
 uint32_t PostProcessDescriptorIndexingPass::GetLinkFunctionId() { return GetLinkFunction(link_function_id_, kOfflineFunction); }
 
 void PostProcessDescriptorIndexingPass::CreateFunctionCall(BasicBlock& block, InstructionIt* inst_it, const InstructionMeta& meta) {
-    const Constant& set_constant = module_.type_manager_.GetConstantUInt32(meta.descriptor_set);
-    const Constant& binding_constant = module_.type_manager_.GetConstantUInt32(meta.descriptor_binding);
+    const Constant& set_constant = type_manager_.GetConstantUInt32(meta.descriptor_set);
+    const Constant& binding_constant = type_manager_.GetConstantUInt32(meta.descriptor_binding);
     const uint32_t descriptor_index_id = CastToUint32(meta.descriptor_index_id, block, inst_it);  // might be int32
 
-    BindingLayout binding_layout = module_.set_index_to_bindings_layout_lut_[meta.descriptor_set][meta.descriptor_binding];
-    const Constant& binding_layout_offset = module_.type_manager_.GetConstantUInt32(binding_layout.start);
-    const Constant& variable_id_constant = module_.type_manager_.GetConstantUInt32(meta.variable_id);
+    const auto& layout_lut = module_.interface_.instrumentation_dsl.set_index_to_bindings_layout_lut;
+    BindingLayout binding_layout = layout_lut[meta.descriptor_set][meta.descriptor_binding];
+    const Constant& binding_layout_offset = type_manager_.GetConstantUInt32(binding_layout.start);
+    const Constant& variable_id_constant = type_manager_.GetConstantUInt32(meta.variable_id);
 
     const uint32_t inst_position = meta.target_instruction->GetPositionOffset();
-    const uint32_t inst_position_id = module_.type_manager_.CreateConstantUInt32(inst_position).Id();
+    const uint32_t inst_position_id = type_manager_.CreateConstantUInt32(inst_position).Id();
 
     const uint32_t function_result = module_.TakeNextId();
     const uint32_t function_def = GetLinkFunctionId();
-    const uint32_t void_type = module_.type_manager_.GetTypeVoid().Id();
+    const uint32_t void_type = type_manager_.GetTypeVoid().Id();
 
     block.CreateInstruction(spv::OpFunctionCall,
                             {void_type, function_result, function_def, set_constant.Id(), binding_constant.Id(),
@@ -62,16 +64,16 @@ void PostProcessDescriptorIndexingPass::CreateFunctionCall(BasicBlock& block, In
 
 bool PostProcessDescriptorIndexingPass::RequiresInstrumentation(const Function& function, const Instruction& inst,
                                                                 InstructionMeta& meta) {
-    const uint32_t opcode = inst.Opcode();
+    const spv::Op opcode = (spv::Op)inst.Opcode();
 
     const Instruction* var_inst = nullptr;
-    if (opcode == spv::OpLoad || opcode == spv::OpStore) {
+    if (IsValueIn(opcode, {spv::OpLoad, spv::OpStore, spv::OpCooperativeMatrixLoadKHR, spv::OpCooperativeMatrixStoreKHR})) {
         const Variable* variable = nullptr;
         const Instruction* access_chain_inst = function.FindInstruction(inst.Operand(0));
         // We need to walk down possibly multiple chained OpAccessChains or OpCopyObject to get the variable
         while (access_chain_inst && access_chain_inst->IsNonPtrAccessChain()) {
             const uint32_t access_chain_base_id = access_chain_inst->Operand(0);
-            variable = module_.type_manager_.FindVariableById(access_chain_base_id);
+            variable = type_manager_.FindVariableById(access_chain_base_id);
             if (variable) {
                 break;  // found
             }
@@ -87,12 +89,12 @@ bool PostProcessDescriptorIndexingPass::RequiresInstrumentation(const Function& 
             return false;
         }
 
-        const Type* pointer_type = variable->PointerType(module_.type_manager_);
+        const Type* pointer_type = variable->PointerType(type_manager_);
         if (pointer_type->IsArray()) {
             meta.descriptor_index_id = access_chain_inst->Operand(1);
         } else {
             // There is no array of this descriptor, so we essentially have an array of 1
-            meta.descriptor_index_id = module_.type_manager_.GetConstantZeroUint32().Id();
+            meta.descriptor_index_id = type_manager_.GetConstantZeroUint32().Id();
         }
 
     } else {
@@ -117,7 +119,7 @@ bool PostProcessDescriptorIndexingPass::RequiresInstrumentation(const Function& 
         var_inst = function.FindInstruction(load_inst->Operand(0));
         if (!var_inst) {
             // can be a global variable
-            const Variable* global_var = module_.type_manager_.FindVariableById(load_inst->Operand(0));
+            const Variable* global_var = type_manager_.FindVariableById(load_inst->Operand(0));
             var_inst = global_var ? &global_var->inst_ : nullptr;
         }
         if (!var_inst || (!var_inst->IsNonPtrAccessChain() && var_inst->Opcode() != spv::OpVariable)) {
@@ -132,14 +134,14 @@ bool PostProcessDescriptorIndexingPass::RequiresInstrumentation(const Function& 
                 return false;
             }
 
-            const Variable* variable = module_.type_manager_.FindVariableById(var_inst->Operand(0));
+            const Variable* variable = type_manager_.FindVariableById(var_inst->Operand(0));
             if (!variable) {
                 module_.InternalError(Name(), "OpAccessChain base is not a variable");
                 return false;
             }
             var_inst = &variable->inst_;
         } else {
-            meta.descriptor_index_id = module_.type_manager_.GetConstantZeroUint32().Id();
+            meta.descriptor_index_id = type_manager_.GetConstantZeroUint32().Id();
         }
     }
 
@@ -166,20 +168,24 @@ bool PostProcessDescriptorIndexingPass::RequiresInstrumentation(const Function& 
 }
 
 bool PostProcessDescriptorIndexingPass::Instrument() {
-    if (module_.set_index_to_bindings_layout_lut_.empty()) {
+    if (module_.interface_.instrumentation_dsl.set_index_to_bindings_layout_lut.empty()) {
         return false;  // If there is no bindings, nothing to instrument
     }
 
-    for (const auto& function : module_.functions_) {
-        if (function->instrumentation_added_) continue;
+    for (Function& function : module_.functions_) {
+        if (!function.called_from_target_) {
+            continue;
+        }
 
         FunctionDuplicateTracker function_duplicate_tracker;
 
-        for (auto block_it = function->blocks_.begin(); block_it != function->blocks_.end(); ++block_it) {
+        for (auto block_it = function.blocks_.begin(); block_it != function.blocks_.end(); ++block_it) {
             BasicBlock& current_block = **block_it;
 
             cf_.Update(current_block);
-            if (debug_disable_loops_ && cf_.in_loop) continue;
+            if (debug_disable_loops_ && cf_.in_loop) {
+                continue;
+            }
 
             auto& block_instructions = current_block.instructions_;
 
@@ -191,7 +197,7 @@ bool PostProcessDescriptorIndexingPass::Instrument() {
                 pc_access.Update(module_, inst_it);
 
                 InstructionMeta meta;
-                if (!RequiresInstrumentation(*function, *(inst_it->get()), meta)) {
+                if (!RequiresInstrumentation(function, *(inst_it->get()), meta)) {
                     continue;
                 }
 
@@ -204,7 +210,9 @@ bool PostProcessDescriptorIndexingPass::Instrument() {
                     continue;  // duplicate detected
                 }
 
-                if (IsMaxInstrumentationsCount()) continue;
+                if (IsMaxInstrumentationsCount()) {
+                    continue;
+                }
                 instrumentations_count_++;
 
                 CreateFunctionCall(current_block, &inst_it, meta);

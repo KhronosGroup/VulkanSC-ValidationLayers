@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -480,7 +480,7 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccess) {
 
     // Create device without protected access features
     vkt::Device test_device(Gpu(), m_device_extension_names);
-    VkShaderObj vs2(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
+    VkShaderObj vs2(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
     vs2.InitFromGLSLTry(&test_device);
 
     const vkt::PipelineLayout test_pipeline_layout(test_device);
@@ -554,7 +554,7 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccessGPL) {
     link_info.libraryCount = size32(libraries);
     link_info.pLibraries = libraries;
 
-    m_errorMonitor->SetDesiredError("VUID-VkPipelineLibraryCreateInfoKHR-pipeline-07404");
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-flags-12357");
     VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
     lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT;
     lib_ci.renderPass = RenderPass();
@@ -562,7 +562,7 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccessGPL) {
     vkt::Pipeline lib(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredError("VUID-VkPipelineLibraryCreateInfoKHR-pipeline-07406");
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-flags-12359");
     lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT;
     vkt::Pipeline lib2(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
@@ -576,7 +576,7 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccessGPL) {
     VkGraphicsPipelineCreateInfo protected_lib_ci = vku::InitStructHelper(&link_info);
     protected_lib_ci.renderPass = RenderPass();
     protected_lib_ci.layout = pre_raster_lib.gp_ci_.layout;
-    m_errorMonitor->SetDesiredError("VUID-VkPipelineLibraryCreateInfoKHR-pipeline-07407");
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-flags-12360");
     lib_ci.flags = 0;
     protected_lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     vkt::Pipeline lib3(*m_device, protected_lib_ci);
@@ -592,7 +592,7 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccessGPL) {
     unprotected_lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     unprotected_lib_ci.renderPass = RenderPass();
     unprotected_lib_ci.layout = pre_raster_lib.gp_ci_.layout;
-    m_errorMonitor->SetDesiredError("VUID-VkPipelineLibraryCreateInfoKHR-pipeline-07405");
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-flags-12358");
     vkt::Pipeline lib4(*m_device, unprotected_lib_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -673,14 +673,14 @@ TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
     // Create actual protected and unprotected buffers
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = 1 << 20;  // 1 MB
-    buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                               VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buffer_create_info.usage =
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 
     buffer_create_info.flags = VK_BUFFER_CREATE_PROTECTED_BIT;
     vkt::Buffer buffer_protected(*m_device, buffer_create_info, vkt::no_mem);
 
     buffer_create_info.flags = 0;
+    buffer_create_info.usage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     vkt::Buffer buffer_unprotected(*m_device, buffer_create_info, vkt::no_mem);
 
     // Create actual protected and unprotected images
@@ -778,12 +778,10 @@ TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(image_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.AddAttachmentDescription(image_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddColorAttachment(0);
-    rp.AddColorAttachment(1);
-    rp.AddSubpassDependency(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                            VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddColorAttachment(1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddSubpassSelfDependency(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
     rp.CreateRenderPass();
 
     vkt::Framebuffer framebuffer(*m_device, rp, 2, image_views, 8, 8);
@@ -829,7 +827,7 @@ TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
            imageStore(si1, ivec2(0), vec4(0));
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineColorBlendAttachmentState cb_attachments[2] = {};
     memset(cb_attachments, 0, sizeof(VkPipelineColorBlendAttachmentState) * 2);
@@ -924,14 +922,12 @@ TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
         vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_, 0, 1,
                                   &g_pipe.descriptor_set_->set_, 0, nullptr);
         VkDeviceSize offset = 0;
-        vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &buffer_protected.handle(), &offset);
-        vk::CmdBindIndexBuffer(m_command_buffer, buffer_protected, 0, VK_INDEX_TYPE_UINT16);
+        vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &buffer_unprotected.handle(), &offset);
+        vk::CmdBindIndexBuffer(m_command_buffer, buffer_unprotected, 0, VK_INDEX_TYPE_UINT16);
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-commandBuffer-02707");  // color attachment
         m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-commandBuffer-02707");  // buffer descriptorSet
         m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-commandBuffer-02707");  // image descriptorSet
-        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-commandBuffer-02707");  // vertex
-        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-commandBuffer-02707");  // index
 
         vk::CmdDrawIndexed(m_command_buffer, 1, 0, 0, 0, 0);
         m_errorMonitor->VerifyFound();
@@ -1051,8 +1047,8 @@ TEST_F(NegativeProtectedMemory, RayTracingPipeline) {
     RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_PROTECTED_BIT));
 
     const vkt::PipelineLayout empty_pipeline_layout(*m_device, {});
-    VkShaderObj rgen_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
-    VkShaderObj chit_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2);
+    VkShaderObj rgen_shader(*m_device, kRayTracingMinimalGlsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
+    VkShaderObj chit_shader(*m_device, kRayTracingMinimalGlsl, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2);
 
     const vkt::PipelineLayout pipeline_layout(*m_device, {});
 
@@ -1131,7 +1127,7 @@ TEST_F(NegativeProtectedMemory, RayQuery) {
                OpReturn
                OpFunctionEnd
         )";
-    VkShaderObj fs(this, spv_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, spv_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1191,7 +1187,7 @@ TEST_F(NegativeProtectedMemory, WriteToProtectedStorageBuffer) {
            x = gl_FragCoord;
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};

@@ -20,6 +20,7 @@
 #include "state_tracker/shader_module.h"
 #include "state_tracker/state_tracker.h"
 #include "utils/shader_utils.h"
+#include "utils/spirv_tools_utils.h"
 #include "vulkansc/sc_vuid_enums.h"
 #include "vulkansc/base64.h"
 #include "spirv-tools/optimizer.hpp"

@@ -19,7 +19,7 @@
 #include "../framework/pipeline_helper.h"
 
 // Tests for AMD-specific best practices
-const char *kEnableAMDValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_AMD";
+const char *kEnableAMDValidation = "validate_best_practices_amd";
 
 class VkAmdBestPracticesLayerTest : public VkBestPracticesLayerTest {};
 
@@ -47,7 +47,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_TooManyPipelines) {
         }
         CreatePipelineHelper pipe(*this);
         pipe.CreateGraphicsPipeline();
-        pipeline_Array[i] = pipe.Handle();
+        pipeline_Array[i] = pipe;
         if (i == 1) {
             // change check to too many pipelines
             m_errorMonitor->VerifyFound();
@@ -529,7 +529,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
 
     // workgroup size = 4
     {
-        VkShaderObj compute_4_1_1(this,
+        VkShaderObj compute_4_1_1(*m_device,
                                   "#version 320 es\n"
                                   "\n"
                                   "layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;\n\n"
@@ -544,7 +544,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
 
     // workgroup size = 64
     {
-        VkShaderObj compute_8_8_1(this,
+        VkShaderObj compute_8_8_1(*m_device,
                                   "#version 320 es\n"
                                   "\n"
                                   "layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;\n\n"
@@ -557,7 +557,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
 
     // workgroup size = 128
     {
-        VkShaderObj compute_16_8_1(this,
+        VkShaderObj compute_16_8_1(*m_device,
                                    "#version 320 es\n"
                                    "\n"
                                    "layout(local_size_x = 16, local_size_y = 8, local_size_z = 1) in;\n\n"

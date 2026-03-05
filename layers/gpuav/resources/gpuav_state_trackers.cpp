@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2025 The Khronos Group Inc.
- * Copyright (c) 2018-2025 Valve Corporation
- * Copyright (c) 2018-2025 LunarG, Inc.
+/* Copyright (c) 2018-2026 The Khronos Group Inc.
+ * Copyright (c) 2018-2026 Valve Corporation
+ * Copyright (c) 2018-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@
 #include "gpuav/resources/gpuav_state_trackers.h"
 #include "gpuav/descriptor_validation/gpuav_descriptor_validation.h"
 #include "gpuav/instrumentation/gpuav_instrumentation.h"
-#include "gpuav/shaders/gpuav_shaders_constants.h"
 #include "gpuav/core/gpuav.h"
 #include "gpuav/core/gpuav_constants.h"
 #include "gpuav/shaders/gpuav_error_header.h"
@@ -80,8 +79,8 @@ void CommandBufferSubState::AllocateResources(const Location &loc) {
             VmaAllocationCreateInfo alloc_info = {};
             alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
             alloc_info.preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-            const bool success = cmd_errors_counts_buffer_.Create(&buffer_info, &alloc_info);
-            if (!success) {
+            result = cmd_errors_counts_buffer_.Create(&buffer_info, &alloc_info);
+            if (result != VK_SUCCESS) {
                 return;
             }
         }
@@ -153,7 +152,7 @@ void CommandBufferSubState::RecordEndRenderPass(const VkSubpassEndInfo *, const 
 // For things like vkCmdCopyImage there is no "last bound" as not shaders are attached to it
 void CommandBufferSubState::AddCommandErrorLogger(const Location &loc, const LastBound *last_bound,
                                                   ErrorLoggerFunc error_logger_func) {
-    if (command_error_loggers_.size() == cst::invalid_index_command) {
+    if (command_error_loggers_.size() == gpuav_.gpuav_settings.invalid_index_command) {
         return;
     }
 
@@ -167,8 +166,10 @@ void CommandBufferSubState::AddCommandErrorLogger(const Location &loc, const Las
 void CommandBufferSubState::ResetCBState(bool should_destroy) {
     // Free or return to cache GPU resources
 
+    on_instrumentation_error_logger_register_functions.clear();
     on_instrumentation_desc_set_update_functions.clear();
     on_instrumentation_desc_buffer_update_functions.clear();
+    on_instrumentation_desc_heap_update_functions.clear();
     on_cb_completion_functions.clear();
     on_post_cb_submission_functions.clear();
     on_pre_cb_submission_functions.clear();
@@ -203,18 +204,18 @@ void CommandBufferSubState::ResetCBState(bool should_destroy) {
 void CommandBufferSubState::IncrementActionCommandCount(VkPipelineBindPoint bind_point) {
     if (bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS) {
         draw_index++;
-        if (draw_index > cst::invalid_index_command) {
-            draw_index = cst::invalid_index_command;
+        if (draw_index > gpuav_.gpuav_settings.invalid_index_command) {
+            draw_index = gpuav_.gpuav_settings.invalid_index_command;
         }
     } else if (bind_point == VK_PIPELINE_BIND_POINT_COMPUTE) {
         compute_index++;
-        if (compute_index > cst::invalid_index_command) {
-            compute_index = cst::invalid_index_command;
+        if (compute_index > gpuav_.gpuav_settings.invalid_index_command) {
+            compute_index = gpuav_.gpuav_settings.invalid_index_command;
         }
     } else if (bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
         trace_rays_index++;
-        if (trace_rays_index > cst::invalid_index_command) {
-            trace_rays_index = cst::invalid_index_command;
+        if (trace_rays_index > gpuav_.gpuav_settings.invalid_index_command) {
+            trace_rays_index = gpuav_.gpuav_settings.invalid_index_command;
         }
     }
 }
@@ -344,24 +345,25 @@ void CommandBufferSubState::OnCompletion(VkQueue queue, const std::vector<std::s
                 error_output_buffer_ptr + (glsl::kErrorBufferByteSize - cst::stream_output_data_offset);
 
             uint32_t *error_record_ptr = error_records_start;
-            uint32_t record_size = error_record_ptr[glsl::kHeaderErrorRecordSizeOffset];
+            uint32_t record_size = error_record_ptr[glsl::kHeader_ErrorRecordSizeOffset];
             assert(record_size == glsl::kErrorRecordSize);
 
             while (record_size > 0 && (error_record_ptr + record_size) <= error_records_end) {
                 const uint32_t error_logger_i =
-                    error_record_ptr[glsl::kHeaderActionIdErrorLoggerIdOffset] & glsl::kErrorLoggerIdMask;
+                    error_record_ptr[glsl::kHeader_ActionIdErrorLoggerIdOffset] & glsl::kErrorLoggerId_Mask;
 
-                assert(error_logger_i < cst::indices_count);
-                if (error_logger_i == cst::invalid_index_command) {
+                assert(error_logger_i < gpuav_.gpuav_settings.indices_buffer_count);
+                if (error_logger_i == gpuav_.gpuav_settings.invalid_index_command) {
                     const LogObjectList objlist(queue, VkHandle());
                     gpuav_.LogError(
                         "GPUAV-Overflow-Unknown", queue, loc,
                         "An error was detected, but after internal limit of %" PRIu32
-                        " draw/dispatch/traceRays in a command buffer, we are unable to track which validation error occured.",
-                        cst::indices_count);
+                        " draw/dispatch/traceRays commands in a command buffer, we are unable to track which validation error "
+                        "occured.\nThis can be adjusted setting env var VK_LAYER_GPUAV_MAX_INDICES_COUNT to a higher value.",
+                        gpuav_.gpuav_settings.invalid_index_command);
                 } else {
                     // normal case
-                    CommandErrorLogger &error_logger = command_error_loggers_[error_logger_i];
+                    const CommandErrorLogger &error_logger = GetErrorLogger(error_logger_i);
                     const LogObjectList objlist(queue, error_logger.objlist);
 
                     std::string debug_region_name = GetDebugLabelRegion(error_logger.label_cmd_i, initial_label_stack);
@@ -371,7 +373,7 @@ void CommandBufferSubState::OnCompletion(VkQueue queue, const std::vector<std::s
 
                 // Next record
                 error_record_ptr += record_size;
-                record_size = error_record_ptr[glsl::kHeaderErrorRecordSizeOffset];
+                record_size = error_record_ptr[glsl::kHeader_ErrorRecordSizeOffset];
             }
 
             VVL_TracyPlot("GPU-AV errors count", int64_t(total_words / glsl::kErrorRecordSize));
@@ -669,8 +671,8 @@ VkPipelineLayout PipelineSubState::GetPipelineLayoutUnion(const Location &loc, v
     }
 
     const std::shared_ptr<const vvl::PipelineLayout> pipeline_layout_state = base.PipelineLayoutState();
-    assert(pipeline_layout_state->set_layouts.size() <= gpuav_.instrumentation_desc_set_bind_index_);
-    if (pipeline_layout_state->set_layouts.size() > gpuav_.instrumentation_desc_set_bind_index_) {
+    assert(pipeline_layout_state->set_layouts.list.size() <= gpuav_.instrumentation_desc_set_bind_index_);
+    if (pipeline_layout_state->set_layouts.list.size() > gpuav_.instrumentation_desc_set_bind_index_) {
         gpuav_.InternalError(LogObjectList(base.VkHandle()), loc,
                              "Trying to recreate a pipeline layout with no room for the instrumentation descriptor set.");
         return VK_NULL_HANDLE;
@@ -680,8 +682,8 @@ VkPipelineLayout PipelineSubState::GetPipelineLayoutUnion(const Location &loc, v
     set_layout_handles.reserve(gpuav_.instrumentation_desc_set_bind_index_ + 1);
     std::vector<size_t> recreated_desc_set_layouts_indices;
 
-    for (size_t set_layout_i = 0; set_layout_i < pipeline_layout_state->set_layouts.size(); ++set_layout_i) {
-        const auto &set_layout = pipeline_layout_state->set_layouts[set_layout_i];
+    for (size_t set_layout_i = 0; set_layout_i < pipeline_layout_state->set_layouts.list.size(); ++set_layout_i) {
+        const auto &set_layout = pipeline_layout_state->set_layouts.list[set_layout_i];
         if (!set_layout) {
             set_layout_handles.emplace_back(VK_NULL_HANDLE);
         } else {

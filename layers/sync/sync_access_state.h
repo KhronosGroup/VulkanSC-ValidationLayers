@@ -1,6 +1,6 @@
-/* Copyright (c) 2019-2025 The Khronos Group Inc.
- * Copyright (c) 2019-2025 Valve Corporation
- * Copyright (c) 2019-2025 LunarG, Inc.
+/* Copyright (c) 2019-2026 The Khronos Group Inc.
+ * Copyright (c) 2019-2026 Valve Corporation
+ * Copyright (c) 2019-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 #include "sync/sync_barrier.h"
 #include "containers/span.h"
 #include <cstring>  // memcpy
+#include <optional>
 
 namespace syncval {
 
@@ -64,7 +65,6 @@ enum SyncHazard {
 
 enum class SyncOrdering : uint8_t {
     kOrderingNone = 0,
-    kNonAttachment = kOrderingNone,
     kColorAttachment = 1,
     kDepthStencilAttachment = 2,
     kRaster = 3,
@@ -72,14 +72,12 @@ enum class SyncOrdering : uint8_t {
 };
 
 struct SyncFlag {
-    enum : uint32_t {
-        kLoadOp = 0x01,
-        kStoreOp = 0x02,
-        kPresent = 0x04,
-        kMarker = 0x08,
+    enum : uint8_t {
+        kPresent = 0x01,
+        kMarker = 0x02,
     };
 };
-using SyncFlags = uint32_t;
+using SyncFlags = uint8_t;
 
 const char *string_SyncHazardVUID(SyncHazard hazard);
 
@@ -144,18 +142,47 @@ class HazardResult {
     std::optional<HazardState> state_;
 };
 
+enum class AttachmentAccessType : uint8_t {
+    Empty,
+    Access,  // Generic access
+    LoadOp,
+    StoreOp,
+    ResolveRead,
+    ResolveWrite,
+};
+
+struct AttachmentAccess {
+    AttachmentAccessType type = AttachmentAccessType::Empty;
+    SyncOrdering ordering = SyncOrdering::kOrderingNone;
+
+    // Identifies a render pass instance (and subpass for legacy render passes).
+    // Used to determine whether two accesses are in the same render pass instance.
+    uint32_t render_pass_instance_id = vvl::kNoIndex32;
+    uint32_t subpass = vvl::kNoIndex32;
+
+    static AttachmentAccess NonAttachment() { return AttachmentAccess{}; }
+    bool operator==(const AttachmentAccess &other) const;
+};
+
 struct FirstAccess {
     const SyncAccessInfo *usage_info;
     ResourceUsageTag tag;
     uint32_t handle_index;
-    SyncOrdering ordering_rule;
+    AttachmentAccess attachment_access;
     SyncFlags flags;
 
-    FirstAccess(const SyncAccessInfo &usage_info, ResourceUsageTagEx tag_ex, SyncOrdering ordering_rule, SyncFlags flags)
-        : usage_info(&usage_info), tag(tag_ex.tag), handle_index(tag_ex.handle_index), ordering_rule(ordering_rule), flags(flags) {}
+    FirstAccess(const SyncAccessInfo &usage_info, ResourceUsageTagEx tag_ex, const AttachmentAccess &attachment_access,
+                SyncFlags flags)
+        : usage_info(&usage_info),
+          tag(tag_ex.tag),
+          handle_index(tag_ex.handle_index),
+          attachment_access(attachment_access),
+          flags(flags) {}
+
     bool operator==(const FirstAccess &rhs) const {
-        return (tag == rhs.tag) && (usage_info == rhs.usage_info) && (ordering_rule == rhs.ordering_rule) && flags == rhs.flags;
+        return tag == rhs.tag && usage_info == rhs.usage_info && attachment_access == rhs.attachment_access && flags == rhs.flags;
     }
+
     ResourceUsageTagEx TagEx() const { return {tag, handle_index}; }
 };
 
@@ -223,7 +250,7 @@ static_assert(std::is_trivially_copyable_v<ReadState>);
 
 struct WriteState {
     SyncAccessIndex access_index;
-    SyncFlags flags;
+    AttachmentAccess attachment_access;
 
     // Union of applicable barrier masks since last write
     SyncAccessFlags barriers;
@@ -235,7 +262,9 @@ struct WriteState {
     uint32_t handle_index;
     QueueId queue;
 
-    void Set(SyncAccessIndex access_index, ResourceUsageTagEx tag_ex, SyncFlags flags);
+    SyncFlags flags;
+
+    void Set(SyncAccessIndex access_index, const AttachmentAccess &attachment_access, ResourceUsageTagEx tag_ex, SyncFlags flags);
     void SetQueueId(QueueId id);
     void MergeBarriers(const WriteState &other);
 
@@ -252,7 +281,8 @@ struct WriteState {
                               const SyncAccessFlags &src_access_scope) const;
 
     bool IsOrdered(const OrderingBarrier &ordering, QueueId queue_id) const;
-    bool IsLoadOp() const { return flags & SyncFlag::kLoadOp; }
+    bool IsLoadOp() const { return attachment_access.type == AttachmentAccessType::LoadOp; }
+    bool IsStoreOp() const { return attachment_access.type == AttachmentAccessType::StoreOp; }
     bool IsPresent() const { return flags & SyncFlag::kPresent; }
 
     ResourceUsageTagEx TagEx() const { return {tag, handle_index}; }
@@ -309,23 +339,29 @@ struct PendingBarriers {
 
 class AccessState {
   public:
-    AccessState() = default;
     ~AccessState();
     AccessState(const AccessState &other);
-    AccessState &operator=(const AccessState &other);
     AccessState(AccessState &&other);
-    AccessState &operator=(AccessState &&other);
+
+    // Use explicit default construction and assignment to control all places where this happens
+    static AccessState DefaultAccessState() { return {}; }
+    void Assign(const AccessState &other);
+    void Assign(AccessState &&other);
+    AccessState &operator=(const AccessState &other) = delete;
+    AccessState &operator=(AccessState &&other) = delete;
 
     HazardResult DetectHazard(const SyncAccessInfo &usage_info) const;
     HazardResult DetectMarkerHazard() const;
 
-    HazardResult DetectHazard(const SyncAccessInfo &usage_info, const OrderingBarrier &ordering, SyncFlags flags,
-                              QueueId queue_id) const;
-    HazardResult DetectHazard(const AccessState &recorded_use, QueueId queue_id, const ResourceUsageRange &tag_range) const;
+    HazardResult DetectHazard(const SyncAccessInfo &usage_info, const OrderingBarrier &ordering,
+                              const AttachmentAccess &attachment_access, SyncFlags flags, QueueId queue_id,
+                              bool detect_load_op_after_store_op_hazards) const;
+    HazardResult DetectHazard(const AccessState &recorded_use, QueueId queue_id, const ResourceUsageRange &tag_range,
+                              bool detect_load_op_after_store_op_hazards) const;
 
     HazardResult DetectAsyncHazard(const SyncAccessInfo &usage_info, ResourceUsageTag start_tag, QueueId queue_id) const;
-    HazardResult DetectAsyncHazard(const AccessState &recorded_use, const ResourceUsageRange &tag_range,
-                                   ResourceUsageTag start_tag, QueueId queue_id) const;
+    HazardResult DetectAsyncHazard(const AccessState &recorded_use, const ResourceUsageRange &tag_range, ResourceUsageTag start_tag,
+                                   QueueId queue_id) const;
 
     HazardResult DetectBarrierHazard(const SyncAccessInfo &usage_info, QueueId queue_id, VkPipelineStageFlags2 source_exec_scope,
                                      const SyncAccessFlags &source_access_scope) const;
@@ -333,15 +369,17 @@ class AccessState {
                                      VkPipelineStageFlags2 source_exec_scope, const SyncAccessFlags &source_access_scope,
                                      QueueId event_queue, ResourceUsageTag event_tag) const;
 
-    void Update(const SyncAccessInfo &usage_info, SyncOrdering ordering_rule, ResourceUsageTagEx tag_ex, SyncFlags flags = 0);
-    void SetWrite(SyncAccessIndex access_index, ResourceUsageTagEx tag_ex, SyncFlags flags = 0);
+    void Update(const SyncAccessInfo &usage_info, const AttachmentAccess &attachment_access, ResourceUsageTagEx tag_ex,
+                SyncFlags flags = 0);
+    void SetWrite(SyncAccessIndex access_index, const AttachmentAccess &attachment_access, ResourceUsageTagEx tag_ex,
+                  SyncFlags flags = 0);
     void ClearWrite();
     void ClearRead();
     void ClearFirstUse();
     void Resolve(const AccessState &other);
 
     // Apply a single barrier to the access state
-    void ApplyBarrier(const BarrierScope &barrier_scope, const SyncBarrier &barrier, bool layout_transition = false,
+    bool ApplyBarrier(const BarrierScope &barrier_scope, const SyncBarrier &barrier, bool layout_transition = false,
                       uint32_t layout_transition_handle_index = vvl::kNoIndex32,
                       ResourceUsageTag layout_transition_tag = kInvalidTag);
 
@@ -358,29 +396,6 @@ class AccessState {
     void ApplyPendingLayoutTransition(const PendingLayoutTransition &layout_transition, ResourceUsageTag layout_transition_tag);
 
     void ApplySemaphore(const SemaphoreScope &signal, const SemaphoreScope &wait);
-
-    struct WaitQueueTagPredicate {
-        QueueId queue;
-        ResourceUsageTag tag;
-        bool operator()(const ReadState &read_access) const;       // Read access predicate
-        bool operator()(const AccessState &access) const;  // Write access predicate
-    };
-    friend WaitQueueTagPredicate;
-
-    struct WaitTagPredicate {
-        ResourceUsageTag tag;
-        bool operator()(const ReadState &read_access) const;       // Read access predicate
-        bool operator()(const AccessState &access) const;  // Write access predicate
-    };
-    friend WaitTagPredicate;
-
-    struct WaitAcquirePredicate {
-        ResourceUsageTag present_tag;
-        ResourceUsageTag acquire_tag;
-        bool operator()(const ReadState &read_access) const;       // Read access predicate
-        bool operator()(const AccessState &access) const;  // Write access predicate
-    };
-    friend WaitAcquirePredicate;
 
     // Clear read/write accesses that satisfy the predicate
     // (predicate says which accesses should be considered synchronized).
@@ -431,15 +446,18 @@ class AccessState {
     void UpdateStats(AccessContextStats &stats) const;
 
   private:
+    AccessState() = default;  // not accessible, use DefaultAccessState instead
     void CopySimpleMembers(const AccessState &other);
     bool IsRAWHazard(const SyncAccessInfo &usage_info) const;
 
     bool IsReadHazard(VkPipelineStageFlags2 stage_mask, const ReadState &read_access) const {
         return stage_mask != (stage_mask & read_access.barriers);
     }
-    VkPipelineStageFlags2 GetOrderedStages(QueueId queue_id, const OrderingBarrier &ordering, SyncFlags flags) const;
+    VkPipelineStageFlags2 GetOrderedStages(QueueId queue_id, const OrderingBarrier &ordering,
+                                           AttachmentAccessType attachment_access_type) const;
 
-    void UpdateFirst(ResourceUsageTagEx tag_ex, const SyncAccessInfo &usage_info, SyncOrdering ordering_rule, SyncFlags flags = 0);
+    void UpdateFirst(ResourceUsageTagEx tag_ex, const SyncAccessInfo &usage_info, const AttachmentAccess &attachment_access,
+                     SyncFlags flags = 0);
     void TouchupFirstForLayoutTransition(ResourceUsageTag tag, const OrderingBarrier &layout_ordering);
 
     bool HasReads() const { return last_read_count != 0; }
@@ -449,6 +467,14 @@ class AccessState {
     void MergeReads(const AccessState &other);
     void ClearReadStates();
 
+public:
+    // Index of the next global barrier to apply.
+    // Global barriers are stored in the AccessContext associated with this access state.
+    // If 0, no global barriers have been applied yet.
+    // If greater than 0, then all global barriers with smaller indices are already applied.
+    uint32_t next_global_barrier_index = 0;
+
+  private:
     // The most recent write.
     // NOTE: For reads, each must be "safe" relative to its prior write, so we need
     // only to save the most recent write operation, since anything *transitively*
@@ -481,8 +507,6 @@ class AccessState {
     bool input_attachment_read = false;
 };
 using AccessStateFunction = std::function<void(AccessState *)>;
-using AccessMap = sparse_container::range_map<ResourceAddress, AccessState>;
-using RangeMergeIterator = sparse_container::parallel_iterator<AccessMap, const AccessMap>;
 
 template <typename Predicate>
 bool AccessState::ClearPredicatedAccesses(Predicate &predicate) {

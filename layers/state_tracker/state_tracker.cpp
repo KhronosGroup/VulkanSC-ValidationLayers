@@ -1,9 +1,9 @@
-/* Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (C) 2015-2025 Google Inc.
+/* Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (C) 2015-2026 Google Inc.
  * Copyright (c) 2025 Arm Limited.
- * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Modifications Copyright (C) 2020,2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +24,8 @@
 #include <vulkan/vulkan_core.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
 #include "containers/custom_containers.h"
+#include "containers/container_utils.h"
+#include "generated/vk_extension_helper.h"
 #include "state_tracker/data_graph_pipeline_session_state.h"
 #include "state_tracker/shader_stage_state.h"
 #include "state_tracker/image_state.h"
@@ -31,7 +33,6 @@
 #include "state_tracker/tensor_state.h"
 #include "state_tracker/device_state.h"
 #include "state_tracker/queue_state.h"
-#include "state_tracker/descriptor_sets.h"
 #include "state_tracker/cmd_buffer_state.h"
 #include "state_tracker/pipeline_state.h"
 #include "state_tracker/render_pass_state.h"
@@ -42,10 +43,13 @@
 #include "state_tracker/descriptor_mode.h"
 #include "chassis/chassis_modification_state.h"
 #include "spirv-tools/optimizer.hpp"
+#include "utils/spirv_tools_utils.h"
+#include "utils/math_utils.h"
 
 // Used for debugging
 #include "utils/keyboard.h"
 
+#include "utils/image_utils.h"  // GetExternalFormat
 #include "utils/sync_utils.h"
 #include "chassis/chassis.h"
 
@@ -145,6 +149,10 @@ std::vector<std::shared_ptr<const ImageView>> DeviceState::GetAttachmentViews(co
                                                                               const Framebuffer &fb_state) const {
     auto get_fn = [this](VkImageView handle) { return this->Get<ImageView>(handle); };
     return GetAttachmentViewsImpl<std::shared_ptr<const ImageView>>(rp_begin, fb_state, get_fn);
+}
+
+DescriptorSetLayoutId DeviceState::GetCanonicalId(const VkDescriptorSetLayoutCreateInfo *p_create_info) {
+    return descriptor_set_layout_canonical_ids_.LookUp(DescriptorSetLayoutDef(*this, p_create_info));
 }
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
@@ -497,6 +505,11 @@ void DeviceState::PostCallRecordCreateTensorARM(VkDevice device, const VkTensorC
     Add(std::move(tensor_state));
 }
 
+void DeviceState::PreCallRecordDestroyTensorARM(VkDevice device, VkTensorARM tensor, const VkAllocationCallbacks *pAllocator,
+                                                const RecordObject &record_obj) {
+    Destroy<Tensor>(tensor);
+}
+
 void DeviceState::PostCallRecordBindTensorMemoryARM(VkDevice device, uint32_t bindInfoCount,
                                                     const VkBindTensorMemoryInfoARM *pBindInfos, const RecordObject &record_obj) {
     if (VK_SUCCESS != record_obj.result) return;
@@ -567,18 +580,20 @@ std::shared_ptr<vvl::DataGraphPipelineSession> DeviceState::CreateDataGraphPipel
     return std::make_shared<vvl::DataGraphPipelineSession>(*this, handle, pCreateInfo);
 }
 
-void DeviceState::PostCallRecordCreateDataGraphPipelineSessionARM(
-    VkDevice device, const VkDataGraphPipelineSessionCreateInfoARM *pCreateInfo, const VkAllocationCallbacks *pAllocator,
-    VkDataGraphPipelineSessionARM *pSession, const RecordObject &record_obj) {
+void DeviceState::PostCallRecordCreateDataGraphPipelineSessionARM(VkDevice device,
+                                                                  const VkDataGraphPipelineSessionCreateInfoARM *pCreateInfo,
+                                                                  const VkAllocationCallbacks *pAllocator,
+                                                                  VkDataGraphPipelineSessionARM *pSession,
+                                                                  const RecordObject &record_obj) {
     if (record_obj.result != VK_SUCCESS) return;
     std::shared_ptr<vvl::DataGraphPipelineSession> pipeline_session_state =
         CreateDataGraphPipelineSessionState(*pSession, pCreateInfo);
     Add(std::move(pipeline_session_state));
 }
 
-void DeviceState::PostCallRecordBindDataGraphPipelineSessionMemoryARM(
-    VkDevice device, uint32_t bindInfoCount, const VkBindDataGraphPipelineSessionMemoryInfoARM *pBindInfos,
-    const RecordObject &record_obj) {
+void DeviceState::PostCallRecordBindDataGraphPipelineSessionMemoryARM(VkDevice device, uint32_t bindInfoCount,
+                                                                      const VkBindDataGraphPipelineSessionMemoryInfoARM *pBindInfos,
+                                                                      const RecordObject &record_obj) {
     if (VK_SUCCESS != record_obj.result) {
         return;
     }
@@ -587,7 +602,7 @@ void DeviceState::PostCallRecordBindDataGraphPipelineSessionMemoryARM(
         auto session_state = Get<vvl::DataGraphPipelineSession>(bind_info.session);
         if (session_state) {
             auto mem_info = std::shared_ptr<vvl::DeviceMemory>(Get<vvl::DeviceMemory>(bind_info.memory));
-            vvl::MemoryBinding binding = { mem_info, bind_info.memoryOffset, 0 };
+            vvl::MemoryBinding binding = {mem_info, bind_info.memoryOffset, 0};
             session_state->AddBoundMemory(bind_info.bindPoint, binding);
         }
     }
@@ -681,6 +696,11 @@ void DeviceState::PostCallRecordCreateTensorViewARM(VkDevice device, const VkTen
     auto tensor_state = Get<vvl::Tensor>(pCreateInfo->tensor);
     ASSERT_AND_RETURN(tensor_state);
     Add(CreateTensorViewState(tensor_state, *pView, pCreateInfo));
+}
+
+void DeviceState::PreCallRecordDestroyTensorViewARM(VkDevice device, VkTensorViewARM tensorView,
+                                                    const VkAllocationCallbacks *pAllocator, const RecordObject &record_obj) {
+    Destroy<TensorView>(tensorView);
 }
 
 void DeviceState::PostCallRecordCmdCopyBuffer2KHR(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2KHR *pCopyBufferInfo,
@@ -1760,11 +1780,29 @@ void DeviceState::PreCallRecordDestroyShaderModule(VkDevice device, VkShaderModu
 
 void DeviceState::PreCallRecordDestroyShaderEXT(VkDevice device, VkShaderEXT shader, const VkAllocationCallbacks *pAllocator,
                                                 const RecordObject &record_obj) {
+    // Don't do state lookup if not needed
+    if (enabled_features.descriptorHeap) {
+        if (const auto &shader_state = Get<ShaderObject>(shader)) {
+            if (shader_state->descriptor_heap_embedded_samplers_count > 0) {
+                descriptor_heap_global_embedded_sampler_count_ -= shader_state->descriptor_heap_embedded_samplers_count;
+            }
+        }
+    }
+
     Destroy<ShaderObject>(shader);
 }
 
 void DeviceState::PreCallRecordDestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks *pAllocator,
                                                const RecordObject &record_obj) {
+    // Don't do state lookup if not needed
+    if (enabled_features.descriptorHeap) {
+        if (const auto &pipeline_state = Get<Pipeline>(pipeline)) {
+            if (pipeline_state->descriptor_heap_embedded_samplers_count > 0) {
+                descriptor_heap_global_embedded_sampler_count_ -= pipeline_state->descriptor_heap_embedded_samplers_count;
+            }
+        }
+    }
+
     Destroy<Pipeline>(pipeline);
 }
 
@@ -1977,16 +2015,84 @@ bool DeviceState::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipe
         if (pCreateInfos[i].renderPass != VK_NULL_HANDLE) {
             render_pass = Get<RenderPass>(create_info.renderPass);
         } else if (enabled_features.dynamicRendering) {
-            auto pipeline_rendering_ci = vku::FindStructInPNextChain<VkPipelineRenderingCreateInfo>(create_info.pNext);
+            // We need VkPipelineRenderingCreateInfo for two reasons
+            //  - The viewMask (pre-raster/fragment shader)
+            //  - The formats (fragment output) (also depends on rasterization being enabled)
+            // We need generate our own, correct VkPipelineRenderingCreateInfo so we can make a safe struct in vvl::RenderPass
+            //
+            // We also need to be careful, if things like rasterization is diabled, we **need** to ignore a possible
+            // VkPipelineRenderingCreateInfo that contains bad pointers (Thanks GPL!)
 
-            // The rasterization_enabled is our way to hint to vvl::RenderPass to ignore a possible VkPipelineRenderingCreateInfo
-            // that contains bad pointers (when using GPL)
-            const bool has_fragment_output_state =
-                Pipeline::ContainsLibraryState(*this, create_info, VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT);
+            VkPipelineCreateFlags2 flags = create_info.flags;
+            if (auto flags2 = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfo>(create_info.pNext)) {
+                flags = flags2->flags;
+            }
+            const bool is_library = (flags & VK_PIPELINE_CREATE_2_LIBRARY_BIT_KHR) != 0;
+
+            // These are simply true for the non-GPL case (or when we are creating the final GPL pipeline)
+            bool has_pre_raster_state = true;
+            bool has_fragment_shader_state = true;
+            bool has_fragment_output_state = true;
+            if (is_library) {
+                // Same as OwnsLibState() but when there is no vvl::Pipeline state
+                if (auto lib_type = vku::FindStructInPNextChain<VkGraphicsPipelineLibraryCreateInfoEXT>(create_info.pNext)) {
+                    has_pre_raster_state = (lib_type->flags & VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT) != 0;
+                    has_fragment_shader_state = (lib_type->flags & VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT) != 0;
+                    has_fragment_output_state =
+                        (lib_type->flags & VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT) != 0;
+                }
+            }
+
+            const bool uses_view_mask = has_pre_raster_state | has_fragment_shader_state;
             const bool rasterization_enabled =
                 has_fragment_output_state && Pipeline::EnablesRasterizationStates(*this, create_info);
 
-            render_pass = std::make_shared<RenderPass>(pipeline_rendering_ci, rasterization_enabled);
+            // Start with empty struct, fill in what is not ignored
+            VkPipelineRenderingCreateInfo rendering_ci = vku::InitStructHelper();
+            rendering_ci.viewMask = 0;
+            rendering_ci.colorAttachmentCount = 0;
+            rendering_ci.pColorAttachmentFormats = nullptr;
+            rendering_ci.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+            rendering_ci.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+            if (auto pnext_ci = vku::FindStructInPNextChain<VkPipelineRenderingCreateInfo>(create_info.pNext)) {
+                if (uses_view_mask) {
+                    rendering_ci.viewMask = pnext_ci->viewMask;
+                }
+                if (rasterization_enabled) {
+                    rendering_ci.colorAttachmentCount = pnext_ci->colorAttachmentCount;
+                    rendering_ci.pColorAttachmentFormats = pnext_ci->pColorAttachmentFormats;
+                    rendering_ci.depthAttachmentFormat = pnext_ci->depthAttachmentFormat;
+                    rendering_ci.stencilAttachmentFormat = pnext_ci->stencilAttachmentFormat;
+                }
+            }
+
+            auto lib_info = vku::FindStructInPNextChain<VkPipelineLibraryCreateInfoKHR>(create_info.pNext);
+            // When GPL (our favorite extension) is used, this will be the final executable pipeline and here we need to fetch all
+            // the library state
+            if (lib_info && lib_info->libraryCount != 0) {
+                // Even if the final executable in GPL has a VkPipelineRenderingCreateInfo, we ignore (override) it
+                for (VkPipeline lib : vvl::make_span(lib_info->pLibraries, lib_info->libraryCount)) {
+                    auto lib_state = Get<vvl::Pipeline>(lib);
+                    ASSERT_AND_CONTINUE(lib_state);
+                    if (!lib_state->rendering_create_info) {
+                        // chance there might not be VkPipelineRenderingCreateInfo when we except, means either a Vertex Input or an
+                        // error will be caught elsewhere
+                        continue;
+                    }
+                    if (lib_state->OwnsLibState(lib_state->fragment_output_state)) {
+                        rendering_ci.colorAttachmentCount = lib_state->rendering_create_info->colorAttachmentCount;
+                        rendering_ci.pColorAttachmentFormats = lib_state->rendering_create_info->pColorAttachmentFormats;
+                        rendering_ci.depthAttachmentFormat = lib_state->rendering_create_info->depthAttachmentFormat;
+                        rendering_ci.stencilAttachmentFormat = lib_state->rendering_create_info->stencilAttachmentFormat;
+                    } else if (lib_state->OwnsLibState(lib_state->pre_raster_state)) {
+                        // Could look for Fragment shader, but their viewMask must match and pre-raster is pre-raster is required
+                        rendering_ci.viewMask = lib_state->rendering_create_info->viewMask;
+                    }
+                }
+            }
+
+            render_pass = std::make_shared<RenderPass>(rendering_ci);
         }
         pipeline_states.push_back(CreateGraphicsPipelineState(&create_info, pipeline_cache, std::move(render_pass),
                                                               std::move(layout_state), chassis_state.stateless_data));
@@ -2003,6 +2109,12 @@ void DeviceState::PostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipel
         const VkPipeline pipeline_handle = pPipelines[i];
         if (pipeline_handle == VK_NULL_HANDLE) {
             continue;  // vkspec.html#pipelines-multiple
+        }
+
+        if (pCreateInfos[i].pStages) {
+            if (pipeline_states[i]->descriptor_heap_embedded_samplers_count > 0) {
+                descriptor_heap_global_embedded_sampler_count_ += pipeline_states[i]->descriptor_heap_embedded_samplers_count;
+            }
         }
 
         pipeline_states[i]->SetHandle(pipeline_handle);
@@ -2045,6 +2157,10 @@ void DeviceState::PostCallRecordCreateComputePipelines(VkDevice device, VkPipeli
             continue;  // vkspec.html#pipelines-multiple
         }
 
+        if (pipeline_states[i]->descriptor_heap_embedded_samplers_count > 0) {
+            descriptor_heap_global_embedded_sampler_count_ += pipeline_states[i]->descriptor_heap_embedded_samplers_count;
+        }
+
         pipeline_states[i]->SetHandle(pipeline_handle);
         Add(std::move(pipeline_states[i]));
     }
@@ -2053,8 +2169,8 @@ void DeviceState::PostCallRecordCreateComputePipelines(VkDevice device, VkPipeli
 
 // TODO - Add tests and pass down StatelessData
 std::shared_ptr<Pipeline> DeviceState::CreateRayTracingPipelineStateNV(const VkRayTracingPipelineCreateInfoNV *create_info,
-                                                                     std::shared_ptr<const PipelineCache> pipeline_cache,
-                                                                     std::shared_ptr<const PipelineLayout> &&layout) const {
+                                                                       std::shared_ptr<const PipelineCache> pipeline_cache,
+                                                                       std::shared_ptr<const PipelineLayout> &&layout) const {
     return std::make_shared<Pipeline>(*this, create_info, std::move(pipeline_cache), std::move(layout));
 }
 
@@ -2083,6 +2199,10 @@ void DeviceState::PostCallRecordCreateRayTracingPipelinesNV(VkDevice device, VkP
             continue;  // vkspec.html#pipelines-multiple
         }
 
+        if (pipeline_states[i]->descriptor_heap_embedded_samplers_count > 0) {
+            descriptor_heap_global_embedded_sampler_count_ += pipeline_states[i]->descriptor_heap_embedded_samplers_count;
+        }
+
         pipeline_states[i]->SetHandle(pipeline_handle);
         Add(std::move(pipeline_states[i]));
     }
@@ -2091,9 +2211,9 @@ void DeviceState::PostCallRecordCreateRayTracingPipelinesNV(VkDevice device, VkP
 
 // TODO - Add tests and pass down StatelessData
 std::shared_ptr<Pipeline> DeviceState::CreateRayTracingPipelineStateKHR(const VkRayTracingPipelineCreateInfoKHR *create_info,
-                                                                     std::shared_ptr<const PipelineCache> pipeline_cache,
-                                                                     std::shared_ptr<const PipelineLayout> &&layout,
-                                                                     std::vector<spirv::StatelessData> &stateless_data) const {
+                                                                        std::shared_ptr<const PipelineCache> pipeline_cache,
+                                                                        std::shared_ptr<const PipelineLayout> &&layout,
+                                                                        std::vector<spirv::StatelessData> &stateless_data) const {
     return std::make_shared<Pipeline>(*this, create_info, std::move(pipeline_cache), std::move(layout), &stateless_data);
 }
 
@@ -2108,8 +2228,8 @@ bool DeviceState::PreCallValidateCreateRayTracingPipelinesKHR(VkDevice device, V
     auto pipeline_cache = Get<PipelineCache>(pipelineCache);
     for (uint32_t i = 0; i < count; i++) {
         // Create and initialize internal tracking data structure
-        pipeline_states.push_back(
-           CreateRayTracingPipelineStateKHR(&pCreateInfos[i], pipeline_cache, Get<PipelineLayout>(pCreateInfos[i].layout), chassis_state.stateless_data));
+        pipeline_states.push_back(CreateRayTracingPipelineStateKHR(
+            &pCreateInfos[i], pipeline_cache, Get<PipelineLayout>(pCreateInfos[i].layout), chassis_state.stateless_data));
     }
     return false;
 }
@@ -2128,6 +2248,10 @@ void DeviceState::PostCallRecordCreateRayTracingPipelinesKHR(VkDevice device, Vk
                 continue;  // vkspec.html#pipelines-multiple
             }
 
+            if (pipeline_states[i]->descriptor_heap_embedded_samplers_count > 0) {
+                descriptor_heap_global_embedded_sampler_count_ += pipeline_states[i]->descriptor_heap_embedded_samplers_count;
+            }
+
             pipeline_states[i]->SetHandle(pipeline_handle);
             Add(std::move(pipeline_states[i]));
         }
@@ -2141,18 +2265,22 @@ void DeviceState::PostCallRecordCreateRayTracingPipelinesKHR(VkDevice device, Vk
         if (dispatch_device_->wrap_handles) {
             deferredOperation = dispatch_device_->Unwrap(deferredOperation);
         }
-        std::vector<std::function<void(const std::vector<VkPipeline> &)>> cleanup_fn;
+        std::vector<std::function<void(std::pair<uint32_t, VkPipeline *>)>> cleanup_fn;
         auto find_res = dispatch_device_->deferred_operation_post_check.pop(deferredOperation);
         if (find_res->first) {
             cleanup_fn = std::move(find_res->second);
         }
         // Mutable lambda because we want to move the shared pointer contained in the copied vector
-        cleanup_fn.emplace_back([this, chassis_state, pipeline_states](const std::vector<VkPipeline> &pipelines) mutable {
+        cleanup_fn.emplace_back([this, chassis_state, pipeline_states](std::pair<uint32_t, VkPipeline *> pipelines) mutable {
             // Just need to capture chassis state to maintain pipeline creations parameters alive, see
             // https://vkdoc.net/chapters/deferred-host-operations#deferred-host-operations-requesting
             (void)chassis_state;
             for (size_t i = 0; i < pipeline_states.size(); ++i) {
-                pipeline_states[i]->SetHandle(pipelines[i]);
+                if (pipeline_states[i]->descriptor_heap_embedded_samplers_count > 0) {
+                    descriptor_heap_global_embedded_sampler_count_ += pipeline_states[i]->descriptor_heap_embedded_samplers_count;
+                }
+
+                pipeline_states[i]->SetHandle(pipelines.second[i]);
                 this->Add(std::move(pipeline_states[i]));
             }
         });
@@ -2160,16 +2288,19 @@ void DeviceState::PostCallRecordCreateRayTracingPipelinesKHR(VkDevice device, Vk
     }
 }
 
-std::shared_ptr<vvl::Pipeline> DeviceState::CreateDataGraphPipelineState(
-    const VkDataGraphPipelineCreateInfoARM *pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
-    std::shared_ptr<const vvl::PipelineLayout> &&layout, spirv::StatelessData *stateless_data) const {
+std::shared_ptr<vvl::Pipeline> DeviceState::CreateDataGraphPipelineState(const VkDataGraphPipelineCreateInfoARM *pCreateInfo,
+                                                                         std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
+                                                                         std::shared_ptr<const vvl::PipelineLayout> &&layout,
+                                                                         spirv::StatelessData *stateless_data) const {
     return std::make_shared<vvl::Pipeline>(*this, pCreateInfo, std::move(pipeline_cache), std::move(layout), stateless_data);
 }
 
-bool DeviceState::PreCallValidateCreateDataGraphPipelinesARM(
-    VkDevice device, VkDeferredOperationKHR deferredOperation, VkPipelineCache pipelineCache, uint32_t count,
-    const VkDataGraphPipelineCreateInfoARM *pCreateInfos, const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
-    const ErrorObject &error_obj, PipelineStates &pipeline_states, chassis::CreateDataGraphPipelinesARM &chassis_state) const {
+bool DeviceState::PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                             VkPipelineCache pipelineCache, uint32_t count,
+                                                             const VkDataGraphPipelineCreateInfoARM *pCreateInfos,
+                                                             const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
+                                                             const ErrorObject &error_obj, PipelineStates &pipeline_states,
+                                                             chassis::CreateDataGraphPipelinesARM &chassis_state) const {
     pipeline_states.reserve(count);
     auto pipeline_cache = Get<vvl::PipelineCache>(pipelineCache);
     for (uint32_t i = 0; i < count; i++) {
@@ -2180,10 +2311,12 @@ bool DeviceState::PreCallValidateCreateDataGraphPipelinesARM(
     return false;
 }
 
-void DeviceState::PostCallRecordCreateDataGraphPipelinesARM(
-    VkDevice device, VkDeferredOperationKHR deferredOperation, VkPipelineCache pipelineCache, uint32_t count,
-    const VkDataGraphPipelineCreateInfoARM *pCreateInfos, const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
-    const RecordObject &record_obj, PipelineStates &pipeline_states, chassis::CreateDataGraphPipelinesARM &chassis_state) {
+void DeviceState::PostCallRecordCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                            VkPipelineCache pipelineCache, uint32_t count,
+                                                            const VkDataGraphPipelineCreateInfoARM *pCreateInfos,
+                                                            const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
+                                                            const RecordObject &record_obj, PipelineStates &pipeline_states,
+                                                            chassis::CreateDataGraphPipelinesARM &chassis_state) {
     // This API may create pipelines regardless of the return value
     for (uint32_t i = 0; i < count; i++) {
         if (pPipelines[i] != VK_NULL_HANDLE) {
@@ -2194,8 +2327,7 @@ void DeviceState::PostCallRecordCreateDataGraphPipelinesARM(
     pipeline_states.clear();
 }
 
-void DeviceState::PostCallRecordCmdDispatchDataGraphARM(VkCommandBuffer commandBuffer,
-                                                        VkDataGraphPipelineSessionARM session,
+void DeviceState::PostCallRecordCmdDispatchDataGraphARM(VkCommandBuffer commandBuffer, VkDataGraphPipelineSessionARM session,
                                                         const VkDataGraphPipelineDispatchInfoARM *pInfo,
                                                         const RecordObject &record_obj) {
     auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
@@ -2271,6 +2403,7 @@ void DeviceState::PostCallRecordResetDescriptorPool(VkDevice device, VkDescripto
     }
 }
 
+// We do some state tracking prior so other things can use it at PreCallValidate time as well
 bool DeviceState::PreCallValidateAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo *pAllocateInfo,
                                                         VkDescriptorSet *pDescriptorSets, const ErrorObject &error_obj,
                                                         AllocateDescriptorSetsData &ads_state) const {
@@ -2293,6 +2426,18 @@ bool DeviceState::PreCallValidateAllocateDescriptorSets(VkDevice device, const V
                     }
                 }
 
+                // In VK_KHR_maintenance6 we can finally check for YCbCr samplers that will take multiple descriptor slots.
+                // First need to check if has a YCbCr format
+                if (binding_layout->pImmutableSamplers != nullptr &&
+                    binding_layout->descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER &&
+                    IsExtEnabled(extensions.vk_khr_maintenance6)) {
+                    if (const auto sampler = Get<Sampler>(*binding_layout->pImmutableSamplers)) {
+                        if (sampler->sampler_conversion != VK_NULL_HANDLE) {
+                            descriptor_count *= phys_dev_props_core14.maxCombinedImageSamplerDescriptorCount;
+                        }
+                    }
+                }
+
                 ads_state.required_descriptors_by_type[type_index] += descriptor_count;
             }
         }
@@ -2306,7 +2451,7 @@ bool DeviceState::PreCallValidateAllocateDescriptorSets(VkDevice device, const V
 // we calculated this
 std::string DeviceState::PrintDescriptorAllocation(const VkDescriptorSetAllocateInfo &allocate_info,
                                                    const vvl::DescriptorPool &pool_state, VkDescriptorType type) const {
-    std::stringstream ss;
+    std::ostringstream ss;
     ss << "Where " << string_VkDescriptorType(type) << " is found in the pool:\n";
     for (const auto [pool_size_i, pool_size] :
          vvl::enumerate(pool_state.create_info.pPoolSizes, pool_state.create_info.poolSizeCount)) {
@@ -2325,13 +2470,29 @@ std::string DeviceState::PrintDescriptorAllocation(const VkDescriptorSetAllocate
                 if (binding_layout->descriptorType != type) {
                     continue;
                 }
+                bool normal_message = true;
                 if (count_allocate_info && i < count_allocate_info->descriptorSetCount &&
                     (ds_layout_state->GetDescriptorBindingFlagsFromIndex(i) &
                      VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT)) {
                     ss << "  pSetLayouts[" << set_layout_i << "]::pBindings[" << i
                        << "].descriptorCount = " << count_allocate_info->pDescriptorCounts[i]
                        << " (adjusted for VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT)\n";
-                } else {
+                    normal_message = false;
+                } else if (binding_layout->pImmutableSamplers != nullptr && type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER &&
+                           IsExtEnabled(extensions.vk_khr_maintenance6)) {
+                    if (const auto sampler = Get<Sampler>(*binding_layout->pImmutableSamplers)) {
+                        if (sampler->sampler_conversion != VK_NULL_HANDLE) {
+                            const uint32_t ycbcr_count =
+                                binding_layout->descriptorCount * phys_dev_props_core14.maxCombinedImageSamplerDescriptorCount;
+                            ss << "  pSetLayouts[" << set_layout_i << "]::pBindings[" << i << "].descriptorCount = " << ycbcr_count
+                               << " (adjusted by multiplying maxCombinedImageSamplerDescriptorCount which is "
+                               << phys_dev_props_core14.maxCombinedImageSamplerDescriptorCount << ")\n";
+                            normal_message = false;
+                        }
+                    }
+                }
+
+                if (normal_message) {
                     ss << "  pSetLayouts[" << set_layout_i << "]::pBindings[" << i
                        << "].descriptorCount = " << binding_layout->descriptorCount << '\n';
                 }
@@ -2424,7 +2585,7 @@ void DeviceState::PostCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer, V
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     cb_state->RecordCommand(record_obj.location);
     auto pipeline_state = Get<Pipeline>(pipeline);
-    ASSERT_AND_RETURN(pipeline);
+    ASSERT_AND_RETURN(pipeline_state);
     cb_state->RecordBindPipeline(pipelineBindPoint, *pipeline_state);
 
     if (!disabled[command_buffer_state]) {
@@ -2721,6 +2882,20 @@ void DeviceState::PostCallRecordCmdCopyAccelerationStructureNV(VkCommandBuffer c
 void DeviceState::PreCallRecordDestroyAccelerationStructureKHR(VkDevice device, VkAccelerationStructureKHR accelerationStructure,
                                                                const VkAllocationCallbacks *pAllocator,
                                                                const RecordObject &record_obj) {
+    if (auto as_state = Get<vvl::AccelerationStructureKHR>(accelerationStructure)) {
+        if (as_state->acceleration_structure_address != 0) {
+            WriteLockGuard lock(as_with_addresses.array_mutex);
+            auto as_found_it = std::find(as_with_addresses.array.begin(), as_with_addresses.array.end(), as_state.get());
+            while (as_found_it != as_with_addresses.array.end()) {
+                const size_t i = std::distance(as_with_addresses.array.begin(), as_found_it);
+                std::swap(as_with_addresses.array[i], as_with_addresses.array[as_with_addresses.array.size() - 1]);
+                as_with_addresses.array.resize(as_with_addresses.array.size() - 1);
+
+                as_found_it = std::find(as_with_addresses.array.begin() + i, as_with_addresses.array.end(), as_state.get());
+            }
+            as_state->acceleration_structure_address = 0;
+        }
+    }
     Destroy<AccelerationStructureKHR>(accelerationStructure);
 }
 
@@ -2837,6 +3012,8 @@ void DeviceState::PostCallRecordCmdBindDescriptorSets(VkCommandBuffer commandBuf
 
     cb_state->UpdateLastBoundDescriptorSets(pipelineBindPoint, pipeline_layout, firstSet, setCount, pDescriptorSets, no_push_desc,
                                             dynamicOffsetCount, pDynamicOffsets, record_obj.location);
+
+    cb_state->SetDescriptorMode(vvl::DescriptorModeClassic, record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
@@ -2871,6 +3048,8 @@ void DeviceState::PostCallRecordCmdBindDescriptorSets2(VkCommandBuffer commandBu
             pBindDescriptorSetsInfo->descriptorSetCount, pBindDescriptorSetsInfo->pDescriptorSets, no_push_desc,
             pBindDescriptorSetsInfo->dynamicOffsetCount, pBindDescriptorSetsInfo->pDynamicOffsets, record_obj.location);
     }
+
+    cb_state->SetDescriptorMode(vvl::DescriptorModeClassic, record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdBindDescriptorSets2KHR(VkCommandBuffer commandBuffer,
@@ -2888,6 +3067,12 @@ void DeviceState::PostCallRecordCmdPushDescriptorSet(VkCommandBuffer commandBuff
     ASSERT_AND_RETURN(pipeline_layout);
     cb_state->PushDescriptorSetState(pipelineBindPoint, pipeline_layout, set, descriptorWriteCount, pDescriptorWrites,
                                      record_obj.location);
+
+    if (pipeline_layout->has_descriptor_buffer) {
+        cb_state->SetDescriptorMode(vvl::DescriptorModeBuffer, record_obj.location.function);
+    } else {
+        cb_state->SetDescriptorMode(vvl::DescriptorModeClassic, record_obj.location.function);
+    }
 }
 
 void DeviceState::PostCallRecordCmdPushDescriptorSetKHR(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
@@ -2919,6 +3104,12 @@ void DeviceState::PostCallRecordCmdPushDescriptorSet2(VkCommandBuffer commandBuf
                                          pPushDescriptorSetInfo->descriptorWriteCount, pPushDescriptorSetInfo->pDescriptorWrites,
                                          record_obj.location);
     }
+
+    if (pipeline_layout->has_descriptor_buffer) {
+        cb_state->SetDescriptorMode(vvl::DescriptorModeBuffer, record_obj.location.function);
+    } else {
+        cb_state->SetDescriptorMode(vvl::DescriptorModeClassic, record_obj.location.function);
+    }
 }
 
 void DeviceState::PostCallRecordCmdPushDescriptorSet2KHR(VkCommandBuffer commandBuffer,
@@ -2946,9 +3137,22 @@ void DeviceState::PostCallRecordCmdBindDescriptorBuffersEXT(VkCommandBuffer comm
 
     // So really this should be set at vkCmdSetDescriptorBufferOffsetsEXT time where the bindpoint is known.
     // In practice, setting it here is better as if the app messes up, it might crash things.
-    for (uint32_t i = 0; i < vvl::BindPointCount; i++) {
-        cb_state->lastBound[i].SetDescriptorMode(DescriptorModeBuffer);
-    }
+    cb_state->SetDescriptorMode(DescriptorModeBuffer, record_obj.location.function);
+}
+
+void DeviceState::PostCallRecordCmdBindDescriptorBufferEmbeddedSamplersEXT(VkCommandBuffer commandBuffer,
+                                                                           VkPipelineBindPoint pipelineBindPoint,
+                                                                           VkPipelineLayout layout, uint32_t set,
+                                                                           const RecordObject &record_obj) {
+    auto cb_state = Get<CommandBuffer>(commandBuffer);
+    cb_state->SetDescriptorMode(DescriptorModeBuffer, record_obj.location.function);
+}
+
+void DeviceState::PostCallRecordCmdBindDescriptorBufferEmbeddedSamplers2EXT(
+    VkCommandBuffer commandBuffer, const VkBindDescriptorBufferEmbeddedSamplersInfoEXT *pBindDescriptorBufferEmbeddedSamplersInfo,
+    const RecordObject &record_obj) {
+    auto cb_state = Get<CommandBuffer>(commandBuffer);
+    cb_state->SetDescriptorMode(DescriptorModeBuffer, record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdSetDescriptorBufferOffsetsEXT(VkCommandBuffer commandBuffer,
@@ -2961,6 +3165,8 @@ void DeviceState::PostCallRecordCmdSetDescriptorBufferOffsetsEXT(VkCommandBuffer
     ASSERT_AND_RETURN(pipeline_layout);
 
     cb_state->UpdateLastBoundDescriptorBuffers(pipelineBindPoint, pipeline_layout, firstSet, setCount, pBufferIndices, pOffsets);
+
+    cb_state->SetDescriptorMode(vvl::DescriptorModeBuffer, record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdSetDescriptorBufferOffsets2EXT(
@@ -2988,6 +3194,8 @@ void DeviceState::PostCallRecordCmdSetDescriptorBufferOffsets2EXT(
             pSetDescriptorBufferOffsetsInfo->setCount, pSetDescriptorBufferOffsetsInfo->pBufferIndices,
             pSetDescriptorBufferOffsetsInfo->pOffsets);
     }
+
+    cb_state->SetDescriptorMode(vvl::DescriptorModeBuffer, record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout,
@@ -2999,6 +3207,8 @@ void DeviceState::PostCallRecordCmdPushConstants(VkCommandBuffer commandBuffer, 
 
     cb_state->RecordCommand(record_obj.location);
     cb_state->RecordPushConstants(*pipeline_layout_state, stageFlags, offset, size, pValues);
+
+    cb_state->InvalidateDescriptorMode(vvl::DescriptorModeHeap, record_obj.location.function);
 }
 
 void DeviceState::PostCallRecordCmdPushConstants2(VkCommandBuffer commandBuffer, const VkPushConstantsInfo *pPushConstantsInfo,
@@ -3069,11 +3279,8 @@ void DeviceState::PostCallRecordCmdBindVertexBuffers(VkCommandBuffer commandBuff
     for (uint32_t i = 0; i < bindingCount; ++i) {
         auto buffer_state = Get<Buffer>(pBuffers[i]);
         // the stride is set from the pipeline or dynamic state
-        vvl::VertexBufferBinding &vertex_buffer_binding = cb_state->current_vertex_buffer_binding_info[i + firstBinding];
-        vertex_buffer_binding.bound = true;
-        vertex_buffer_binding.buffer = pBuffers[i];
-        vertex_buffer_binding.offset = pOffsets[i];
-        vertex_buffer_binding.effective_size = Buffer::GetRegionSize(buffer_state, vertex_buffer_binding.offset, VK_WHOLE_SIZE);
+        const VkDeviceSize effective_size = Buffer::GetRegionSize(buffer_state, pOffsets[i], VK_WHOLE_SIZE);
+        cb_state->current_vertex_buffer_binding_info[i + firstBinding].Set(pBuffers[i], effective_size, pOffsets[i], nullptr);
 
         // Add binding for this vertex buffer to this commandbuffer
         if (pBuffers[i] && !disabled[command_buffer_state]) {
@@ -3410,6 +3617,13 @@ void DeviceState::PostCallRecordCmdBeginRenderPass2KHR(VkCommandBuffer commandBu
     PostCallRecordCmdBeginRenderPass2(commandBuffer, pRenderPassBegin, pSubpassBeginInfo, record_obj);
 }
 
+void DeviceState::PostCallRecordCmdBeginCustomResolveEXT(VkCommandBuffer commandBuffer,
+                                                         const VkBeginCustomResolveInfoEXT *pBeginCustomResolveInfo,
+                                                         const RecordObject &record_obj) {
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    cb_state->RecordBeginCustomResolve(record_obj.location);
+}
+
 void DeviceState::PostCallRecordCmdBeginVideoCodingKHR(VkCommandBuffer commandBuffer, const VkVideoBeginCodingInfoKHR *pBeginInfo,
                                                        const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
@@ -3446,6 +3660,14 @@ void DeviceState::PostCallRecordCmdEndConditionalRenderingEXT(VkCommandBuffer co
     cb_state->RecordEndConditionalRendering(record_obj.location);
 }
 
+void DeviceState::PostCallRecordCmdBindTileMemoryQCOM(VkCommandBuffer commandBuffer,
+                                                      const VkTileMemoryBindInfoQCOM *pTileMemoryBindInfo,
+                                                      const RecordObject &record_obj) {
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    // The bound tile memory can be reset by the application
+    cb_state->bound_tile_memory = pTileMemoryBindInfo ? Get<vvl::DeviceMemory>(pTileMemoryBindInfo->memory) : nullptr;
+}
+
 void DeviceState::PostCallRecordCmdBeginRenderingKHR(VkCommandBuffer commandBuffer, const VkRenderingInfoKHR *pRenderingInfo,
                                                      const RecordObject &record_obj) {
     PostCallRecordCmdBeginRendering(commandBuffer, pRenderingInfo, record_obj);
@@ -3467,6 +3689,11 @@ void DeviceState::PostCallRecordCmdEndRendering(VkCommandBuffer commandBuffer, c
 }
 
 void DeviceState::PostCallRecordCmdEndRendering2EXT(VkCommandBuffer commandBuffer, const VkRenderingEndInfoEXT *pRenderingEndInfo,
+                                                    const RecordObject &record_obj) {
+    PostCallRecordCmdEndRendering2KHR(commandBuffer, pRenderingEndInfo, record_obj);
+}
+
+void DeviceState::PostCallRecordCmdEndRendering2KHR(VkCommandBuffer commandBuffer, const VkRenderingEndInfoKHR *pRenderingEndInfo,
                                                     const RecordObject &record_obj) {
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     cb_state->RecordEndRendering(pRenderingEndInfo, record_obj.location);
@@ -3653,6 +3880,35 @@ void DeviceState::RecordGetExternalSemaphoreState(Semaphore &semaphore_state, Vk
 }
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
+void InstanceState::PostCallRecordCreateWin32SurfaceKHR(VkInstance instance, const VkWin32SurfaceCreateInfoKHR *pCreateInfo,
+                                                        const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface,
+                                                        const RecordObject &record_obj) {
+    if (record_obj.result != VK_SUCCESS) {
+        return;
+    }
+    RecordVulkanSurface(pSurface);
+}
+
+void DeviceState::PostCallRecordAcquireFullScreenExclusiveModeEXT(VkDevice device, VkSwapchainKHR swapchain,
+                                                                  const RecordObject &record_obj) {
+    if (record_obj.result != VK_SUCCESS) {
+        return;
+    }
+    auto swapchain_state = Get<Swapchain>(swapchain);
+    ASSERT_AND_RETURN(swapchain_state);
+    swapchain_state->exclusive_full_screen_access = true;
+}
+
+void DeviceState::PostCallRecordReleaseFullScreenExclusiveModeEXT(VkDevice device, VkSwapchainKHR swapchain,
+                                                                  const RecordObject &record_obj) {
+    if (record_obj.result != VK_SUCCESS) {
+        return;
+    }
+    auto swapchain_state = Get<Swapchain>(swapchain);
+    ASSERT_AND_RETURN(swapchain_state);
+    swapchain_state->exclusive_full_screen_access = false;
+}
+
 void DeviceState::PostCallRecordImportSemaphoreWin32HandleKHR(
     VkDevice device, const VkImportSemaphoreWin32HandleInfoKHR *pImportSemaphoreWin32HandleInfo, const RecordObject &record_obj) {
     if (record_obj.result != VK_SUCCESS) {
@@ -3690,7 +3946,30 @@ void DeviceState::PostCallRecordGetFenceWin32HandleKHR(VkDevice device, const Vk
     }
     RecordGetExternalFenceState(pGetWin32HandleInfo->fence, pGetWin32HandleInfo->handleType, record_obj.location);
 }
-#endif
+
+void DeviceState::PostCallRecordGetMemoryWin32HandleKHR(VkDevice device, const VkMemoryGetWin32HandleInfoKHR *pGetWin32HandleInfo,
+                                                        HANDLE *pHandle, const RecordObject &record_obj) {
+    if (record_obj.result != VK_SUCCESS) {
+        return;
+    }
+    if (const auto memory_state = Get<DeviceMemory>(pGetWin32HandleInfo->memory)) {
+        // For validation purposes we need to keep allocation size and memory type index.
+        // There is no need to keep pNext chain.
+        ExternalOpaqueInfo external_info = {};
+        external_info.allocation_size = memory_state->allocate_info.allocationSize;
+        external_info.memory_type_index = memory_state->allocate_info.memoryTypeIndex;
+        external_info.dedicated_buffer = memory_state->GetDedicatedBuffer();
+        external_info.dedicated_image = memory_state->GetDedicatedImage();
+        external_info.device_memory = pGetWin32HandleInfo->memory;
+
+        WriteLockGuard guard(win32_handle_map_lock_);
+        // `insert_or_assign` ensures that information is updated when the system decides to re-use
+        // closed handle value for a new handle. The validation layer does not track handle close operation
+        // which is performed by 'CloseHandle' system call.
+        win32_handle_map_.insert_or_assign(*pHandle, external_info);
+    }
+}
+#endif  // VK_USE_PLATFORM_WIN32_KHR
 
 #ifdef VK_USE_PLATFORM_FUCHSIA
 void DeviceState::PostCallRecordImportSemaphoreZirconHandleFUCHSIA(
@@ -3738,31 +4017,6 @@ void DeviceState::RecordImportFenceState(VkFence fence, VkExternalFenceHandleTyp
         fence_node->Import(handle_type, flags);
     }
 }
-
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-void DeviceState::PostCallRecordGetMemoryWin32HandleKHR(VkDevice device, const VkMemoryGetWin32HandleInfoKHR *pGetWin32HandleInfo,
-                                                        HANDLE *pHandle, const RecordObject &record_obj) {
-    if (record_obj.result != VK_SUCCESS) {
-        return;
-    }
-    if (const auto memory_state = Get<DeviceMemory>(pGetWin32HandleInfo->memory)) {
-        // For validation purposes we need to keep allocation size and memory type index.
-        // There is no need to keep pNext chain.
-        ExternalOpaqueInfo external_info = {};
-        external_info.allocation_size = memory_state->allocate_info.allocationSize;
-        external_info.memory_type_index = memory_state->allocate_info.memoryTypeIndex;
-        external_info.dedicated_buffer = memory_state->GetDedicatedBuffer();
-        external_info.dedicated_image = memory_state->GetDedicatedImage();
-        external_info.device_memory = pGetWin32HandleInfo->memory;
-
-        WriteLockGuard guard(win32_handle_map_lock_);
-        // `insert_or_assign` ensures that information is updated when the system decides to re-use
-        // closed handle value for a new handle. The validation layer does not track handle close operation
-        // which is performed by 'CloseHandle' system call.
-        win32_handle_map_.insert_or_assign(*pHandle, external_info);
-    }
-}
-#endif
 
 void DeviceState::PostCallRecordGetMemoryFdKHR(VkDevice device, const VkMemoryGetFdInfoKHR *pGetFdInfo, int *pFd,
                                                const RecordObject &record_obj) {
@@ -3926,13 +4180,13 @@ void DeviceState::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentIn
 
     std::vector<QueueSubmission> present_submissions;  // TODO: use small_vector. Update interfaces to use span
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; ++i) {
-        present_submissions.emplace_back(present_loc.dot(Field::pSwapchains, i));
+        QueueSubmission &present_submission = present_submissions.emplace_back(present_loc.dot(Field::pSwapchains, i));
         if (present_fence_info) {
-            present_submissions.back().AddFence(Get<Fence>(present_fence_info->pFences[i]));
+            present_submission.AddFence(Get<Fence>(present_fence_info->pFences[i]));
         }
         auto swapchain = Get<Swapchain>(pPresentInfo->pSwapchains[i]);
-        present_submissions.back().swapchain = swapchain->VkHandle();
-        present_submissions.back().swapchain_image = swapchain->GetSwapChainImageShared(pPresentInfo->pImageIndices[i]);
+        present_submission.swapchain = swapchain->VkHandle();
+        present_submission.swapchain_image = swapchain->GetSwapChainImageShared(pPresentInfo->pImageIndices[i]);
     }
 
     vvl::Semaphore::SwapchainWaitInfo semaphore_swapchain_info;
@@ -3944,7 +4198,7 @@ void DeviceState::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentIn
 
         // Store the value of the acquire counter that corresponds to the presented image.
         // When we get an error we can find where in the acquire history this semaphore was used the last time.
-        semaphore_swapchain_info.acquire_counter_value = semaphore_swapchain_info.swapchain->acquire_count;
+        semaphore_swapchain_info.acquire_counter_value = semaphore_swapchain_info.swapchain->acquire_request_count;
 
         // Usually acquire_counter_value it's the current vvl::Swapchain::acquire_count but for the case when
         // application acquires multiple images before presenting we iterate to find specific image index.
@@ -4000,6 +4254,7 @@ void DeviceState::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentIn
 
     const auto *present_id_info = vku::FindStructInPNextChain<VkPresentIdKHR>(pPresentInfo->pNext);
     const auto *present_id_info_2 = vku::FindStructInPNextChain<VkPresentId2KHR>(pPresentInfo->pNext);
+    const auto *present_timings_info = vku::FindStructInPNextChain<VkPresentTimingsInfoEXT>(pPresentInfo->pNext);
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; ++i) {
         auto swapchain_data = Get<Swapchain>(pPresentInfo->pSwapchains[i]);
         if (!swapchain_data) {
@@ -4010,12 +4265,13 @@ void DeviceState::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentIn
         assert(pPresentInfo->swapchainCount < 2 || pPresentInfo->pResults);
         auto local_result = pPresentInfo->pResults ? pPresentInfo->pResults[i] : record_obj.result;
 
-        // spec: "However, if the presentation request is rejected by the presentation engine with an error
-        // VK_ERROR_OUT_OF_DATE_KHR, VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT, or VK_ERROR_SURFACE_LOST_KHR, the set of queue
-        // operations are still considered to be enqueued and thus any semaphore wait operation specified in VkPresentInfoKHR will
-        // execute when the corresponding queue operation is complete."
-        if (!IsValueIn(local_result, {VK_SUCCESS, VK_SUBOPTIMAL_KHR, VK_ERROR_OUT_OF_DATE_KHR,
-                                      VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT, VK_ERROR_SURFACE_LOST_KHR})) {
+        // If the present timing queue reports as full, any waits would have been enqueued and therefore need to
+        // be tracked here, however the presentation will be dropped
+        if (local_result == VK_ERROR_PRESENT_TIMING_QUEUE_FULL_EXT) {
+            queue_state->Notify(result.submission_seq);
+            for (const auto &semaphore : present_wait_semaphores) {
+                semaphore->ClearSwapchainWaitInfo();
+            }
             continue;
         }
 
@@ -4028,6 +4284,22 @@ void DeviceState::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentIn
         } else if (present_id_info && i < present_id_info->swapchainCount) {
             present_id = present_id_info->pPresentIds[i];
         }
+
+        if (present_timings_info && present_timings_info->pTimingInfos->presentStageQueries) {
+            const Swapchain::PresentTimingInfo presentTimingInfo{
+                GetBitSetCount(present_timings_info->pTimingInfos->presentStageQueries), present_submission_ref};
+            swapchain_data->present_timing_stage_queries.push_back({present_id, presentTimingInfo});
+        }
+
+        // spec: "However, if the presentation request is rejected by the presentation engine with an error
+        // VK_ERROR_OUT_OF_DATE_KHR, VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT, or VK_ERROR_SURFACE_LOST_KHR, the set of queue
+        // operations are still considered to be enqueued and thus any semaphore wait operation specified in VkPresentInfoKHR will
+        // execute when the corresponding queue operation is complete."
+        if (!IsValueIn(local_result, {VK_SUCCESS, VK_SUBOPTIMAL_KHR, VK_ERROR_OUT_OF_DATE_KHR,
+                                      VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT, VK_ERROR_SURFACE_LOST_KHR})) {
+            continue;
+        }
+
         swapchain_data->PresentImage(pPresentInfo->pImageIndices[i], present_id, present_submission_ref, present_wait_semaphores);
     }
 
@@ -4049,6 +4321,40 @@ void DeviceState::PostCallRecordReleaseSwapchainImagesKHR(VkDevice device, const
 void DeviceState::PostCallRecordReleaseSwapchainImagesEXT(VkDevice device, const VkReleaseSwapchainImagesInfoEXT *pReleaseInfo,
                                                           const RecordObject &record_obj) {
     PostCallRecordReleaseSwapchainImagesKHR(device, pReleaseInfo, record_obj);
+}
+
+void DeviceState::PostCallRecordSetSwapchainPresentTimingQueueSizeEXT(VkDevice device, VkSwapchainKHR swapchain, uint32_t size,
+                                                                      const RecordObject &record_obj) {
+    auto swapchain_state = Get<Swapchain>(swapchain);
+    swapchain_state->present_timing_queue_size = size;
+}
+
+void DeviceState::PostCallRecordGetSwapchainTimeDomainPropertiesEXT(
+    VkDevice device, VkSwapchainKHR swapchain, VkSwapchainTimeDomainPropertiesEXT *pSwapchainTimeDomainProperties,
+    uint64_t *pTimeDomainsCounter, const RecordObject &record_obj) {
+    auto swapchain_state = Get<Swapchain>(swapchain);
+    if (pSwapchainTimeDomainProperties->pTimeDomainIds) {
+        for (uint32_t i = 0; i < pSwapchainTimeDomainProperties->timeDomainCount; ++i) {
+            swapchain_state->time_domains[pSwapchainTimeDomainProperties->pTimeDomainIds[i]] =
+                pSwapchainTimeDomainProperties->pTimeDomains[i];
+        }
+    }
+}
+
+void DeviceState::PostCallRecordGetPastPresentationTimingEXT(
+    VkDevice device, const VkPastPresentationTimingInfoEXT *pPastPresentationTimingInfo,
+    VkPastPresentationTimingPropertiesEXT *pPastPresentationTimingProperties, const RecordObject &record_obj) {
+    if (pPastPresentationTimingProperties->pPresentationTimings != nullptr) {
+        auto swapchain = Get<Swapchain>(pPastPresentationTimingInfo->swapchain);
+        for (uint32_t i = 0; i < pPastPresentationTimingProperties->presentationTimingCount; ++i) {
+            for (uint32_t j = 0; j < pPastPresentationTimingProperties->pPresentationTimings->reportComplete; ++j) {
+                const SubmissionReference present_submission_ref =
+                    swapchain->present_timing_stage_queries.front().second.present_submission_ref;
+                present_submission_ref.queue->NotifyAndWait(record_obj.location, present_submission_ref.seq);
+                swapchain->present_timing_stage_queries.pop_front();
+            }
+        }
+    }
 }
 
 void DeviceState::PostCallRecordCreateSharedSwapchainsKHR(VkDevice device, uint32_t swapchainCount,
@@ -4102,6 +4408,37 @@ void DeviceState::PostCallRecordAcquireNextImage2KHR(VkDevice device, const VkAc
     if ((VK_SUCCESS != record_obj.result) && (VK_SUBOPTIMAL_KHR != record_obj.result)) return;
     RecordAcquireNextImageState(device, pAcquireInfo->swapchain, pAcquireInfo->timeout, pAcquireInfo->semaphore,
                                 pAcquireInfo->fence, pImageIndex, record_obj.location.function);
+}
+
+void DeviceState::RecordWaitForPresent(VkDevice device, VkSwapchainKHR swapchain, uint64_t present_id, const Location &location) {
+    if (auto swapchain_state = Get<Swapchain>(swapchain)) {
+        // Find the smallest registered present id >= the given present id,
+        // and ensure that the queue has progressed to the corresponding seq location
+        const uint32_t present_id_info_count = swapchain_state->GetPresentIdInfoCount();
+        for (uint32_t i = 0; i < present_id_info_count; i++) {
+            const Swapchain::PresentIdInfo present_id_info = swapchain_state->GetPresentIdInfo(i);
+            if (present_id_info.present_id >= present_id) {
+                present_id_info.present_submission_ref.queue->NotifyAndWait(location, present_id_info.present_submission_ref.seq);
+                break;
+            }
+        }
+    }
+}
+
+void DeviceState::PostCallRecordWaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t presentId, uint64_t timeout,
+                                                  const RecordObject &record_obj) {
+    if (record_obj.result != VK_SUCCESS && record_obj.result != VK_SUBOPTIMAL_KHR) {
+        return;
+    }
+    RecordWaitForPresent(device, swapchain, presentId, record_obj.location);
+}
+
+void DeviceState::PostCallRecordWaitForPresent2KHR(VkDevice device, VkSwapchainKHR swapchain,
+                                                   const VkPresentWait2InfoKHR *pPresentWait2Info, const RecordObject &record_obj) {
+    if (record_obj.result != VK_SUCCESS && record_obj.result != VK_SUBOPTIMAL_KHR) {
+        return;
+    }
+    RecordWaitForPresent(device, swapchain, pPresentWait2Info->presentId, record_obj.location);
 }
 
 std::shared_ptr<PhysicalDevice> InstanceState::CreatePhysicalDeviceState(VkPhysicalDevice handle) {
@@ -4294,17 +4631,6 @@ void InstanceState::PostCallRecordCreateWaylandSurfaceKHR(VkInstance instance, c
     RecordVulkanSurface(pSurface);
 }
 #endif  // VK_USE_PLATFORM_WAYLAND_KHR
-
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-void InstanceState::PostCallRecordCreateWin32SurfaceKHR(VkInstance instance, const VkWin32SurfaceCreateInfoKHR *pCreateInfo,
-                                                        const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface,
-                                                        const RecordObject &record_obj) {
-    if (record_obj.result != VK_SUCCESS) {
-        return;
-    }
-    RecordVulkanSurface(pSurface);
-}
-#endif  // VK_USE_PLATFORM_WIN32_KHR
 
 #ifdef VK_USE_PLATFORM_XCB_KHR
 void InstanceState::PostCallRecordCreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKHR *pCreateInfo,
@@ -4619,12 +4945,19 @@ void DeviceState::PostCallRecordCmdPushDescriptorSetWithTemplate(VkCommandBuffer
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto template_state = Get<DescriptorUpdateTemplate>(descriptorUpdateTemplate);
     auto pipeline_layout = Get<PipelineLayout>(layout);
-    if (!cb_state || !template_state || !pipeline_layout) {
+
+    if (pipeline_layout->has_descriptor_buffer) {
+        cb_state->SetDescriptorMode(vvl::DescriptorModeBuffer, record_obj.location.function);
+    } else {
+        cb_state->SetDescriptorMode(vvl::DescriptorModeClassic, record_obj.location.function);
+    }
+
+    if (!template_state || !pipeline_layout) {
         return;
     }
 
     cb_state->RecordCommand(record_obj.location);
-    auto dsl = pipeline_layout->set_layouts[set];
+    auto dsl = pipeline_layout->set_layouts.list[set];
     // Decode the template into a set of write updates
     DecodedTemplateUpdate decoded_template(*this, VK_NULL_HANDLE, *template_state, pData, dsl->VkHandle());
     cb_state->PushDescriptorSetState(template_state->create_info.pipelineBindPoint, pipeline_layout, set,
@@ -4645,12 +4978,19 @@ void DeviceState::PostCallRecordCmdPushDescriptorSetWithTemplate2(
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     auto template_state = Get<DescriptorUpdateTemplate>(pPushDescriptorSetWithTemplateInfo->descriptorUpdateTemplate);
     auto pipeline_layout = Get<PipelineLayout>(pPushDescriptorSetWithTemplateInfo->layout);
-    if (!cb_state || !template_state || !pipeline_layout) {
+
+    if (pipeline_layout->has_descriptor_buffer) {
+        cb_state->SetDescriptorMode(vvl::DescriptorModeBuffer, record_obj.location.function);
+    } else {
+        cb_state->SetDescriptorMode(vvl::DescriptorModeClassic, record_obj.location.function);
+    }
+
+    if (!template_state || !pipeline_layout) {
         return;
     }
 
     cb_state->RecordCommand(record_obj.location);
-    auto dsl = pipeline_layout->set_layouts[pPushDescriptorSetWithTemplateInfo->set];
+    auto dsl = pipeline_layout->set_layouts.list[pPushDescriptorSetWithTemplateInfo->set];
     // Decode the template into a set of write updates
     DecodedTemplateUpdate decoded_template(*this, VK_NULL_HANDLE, *template_state, pPushDescriptorSetWithTemplateInfo->pData,
                                            dsl->VkHandle());
@@ -5144,6 +5484,10 @@ void DeviceState::PostCallRecordCreateShadersEXT(VkDevice device, uint32_t creat
             }
         }
 
+        if (shader_object_state->descriptor_heap_embedded_samplers_count > 0) {
+            descriptor_heap_global_embedded_sampler_count_ += shader_object_state->descriptor_heap_embedded_samplers_count;
+        }
+
         Add(std::move(shader_object_state));
     }
 }
@@ -5291,15 +5635,11 @@ void DeviceState::PostCallRecordCmdBindVertexBuffers2(VkCommandBuffer commandBuf
 
     for (uint32_t i = 0; i < bindingCount; ++i) {
         auto buffer_state = Get<vvl::Buffer>(pBuffers[i]);
-        vvl::VertexBufferBinding &vertex_buffer_binding = cb_state->current_vertex_buffer_binding_info[i + firstBinding];
-        vertex_buffer_binding.bound = true;
-        vertex_buffer_binding.buffer = pBuffers[i];
-        vertex_buffer_binding.offset = pOffsets[i];
-        vertex_buffer_binding.effective_size = Buffer::GetRegionSize(buffer_state, pOffsets[i], pSizes ? pSizes[i] : VK_WHOLE_SIZE);
 
-        if (pStrides) {
-            vertex_buffer_binding.stride = pStrides[i];
-        }
+        const VkDeviceSize* stride_ptr = pStrides ? &pStrides[i] : nullptr;
+        const VkDeviceSize effective_size = Buffer::GetRegionSize(buffer_state, pOffsets[i], pSizes ? pSizes[i] : VK_WHOLE_SIZE);
+
+        cb_state->current_vertex_buffer_binding_info[i + firstBinding].Set(pBuffers[i], effective_size, pOffsets[i], stride_ptr);
 
         // Add binding for this vertex buffer to this commandbuffer
         if (!disabled[command_buffer_state] && pBuffers[i]) {
@@ -5570,28 +5910,6 @@ void DeviceState::PostCallRecordCmdSetAttachmentFeedbackLoopEnableEXT(VkCommandB
     cb_state->dynamic_state_value.attachment_feedback_loop_enable = aspectMask;
 }
 
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-void DeviceState::PostCallRecordAcquireFullScreenExclusiveModeEXT(VkDevice device, VkSwapchainKHR swapchain,
-                                                                  const RecordObject &record_obj) {
-    if (record_obj.result != VK_SUCCESS) {
-        return;
-    }
-    auto swapchain_state = Get<Swapchain>(swapchain);
-    ASSERT_AND_RETURN(swapchain_state);
-    swapchain_state->exclusive_full_screen_access = true;
-}
-
-void DeviceState::PostCallRecordReleaseFullScreenExclusiveModeEXT(VkDevice device, VkSwapchainKHR swapchain,
-                                                                  const RecordObject &record_obj) {
-    if (record_obj.result != VK_SUCCESS) {
-        return;
-    }
-    auto swapchain_state = Get<Swapchain>(swapchain);
-    ASSERT_AND_RETURN(swapchain_state);
-    swapchain_state->exclusive_full_screen_access = false;
-}
-#endif
-
 void DeviceState::PostCallRecordCmdSetTessellationDomainOriginEXT(VkCommandBuffer commandBuffer,
                                                                   VkTessellationDomainOrigin domainOrigin,
                                                                   const RecordObject &record_obj) {
@@ -5633,6 +5951,9 @@ void DeviceState::PostCallRecordCmdSetSampleMaskEXT(VkCommandBuffer commandBuffe
     auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
     cb_state->RecordStateCmd(CB_DYNAMIC_STATE_SAMPLE_MASK_EXT);
     cb_state->dynamic_state_value.samples_mask_samples = samples;
+    // Note from the spec, if the need to record pSampleMask rises:
+    // If the maintenance10 feature is enabled, and this (pSampleMask) parameter is set to NULL,
+    // it is treated as if the mask has all bits set to 1.
 }
 
 void DeviceState::PostCallRecordCmdSetAlphaToCoverageEnableEXT(VkCommandBuffer commandBuffer, VkBool32 alphaToCoverageEnable,
@@ -5935,6 +6256,47 @@ void DeviceState::PostCallRecordCmdBindTransformFeedbackBuffersEXT(VkCommandBuff
     cb_state->transform_feedback_buffers_bound = bindingCount;
 }
 
+void DeviceState::PostCallRecordGetAccelerationStructureDeviceAddressKHR(VkDevice device,
+                                                                         const VkAccelerationStructureDeviceAddressInfoKHR *pInfo,
+                                                                         const RecordObject &record_obj) {
+    if (!pInfo) {
+        return;
+    }
+    if (record_obj.device_address == 0) {
+        return;
+    }
+    if (auto as_state = Get<vvl::AccelerationStructureKHR>(pInfo->accelerationStructure)) {
+        as_state->acceleration_structure_address = record_obj.device_address;
+        WriteLockGuard lock(as_with_addresses.array_mutex);
+        if (as_with_addresses.array.capacity() <= (as_with_addresses.array.size() + 1)) {
+            as_with_addresses.array.reserve(as_with_addresses.array.capacity() * 2);
+        }
+        as_with_addresses.array.emplace_back(as_state.get());
+    }
+}
+
+small_vector<const vvl::AccelerationStructureKHR *, 2> DeviceState::GetAccelerationStructuresByAddress(
+    VkDeviceAddress address) const {
+    small_vector<const vvl::AccelerationStructureKHR *, 2> as_vector;
+    if (address == 0) {
+        return as_vector;
+    }
+    as_vector.reserve(static_cast<uint32_t>(as_with_addresses.array.size()));
+
+    ReadLockGuard lock(as_with_addresses.array_mutex);
+    auto as_found_it =
+        std::find_if(as_with_addresses.array.begin(), as_with_addresses.array.end(),
+                     [address](vvl::AccelerationStructureKHR *as) { return as->acceleration_structure_address == address; });
+
+    while (as_found_it != as_with_addresses.array.end()) {
+        as_vector.emplace_back(*as_found_it);
+        as_found_it = std::find_if(as_found_it + 1, as_with_addresses.array.end(), [address](vvl::AccelerationStructureKHR *as) {
+            return as->acceleration_structure_address == address;
+        });
+    }
+    return as_vector;
+}
+
 void DeviceState::PreCallRecordLatencySleepNV(VkDevice device, VkSwapchainKHR swapchain, const VkLatencySleepInfoNV *pSleepInfo,
                                               const RecordObject &record_obj) {
     if (auto semaphore_state = Get<Semaphore>(pSleepInfo->signalSemaphore)) {
@@ -6006,4 +6368,144 @@ void DeviceState::PreCallRecordDestroyIndirectCommandsLayoutEXT(VkDevice device,
                                                                 const RecordObject &record_obj) {
     Destroy<IndirectCommandsLayout>(indirectCommandsLayout);
 }
+
+struct CommandBufferReservedAddressInfillUpdateOps {
+    using Map = typename DeviceState::DescriptorHeapReservedAddress::RangeMap;
+    using Iterator = typename Map::iterator;
+    using Value = typename Map::value_type;
+    using Mapped = typename Map::mapped_type;
+    using Range = typename Map::key_type;
+
+    void infill(Map &map, const Iterator &pos, const Range &infill_range) const {
+        map.insert(pos, Value(infill_range, insert_value));
+    }
+
+    void update(const Iterator &pos) const {
+        auto &current_buffer_list = pos->second;
+        assert(!current_buffer_list.empty());
+        const auto buffer_found_it = std::find(current_buffer_list.begin(), current_buffer_list.end(), insert_value[0]);
+        if (buffer_found_it == current_buffer_list.end()) {
+            if (current_buffer_list.capacity() <= (current_buffer_list.size() + 1)) {
+                current_buffer_list.reserve(current_buffer_list.capacity() * 2);
+            }
+            current_buffer_list.emplace_back(insert_value[0]);
+        }
+    }
+    const Mapped &insert_value;
+};
+
+struct CommandBufferReservedAddressRemoveOps {
+    using Map = DeviceState::DescriptorHeapReservedAddress::RangeMap;
+    using Mapped = Map::mapped_type;
+
+    bool operator()(Mapped &cmd_buffer_list) const {
+        auto it = std::find(cmd_buffer_list.begin(), cmd_buffer_list.end(), removed_value);
+        if (it != cmd_buffer_list.end()) {
+            if (cmd_buffer_list.size() == 1) {
+                return true;
+            } else {
+                // Swap with last element and resize to remove it
+                size_t idx = std::distance(cmd_buffer_list.begin(), it);
+                if (idx != cmd_buffer_list.size() - 1) {
+                    std::swap(cmd_buffer_list[idx], cmd_buffer_list.back());
+                }
+                cmd_buffer_list.resize(cmd_buffer_list.size() - 1);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    const vvl::CommandBuffer *removed_value;
+};
+
+void DeviceState::UpdateCommandBufferHeapReservedAddressMap(vvl::CommandBuffer *cb_state,
+                                                            const vvl::range<VkDeviceAddress> &new_range, bool is_sampler) {
+    assert(cb_state != nullptr);
+
+    WriteLockGuard guard(descriptor_heap_reserved_address.lock);
+
+    const vvl::range<VkDeviceAddress> &existing_range =
+        is_sampler ? cb_state->descriptor_heap.sampler_reserved : cb_state->descriptor_heap.resource_reserved;
+    DescriptorHeapReservedAddress::RangeMap &cmd_buffer_map =
+        is_sampler ? descriptor_heap_reserved_address.sampler_map : descriptor_heap_reserved_address.resource_map;
+
+    if (existing_range.non_empty()) {
+        CommandBufferReservedAddressRemoveOps remove_ops{cb_state};
+        cmd_buffer_map.erase_range_or_touch(existing_range, remove_ops);
+    }
+
+    if (new_range.non_empty()) {
+        CommandBufferReservedAddressInfillUpdateOps update_ops{{cb_state}};
+        sparse_container::infill_update_range(cmd_buffer_map, new_range, update_ops);
+    }
+}
+
+void DeviceState::RemoveCommandBufferHeapReservedAddressMap(vvl::CommandBuffer *cb_state) {
+    assert(cb_state != nullptr);
+
+    WriteLockGuard guard(descriptor_heap_reserved_address.lock);
+
+    const vvl::range<VkDeviceAddress> &resource_existing_range = cb_state->descriptor_heap.resource_reserved;
+    if (resource_existing_range.non_empty()) {
+        CommandBufferReservedAddressRemoveOps remove_ops{cb_state};
+        descriptor_heap_reserved_address.resource_map.erase_range_or_touch(resource_existing_range, remove_ops);
+    }
+
+    const vvl::range<VkDeviceAddress> &sampler_existing_range = cb_state->descriptor_heap.sampler_reserved;
+    if (sampler_existing_range.non_empty()) {
+        CommandBufferReservedAddressRemoveOps remove_ops{cb_state};
+        descriptor_heap_reserved_address.sampler_map.erase_range_or_touch(sampler_existing_range, remove_ops);
+    }
+}
+
+void DeviceState::PostCallRecordCmdBindSamplerHeapEXT(VkCommandBuffer commandBuffer, const VkBindHeapInfoEXT *pBindInfo,
+                                                      const RecordObject &record_obj) {
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    cb_state->descriptor_heap.sampler_bound = true;
+
+    vvl::range<VkDeviceAddress> reserved = {
+        pBindInfo->heapRange.address + pBindInfo->reservedRangeOffset,
+        pBindInfo->heapRange.address + pBindInfo->reservedRangeOffset + pBindInfo->reservedRangeSize};
+
+    if (cb_state->descriptor_heap.sampler_reserved != reserved) {
+        UpdateCommandBufferHeapReservedAddressMap(cb_state.get(), reserved, true);
+        cb_state->descriptor_heap.sampler_reserved = reserved;
+    }
+
+    vvl::range<VkDeviceAddress> range = {pBindInfo->heapRange.address, pBindInfo->heapRange.address + pBindInfo->heapRange.size};
+    cb_state->descriptor_heap.sampler_range = range;
+
+    cb_state->SetDescriptorMode(DescriptorModeHeap, record_obj.location.function);
+}
+
+void DeviceState::PostCallRecordCmdBindResourceHeapEXT(VkCommandBuffer commandBuffer, const VkBindHeapInfoEXT *pBindInfo,
+                                                       const RecordObject &record_obj) {
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    cb_state->descriptor_heap.resource_bound = true;
+
+    vvl::range<VkDeviceAddress> reserved = {
+        pBindInfo->heapRange.address + pBindInfo->reservedRangeOffset,
+        pBindInfo->heapRange.address + pBindInfo->reservedRangeOffset + pBindInfo->reservedRangeSize};
+
+    if (cb_state->descriptor_heap.resource_reserved != reserved) {
+        UpdateCommandBufferHeapReservedAddressMap(cb_state.get(), reserved, false);
+        cb_state->descriptor_heap.resource_reserved = reserved;
+    }
+
+    vvl::range<VkDeviceAddress> range = {pBindInfo->heapRange.address, pBindInfo->heapRange.address + pBindInfo->heapRange.size};
+    cb_state->descriptor_heap.resource_range = range;
+
+    cb_state->SetDescriptorMode(DescriptorModeHeap, record_obj.location.function);
+}
+
+void DeviceState::PostCallRecordCmdPushDataEXT(VkCommandBuffer commandBuffer, const VkPushDataInfoEXT *pPushDataInfo,
+                                               const RecordObject &record_obj) {
+    auto cb_state = GetWrite<CommandBuffer>(commandBuffer);
+    ASSERT_AND_RETURN(cb_state);
+    cb_state->RecordCmdPushDataEXT(*pPushDataInfo, record_obj.location);
+
+    cb_state->SetDescriptorMode(DescriptorModeHeap, record_obj.location.function);
+}
+
 }  // namespace vvl

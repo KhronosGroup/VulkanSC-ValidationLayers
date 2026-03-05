@@ -23,56 +23,28 @@
 #include "state_tracker/data_graph_pipeline_session_state.h"
 #include "state_tracker/pipeline_layout_state.h"
 #include "state_tracker/pipeline_state.h"
+#include "utils/math_utils.h"
 
 bool CoreChecks::ValidateDataGraphPipelineShaderModuleCreateInfo(VkDevice device,
-                                                                 const VkDataGraphPipelineCreateInfoARM& create_info,
-                                                                 const Location& create_info_loc,
+                                                                 const VkDataGraphPipelineShaderModuleCreateInfoARM& dg_shader_ci,
+                                                                 const Location& dg_shader_ci_loc,
                                                                  const vvl::Pipeline& pipeline) const {
     bool skip = false;
-    const auto* dg_pipeline_shader_module_ci =
-        vku::FindStructInPNextChain<VkDataGraphPipelineShaderModuleCreateInfoARM>(create_info.pNext);
-    if (!dg_pipeline_shader_module_ci) {
-        return skip;
-    }
 
-    const Location pipeline_shader_module_ci_loc = create_info_loc.pNext(Struct::VkDataGraphPipelineShaderModuleCreateInfoARM);
-    auto module_state = Get<vvl::ShaderModule>(dg_pipeline_shader_module_ci->module);
-    if (module_state) {
+    if (auto module_state = Get<vvl::ShaderModule>(dg_shader_ci.module)) {
         if (!enabled_features.dataGraphSpecializationConstants) {
-            if (dg_pipeline_shader_module_ci->pSpecializationInfo) {
+            if (dg_shader_ci.pSpecializationInfo) {
                 skip |= LogError("VUID-VkDataGraphPipelineShaderModuleCreateInfoARM-dataGraphSpecializationConstants-09849", device,
-                                 pipeline_shader_module_ci_loc.dot(Field::pSpecializationInfo),
+                                 dg_shader_ci_loc.dot(Field::pSpecializationInfo),
                                  "(%p) is not null but dataGraphSpecializationConstants feature is not enabled",
-                                 dg_pipeline_shader_module_ci->pSpecializationInfo);
-            }
-        }
-
-        for (uint32_t j = 0; j < dg_pipeline_shader_module_ci->constantCount; j++) {
-            const auto& constant = dg_pipeline_shader_module_ci->pConstants[j];
-            if (const auto* sparsity =
-                    vku::FindStructInPNextChain<VkDataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM>(constant.pNext)) {
-                const auto* tensor_desc = vku::FindStructInPNextChain<VkTensorDescriptionARM>(constant.pNext);
-                skip |= ValidateTensorSemiStructuredSparsityInfo(device, sparsity, tensor_desc,
-                                                                 pipeline_shader_module_ci_loc.dot(Field::pConstants, j), pipeline);
+                                 dg_shader_ci.pSpecializationInfo);
             }
         }
     }
 
-    // The shader module can also be defined via a VkShaderModuleCreateInfo structure
-    if (const auto* shader_module_ci = vku::FindStructInPNextChain<VkShaderModuleCreateInfo>(create_info.pNext)) {
-        if (dg_pipeline_shader_module_ci->module != VK_NULL_HANDLE) {
-            skip |= LogError(
-                "VUID-VkDataGraphPipelineShaderModuleCreateInfoARM-pNext-09873", device, create_info_loc.dot(Field::module),
-                "(%p) is not NULL but the pNext chain of VkDataGraphPipelineCreateInfoARM includes a VkShaderModuleCreateInfo",
-                reinterpret_cast<const void*>(dg_pipeline_shader_module_ci->module));
-        }
-        skip |= ValidateShaderModuleCreateInfo(*shader_module_ci, create_info_loc.pNext(Struct::VkShaderModuleCreateInfo));
-    } else if (!module_state) {
-        // we can't find the state object for dg_pipeline_shader_module_ci->module: it must be invalid: undefined or deleted
-        skip |=
-            LogError("VUID-VkDataGraphPipelineShaderModuleCreateInfoARM-pNext-09874", device, create_info_loc.dot(Field::module),
-                     "(%p) is not a valid VkShaderModule and there is no VkShaderModuleCreateInfo in the pNext chain",
-                     reinterpret_cast<const void*>(dg_pipeline_shader_module_ci->module));
+    for (uint32_t j = 0; j < dg_shader_ci.constantCount; j++) {
+        skip |= ValidateTensorSemiStructuredSparsityInfo(device, dg_shader_ci.pConstants[j],
+                                                         dg_shader_ci_loc.dot(Field::pConstants, j), pipeline);
     }
 
     return skip;
@@ -100,8 +72,8 @@ bool CoreChecks::ValidateDataGraphPipelineCreateInfo(VkDevice device, const VkDa
             LogError("VUID-VkDataGraphPipelineCreateInfoARM-layout-09767", device, layout_loc.dot(Field::pushConstantRangeCount),
                      "(%zu) must be zero", pipeline_layout->push_constant_ranges_layout->size());
     }
-    for (uint32_t j = 0; j < pipeline_layout->set_layouts.size(); j++) {
-        auto dsl = pipeline_layout->set_layouts[j];
+    for (uint32_t j = 0; j < pipeline_layout->set_layouts.list.size(); j++) {
+        auto dsl = pipeline_layout->set_layouts.list[j];
         if ((dsl->GetCreateFlags() & VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT) != 0) {
             if (!enabled_features.dataGraphUpdateAfterBind) {
                 skip |= LogError("VUID-VkDataGraphPipelineCreateInfoARM-dataGraphUpdateAfterBind-09768", device,
@@ -122,76 +94,50 @@ bool CoreChecks::ValidateDataGraphPipelineCreateInfo(VkDevice device, const VkDa
         }
     }
 
-    for (uint32_t j = 0; j < create_info.resourceInfoCount; j++) {
-        auto resource = create_info.pResourceInfos[j];
-        if (resource.arrayElement != 0) {
-            skip |= LogError("VUID-VkDataGraphPipelineResourceInfoARM-arrayElement-09779", device,
-                             create_info_loc.dot(Field::pResourceInfos, j).dot(Field::arrayElement), "(%" PRIu32 ") is not zero",
-                             resource.arrayElement);
-        }
-    }
-
     return skip;
 }
 
-bool CoreChecks::ValidateDataGraphPipelineCreateInfoFlags(VkPipelineCreateFlags2 flags, Location flags_loc) const {
+bool CoreChecks::ValidateTensorSemiStructuredSparsityInfo(VkDevice device, const VkDataGraphPipelineConstantARM& constant,
+                                                          const Location& constant_loc, const vvl::Pipeline& pipeline) const {
     bool skip = false;
 
-    constexpr VkPipelineCreateFlags2 valid_flag_mask =
-        VK_PIPELINE_CREATE_2_NO_PROTECTED_ACCESS_BIT | VK_PIPELINE_CREATE_2_PROTECTED_ACCESS_ONLY_BIT |
-        VK_PIPELINE_CREATE_2_DISABLE_OPTIMIZATION_BIT | VK_PIPELINE_CREATE_2_DESCRIPTOR_BUFFER_BIT_EXT |
-        VK_PIPELINE_CREATE_2_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT | VK_PIPELINE_CREATE_2_EARLY_RETURN_ON_FAILURE_BIT;
+    const auto* sparsity =
+        vku::FindStructInPNextChain<VkDataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM>(constant.pNext);
 
-    if ((flags & ~(valid_flag_mask)) != 0) {
-        skip |= LogError("VUID-VkDataGraphPipelineCreateInfoARM-flags-09764", device, flags_loc, "(%s) contains invalid values.",
-                         string_VkPipelineCreateFlags2(flags).c_str());
-    }
-    if (!enabled_features.pipelineProtectedAccess) {
-        if ((flags & VK_PIPELINE_CREATE_2_NO_PROTECTED_ACCESS_BIT_EXT) != 0 ||
-            (flags & VK_PIPELINE_CREATE_2_PROTECTED_ACCESS_ONLY_BIT_EXT) != 0) {
-            skip |= LogError(
-                "VUID-VkDataGraphPipelineCreateInfoARM-pipelineProtectedAccess-09772", device, flags_loc,
-                "(%s) must not contain VK_PIPELINE_CREATE_2_PROTECTED_ACCESS_ONLY_BIT_EXT or "
-                "VK_PIPELINE_CREATE_2_NO_PROTECTED_ACCESS_BIT_EXT because the pipelineProtectedAccess feature was not enabled.",
-                string_VkPipelineCreateFlags2(flags).c_str());
-        }
-    } else {
-        if ((flags & VK_PIPELINE_CREATE_2_NO_PROTECTED_ACCESS_BIT_EXT) != 0 &&
-            (flags & VK_PIPELINE_CREATE_2_PROTECTED_ACCESS_ONLY_BIT_EXT) != 0) {
-            skip |= LogError("VUID-VkDataGraphPipelineCreateInfoARM-flags-09773", device, flags_loc,
-                             "(%s) must not contain both VK_PIPELINE_CREATE_2_PROTECTED_ACCESS_ONLY_BIT_EXT and "
-                             "VK_PIPELINE_CREATE_2_NO_PROTECTED_ACCESS_BIT_EXT",
-                             string_VkPipelineCreateFlags2(flags).c_str());
-        }
+    if (!sparsity) {
+        return skip;
     }
 
-    skip |= ValidatePipelineCacheControlFlags(flags, flags_loc,
-                                              "VUID-VkDataGraphPipelineCreateInfoARM-pipelineCreationCacheControl-09871");
+    const auto* tensor_desc = vku::FindStructInPNextChain<VkTensorDescriptionARM>(constant.pNext);
 
-    return skip;
-}
+    if (!tensor_desc) {
+        skip |= LogError("VUID-VkDataGraphPipelineConstantARM-pNext-09775", device,
+                         constant_loc.pNext(Struct::VkDataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM),
+                         "exists but the pNext chain doesn't include a VkTensorDescriptionARM.\n%s",
+                         PrintPNextChain(Struct::VkDataGraphPipelineConstantARM, constant.pNext).c_str());
+        return skip;
+    }
 
-bool CoreChecks::ValidateTensorSemiStructuredSparsityInfo(
-    VkDevice device, const VkDataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM* sparsity,
-    const VkTensorDescriptionARM* tensor_desc, const Location& constant_loc, const vvl::Pipeline& pipeline) const {
-    bool skip = false;
+    vvl::unordered_set<uint32_t> sparsity_dimensions;
     while (sparsity) {
-        if (!tensor_desc) {
-            skip |= LogError("VUID-VkDataGraphPipelineConstantARM-pNext-09775", device,
-                             constant_loc.pNext(Struct::VkDataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM),
-                             "exists but no VkTensorDescriptionARM found in the chain");
-        } else if (sparsity->dimension >= tensor_desc->dimensionCount) {
+        if (sparsity->dimension >= tensor_desc->dimensionCount) {
             skip |= LogError(
                 "VUID-VkDataGraphPipelineConstantARM-pNext-09776", device,
                 constant_loc.pNext(Struct::VkDataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM, Field::dimension),
                 "(%" PRIu32 ") must be less than the tensor rank (dimensionCount = %" PRIu32 ")", sparsity->dimension,
                 tensor_desc->dimensionCount);
-        } else if (tensor_desc->pDimensions[sparsity->dimension] % sparsity->groupSize != 0) {
+        } else if (!IsIntegerMultipleOf(tensor_desc->pDimensions[sparsity->dimension], sparsity->groupSize)) {
             skip |= LogError("VUID-VkDataGraphPipelineConstantARM-pNext-09777", device,
                              constant_loc.pNext(Struct::VkDataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM,
                                                 Field::pDimensions, sparsity->dimension),
                              "(%" PRIu64 ") must be a multiple of groupSize (%" PRIu32 ")",
                              tensor_desc->pDimensions[sparsity->dimension], sparsity->groupSize);
+        }
+        auto insert_ok = sparsity_dimensions.insert(sparsity->dimension).second;
+        if (!insert_ok) {
+            skip |= LogError("VUID-VkDataGraphPipelineConstantARM-pNext-09870", device,
+                             constant_loc.pNext(Struct::VkDataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM, Field::dimension),
+                             "(%" PRIu32 ") already has a defined sparsity", sparsity->dimension);
         }
         // We can have multiple Sparsity structures in the pNext chain.
         sparsity = vku::FindStructInPNextChain<VkDataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM>(sparsity->pNext);
@@ -207,25 +153,98 @@ bool CoreChecks::PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, VkD
                                                             chassis::CreateDataGraphPipelinesARM& chassis_state) const {
     bool skip = ValidateDeviceQueueSupport(error_obj.location);
 
-    if (!enabled_features.dataGraph) {
-        skip |= LogError("VUID-vkCreateDataGraphPipelinesARM-dataGraph-09760", device, error_obj.location,
-                         "dataGraph feature is not enabled");
-    }
-    if (VK_NULL_HANDLE != deferredOperation) {
-        skip |= LogError("VUID-vkCreateDataGraphPipelinesARM-deferredOperation-09761", device, error_obj.location,
-                         "deferredOperation must be VK_NULL_HANDLE");
-    }
-
     for (uint32_t i = 0; i < createInfoCount; i++) {
         const VkDataGraphPipelineCreateInfoARM& create_info = pCreateInfos[i];
         const vvl::Pipeline* pipeline = pipeline_states[i].get();
         ASSERT_AND_RETURN_SKIP(pipeline);
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfos, i);
 
+        // three different ways to define a datagraph:
+        const auto* dg_shader_ci = vku::FindStructInPNextChain<VkDataGraphPipelineShaderModuleCreateInfoARM>(create_info.pNext);
+        const auto* dg_pipeline_identifier_ci =
+            vku::FindStructInPNextChain<VkDataGraphPipelineIdentifierCreateInfoARM>(create_info.pNext);
+        const auto* qcom_model_ci = vku::FindStructInPNextChain<VkDataGraphPipelineBuiltinModelCreateInfoQCOM>(create_info.pNext);
+
+        // 1 and ONLY 1 of them MUST be present
+        uint32_t defined_structs = (qcom_model_ci ? 1 : 0) + (dg_pipeline_identifier_ci ? 1 : 0) + (dg_shader_ci ? 1 : 0);
+        if (defined_structs != 1) {
+            skip |= LogError("VUID-VkDataGraphPipelineCreateInfoARM-pNext-09763", device, create_info_loc,
+                             "%" PRIu32 " of the possible required structures are included in the pNext chain%s.\n%s",
+                             defined_structs, (defined_structs > 1) ? " (only 1 is allowed)" : "",
+                             PrintPNextChain(Struct::VkDataGraphPipelineCreateInfoARM, create_info.pNext).c_str());
+            return skip;
+        }
+
+        if (dg_pipeline_identifier_ci || qcom_model_ci) {
+            if (!(create_info.flags & VK_PIPELINE_CREATE_2_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT)) {
+                skip |= LogError(
+                    "VUID-VkDataGraphPipelineCreateInfoARM-None-11840", device, create_info_loc.dot(Field::flags),
+                    "(%s) does not include VK_PIPELINE_CREATE_2_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT, but the pNext chain include one "
+                    "of VkDataGraphPipelineIdentifierCreateInfoARM or VkDataGraphPipelineBuiltinModelCreateInfoQCOM.\n%s",
+                    string_VkPipelineCreateFlags2(create_info.flags).c_str(),
+                    PrintPNextChain(Struct::VkDataGraphPipelineCreateInfoARM, create_info.pNext).c_str());
+            }
+            if (create_info.resourceInfoCount) {
+                skip |= LogError(
+                    "VUID-VkDataGraphPipelineCreateInfoARM-None-12363", device, create_info_loc.dot(Field::resourceInfoCount),
+                    "(%" PRIu32 ") is not zero, but the pNext chain includes one of VkDataGraphPipelineIdentifierCreateInfoARM or VkDataGraphPipelineBuiltinModelCreateInfoQCOM.\n%s",
+                    create_info.resourceInfoCount, PrintPNextChain(Struct::VkDataGraphPipelineCreateInfoARM, create_info.pNext).c_str());
+            }
+        } else if (create_info.resourceInfoCount == 0) {
+            skip |= LogError(
+                "VUID-VkDataGraphPipelineCreateInfoARM-None-12365", device, create_info_loc.dot(Field::resourceInfoCount),
+                "is 0, but the pNext chain doesn't include VkDataGraphPipelineIdentifierCreateInfoARM or VkDataGraphPipelineBuiltinModelCreateInfoQCOM.\n%s",
+                PrintPNextChain(Struct::VkDataGraphPipelineCreateInfoARM, create_info.pNext).c_str());
+        }
+
+        if (create_info.resourceInfoCount == 0 && create_info.pResourceInfos) {
+            skip |= LogError(
+                "VUID-VkDataGraphPipelineCreateInfoARM-resourceInfoCount-12364", device, create_info_loc.dot(Field::resourceInfoCount),
+                "(%" PRIu32 ") is 0, but pResourceInfos (%p) is not NULL.", create_info.resourceInfoCount, create_info.pResourceInfos);
+        }
+
+        if (dg_shader_ci) {
+            // checks for datagraph defined via a shader module.
+
+            const Location dg_shader_ci_loc = create_info_loc.pNext(Struct::VkDataGraphPipelineShaderModuleCreateInfoARM);
+            if (!enabled_features.dataGraphShaderModule) {
+                skip |= LogError("VUID-VkDataGraphPipelineCreateInfoARM-dataGraphShaderModule-09886", device, dg_shader_ci_loc,
+                                 "is in the pNext chain, but the dataGraphShaderModule feature is not enabled.\n%s",
+                                 PrintPNextChain(Struct::VkDataGraphPipelineCreateInfoARM, create_info.pNext).c_str());
+            }
+
+            // 2 possible ways to pass the shader, 1 and ONLY 1 MUST be present:
+            // - VkShaderModuleCreateInfo (shader_module_ci), or
+            // - VkDataGraphPipelineShaderModuleCreateInfoARM::module (dg_shader_ci->module)
+            if (const auto* shader_module_ci = vku::FindStructInPNextChain<VkShaderModuleCreateInfo>(create_info.pNext)) {
+                if (dg_shader_ci->module) {
+                    skip |= LogError("VUID-VkDataGraphPipelineShaderModuleCreateInfoARM-pNext-09873", device,
+                                     dg_shader_ci_loc.dot(Field::module),
+                                     "(%s) is not NULL but the pNext chain includes a VkShaderModuleCreateInfo.\n%s",
+                                     FormatHandle(dg_shader_ci->module).c_str(),
+                                     PrintPNextChain(Struct::VkDataGraphPipelineCreateInfoARM, create_info.pNext).c_str());
+                }
+                skip |= ValidateShaderModuleCreateInfo(*shader_module_ci, create_info_loc.pNext(Struct::VkShaderModuleCreateInfo));
+            } else if (!Get<vvl::ShaderModule>(dg_shader_ci->module)) {
+                // there is no shader module: both dg_shader_ci->module and shader_module_ci are NULL
+                skip |= LogError(
+                    "VUID-VkDataGraphPipelineShaderModuleCreateInfoARM-pNext-09874", device, dg_shader_ci_loc.dot(Field::module),
+                    "(%s) is not a valid VkShaderModule and the pNext chain doesn't include a VkShaderModuleCreateInfo.\n%s",
+                    FormatHandle(dg_shader_ci->module).c_str(),
+                    PrintPNextChain(Struct::VkDataGraphPipelineCreateInfoARM, create_info.pNext).c_str());
+            }
+
+            // remaining checks for shader module: create info and spirv
+            skip |= ValidateDataGraphPipelineShaderModuleCreateInfo(device, *dg_shader_ci, dg_shader_ci_loc, *pipeline);
+            skip |= ValidateDataGraphPipelineShaderModuleSpirv(device, create_info, create_info_loc, *dg_shader_ci, *pipeline);
+        } else if (dg_pipeline_identifier_ci) {
+            // TODO: add here validation for datagraph defined as cache object
+        } else if (qcom_model_ci) {
+            // TODO: add here validation for datagraph defined as QCOM model object
+        }
+
+        // common checks
         skip |= ValidateDataGraphPipelineCreateInfo(device, create_info, create_info_loc, *pipeline);
-        skip |= ValidateDataGraphPipelineCreateInfoFlags(create_info.flags, create_info_loc.dot(Field::flags));
-        skip |= ValidateDataGraphPipelineShaderModuleCreateInfo(device, create_info, create_info_loc, *pipeline);
-        skip |= ValidateDataGraphPipelineShaderModuleSpirv(device, create_info, create_info_loc, *pipeline);
     }
 
     return skip;
@@ -241,9 +260,19 @@ bool CoreChecks::PreCallValidateGetDataGraphPipelinePropertiesARM(VkDevice devic
 
     if (VK_STRUCTURE_TYPE_DATA_GRAPH_PIPELINE_CREATE_INFO_ARM != pipeline_ptr->GetCreateInfoSType()) {
         skip |= LogError("VUID-VkDataGraphPipelineInfoARM-dataGraphPipeline-09803", device,
-                         error_obj.location.dot(Field::dataGraphPipeline),
+                         error_obj.location.dot(Field::pPipelineInfo).dot(Field::dataGraphPipeline),
                          "was not created with vkCreateDataGraphPipelinesARM. The create info structure type was %s",
                          string_VkStructureType(pipeline_ptr->GetCreateInfoSType()));
+    }
+    for (uint32_t i = 0; i < propertiesCount; i++) {
+        const VkDataGraphPipelinePropertyQueryResultARM& prop1 = pProperties[i];
+        for (uint32_t j = i+1; j < propertiesCount; j++) {
+            const VkDataGraphPipelinePropertyQueryResultARM& prop2 = pProperties[j];
+            if (prop1.property == prop2.property) {
+                skip |= LogError("VUID-vkGetDataGraphPipelinePropertiesARM-pProperties-09889", device, error_obj.location.dot(Field::pProperties, i).dot(Field::property),
+                                "and pProperties[%" PRIu32 "].property are the same (%s).", j, string_VkDataGraphPipelinePropertyARM(prop1.property));
+            }
+        }
     }
 
     return skip;
@@ -366,6 +395,18 @@ bool CoreChecks::PreCallValidateCmdDispatchDataGraphARM(VkCommandBuffer commandB
                                                  "VUID-vkCmdDispatchDataGraphARM-session-09796");
             }
         }
+    }
+
+    // if the pipeline is NULL, skip is already false; otherwise, more checks
+    if (!last_bound_state.pipeline_state) {
+        return skip;
+    }
+
+    const VkPipeline cb_pipeline = last_bound_state.pipeline_state->VkHandle();
+    if (session_state.create_info.dataGraphPipeline != cb_pipeline) {
+        skip |= LogError("VUID-vkCmdDispatchDataGraphARM-dataGraphPipeline-09951", LogObjectList(), error_obj.location,
+            "The pipeline bound to the command buffer (%s) is different from the pipeline bound to the session (%s); session %s.",
+            FormatHandle(cb_pipeline).c_str(), FormatHandle(session_state.create_info.dataGraphPipeline).c_str(), FormatHandle(session_state).c_str());
     }
 
     return skip;

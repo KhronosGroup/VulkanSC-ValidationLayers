@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -224,6 +224,9 @@ TEST_F(NegativeAndroidHardwareBuffer, AllocationSize) {
         memory_allocate_info.memoryTypeIndex++;
 #if defined(VVL_MOCK_ANDROID)
         m_errorMonitor->SetUnexpectedError("VUID-vkAllocateMemory-pAllocateInfo-01714");  // incase at last index
+        // With TestICD, the next memory index in a tileMemory type, so just ignore
+        m_errorMonitor->SetUnexpectedError("VUID-vkAllocateMemory-tileMemoryHeap-10976");
+
 #endif
         m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-memoryTypeIndex-02385");
         vkt::DeviceMemory memory(*m_device, memory_allocate_info);

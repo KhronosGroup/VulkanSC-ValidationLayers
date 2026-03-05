@@ -3,7 +3,7 @@
 
 /*
  * Copyright (c) 2023-2025 Nintendo
- * Copyright (c) 2023-2025 LunarG, Inc.
+ * Copyright (c) 2023-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,16 +15,17 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/shader_object_helper.h"
 #include "../framework/descriptor_helper.h"
+#include "../framework/shader_helper.h"
 #include "../framework/shader_templates.h"
 #include "utils/math_utils.h"
 
-void ShaderObjectTest::InitBasicShaderObject() {
+void ShaderObjectTest::InitBasicShaderObject(void *instance_pnext) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     AddRequiredFeature(vkt::Feature::shaderObject);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(Init(nullptr, nullptr, instance_pnext));
 }
 
 void ShaderObjectTest::InitBasicMeshShaderObject(APIVersion target_api_version) {
@@ -251,8 +252,7 @@ TEST_F(PositiveShaderObject, VertFragShaderDraw) {
     color_attachment.imageView = view;
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
-    begin_rendering_info.renderArea.extent.width = static_cast<uint32_t>(m_width);
-    begin_rendering_info.renderArea.extent.height = static_cast<uint32_t>(m_height);
+    begin_rendering_info.renderArea.extent = {m_width, m_height};
     begin_rendering_info.layerCount = 1u;
     begin_rendering_info.colorAttachmentCount = 1u;
     begin_rendering_info.pColorAttachments = &color_attachment;
@@ -273,11 +273,7 @@ TEST_F(PositiveShaderObject, VertFragShaderDraw) {
         image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         image_memory_barrier.image = image;
-        image_memory_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        image_memory_barrier.subresourceRange.baseMipLevel = 0u;
-        image_memory_barrier.subresourceRange.levelCount = 1u;
-        image_memory_barrier.subresourceRange.baseArrayLayer = 0u;
-        image_memory_barrier.subresourceRange.layerCount = 1u;
+        image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u,
                                0u, nullptr, 0u, nullptr, 1u, &image_memory_barrier);
     }
@@ -377,7 +373,7 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
 
     vkt::Image image(*m_device, m_width, m_height, VK_FORMAT_R32G32B32A32_SFLOAT,
                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    image.SetLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkt::ImageView view = image.CreateView();
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
@@ -386,10 +382,8 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.flags = 0u;
-    begin_rendering_info.renderArea.offset.x = 0;
-    begin_rendering_info.renderArea.offset.y = 0;
-    begin_rendering_info.renderArea.extent.width = static_cast<uint32_t>(m_width);
-    begin_rendering_info.renderArea.extent.height = static_cast<uint32_t>(m_height);
+    begin_rendering_info.renderArea.offset = {0, 0};
+    begin_rendering_info.renderArea.extent = {m_width, m_height};
     begin_rendering_info.layerCount = 1u;
     begin_rendering_info.viewMask = 0x0;
     begin_rendering_info.colorAttachmentCount = 1u;
@@ -499,10 +493,8 @@ TEST_F(PositiveShaderObject, TaskMeshShadersDraw) {
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.flags = 0u;
-    begin_rendering_info.renderArea.offset.x = 0;
-    begin_rendering_info.renderArea.offset.y = 0;
-    begin_rendering_info.renderArea.extent.width = static_cast<uint32_t>(m_width);
-    begin_rendering_info.renderArea.extent.height = static_cast<uint32_t>(m_height);
+    begin_rendering_info.renderArea.offset = {0, 0};
+    begin_rendering_info.renderArea.extent = {m_width, m_height};
     begin_rendering_info.layerCount = 1u;
     begin_rendering_info.viewMask = 0x0;
     begin_rendering_info.colorAttachmentCount = 1u;
@@ -1685,6 +1677,52 @@ TEST_F(PositiveShaderObject, MultiCreateGraphicsCompute) {
     }
 }
 
+TEST_F(PositiveShaderObject, CustomResolve) {
+    AddRequiredExtensions(VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::customResolve);
+    RETURN_IF_SKIP(Init());
+    CreateMinimalShaders();
+
+    VkFormat color_format = VK_FORMAT_B8G8R8A8_UNORM;
+    VkImageCreateInfo image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    vkt::Image color_image(*m_device, image_ci);
+    vkt::ImageView color_image_view = color_image.CreateView();
+
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    vkt::Image resolve_image(*m_device, image_ci);
+    vkt::ImageView resolve_image_view = resolve_image.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.imageView = color_image_view;
+    color_attachment.resolveMode = VK_RESOLVE_MODE_CUSTOM_BIT_EXT;
+    color_attachment.resolveImageView = resolve_image_view;
+    color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.flags = VK_RENDERING_CUSTOM_RESOLVE_BIT_EXT;
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment;
+    begin_rendering_info.layerCount = 1;
+    begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
+    VkBeginCustomResolveInfoEXT begin_resolve_info = vku::InitStructHelper();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    SetDefaultDynamicStatesExclude();
+    vk::CmdSetRasterizationSamplesEXT(m_command_buffer, VK_SAMPLE_COUNT_4_BIT);
+    m_command_buffer.BindShaders(m_vert_shader, m_frag_shader);
+    vk::CmdBeginCustomResolveEXT(m_command_buffer, &begin_resolve_info);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
 TEST_F(PositiveShaderObject, DisableShaderValidation) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
@@ -1703,6 +1741,201 @@ TEST_F(PositiveShaderObject, DisableShaderValidation) {
     SetDefaultDynamicStatesExclude();
     m_command_buffer.BindShaders(m_vert_shader, m_frag_shader);
     vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveShaderObject, DescriptorHeapPushConstant) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitRenderTarget();
+
+    const char *vsSource = R"glsl(
+        #version 450
+        layout(push_constant, std430) uniform foo { float x; } consts;
+        void main(){
+           gl_Position = vec4(consts.x);
+        }
+    )glsl";
+
+    const auto vspv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vsSource);
+
+    VkShaderCreateInfoEXT create_info = vku::InitStructHelper();
+    create_info.flags = VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+    create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    create_info.codeSize = vspv.size() * sizeof(vspv[0]);
+    create_info.pCode = vspv.data();
+    create_info.pName = "main";
+
+    vkt::Shader shader(*m_device, create_info);
+}
+
+TEST_F(PositiveShaderObject, DescriptorHeapStorageBuffer) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    const char comp_src[] = R"glsl(
+        #version 450
+        layout(local_size_x=16, local_size_x=1, local_size_x=1) in;
+        layout(binding = 0) buffer Output {
+            uint values[16];
+        } buffer_out;
+
+        void main() {
+            buffer_out.values[gl_LocalInvocationID.x] = gl_LocalInvocationID.x;
+        }
+    )glsl";
+
+    VkDescriptorSetAndBindingMappingEXT mappings = MakeSetAndBindingMapping(0, 0);
+    mappings.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mappings.sourceData.constantOffset.heapOffset = 0;
+    mappings.sourceData.constantOffset.heapArrayStride = 0;
+
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 1;
+    mapping_info.pMappings = &mappings;
+
+    const auto cspv = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, comp_src);
+
+    VkShaderCreateInfoEXT create_info = vku::InitStructHelper();
+    create_info.flags = VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+    create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    create_info.codeSize = cspv.size() * sizeof(cspv[0]);
+    create_info.pCode = cspv.data();
+    create_info.pName = "main";
+    create_info.pNext = &mapping_info;
+
+    const vkt::Shader comp_shader(*m_device, create_info);
+}
+
+TEST_F(PositiveShaderObject, HeapFlags) {
+    TEST_DESCRIPTION("Create a linked shaders with mismatched heap flags.");
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    VkShaderCreateInfoEXT create_infos[2];
+    create_infos[0] = ShaderCreateInfoLink(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT);
+    create_infos[0].flags |= VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+    create_infos[1] = ShaderCreateInfoLink(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    create_infos[1].flags |= VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+
+    VkShaderEXT shaders[2];
+    vk::CreateShadersEXT(*m_device, 2u, create_infos, nullptr, shaders);
+    vk::DestroyShaderEXT(*m_device, shaders[0], nullptr);
+    vk::DestroyShaderEXT(*m_device, shaders[1], nullptr);
+}
+
+TEST_F(PositiveShaderObject, DrawWithHeap) {
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+
+    const char vert_src[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer Output {
+            uint values[16];
+        } buffer_out;
+
+        void main() {
+            buffer_out.values[gl_VertexIndex] = gl_VertexIndex + 1;
+            gl_Position = vec4(1.0f);
+        }
+    )glsl";
+
+    VkDescriptorSetAndBindingMappingEXT mappings = MakeSetAndBindingMapping(0, 0);
+    mappings.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mappings.sourceData.constantOffset.heapOffset = 0;
+    mappings.sourceData.constantOffset.heapArrayStride = 0;
+
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 1;
+    mapping_info.pMappings = &mappings;
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert_src);
+    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    VkShaderCreateInfoEXT create_infos[2];
+    create_infos[0] = ShaderCreateInfo(vert_spv, VK_SHADER_STAGE_VERTEX_BIT);
+    create_infos[0].pNext = &mapping_info;
+    create_infos[0].flags |= VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+    create_infos[1] = ShaderCreateInfo(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    create_infos[1].flags |= VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+
+    const vkt::Shader vert_shader(*m_device, create_infos[0]);
+    const vkt::Shader frag_shader(*m_device, create_infos[1]);
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(heap_props);
+
+    VkDeviceSize resource_heap_size = Align(heap_props.bufferDescriptorAlignment, heap_props.imageDescriptorAlignment);
+    VkDeviceSize total_heap_size = resource_heap_size + heap_props.minResourceHeapReservedRange;
+    vkt::Buffer resource_heap(*m_device, total_heap_size, VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT, vkt::device_address);
+    uint8_t *resource_heap_data = static_cast<uint8_t *>(resource_heap.Memory().Map());
+
+    VkDeviceSize buffer_size = sizeof(uint32_t) * 16u;
+    vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT_KHR, vkt::device_address);
+
+    VkDeviceAddressRangeEXT buffer_address_range = {buffer.Address(), buffer_size};
+
+    VkHostAddressRangeEXT resource_host = {resource_heap_data, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+
+    VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
+    descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_info.data.pAddressRange = &buffer_address_range;
+    vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &resource_host);
+
+    VkBindHeapInfoEXT resource_bind_info = vku::InitStructHelper();
+    resource_bind_info.heapRange = {resource_heap.Address(), total_heap_size};
+    resource_bind_info.reservedRangeOffset = resource_heap_size;
+    resource_bind_info.reservedRangeSize = heap_props.minResourceHeapReservedRange;
+
+    m_command_buffer.Begin();
+    vk::CmdBindResourceHeapEXT(m_command_buffer, &resource_bind_info);
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveShaderObject, IdenticallyDefinedLayouts) {
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+
+    OneOffDescriptorSet descriptor_set1(m_device, {
+                                                      {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                  });
+    OneOffDescriptorSet descriptor_set2(m_device, {
+                                                      {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                  });
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set1.layout_});
+
+    const vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl, &descriptor_set1.layout_.handle());
+    const vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl, &descriptor_set2.layout_.handle());
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0u, 1u, &descriptor_set1.set_, 0u,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+
     m_command_buffer.EndRendering();
     m_command_buffer.End();
 }

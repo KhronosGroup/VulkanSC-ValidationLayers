@@ -65,10 +65,10 @@
             ]
         },
         {
-            "reason": "Not supported in Vulkan SC: deprecation messages",
+            "reason": "Not supported in Vulkan SC: legacy/deprecation messages",
             "cases": [
-                "NegativeDeprecation.*",
-                "PositiveDeprecation.*"
+                "NegativeLegacy.*",
+                "PositiveLegacy.*"
             ]
         },
         {
@@ -130,9 +130,10 @@
                 "PositiveMemory.BindImageMemoryMultiThreaded",
                 "NegativeObjectLifetime.CmdBarrierBufferDestroyed",
                 "NegativeObjectLifetime.CmdBarrierImageDestroyed",
+                "NegativeObjectLifetime.DestroyedImageInImageView",
+                "NegativeObjectLifetime.FramebufferAttachmentMemoryFreed",
                 "NegativeObjectLifetime.Sync2CmdBarrierBufferDestroyed",
                 "NegativeObjectLifetime.Sync2CmdBarrierImageDestroyed",
-                "NegativeObjectLifetime.FramebufferAttachmentMemoryFreed",
 
                 "@Note: Allocates 10000 transient device memory objects unnecessarily",
                 "PositiveSyncObject.WaitTimelineSemThreadRace"
@@ -141,9 +142,9 @@
         {
             "reason": "Not supported in Vulkan SC: vkDestroyQueryPool",
             "cases": [
-                "NegativeObjectLifetime.DescriptorPoolInUseDestroyedSignaled",
+                "NegativeObjectLifetime.DescriptorPoolInUseDestroyed",
                 "NegativeQuery.CmdBufferQueryPoolDestroyed",
-                "NegativeQuery.PoolInUseDestroyedSignaled",
+                "NegativeQuery.PoolInUseDestroyed",
                 "NegativeQuery.DestroyActiveQueryPool",
                 "NegativeQuery.DestroyWithoutQueryPool",
                 "NegativeQuery.HostResetQueryPool"
@@ -263,6 +264,19 @@
             ]
         },
         {
+            "reason": "Not supported in Vulkan SC: VK_EXT_descriptor_heap",
+            "cases": [
+                "NegativeBuffer.DescriptorHeapSparse",
+                "NegativeBuffer.DescriptorHeapProtected"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_KHR_maintenance10",
+            "cases": [
+                "NegativeCommand.ResolveImage2DepthImageNoMaintenance10"
+            ]
+        },
+        {
             "reason": "Not supported in Vulkan SC: miscellaneous Vulkan-only extensions",
             "cases": [
                 "NegativeInstanceless.ExtensionStructsWithoutExtensions",
@@ -275,6 +289,13 @@
             "reason": "TODO: This test is disabled because the sync validation layer crashes on cleanup if the case is skipped mid-run",
             "cases": [
                 "NegativeSyncVal.QSBufferEvents"
+            ]
+        },
+        {
+            "reason": "TODO: These tests fail due to some SPIR-V Tools bugs and do not happen to show up upstream as they do spec constant folding and other optimizations on SPIR-V before validation, unlike our device-create-time SPIR-V validation",
+            "cases": [
+                "NegativeSubpass.InputAttachmentMissingSpecConstant",
+                "PositiveSubpass.InputAttachmentMissingSpecConstant"
             ]
         }
     ],
@@ -326,7 +347,6 @@
                 "NegativeCommand.DrawTimeImageViewTypeMismatchWithPipelineFunction",
                 "NegativeCommand.FilterCubicSamplerInCmdDraw",
                 "NegativeDescriptorIndexing.VariableDescriptorCountBuffer",
-                "NegativeDescriptors.BindInvalidPipelineLayout",
                 "NegativeDescriptors.CmdBufferDescriptorSetBufferDestroyed",
                 "NegativeDescriptors.CmdBufferDescriptorSetImageSamplerDestroyed",
                 "NegativeDescriptors.CompatiblePushConstantRanges",
@@ -375,16 +395,17 @@
                 "NegativeImageLayout.MultiArrayLayers",
                 "NegativeImageLayout.MultipleCommandDispatches",
                 "NegativeMultiview.UnboundResourcesAfterBeginRenderPassAndNextSubpass",
-                "NegativeObjectLifetime.BufferViewInUseDestroyedSignaled",
+                "NegativeObjectLifetime.BufferViewInUseDestroyed",
                 "NegativeObjectLifetime.CmdBufferBufferViewDestroyed",
-                "NegativeObjectLifetime.ImageViewInUseDestroyedSignaled",
-                "NegativeObjectLifetime.SamplerInUseDestroyedSignaled",
+                "NegativeObjectLifetime.ImageViewInUseDestroyed",
+                "NegativeObjectLifetime.SamplerInUseDestroyed",
                 "NegativeObjectLifetime.DescriptorSetStorageBufferDestroyed",
                 "NegativePipeline.DescriptorSetNotBound",
                 "NegativePipeline.NotCompatibleForSet",
                 "NegativePipeline.ShaderDrawParametersNotEnabled11",
                 "NegativePipelineLayout.DescriptorNotAccessible",
                 "NegativePipelineLayout.DescriptorTypeMismatch",
+                "NegativePipelineLayout.DescriptorTypeMismatchBufferBlock",
                 "NegativePipelineLayout.DescriptorTypeMismatchCompute",
                 "NegativePipelineLayout.DescriptorTypeMismatchNonCombinedImageSampler",
                 "NegativePipelineLayout.MissingDescriptor",
@@ -441,12 +462,15 @@
                 "NegativeShaderPushConstants.MultipleEntryPoint",
                 "NegativeShaderPushConstants.NotDeclared",
                 "NegativeShaderPushConstants.NotInLayout",
+                "NegativeShaderPushConstants.SpecConstantSize",
                 "NegativeShaderPushConstants.StructOf8Bit",
                 "NegativeShaderSpirv.Bitwise32bitMaintenance9",
                 "NegativeShaderSpirv.ConservativeRasterizationPostDepthCoverage",
                 "NegativeShaderSpirv.DemoteToHelperInvocation",
                 "NegativeShaderSpirv.DescriptorCountConstant",
                 "NegativeShaderSpirv.DescriptorCountConstantRuntimeArray",
+                "NegativeShaderSpirv.DescriptorCountSpecConstant",
+                "NegativeShaderSpirv.DescriptorCountSpecConstantOp",
                 "NegativeShaderSpirv.DeviceMemoryScope",
                 "NegativeShaderSpirv.DeviceMemoryScopeDebugInfo",
                 "NegativeShaderSpirv.DynamicUniformIndex",
@@ -469,6 +493,7 @@
                 "NegativeShaderSpirv.Storage8and16bitCapability",
                 "NegativeShaderSpirv.Storage8and16bitFeatures",
                 "NegativeShaderSpirv.ShaderFloatControl",
+                "NegativeShaderSpirv.ShaderUniformBufferUnsizedArray",
                 "NegativeShaderSpirv.ScalarBlockLayoutShaderCache",
                 "NegativeShaderStorageImage.*",
                 "NegativeShaderStorageTexel.*",
@@ -476,14 +501,14 @@
                 "NegativeSubgroup.Properties",
                 "NegativeSubpass.InputAttachmentMissing",
                 "NegativeSubpass.InputAttachmentMissingArray",
+                "NegativeSubpass.InputAttachmentMissingArray2",
+                "NegativeSubpass.InputAttachmentMissingSpecConstant2",
                 "NegativeSubpass.InputAttachmentSharingVariable",
                 "NegativeSubpass.SubpassInputNotBoundDescriptorSet",
                 "NegativeSubpass.SubpassInputWithoutFormat",
                 "NegativeSyncVal.CmdDispatchBase",
                 "NegativeSyncVal.CopyVsShaderDescriptorAccess",
                 "NegativeSyncVal.ExternalDependencyDoesNotSyncLayoutTransition",
-                "NegativeSyncVal.InputAttachmentReadHazard",
-                "NegativeSyncVal.InputAttachmentReadHazard2",
                 "NegativeSyncVal.RenderPassAsyncHazard",
                 "NegativeSyncVal.SampledImageDescriptorHazard",
                 "NegativeSyncVal.StageAccessExpansion",
@@ -494,6 +519,9 @@
                 "NegativeSyncVal.TexelBufferDescriptorHazard",
                 "NegativeSyncVal.UniformBufferDescriptorHazard",
                 "PositiveSyncVal.AtomicAccessFromTwoSubmits2",
+                "NegativeSyncValRenderPass.InputAttachmentRAW",
+                "NegativeSyncValRenderPass.InputAttachmentReadAndResolveWrite",
+                "NegativeSyncValRenderPass.InputAttachmentWAR",
                 "NegativeSyncValReporting.ReportDescriptorBuffer_SubmitTime",
                 "NegativeSyncValReporting.ReportDescriptorBuffer2_SubmitTime",
                 "NegativeSyncValReporting.ReportDescriptorBuffer3_SubmitTime",
@@ -510,6 +538,8 @@
                 "NegativeVertexInput.AttributeStructTypeSecondLocation",
                 "NegativeVertexInput.AttributeTypeMismatch",
                 "NegativeVertexInput.AttributeTypeMismatchDynamic",
+                "NegativeVertexInput.MatrixArrayComponentNotConsumed",
+                "NegativeVertexInput.MatrixComponentNotConsumed",
                 "NegativeVertexInput.NoBoundVertexBuffer",
                 "NegativeVertexInput.ResetCmdSetVertexInput",
                 "NegativeVertexInput.VertexInputRebinding",
@@ -518,8 +548,10 @@
                 "NegativeVertexInput.VertextBindingMultipleLocations",
                 "NegativeVertexInput.VertextBindingNonLinear",
                 "NegativeYcbcr.ConstOffset",
+                "NegativeYcbcr.DescriptorIndexCombinedSampledImage",
                 "NegativeYcbcr.TexelFetch",
                 "NegativeYcbcr.TexelFetchArray",
+                "NegativeYcbcr.TexelFetchDestroyedSampler",
                 "NegativeYcbcr.TexelFetchIndexed",
                 "NegativeYcbcr.TexelFetchNonArrayPartiallyBound",
                 "NegativeYcbcr.TextureGather"
@@ -544,6 +576,15 @@
             ],
             "patch": [
                 "ObjectReservation().descriptorSetRequestCount = 10000"
+            ]
+        },
+        {
+            "reason": "This test case creates 10000 pipeline layouts",
+            "cases": [
+                "PositiveThreading.ObjectTrackerPoisoning"
+            ],
+            "patch": [
+                "ObjectReservation().pipelineLayoutRequestCount = 10000"
             ]
         }
     ]

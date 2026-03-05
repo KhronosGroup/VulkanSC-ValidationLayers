@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+/* Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
@@ -31,6 +31,7 @@
 #include "state_tracker/pipeline_state.h"
 #include "state_tracker/query_state.h"
 #include "state_tracker/render_pass_state.h"
+#include "state_tracker/shader_object_state.h"
 
 // Location to add per-queue submit debug info if built with -D DEBUG_CAPTURE_KEYBOARD=ON
 void CoreChecks::DebugCapture() {}
@@ -63,6 +64,12 @@ void CommandBufferSubState::Begin(const VkCommandBufferBeginInfo& begin_info) {
                                                  p_viewport_depths + p_inherited_viewport_scissor_info->viewportDepthCount);
             }
         }
+
+        if (auto custom_resolve_ci =
+                vku::FindStructInPNextChain<VkCustomResolveCreateInfoEXT>(begin_info.pInheritanceInfo->pNext)) {
+            custom_resolve.inherited_struct = true;
+            custom_resolve.inherited_resolve = custom_resolve_ci->customResolve;
+        }
     }
 }
 
@@ -94,39 +101,80 @@ void CommandBufferSubState::UpdateActionPipelineState(LastBound& last_bound, con
     }
 
     if (last_bound.desc_set_pipeline_layout) {
-        for (const auto& [set_index, binding_req_map] : pipeline_state.active_slots) {
-            if (set_index >= last_bound.ds_slots.size()) {
-                continue;
-            }
-            auto& ds_slot = last_bound.ds_slots[set_index];
-            // Pull the set node
-            auto& descriptor_set = ds_slot.ds_state;
-            if (!descriptor_set) {
-                continue;
-            }
+        UpdateActiveSlotsState(last_bound, pipeline_state.active_slots);
+    }
+}
 
-            // For the "bindless" style resource usage with many descriptors, need to optimize command <-> descriptor binding
-
-            // We can skip updating the state if "nothing" has changed since the last validation.
-            // See CoreChecks::ValidateActionState for more details.
-            const bool need_update =  // Update if descriptor set (or contents) has changed
-                ds_slot.validated_set != descriptor_set.get() ||
-                ds_slot.validated_set_change_count != descriptor_set->GetChangeCount() ||
-                (!base.dev_data.disabled[image_layout_validation] &&
-                 ds_slot.validated_set_image_layout_change_count != base.image_layout_change_count);
-            if (need_update) {
-                if (!base.dev_data.disabled[command_buffer_state] && !descriptor_set->IsPushDescriptor()) {
-                    base.AddChild(descriptor_set);
-                }
-
-                // Bind this set and its active descriptor resources to the command buffer
-                descriptor_set->UpdateImageLayoutDrawStates(&base.dev_data, base, binding_req_map);
-
-                ds_slot.validated_set = descriptor_set.get();
-                ds_slot.validated_set_change_count = descriptor_set->GetChangeCount();
-                ds_slot.validated_set_image_layout_change_count = base.image_layout_change_count;
+void CommandBufferSubState::UpdateActionShaderObjectState(LastBound& last_bound) {
+    if (last_bound.desc_set_pipeline_layout) {
+        for (uint32_t stage = 0; stage < kShaderObjectStageCount; ++stage) {
+            const auto shader_object = last_bound.GetShaderObjectState(static_cast<ShaderObjectStage>(stage));
+            if (shader_object) {
+                UpdateActiveSlotsState(last_bound, shader_object->active_slots);
             }
         }
+    }
+}
+
+void CommandBufferSubState::UpdateActiveSlotsState(LastBound& last_bound, const ActiveSlotMap& active_slots) {
+    for (const auto& [set_index, binding_req_map] : active_slots) {
+        if (set_index >= last_bound.ds_slots.size()) {
+            continue;
+        }
+        auto& ds_slot = last_bound.ds_slots[set_index];
+        // Pull the set node
+        auto& descriptor_set = ds_slot.ds_state;
+        if (!descriptor_set) {
+            continue;
+        }
+
+        // For the "bindless" style resource usage with many descriptors, need to optimize command <-> descriptor binding
+
+        // We can skip updating the state if "nothing" has changed since the last validation.
+        // See CoreChecks::ValidateActionState for more details.
+        const bool need_update =  // Update if descriptor set (or contents) has changed
+            ds_slot.validated_set != descriptor_set.get() ||
+            ds_slot.validated_set_change_count != descriptor_set->GetChangeCount() ||
+            (!base.dev_data.disabled[image_layout_validation] &&
+             ds_slot.validated_set_image_layout_change_count != base.image_layout_change_count);
+        if (need_update) {
+            if (!base.dev_data.disabled[command_buffer_state] && !descriptor_set->IsPushDescriptor()) {
+                base.AddChild(descriptor_set);
+            }
+
+            // Bind this set and its active descriptor resources to the command buffer
+            descriptor_set->UpdateImageLayoutDrawStates(&base.dev_data, base, binding_req_map);
+
+            ds_slot.validated_set = descriptor_set.get();
+            ds_slot.validated_set_change_count = descriptor_set->GetChangeCount();
+            ds_slot.validated_set_image_layout_change_count = base.image_layout_change_count;
+        }
+    }
+}
+
+void CommandBufferSubState::UpdateCustomResolve(LastBound& last_bound) {
+    // we only need to record the first time custom resolved is used to compare to future usages
+    if (!custom_resolve.started && !custom_resolve.used) {
+        return;
+    }
+    custom_resolve.used = true;
+
+    const VkCustomResolveCreateInfoEXT* create_info = nullptr;
+    if (last_bound.cb_state.IsSecondary()) {
+        create_info = vku::FindStructInPNextChain<VkCustomResolveCreateInfoEXT>(last_bound.cb_state.inheritance_info.pNext);
+    } else if (last_bound.pipeline_state && last_bound.pipeline_state->fragment_output_state) {
+        // Will get normal and GPL Fragment Output pipelines
+        create_info = vku::FindStructInPNextChain<VkCustomResolveCreateInfoEXT>(
+            last_bound.pipeline_state->fragment_output_state->parent.GetCreateInfoPNext());
+    }
+
+    if (create_info) {
+        custom_resolve.color_formats.reserve(create_info->colorAttachmentCount);
+        for (uint32_t i = 0; i < create_info->colorAttachmentCount; i++) {
+            custom_resolve.color_formats.emplace_back(create_info->pColorAttachmentFormats[i]);
+        }
+        custom_resolve.depth_format = create_info->depthAttachmentFormat;
+        custom_resolve.stencil_format = create_info->stencilAttachmentFormat;
     }
 }
 
@@ -134,7 +182,10 @@ void CommandBufferSubState::UpdateActionPipelineState(LastBound& last_bound, con
 void CommandBufferSubState::RecordActionCommand(LastBound& last_bound, const Location&) {
     if (last_bound.pipeline_state) {
         UpdateActionPipelineState(last_bound, *last_bound.pipeline_state);
+    } else {
+        UpdateActionShaderObjectState(last_bound);
     }
+    UpdateCustomResolve(last_bound);
 }
 
 void CommandBufferSubState::RecordBindPipeline(VkPipelineBindPoint bind_point, vvl::Pipeline& pipeline) {
@@ -192,6 +243,11 @@ void CommandBufferSubState::RecordNextSubpass(const VkSubpassBeginInfo&, const V
     validator.TransitionSubpassLayouts(base, *base.active_render_pass, base.GetActiveSubpass());
 }
 
+void CommandBufferSubState::RecordBeginRendering(const VkRenderingInfo& rendering_info, const Location& loc) {
+    custom_resolve.started = false;
+    custom_resolve.used = false;
+}
+
 void CommandBufferSubState::RecordBeginRenderPass(const VkRenderPassBeginInfo& render_pass_begin, const VkSubpassBeginInfo&,
                                                   const Location&) {
     ASSERT_AND_RETURN(base.active_render_pass);
@@ -220,6 +276,8 @@ void CommandBufferSubState::RecordEndRendering(const VkRenderingEndInfoEXT* pRen
 void CommandBufferSubState::RecordEndRenderPass(const VkSubpassEndInfo*, const Location&) {
     validator.TransitionFinalSubpassLayouts(base);
 }
+
+void CommandBufferSubState::RecordBeginCustomResolve() { custom_resolve.started = true; }
 
 template <typename RegionType>
 void CommandBufferSubState::RecordCopyBufferCommon(vvl::Buffer& src_buffer_state, vvl::Buffer& dst_buffer_state,
@@ -778,11 +836,12 @@ void CommandBufferSubState::RecordBeginVideoCoding(vvl::VideoSession& vs_state, 
                 for (const auto& slot : expected_slots) {
                     if (!dev_state.IsSlotActive(slot.index)) {
                         skip |= validator.LogError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239", vs_state->Handle(), loc,
-                                                   "DPB slot index %d is not active in %s.", slot.index,
+                                                   "DPB slot index %" PRIu32 " is not active in %s.", slot.index,
                                                    validator.FormatHandle(*vs_state).c_str());
                     } else if (slot.resource && !dev_state.IsSlotPicture(slot.index, slot.resource)) {
                         skip |= validator.LogError("VUID-vkCmdBeginVideoCodingKHR-pPictureResource-07265", vs_state->Handle(), loc,
-                                                   "DPB slot index %d of %s is not currently associated with the specified "
+                                                   "DPB slot index %" PRIu32
+                                                   " of %s is not currently associated with the specified "
                                                    "video picture resource: %s, layer %" PRIu32 ", offset (%s), extent (%s).",
                                                    slot.index, validator.FormatHandle(*vs_state).c_str(),
                                                    validator.FormatHandle(slot.resource.image_state->Handle()).c_str(),
@@ -863,7 +922,8 @@ void CommandBufferSubState::RecordDecodeVideo(vvl::VideoSession& vs_state, const
                 const auto log_picture_kind_error = [&](const vvl::VideoReferenceSlot& slot, const char* vuid,
                                                         const char* picture_kind) -> bool {
                     return validator.LogError(vuid, vs_state->Handle(), loc,
-                                              "DPB slot index %d of %s does not currently contain a %s with the specified "
+                                              "DPB slot index %" PRIu32
+                                              " of %s does not currently contain a %s with the specified "
                                               "video picture resource: %s, layer %" PRIu32 ", offset (%s), extent (%s).",
                                               slot.index, validator.FormatHandle(*vs_state).c_str(), picture_kind,
                                               validator.FormatHandle(slot.resource.image_state->Handle()).c_str(),
@@ -962,6 +1022,15 @@ void CommandBufferSubState::ResetCBState() {
 
     // VK_EXT_nested_command_buffer
     nesting_level = 0;
+
+    // VK_EXT_custom_resolve
+    custom_resolve.started = false;
+    custom_resolve.used = false;
+    custom_resolve.inherited_struct = false;
+    custom_resolve.inherited_resolve = false;
+    custom_resolve.color_formats.clear();
+    custom_resolve.depth_format = VK_FORMAT_UNDEFINED;
+    custom_resolve.stencil_format = VK_FORMAT_UNDEFINED;
 
     // Submit time validation
     queue_submit_functions.clear();

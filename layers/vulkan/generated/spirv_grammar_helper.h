@@ -35,7 +35,7 @@ const char* string_SpvStorageClass(uint32_t storage_class);
 const char* string_SpvExecutionModel(uint32_t execution_model);
 const char* string_SpvExecutionMode(uint32_t execution_mode);
 const char* string_SpvDecoration(uint32_t decoration);
-const char* string_SpvBuiltIn(uint32_t built_in);
+const char* string_SpvBuiltIn(spv::BuiltIn built_in);
 const char* string_SpvDim(uint32_t dim);
 std::string string_SpvCooperativeMatrixOperands(uint32_t mask);
 
@@ -324,6 +324,9 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpReadClockKHR:
         case spv::OpGroupNonUniformQuadAllKHR:
         case spv::OpGroupNonUniformQuadAnyKHR:
+        case spv::OpBufferPointerEXT:
+        case spv::OpUntypedImageTexelPointerEXT:
+        case spv::OpConstantSizeOfEXT:
         case spv::OpHitObjectGetWorldToObjectNV:
         case spv::OpHitObjectGetObjectToWorldNV:
         case spv::OpHitObjectGetObjectRayDirectionNV:
@@ -347,14 +350,35 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpCooperativeVectorMatrixMulNV:
         case spv::OpCooperativeVectorMatrixMulAddNV:
         case spv::OpCooperativeMatrixConvertNV:
-        case spv::OpGroupNonUniformPartitionNV:
+        case spv::OpGroupNonUniformPartitionEXT:
         case spv::OpFetchMicroTriangleVertexPositionNV:
         case spv::OpFetchMicroTriangleVertexBarycentricNV:
         case spv::OpCooperativeVectorLoadNV:
+        case spv::OpHitObjectGetIntersectionTriangleVertexPositionsEXT:
+        case spv::OpHitObjectGetRayFlagsEXT:
+        case spv::OpHitObjectGetCurrentTimeEXT:
+        case spv::OpHitObjectGetHitKindEXT:
+        case spv::OpHitObjectGetPrimitiveIndexEXT:
+        case spv::OpHitObjectGetGeometryIndexEXT:
+        case spv::OpHitObjectGetInstanceIdEXT:
+        case spv::OpHitObjectGetInstanceCustomIndexEXT:
+        case spv::OpHitObjectGetObjectRayOriginEXT:
+        case spv::OpHitObjectGetObjectRayDirectionEXT:
+        case spv::OpHitObjectGetWorldRayDirectionEXT:
+        case spv::OpHitObjectGetWorldRayOriginEXT:
+        case spv::OpHitObjectGetObjectToWorldEXT:
+        case spv::OpHitObjectGetWorldToObjectEXT:
+        case spv::OpHitObjectGetRayTMaxEXT:
         case spv::OpReportIntersectionKHR:
         case spv::OpRayQueryGetIntersectionTriangleVertexPositionsKHR:
         case spv::OpRayQueryGetIntersectionClusterIdNV:
         case spv::OpHitObjectGetClusterIdNV:
+        case spv::OpHitObjectGetRayTMinEXT:
+        case spv::OpHitObjectGetShaderBindingTableRecordIndexEXT:
+        case spv::OpHitObjectGetShaderRecordBufferHandleEXT:
+        case spv::OpHitObjectIsEmptyEXT:
+        case spv::OpHitObjectIsHitEXT:
+        case spv::OpHitObjectIsMissEXT:
         case spv::OpCooperativeMatrixLoadNV:
         case spv::OpCooperativeMatrixMulAddNV:
         case spv::OpCooperativeMatrixLengthNV:
@@ -431,8 +455,6 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpRayQueryGetIntersectionWorldToObjectKHR:
         case spv::OpAtomicFAddEXT:
         case spv::OpArithmeticFenceEXT:
-        case spv::OpTaskSequenceCreateINTEL:
-        case spv::OpTaskSequenceGetINTEL:
         case spv::OpSubgroupMatrixMultiplyAccumulateINTEL:
         case spv::OpBitwiseFunctionINTEL:
         case spv::OpUntypedVariableLengthArrayINTEL:
@@ -772,6 +794,10 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpReadClockKHR:
         case spv::OpGroupNonUniformQuadAllKHR:
         case spv::OpGroupNonUniformQuadAnyKHR:
+        case spv::OpTypeBufferEXT:
+        case spv::OpBufferPointerEXT:
+        case spv::OpUntypedImageTexelPointerEXT:
+        case spv::OpConstantSizeOfEXT:
         case spv::OpHitObjectGetWorldToObjectNV:
         case spv::OpHitObjectGetObjectToWorldNV:
         case spv::OpHitObjectGetObjectRayDirectionNV:
@@ -793,19 +819,41 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpHitObjectIsMissNV:
         case spv::OpTypeHitObjectNV:
         case spv::OpImageSampleFootprintNV:
-        case spv::OpTypeCooperativeVectorNV:
+        case spv::OpTypeVectorIdEXT:
         case spv::OpCooperativeVectorMatrixMulNV:
         case spv::OpCooperativeVectorMatrixMulAddNV:
         case spv::OpCooperativeMatrixConvertNV:
-        case spv::OpGroupNonUniformPartitionNV:
+        case spv::OpGroupNonUniformPartitionEXT:
         case spv::OpFetchMicroTriangleVertexPositionNV:
         case spv::OpFetchMicroTriangleVertexBarycentricNV:
         case spv::OpCooperativeVectorLoadNV:
+        case spv::OpHitObjectGetIntersectionTriangleVertexPositionsEXT:
+        case spv::OpHitObjectGetRayFlagsEXT:
+        case spv::OpTypeHitObjectEXT:
+        case spv::OpHitObjectGetCurrentTimeEXT:
+        case spv::OpHitObjectGetHitKindEXT:
+        case spv::OpHitObjectGetPrimitiveIndexEXT:
+        case spv::OpHitObjectGetGeometryIndexEXT:
+        case spv::OpHitObjectGetInstanceIdEXT:
+        case spv::OpHitObjectGetInstanceCustomIndexEXT:
+        case spv::OpHitObjectGetObjectRayOriginEXT:
+        case spv::OpHitObjectGetObjectRayDirectionEXT:
+        case spv::OpHitObjectGetWorldRayDirectionEXT:
+        case spv::OpHitObjectGetWorldRayOriginEXT:
+        case spv::OpHitObjectGetObjectToWorldEXT:
+        case spv::OpHitObjectGetWorldToObjectEXT:
+        case spv::OpHitObjectGetRayTMaxEXT:
         case spv::OpReportIntersectionKHR:
         case spv::OpRayQueryGetIntersectionTriangleVertexPositionsKHR:
         case spv::OpTypeAccelerationStructureKHR:
         case spv::OpRayQueryGetIntersectionClusterIdNV:
         case spv::OpHitObjectGetClusterIdNV:
+        case spv::OpHitObjectGetRayTMinEXT:
+        case spv::OpHitObjectGetShaderBindingTableRecordIndexEXT:
+        case spv::OpHitObjectGetShaderRecordBufferHandleEXT:
+        case spv::OpHitObjectIsEmptyEXT:
+        case spv::OpHitObjectIsHitEXT:
+        case spv::OpHitObjectIsMissEXT:
         case spv::OpTypeCooperativeMatrixNV:
         case spv::OpCooperativeMatrixLoadNV:
         case spv::OpCooperativeMatrixMulAddNV:
@@ -885,9 +933,6 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpRayQueryGetIntersectionWorldToObjectKHR:
         case spv::OpAtomicFAddEXT:
         case spv::OpArithmeticFenceEXT:
-        case spv::OpTaskSequenceCreateINTEL:
-        case spv::OpTaskSequenceGetINTEL:
-        case spv::OpTypeTaskSequenceINTEL:
         case spv::OpSubgroupMatrixMultiplyAccumulateINTEL:
         case spv::OpBitwiseFunctionINTEL:
         case spv::OpUntypedVariableLengthArrayINTEL:
@@ -988,7 +1033,7 @@ static constexpr bool GroupOperation(uint32_t opcode) {
         case spv::OpGroupNonUniformQuadSwap:
         case spv::OpGroupNonUniformQuadAllKHR:
         case spv::OpGroupNonUniformQuadAnyKHR:
-        case spv::OpGroupNonUniformPartitionNV:
+        case spv::OpGroupNonUniformPartitionEXT:
             return true;
         default:
             return false;
@@ -1292,13 +1337,14 @@ enum class SpvType {
     kUntypedPointerKHR,
     kCooperativeMatrixKHR,
     kRayQueryKHR,
+    kBufferEXT,
     kHitObjectNV,
-    kCooperativeVectorNV,
+    kVectorIdEXT,
+    kHitObjectEXT,
     kAccelerationStructureKHR,
     kCooperativeMatrixNV,
     kTensorLayoutNV,
     kTensorViewNV,
-    kTaskSequenceINTEL,
 };
 
 static constexpr SpvType GetSpvType(uint32_t opcode) {
@@ -1343,10 +1389,14 @@ static constexpr SpvType GetSpvType(uint32_t opcode) {
             return SpvType::kCooperativeMatrixKHR;
         case spv::OpTypeRayQueryKHR:
             return SpvType::kRayQueryKHR;
+        case spv::OpTypeBufferEXT:
+            return SpvType::kBufferEXT;
         case spv::OpTypeHitObjectNV:
             return SpvType::kHitObjectNV;
-        case spv::OpTypeCooperativeVectorNV:
-            return SpvType::kCooperativeVectorNV;
+        case spv::OpTypeVectorIdEXT:
+            return SpvType::kVectorIdEXT;
+        case spv::OpTypeHitObjectEXT:
+            return SpvType::kHitObjectEXT;
         case spv::OpTypeAccelerationStructureKHR:
             return SpvType::kAccelerationStructureKHR;
         case spv::OpTypeCooperativeMatrixNV:
@@ -1355,8 +1405,6 @@ static constexpr SpvType GetSpvType(uint32_t opcode) {
             return SpvType::kTensorLayoutNV;
         case spv::OpTypeTensorViewNV:
             return SpvType::kTensorViewNV;
-        case spv::OpTypeTaskSequenceINTEL:
-            return SpvType::kTaskSequenceINTEL;
         default:
             return SpvType::Empty;
     }

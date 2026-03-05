@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# Copyright (c) 2015-2025 The Khronos Group Inc.
-# Copyright (c) 2015-2025 Valve Corporation
-# Copyright (c) 2015-2025 LunarG, Inc.
-# Copyright (c) 2015-2025 Google Inc.
-# Copyright (c) 2023-2025 RasterGrid Kft.
+# Copyright (c) 2015-2026 The Khronos Group Inc.
+# Copyright (c) 2015-2026 Valve Corporation
+# Copyright (c) 2015-2026 LunarG, Inc.
+# Copyright (c) 2015-2026 Google Inc.
+# Copyright (c) 2023-2026 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -167,7 +167,8 @@ oversized_vus = {
     'VUID-RuntimeSpirv-OpTypeCooperativeMatrixMulAddNV-10059' : 'For OpTypeCooperativeMatrixMulAddNV, the operands must match a supported VkCooperativeMatrixPropertiesNV',
     'VUID-RuntimeSpirv-cooperativeMatrixFlexibleDimensions-10165' : 'For OpTypeCooperativeMatrixKHR, if the cooperativeMatrixFlexibleDimensions feature is enabled, the component type, scope, number of rows, and number of columns must match either one of the matrices in one of the supported VkCooperativeMatrixPropertiesKHR or VkCooperativeMatrixFlexibleDimensionsPropertiesNV',
     'VUID-RuntimeSpirv-cooperativeMatrixFlexibleDimensions-10166' : 'For OpCooperativeMatrixMulAddKHR, if the cooperativeMatrixFlexibleDimensions feature is enabled, the operands must match either one of the supported VkCooperativeMatrixPropertiesKHR or VkCooperativeMatrixFlexibleDimensionsPropertiesNV',
-    'VUID-RuntimeSpirv-pNext-09923' : 'The data graph pipeline must satisfies all constraints',
+    'VUID-RuntimeSpirv-pNext-09921' : 'The pConstants in the data graph pipeline must satisfy all constraints',
+    'VUID-RuntimeSpirv-pNext-09923' : 'The pResourceInfos in the data graph pipeline must satisfy all constraints',
 }
 
 def GenerateSpecErrorMessage(api : str, valid_usage_json : str, out_file : str):
@@ -181,8 +182,8 @@ def GenerateSpecErrorMessage(api : str, valid_usage_json : str, out_file : str):
 
 /***************************************************************************
  *
- * Copyright (c) 2016-2025 Google Inc.
- * Copyright (c) 2016-2025 LunarG, Inc.
+ * Copyright (c) 2016-2026 Google Inc.
+ * Copyright (c) 2016-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

@@ -82,7 +82,7 @@ static inline APIVersion NormalizeApiVersion(APIVersion) { return VKSC_API_VERSI
 
 // Convert integer API version to a string
 static inline std::string StringAPIVersion(APIVersion version) {
-    std::stringstream version_name;
+    std::ostringstream version_name;
     if (!version.Valid()) {
         return "<unrecognized>";
     }

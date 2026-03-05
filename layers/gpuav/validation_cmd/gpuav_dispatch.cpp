@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2025 The Khronos Group Inc.
- * Copyright (c) 2018-2025 Valve Corporation
- * Copyright (c) 2018-2025 LunarG, Inc.
+/* Copyright (c) 2018-2026 The Khronos Group Inc.
+ * Copyright (c) 2018-2026 Valve Corporation
+ * Copyright (c) 2018-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,20 +35,14 @@ struct DispatchValidationShader {
     valpipe::BoundStorageBuffer indirect_buffer_binding = {glsl::kPreDispatchBinding_DispatchIndirectBuffer};
 
     static std::vector<VkDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() {
-        std::vector<VkDescriptorSetLayoutBinding> bindings = {
-            {glsl::kPreDispatchBinding_DispatchIndirectBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT,
-             nullptr},  // indirect buffer
-
-        };
-
-        return bindings;
+        return {{glsl::kPreDispatchBinding_DispatchIndirectBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                 VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
     }
 
-    std::vector<VkWriteDescriptorSet> GetDescriptorWrites(VkDescriptorSet desc_set) const {
+    std::vector<VkWriteDescriptorSet> GetDescriptorWrites() const {
         std::vector<VkWriteDescriptorSet> desc_writes(1);
 
         desc_writes[0] = vku::InitStructHelper();
-        desc_writes[0].dstSet = desc_set;
         desc_writes[0].dstBinding = indirect_buffer_binding.binding;
         desc_writes[0].dstArrayElement = 0;
         desc_writes[0].descriptorCount = 1;
@@ -65,13 +59,13 @@ void DispatchIndirect(Validator &gpuav, const Location &loc, CommandBufferSubSta
         return;
     }
 
-    ValidationCommandsCommon &val_cmd_common =
-        cb_state.shared_resources_cache.GetOrCreate<ValidationCommandsCommon>(gpuav, cb_state, loc);
-
+    ValidationCommandsGpuavState &val_cmd_gpuav_state =
+        gpuav.shared_resources_cache.GetOrCreate<ValidationCommandsGpuavState>(gpuav, loc);
     valpipe::ComputePipeline<DispatchValidationShader> &validation_pipeline =
-        gpuav.shared_resources_manager.GetOrCreate<valpipe::ComputePipeline<DispatchValidationShader>>(
-            gpuav, loc, val_cmd_common.error_logging_desc_set_layout_);
+        gpuav.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<DispatchValidationShader>>(
+            gpuav, loc, val_cmd_gpuav_state.error_logging_desc_set_layout_);
     if (!validation_pipeline.valid) {
+        gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create DispatchValidationShader.");
         return;
     }
 
@@ -90,6 +84,7 @@ void DispatchIndirect(Validator &gpuav, const Location &loc, CommandBufferSubSta
 
         if (!BindShaderResources(validation_pipeline, gpuav, cb_state, cb_state.compute_index, cb_state.GetErrorLoggerIndex(),
                                  shader_resources)) {
+            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to GetManagedDescriptorSet in BindShaderResources");
             return;
         }
     }
@@ -107,31 +102,30 @@ void DispatchIndirect(Validator &gpuav, const Location &loc, CommandBufferSubSta
             bool skip = false;
             using namespace glsl;
 
-            const uint32_t error_group = error_record[kHeaderShaderIdErrorOffset] >> kErrorGroupShift;
-            if (error_group != kErrorGroupGpuPreDispatch) {
+            if (GetErrorGroup(error_record) != kErrorGroup_GpuPreDispatch) {
                 return skip;
             }
 
-            const uint32_t error_sub_code = (error_record[kHeaderShaderIdErrorOffset] & kErrorSubCodeMask) >> kErrorSubCodeShift;
+            const uint32_t error_sub_code = GetSubError(error_record);
             switch (error_sub_code) {
-                case kErrorSubCodePreDispatchCountLimitX: {
-                    uint32_t count = error_record[kValCmdErrorPayloadDword_0];
+                case kErrorSubCode_PreDispatch_CountLimitX: {
+                    uint32_t count = error_record[kValCmd_ErrorPayloadDword_0];
                     skip |= gpuav.LogError("VUID-VkDispatchIndirectCommand-x-00417", objlist, loc_with_debug_region,
                                            "Indirect dispatch VkDispatchIndirectCommand::x of %" PRIu32
                                            " would exceed maxComputeWorkGroupCount[0] limit of %" PRIu32 ".",
                                            count, gpuav.phys_dev_props.limits.maxComputeWorkGroupCount[0]);
                     break;
                 }
-                case kErrorSubCodePreDispatchCountLimitY: {
-                    uint32_t count = error_record[kValCmdErrorPayloadDword_0];
+                case kErrorSubCode_PreDispatch_CountLimitY: {
+                    uint32_t count = error_record[kValCmd_ErrorPayloadDword_0];
                     skip |= gpuav.LogError("VUID-VkDispatchIndirectCommand-y-00418", objlist, loc_with_debug_region,
                                            "Indirect dispatch VkDispatchIndirectCommand::y of %" PRIu32
                                            " would exceed maxComputeWorkGroupCount[1] limit of %" PRIu32 ".",
                                            count, gpuav.phys_dev_props.limits.maxComputeWorkGroupCount[1]);
                     break;
                 }
-                case kErrorSubCodePreDispatchCountLimitZ: {
-                    uint32_t count = error_record[kValCmdErrorPayloadDword_0];
+                case kErrorSubCode_PreDispatch_CountLimitZ: {
+                    uint32_t count = error_record[kValCmd_ErrorPayloadDword_0];
                     skip |= gpuav.LogError("VUID-VkDispatchIndirectCommand-z-00419", objlist, loc_with_debug_region,
                                            "Indirect dispatch VkDispatchIndirectCommand::z of %" PRIu32
                                            " would exceed maxComputeWorkGroupCount[2] limit of %" PRIu32 ".",

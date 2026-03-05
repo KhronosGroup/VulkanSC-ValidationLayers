@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -142,7 +142,8 @@ TEST_F(PositiveQuery, BasicQuery) {
     m_command_buffer.End();
 
     m_default_queue->SubmitAndWait(m_command_buffer);
-    uint64_t samples_passed[4];
+    // alignas() for 32-bit machines
+    alignas(8) uint64_t samples_passed[4];
     vk::GetQueryPoolResults(*m_device, query_pool, 0, 2, sizeof(samples_passed), samples_passed, sizeof(uint64_t),
                             VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
 
@@ -165,8 +166,9 @@ TEST_F(PositiveQuery, DestroyQueryPoolBasedOnQueryPoolResults) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    std::array<uint64_t, 4> samples_passed = {};
-    constexpr uint64_t sizeof_samples_passed = samples_passed.size() * sizeof(uint64_t);
+    // alignas() for 32-bit machines
+    alignas(8) uint64_t samples_passed[4];
+    constexpr uint64_t sizeof_samples_passed = 4 * sizeof(uint64_t);
     constexpr VkDeviceSize sample_stride = sizeof(uint64_t);
 
     vkt::Buffer buffer(*m_device, sizeof_samples_passed, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
@@ -198,7 +200,7 @@ TEST_F(PositiveQuery, DestroyQueryPoolBasedOnQueryPoolResults) {
 
     m_default_queue->Submit(m_command_buffer);
 
-    VkResult res = vk::GetQueryPoolResults(*m_device, query_pool, 0, query_count, sizeof_samples_passed, samples_passed.data(),
+    VkResult res = vk::GetQueryPoolResults(*m_device, query_pool, 0, query_count, sizeof_samples_passed, samples_passed,
                                            sample_stride, query_flags);
 
     if (res == VK_SUCCESS) {
@@ -659,4 +661,53 @@ TEST_F(PositiveQuery, QueryPoolResultsStride) {
     uint32_t data_space[2];
     vk::GetQueryPoolResults(*m_device, query_pool, 0u, 1u, sizeof(uint32_t) * 2, data_space, 0u,
                             VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+}
+
+TEST_F(PositiveQuery, SubpassQueries) {
+    RETURN_IF_SKIP(Init());
+
+    VkSubpassDescription subpasses[2] = {};
+
+    VkRenderPassCreateInfo render_pass_ci = vku::InitStructHelper();
+    render_pass_ci.subpassCount = 2u;
+    render_pass_ci.pSubpasses = subpasses;
+
+    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    vkt::Framebuffer framebuffer(*m_device, render_pass, 0u, nullptr);
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2u);
+
+    CreatePipelineHelper pipe1(*this);
+    pipe1.gp_ci_.renderPass = render_pass;
+    pipe1.CreateGraphicsPipeline();
+
+    CreatePipelineHelper pipe2(*this);
+    pipe2.gp_ci_.renderPass = render_pass;
+    pipe2.gp_ci_.subpass = 1;
+    pipe2.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 1u);
+
+    VkRenderPassBeginInfo render_pass_bi = vku::InitStructHelper();
+    render_pass_bi.renderPass = render_pass;
+    render_pass_bi.framebuffer = framebuffer;
+    render_pass_bi.renderArea = {{0, 0}, {32u, 32u}};
+
+    m_command_buffer.BeginRenderPass(render_pass_bi);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1);
+
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
+
+    vk::CmdNextSubpass(m_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2);
+
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 1u, 0u);
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 1u);
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

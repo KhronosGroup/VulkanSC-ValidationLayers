@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (c) 2015-2025 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -360,7 +360,7 @@ TEST_F(PositiveDynamicRenderingLocalRead, LocationsInfoNullAttachments) {
 
     VkRenderingAttachmentInfo attachment;
     attachment = vku::InitStructHelper();
-    attachment.imageView = image_view.handle();
+    attachment.imageView = image_view;
     attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -372,13 +372,13 @@ TEST_F(PositiveDynamicRenderingLocalRead, LocationsInfoNullAttachments) {
     rendering_info.pColorAttachments = &attachment;
 
     m_command_buffer.Begin();
-    vk::CmdBeginRenderingKHR(m_command_buffer.handle(), &rendering_info);
+    vk::CmdBeginRenderingKHR(m_command_buffer, &rendering_info);
 
     VkRenderingAttachmentLocationInfo location_info = vku::InitStructHelper();
     location_info.colorAttachmentCount = 1u;
-    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &location_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &location_info);
 
-    vk::CmdEndRenderingKHR(m_command_buffer.handle());
+    vk::CmdEndRenderingKHR(m_command_buffer);
     m_command_buffer.End();
 }
 
@@ -484,4 +484,146 @@ TEST_F(PositiveDynamicRenderingLocalRead, GPL) {
     vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer, &locations_info);
     vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer, &inputs_info);
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+}
+
+TEST_F(PositiveDynamicRenderingLocalRead, CmdDrawColorIndexUnusedAttachment) {
+    TEST_DESCRIPTION("Validate that mapping is not applied in CmdDraw call if rendering is not started by vkCmdBeginRendering");
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    VkFormat color_formats[] = {VK_FORMAT_UNDEFINED, VK_FORMAT_UNDEFINED};
+
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 2;
+    pipeline_rendering_info.pColorAttachmentFormats = color_formats;
+
+    std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments(2);
+    VkPipelineColorBlendStateCreateInfo cbi = vku::InitStructHelper();
+    cbi.attachmentCount = 2u;
+    cbi.pAttachments = color_blend_attachments.data();
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
+    pipe.gp_ci_.pColorBlendState = &cbi;
+    pipe.CreateGraphicsPipeline();
+
+    VkRenderingAttachmentInfo color_attachment[2] = {vku::InitStructHelper(), vku::InitStructHelper()};
+    color_attachment[0].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    color_attachment[1].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {32, 32}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 2;
+    rendering_info.pColorAttachments = &color_attachment[0];
+
+    m_command_buffer.BeginRendering(rendering_info);
+
+    uint32_t input_indices[] = {VK_ATTACHMENT_UNUSED, VK_ATTACHMENT_UNUSED};
+
+    VkRenderingInputAttachmentIndexInfo input_attachment_index_info = vku::InitStructHelper();
+    input_attachment_index_info.colorAttachmentCount = 2u;
+    input_attachment_index_info.pColorAttachmentInputIndices = input_indices;
+    vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer, &input_attachment_index_info);
+
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDynamicRenderingLocalRead, InputAttachmentIndexArray) {
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    const char* fs_source = R"glsl(
+        #version 450
+        layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x[2];
+        layout(location=0) out vec4 color;
+        void main() {
+           color = subpassLoad(x[0]);
+        }
+    )glsl";
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    vkt::DescriptorSetLayout descriptor_set(*m_device,
+                                            {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set});
+
+    VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkPipelineRenderingCreateInfo rendering_info = vku::InitStructHelper();
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachmentFormats = &color_format;
+
+    CreatePipelineHelper pipe(*this, &rendering_info);
+    pipe.shader_stages_[1] = fs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pipeline_layout;
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositiveDynamicRenderingLocalRead, InputAttachmentIndexArray2) {
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    if (m_device->Physical().limits_.maxColorAttachments <= 5 ||
+        m_device->Physical().limits_.maxPerStageDescriptorInputAttachments <= 5 ||
+        m_device->Physical().limits_.maxDescriptorSetInputAttachments <= 5) {
+        GTEST_SKIP() << "Can't handle enough input attachments";
+    }
+
+    const char* fs_source = R"glsl(
+        #version 450
+        layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x[2];
+        layout(input_attachment_index=2, set=0, binding=0) uniform subpassInput y;
+        layout(input_attachment_index=3, set=0, binding=0) uniform subpassInput z[2];
+        layout(location=0) out vec4 color;
+        void main() {
+           color = subpassLoad(y) + subpassLoad(x[0]) + subpassLoad(x[1]) + subpassLoad(z[0]) + subpassLoad(z[1]);
+        }
+    )glsl";
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    vkt::DescriptorSetLayout descriptor_set(*m_device,
+                                            {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 5, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set});
+
+    VkFormat color_formats[5] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM,
+                                 VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+    VkPipelineRenderingCreateInfo rendering_info = vku::InitStructHelper();
+    rendering_info.colorAttachmentCount = 5;
+    rendering_info.pColorAttachmentFormats = color_formats;
+
+    std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments(5);
+    VkPipelineColorBlendStateCreateInfo cbi = vku::InitStructHelper();
+    cbi.attachmentCount = 5;
+    cbi.pAttachments = color_blend_attachments.data();
+
+    CreatePipelineHelper pipe(*this, &rendering_info);
+    pipe.shader_stages_[1] = fs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pipeline_layout;
+    pipe.gp_ci_.pColorBlendState = &cbi;
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositiveDynamicRenderingLocalRead, InputAttachmentIndexDepth) {
+    TEST_DESCRIPTION("Use depth attachment as input attachment");
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+
+    const VkFormat depth_format = FindSupportedDepthOnlyFormat(Gpu());
+
+    // Use depth attachment as input attachment 0
+    uint32_t zero = 0;
+    VkRenderingInputAttachmentIndexInfo input_attachment_info = vku::InitStructHelper();
+    input_attachment_info.pDepthInputAttachmentIndex = &zero;
+
+    VkPipelineRenderingCreateInfo pipeline_rendering_info_read = vku::InitStructHelper(&input_attachment_info);
+    pipeline_rendering_info_read.depthAttachmentFormat = depth_format;
+
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentSubpassLoadGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info_read);
+    pipe.ds_ci_ = vku::InitStruct<VkPipelineDepthStencilStateCreateInfo>();
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT};
+    pipe.CreateGraphicsPipeline();
 }

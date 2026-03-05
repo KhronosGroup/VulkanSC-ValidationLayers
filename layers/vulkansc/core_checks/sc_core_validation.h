@@ -164,9 +164,6 @@ class Device : public vvl::sc::DeviceProxy<CoreChecks> {
                                         const ErrorObject& error_obj) const override;
 
     // Validation utility functions overridden for Vulkan SC
-    bool ValidatePipelineShaderStage(const vvl::Pipeline& pipeline, const vku::safe_VkPipelineShaderStageCreateInfo& stage_ci,
-                                     const void* pipeline_ci_pnext, const Location& loc) const override;
-
     bool PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
                                           const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
                                           const ErrorObject& error_obj) const override;

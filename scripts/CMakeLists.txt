@@ -1,5 +1,5 @@
 # ~~~
-# Copyright (c) 2023-2025 LunarG, Inc.
+# Copyright (c) 2023-2026 LunarG, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # limitations under the License.
 # ~~~
 
-option(UPDATE_DEPS "Run update_deps.py for user")
+option(UPDATE_DEPS "Run update_deps.py for user" ON)
 if (UPDATE_DEPS)
     find_package(Python3 REQUIRED QUIET)
 
@@ -31,9 +31,6 @@ if (UPDATE_DEPS)
         list(APPEND update_dep_command "--arch")
         list(APPEND update_dep_command "${CMAKE_GENERATOR_PLATFORM}")
     endif()
-
-    list(APPEND update_dep_command "--pointer_size")
-    list(APPEND update_dep_command "${CMAKE_SIZEOF_VOID_P}")
 
     if (NOT CMAKE_BUILD_TYPE)
         message(WARNING "CMAKE_BUILD_TYPE not set. Using Debug for dependency build type")
@@ -73,6 +70,7 @@ if (UPDATE_DEPS)
         list(APPEND update_dep_command "--skip-existing-install")
     endif()
 
+    # Need to propagate current CMake variables into the builds that update_deps.py executes - so collect all the variable names and use a function to set them all
     list(APPEND cmake_vars "CMAKE_TOOLCHAIN_FILE")
 
     # Avoids manually setting CMAKE_SYSTEM_NAME unless it's needed:

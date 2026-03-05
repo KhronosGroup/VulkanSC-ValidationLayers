@@ -1,9 +1,10 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Copyright (C) 2025 Arm Limited.
+ * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,6 +104,7 @@ bool FormatIsSupported(VkPhysicalDevice gpu, VkFormat format, VkImageTiling tili
 
 // Returns true if format and *all* requested features are available.
 bool FormatFeaturesAreSupported(VkPhysicalDevice gpu, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features);
+bool FormatFeatures2AreSupported(VkPhysicalDevice gpu, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags2 features);
 
 // Small wrapprer around vkGetPhysicalDeviceImageFormatProperties
 VkResult GetImageFormatProps(VkPhysicalDevice gpu, const VkImageCreateInfo &ci, VkImageFormatProperties &out_limits);
@@ -196,6 +198,9 @@ class VkLayerTest : public VkLayerTestBase {
     void CreateRenderPassBeginTest(const VkCommandBuffer command_buffer, const VkRenderPassBeginInfo *begin_info,
                                    bool rp2_supported, const char *rp1_vuid, const char *rp2_vuid);
 
+    VkResolveModeFlagBits FindSupportedDepthResolveMode();
+    VkResolveModeFlagBits FindSupportedStencilResolveMode();
+
   protected:
     void SetTargetApiVersion(APIVersion target_api_version);
     bool LoadDeviceProfileLayer(
@@ -221,8 +226,8 @@ VkPhysicalDeviceProperties2 VkLayerTest::GetPhysicalDeviceProperties2(VkPhysical
 
 class VkBestPracticesLayerTest : public VkLayerTest {
   public:
-    void InitBestPracticesFramework(const char *ValidationChecksToEnable = "");
-    void InitBestPractices(const char *ValidationChecksToEnable = "");
+    void InitBestPracticesFramework(const char* vendor_checks_to_enable = nullptr);
+    void InitBestPractices(const char* vendor_checks_to_enable = nullptr);
 
   protected:
     VkValidationFeatureEnableEXT enables_[1] = {VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT};
@@ -236,6 +241,11 @@ class GpuAVTest : public virtual VkLayerTest {
     VkValidationFeaturesEXT GetGpuAvValidationFeatures();
 };
 
+class GpuAVGpuAVShaderSanitizer : public GpuAVTest {
+  public:
+    void SimpleZeroComputeTest(const char *shader, int source_type, const char *expected_error = nullptr, uint32_t error_count = 1);
+};
+
 class GpuAVBufferDeviceAddressTest : public GpuAVTest {
   public:
     void InitGpuVUBufferDeviceAddress(bool safe_mode = true);
@@ -246,15 +256,38 @@ class GpuAVDescriptorIndexingTest : public GpuAVTest {
     void InitGpuVUDescriptorIndexing(bool safe_mode = true);
 };
 
+class GpuAVMesh : public GpuAVTest {
+  public:
+    void InitBasicMeshAndTask(bool safe_mode = true);
+};
+
 class GpuAVDescriptorClassGeneralBuffer : public GpuAVTest {
   public:
     void ComputeStorageBufferTest(const char *shader, int source_type, VkDeviceSize buffer_size,
                                   const char *expected_error = nullptr, uint32_t error_count = 1);
 };
 
+class GpuAVDescriptorClassGeneralBufferCoopMat : public GpuAVTest {
+  public:
+    void InitCooperativeMatrixKHR(bool safe_mode = true);
+    void BasicComputeTest(const char *shader, int source_type, VkDeviceSize buffer_size, const char *expected_error = nullptr,
+                          uint32_t error_count = 1);
+};
+
+class GpuAVCopyMemoryIndirect : public GpuAVTest {
+  public:
+    void InitGpuAVCopyMemoryIndirect(bool safe_mode = true);
+};
+
 class GpuAVRayQueryTest : public GpuAVTest {
   public:
     void InitGpuAVRayQuery(std::vector<VkLayerSettingEXT> layer_settings = {});
+};
+
+class GpuAVRayHitObjectTest : public GpuAVTest {
+  public:
+    void InitHitObjectMotionTest(std::vector<VkLayerSettingEXT> layer_settings = {});
+    void InitHitObjectTest(std::vector<VkLayerSettingEXT> layer_settings = {});
 };
 
 class DebugPrintfTests : public VkLayerTest {
@@ -268,7 +301,7 @@ class AndroidExternalResolveTest : public VkLayerTest {
     bool nullColorAttachmentWithExternalFormatResolve;
 };
 
-class DeprecationTest : public VkLayerTest {
+class LegacyTest : public VkLayerTest {
   public:
     void CreateRenderPass();
 };
@@ -283,6 +316,31 @@ class DescriptorBufferTest : public VkLayerTest {
 class DescriptorIndexingTest : public VkLayerTest {
   public:
     void ComputePipelineShaderTest(const char *shader, std::vector<VkDescriptorSetLayoutBinding> &bindings);
+};
+
+class DescriptorHeapTest : public VkLayerTest {
+  public:
+    void InitBasicDescriptorHeap();
+    void CreateResourceHeap(VkDeviceSize app_size);
+    void CreateSamplerHeap(VkDeviceSize app_size, bool use_embedded_samplers = false);
+
+    void BindResourceHeap();
+    void BindSamplerHeap();
+
+    VkDeviceSize AlignedAppend(VkDeviceSize& end, VkDescriptorType type, uint32_t count = 1);
+    VkDeviceSize AlignResource(VkDeviceSize offset);
+    VkDeviceSize AlignSampler(VkDeviceSize offset);
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+    VkPhysicalDeviceDescriptorHeapTensorPropertiesARM tensor_heap_props = vku::InitStructHelper();
+
+    vkt::Buffer resource_heap_;
+    uint8_t* resource_heap_data_ = nullptr;
+    vkt::Buffer sampler_heap_;
+    uint8_t* sampler_heap_data_ = nullptr;
+
+  private:
+    bool embedded_samplers = false;
 };
 
 class DynamicRenderingTest : public VkLayerTest {
@@ -313,13 +371,17 @@ class DeviceGeneratedCommandsTest : public VkLayerTest {
   public:
     void InitBasicDeviceGeneratedCommands();
 
-    void SetPreProcessBuffer(VkGeneratedCommandsInfoEXT &generated_commands_info);
+    void SetPreProcessBuffer(VkGeneratedCommandsInfoEXT &generated_commands_info, void *pipeline_or_shader_object = nullptr);
     std::unique_ptr<vkt::Buffer> pre_process_buffer_ = std::make_unique<vkt::Buffer>();
 };
 
 class GraphicsLibraryTest : public VkLayerTest {
   public:
     void InitBasicGraphicsLibrary();
+};
+
+class TileMemoryHeapTest : public VkLayerTest {
+  public:
 };
 
 class HostImageCopyTest : public VkLayerTest {
@@ -370,7 +432,7 @@ class GpuAVRayTracingTest : public GpuAVTest, public RayTracingTest {};
 
 class ShaderObjectTest : public virtual VkLayerTest {
   public:
-    void InitBasicShaderObject();
+    void InitBasicShaderObject(void *instance_pnext = nullptr);
     void InitBasicMeshShaderObject(APIVersion target_api_version);
 
     // Many tests just need a basic vert/frag shader
@@ -392,26 +454,8 @@ class TensorTest : public VkLayerTest {
   public:
     void InitBasicTensor();
     static VkTensorDescriptionARM DefaultDesc();
+    static VkTensorDescriptionARM TensorShaderDesc();
     static VkTensorCreateInfoARM DefaultCreateInfo(VkTensorDescriptionARM *desc = nullptr);
-
-    const char *tensor_shader_source = R"glsl(
-      #version 450
-      #extension GL_ARM_tensors : require
-      #extension GL_EXT_shader_explicit_arithmetic_types : require
-      layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-      layout(set=0, binding=0) uniform tensorARM<int32_t, 1> tens;
-      layout(set=0, binding=1, std430) buffer asd {
-        int32_t out_data[];
-      };
-      void main()
-      {
-        const uint size_x = tensorSizeARM(tens, 0);
-        const uint x = gl_GlobalInvocationID.x % size_x;
-        const uint out_index = gl_GlobalInvocationID.x;
-
-        tensorReadARM(tens, uint[](x), out_data[out_index]);
-      }
-    )glsl";
 };
 
 class DataGraphTest : public VkLayerTest {
@@ -419,8 +463,12 @@ class DataGraphTest : public VkLayerTest {
     void InitBasicDataGraph();
     static void CheckSessionMemory(const vkt::DataGraphPipelineSession& session);
     static std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> InitSessionBindInfo(const vkt::DataGraphPipelineSession& session, const std::vector<vkt::DeviceMemory>& device_mem);
+    static VkTensorDescriptionARM DefaultDesc();
+    static VkTensorDescriptionARM DefaultConstantTensorDesc();
+    static VkDataGraphPipelineConstantARM GetConstant(const VkTensorDescriptionARM &desc = defaultConstantTensorDesc);
 
     static const std::string IncorrectSpirvMessage;
+    static const VkTensorDescriptionARM defaultConstantTensorDesc;
 };
 
 class WsiTest : public VkLayerTest {
@@ -432,9 +480,6 @@ class WsiTest : public VkLayerTest {
 class CooperativeMatrixTest : public VkLayerTest {
   public:
     void InitCooperativeMatrixKHR();
-    bool HasValidProperty(VkScopeKHR scope, uint32_t m, uint32_t n, uint32_t k, VkComponentTypeKHR type);
-    std::vector<VkCooperativeMatrixPropertiesKHR> coop_matrix_props;
-    std::vector<VkCooperativeMatrixFlexibleDimensionsPropertiesNV> coop_matrix_flex_props;
 };
 
 class ParentTest : public VkLayerTest {

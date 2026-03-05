@@ -1,4 +1,4 @@
-/* Copyright (c) 2021-2025 The Khronos Group Inc.
+/* Copyright (c) 2021-2026 The Khronos Group Inc.
  * Copyright (c) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,11 +39,15 @@ class Pipeline;
 namespace spirv {
 struct EntryPoint;
 struct Module;
+struct ParsedInfo;
 
+// We can assume the upper 3 uint max values are not going to be used for anything meaningful in SPIR-V
 static constexpr uint32_t kInvalidValue = vvl::kNoIndex32;
+static constexpr spv::BuiltIn kInvalidBuiltIn = spv::BuiltInMax;
 
 // Need to find a way to know if actually array length of zero, or a runtime array.
-static constexpr uint32_t kRuntimeArray = vvl::kNoIndex32;
+static constexpr uint32_t kRuntimeArray = vvl::kNoIndex32 - 1;
+static constexpr uint32_t kSpecConstant = vvl::kNoIndex32 - 2;
 
 struct LocalSize {
     uint32_t x = 0;
@@ -70,6 +74,7 @@ struct DecorationBase {
         input_attachment_bit = 1 << 8,
         per_task_nv = 1 << 9,
         per_primitive_ext = 1 << 10,
+        sample_bit = 1 << 11,
     };
 
     // bits to know if things have been set or not by a Decoration
@@ -81,12 +86,15 @@ struct DecorationBase {
     uint32_t component = 0;
     uint32_t index = 0;
 
-    uint32_t offset = 0;
+    uint32_t offset = kInvalidValue;
+    uint32_t offset_id = kInvalidValue;  // OffsetIdEXT
+    uint32_t GetOffset(const Module& module_state) const;
 
     // A given object can only have a single BuiltIn OpDecoration
-    uint32_t builtin = kInvalidValue;
+    spv::BuiltIn built_in = kInvalidBuiltIn;
 
     void Add(uint32_t decoration, uint32_t value);
+    void AddId(uint32_t decoration, uint32_t id);
     bool Has(FlagBit flag_bit) const { return (flags & flag_bit) != 0; }
 };
 
@@ -94,8 +102,8 @@ struct DecorationBase {
 // Can't have nested structs with OpMemberDecorate, this class prevents accidently creating a 2nd level of member decorations,
 struct DecorationSet : public DecorationBase {
     // For descriptors
-    uint32_t set = 0;
-    uint32_t binding = 0;
+    uint32_t set = kInvalidValue;
+    uint32_t binding = kInvalidValue;
 
     // Value of InputAttachmentIndex the variable starts
     uint32_t input_attachment_index_start = kInvalidValue;
@@ -107,6 +115,7 @@ struct DecorationSet : public DecorationBase {
     bool HasAnyBuiltIn() const;
     bool HasInMember(FlagBit flag_bit) const;
     bool AllMemberHave(FlagBit flag_bit) const;
+    bool IsDescriptorSet() const { return set != kInvalidValue && binding != kInvalidValue; }
 };
 
 // Tracking of OpExecutionMode / OpExecutionModeId values
@@ -164,6 +173,8 @@ struct ExecutionModeSet {
         geometry_input_line_adjacency_bit = 1ull << 40,
         geometry_input_triangle_bit = 1ull << 41,
         geometry_input_triangle_adjacency_bit = 1ull << 42,
+
+        shader_64bit_indexing = 1ull << 43,
     };
 
     // bits to know if things have been set or not by a Decoration
@@ -210,6 +221,9 @@ struct TypeStructInfo {
     const uint32_t id;
     const uint32_t length;  // number of elements
     const DecorationSet &decorations;
+    bool has_runtime_array;
+    // VK_EXT_descriptor_heap allows subset of opaque types inside a struct
+    bool has_descriptor_type;
 
     // data about each member in struct
     struct Member {
@@ -239,9 +253,6 @@ constexpr uint32_t image_mask = image_read | image_write;
 constexpr uint32_t read_mask = read | atomic_read | image_read;
 constexpr uint32_t write_mask = write | atomic_write | image_write;
 }  // namespace AccessBit
-
-// Mapping of < variable ID, AccessBit >
-using VariableAccessMap = vvl::unordered_map<uint32_t, uint32_t>;
 
 // Track all paths from %param to %arg so can walk back functions
 //
@@ -275,15 +286,6 @@ struct StaticImageAccess {
 
     StaticImageAccess(const Module &module_state, const Instruction &insn, const FuncParameterMap &func_parameter_map);
 };
-
-// <Image OpVariable Result ID, [StaticImageAccess, StaticImageAccess, etc] > - used for faster lookup
-// Many StaticImageAccess can point to a single Image Variable
-using StaticImageAccessMap = vvl::unordered_map<uint32_t, std::vector<std::shared_ptr<const StaticImageAccess>>>;
-// < Variable ID, [ OpAccessChain ] >
-// Allows for grouping the access chains by which variables they are actually accessing
-using AccessChainVariableMap = vvl::unordered_map<uint32_t, std::vector<const Instruction *>>;
-// Mapping of OpName instructions
-using DebugNameMap = vvl::unordered_map<uint32_t, const Instruction *>;
 
 // A slot is a <Location, Component> mapping
 struct InterfaceSlot {
@@ -324,9 +326,11 @@ enum NumericType {
     NumericTypeFloat = 1,    // UNORM, SNORM, FLOAT, USCALED, SSCALED, SRGB -- anything we consider float in the shader
     NumericTypeSint = 2,
     NumericTypeUint = 4,
+    NumericTypeBool = 5,
 };
 uint32_t GetFormatType(VkFormat format);
 const char *string_NumericType(uint32_t type);
+VkFormat GetTensorFormat(NumericType numeric_type, uint32_t bit_width);
 
 // Common info needed for all OpVariable
 struct VariableBase {
@@ -339,13 +343,11 @@ struct VariableBase {
     // The variable may have different access for a given entrypoint
     uint32_t access_mask;  // AccessBit
     const VkShaderStageFlagBits stage;
-    VariableBase(const Module &module_state, const Instruction &insn, VkShaderStageFlagBits stage,
-                 const VariableAccessMap &variable_access_map, const DebugNameMap &debug_name_map);
+    VariableBase(const Module &module_state, const Instruction &insn, VkShaderStageFlagBits stage, const ParsedInfo &parsed);
 
-    // When no SPIR-V debug info is used, this will be empty strings
-    // We need to store a std::string since the original SPIR-V string will be gone when we need to print this in an error message
-    const std::string debug_name;  // OpName
-    std::string DescribeDescriptor() const;
+    const Instruction* debug_global_variable;  // DebugGlobalVariable from NonSemantic.Shader.DebugInfo.100
+    // We need to store a std::string since the original SPIR-V string can be gone when we need to print this in an error message
+    const std::string debug_name;  // OpName or OpString (empty if no debug info found)
 
     // These are helpers to show how the variable will be STATICALLY accessed.
     // (It would require a lot of GPU-AV overhead to detect if the access is dynamic and that level of fine control is currently not
@@ -373,7 +375,9 @@ struct VariableBase {
     bool IsUntyped() const { return data_type_id != 0; }
 
   private:
-    static const char *FindDebugName(const VariableBase &variable, const DebugNameMap &debug_name_map);
+    static const Instruction* FindDebugGlobalVariable(const VariableBase& variable, const Module& module_state,
+                                                      const ParsedInfo& parsed);
+    static const char* FindDebugName(const VariableBase& variable, const Module& module_state, const ParsedInfo& parsed);
 };
 
 // These are Input/Output OpVariable that go in-between stages
@@ -384,32 +388,34 @@ struct VariableBase {
 // These include both BuiltIns and User Defined, while there are difference in member variables, the variables are needed for the
 // common logic so its easier using the same object in the end
 struct StageInterfaceVariable : public VariableBase {
-    // Only will be true in BuiltIns
-    const bool is_patch;
-    const bool is_per_vertex;   // VK_KHR_fragment_shader_barycentric
+    // Quick look up of decoration found only in BuiltIns
+    const bool is_patch;              // Tessellation
+    const bool is_per_primitive_ext;  // VK_EXT_mesh_shader
     const bool is_per_task_nv;  // VK_NV_mesh_shader
 
     const bool is_array_interface;
     uint32_t array_size = 1;  // flatten size of all dimensions; 1 if no array
     const Instruction &base_type;
-    const bool is_builtin;
+    const bool is_built_in;
     bool nested_struct;
 
     const std::vector<InterfaceSlot> interface_slots;  // Only for User Defined variables
-    const std::vector<uint32_t> builtin_block;
-    uint32_t total_builtin_components = 0;
+    const std::vector<spv::BuiltIn> built_in_block;
+    uint32_t total_built_in_components = 0;
+
+    std::string Describe() const;
 
     StageInterfaceVariable(const Module &module_state, const Instruction &insn, VkShaderStageFlagBits stage,
-                           const VariableAccessMap &variable_access_map, const DebugNameMap &debug_name_map);
+                           const ParsedInfo &parsed);
 
   protected:
     static bool IsPerTaskNV(const StageInterfaceVariable &variable);
     static bool IsArrayInterface(const StageInterfaceVariable &variable);
     static const Instruction &FindBaseType(StageInterfaceVariable &variable, const Module &module_state);
-    static bool IsBuiltin(const StageInterfaceVariable &variable, const Module &module_state);
+    static bool IsBuiltIn(const StageInterfaceVariable &variable, const Module &module_state);
     static std::vector<InterfaceSlot> GetInterfaceSlots(StageInterfaceVariable &variable, const Module &module_state);
-    static std::vector<uint32_t> GetBuiltinBlock(const StageInterfaceVariable &variable, const Module &module_state);
-    static uint32_t GetBuiltinComponents(const StageInterfaceVariable &variable, const Module &module_state);
+    static std::vector<spv::BuiltIn> GetBuiltInBlock(const StageInterfaceVariable &variable, const Module &module_state);
+    static uint32_t GetBuiltInComponents(const StageInterfaceVariable &variable, const Module &module_state);
 };
 
 // vkspec.html#interfaces-resources describes 'Shader Resource Interface'
@@ -421,34 +427,39 @@ struct StageInterfaceVariable : public VariableBase {
 struct ResourceInterfaceVariable : public VariableBase {
     // If the type is a OpTypeArray save the length
     // Will be kRuntimeArray (non-zero) for runtime arrays
-    uint32_t array_length;
+    // Will be kSpecConstant (non-zero) if needs to be resolved later
+    uint32_t array_length{0};
+    bool IsRuntimeArray() const { return array_length == kRuntimeArray; }
+    bool IsArray() const { return array_length != 0; }
 
     // OpTypeSampledImage (used for combined image samplers)
     bool is_type_sampled_image;
 
     // The index of vector is index of image. (TODO - this doesn't work for GPU-AV)
     std::vector<vvl::unordered_set<SamplerUsedByImage>> samplers_used_by_image;
-    // workaround for YCbCr to track sampler variables until |samplers_used_by_image| is fixed
-    vvl::unordered_set<uint32_t> sampled_image_sampler_variable_ids;
 
     // For storage images - list of Texel component length the OpImageWrite
     std::vector<uint32_t> write_without_formats_component_count_list;
 
-    // A variable can have an array of indexes, need to track which are written to
-    // can't use bitset because number of indexes isn't known until runtime
-    // This array will match the OpTypeArray and not consider the InputAttachmentIndex
-    std::vector<bool> input_attachment_index_read;
+    // Index into input attachment array that have been read
+    // If there is no array, index 0 is marked if the single image is read
+    vvl::unordered_set<uint32_t> input_attachment_index_read;
 
     // Type once array/pointer are stripped
-    // most likly will be OpTypeImage, OpTypeStruct, OpTypeSampler, or OpTypeAccelerationStructureKHR
+    // most likely will be OpTypeImage, OpTypeStruct, OpTypeSampler, or OpTypeAccelerationStructureKHR
     const Instruction &base_type;
 
     // True if the Resource variable itself is runtime descriptor array
     // Online example to showcase various arrays we do/don't care about here https://godbolt.org/z/h9jhsKaPn
     bool is_runtime_descriptor_array;
 
+    // "constant integral expressions" is fancy spec language to mean "you are not doing dynamic descriptor indexing into an array"
+    // NOTE - This just checks if there is ANY non-costant access
+    bool all_constant_integral_expressions{true};
+    uint32_t non_constant_id{0};
+
     // All info regarding what will be validated from requirements imposed by the pipeline on a descriptor. These
-    // can't be checked at pipeline creation time as they depend on the Image or ImageView bound.
+    // can't be checked at pipeline creation time as they depend on the object bound (Image/Tensor) or its view.
     // That is perf-critical code and hashing if 2 variables have same info provides a 20% perf bonus
     //
     // This info can be broken down into two further parts:
@@ -458,23 +469,25 @@ struct ResourceInterfaceVariable : public VariableBase {
     // in the array that match correctly depending on the index used. (For normal 1.0 descriptor, all access to the array must be
     // valid for all indexes in the array)
     struct Info {
-        // the 'format' operand of OpTypeImage as the corresponding Vulkan Format
-        VkFormat image_format{VK_FORMAT_UNDEFINED};
-        // the 'Sampled Type' operand of OpTypeImage,as a numeric type (float, uint, int)
-        NumericType image_sampled_type_numeric{NumericTypeUnknown};
-        // the 'Sampled Type' operand of OpTypeImage as the bit width (64 is the largest bit width in SPIR-V)
-        uint8_t image_sampled_type_width{0};
+        // the 'format' operand of OpTypeImage as the corresponding Vulkan Format. Computed for OpTypeTensorARM
+        VkFormat vk_format{VK_FORMAT_UNDEFINED};
+        // the 'Type' operand of OpTypeImage/OpTypeTensorARM, as a numeric type (float, uint, int, bool)
+        NumericType numeric_type{NumericTypeUnknown};
+        // the width in bits of the 'Type' operand of OpTypeImage/OpTypeTensorARM (64 is the largest bit width in SPIR-V)
+        uint8_t bit_width{0};
 
         spv::Dim image_dim;
-        bool is_image_array;
-        bool is_multisampled;
+        bool is_image_array{false};
+        bool is_multisampled{false};
 
         ImageInstruction image_insn;
+
+        uint32_t tensor_rank{0};
 
         bool is_read_without_format{false};   // For storage images
         bool is_write_without_format{false};  // For storage images
 
-        // If a variable is used as a function arguement, but never actually used, it will be found in EntryPoint::accessible_ids so
+        // If a variable is used as a function argument, but never actually used, it will be found in EntryPoint::accessible_ids so
         // we need to have a dedicated mark if it was accessed.
         // We use this for variable hashing, but the VariableBase has the helper functions to read this value.
         uint32_t access_mask{AccessBit::empty};
@@ -484,20 +497,28 @@ struct ResourceInterfaceVariable : public VariableBase {
     uint64_t descriptor_hash = 0;
     bool IsImage() const { return base_type.Opcode() == spv::OpTypeImage; }
 
+    bool IsHeap() const;
+    std::string DescribeDescriptor() const;
+
     // Type of resource type (vkspec.html#interfaces-resources-storage-class-correspondence)
     bool is_storage_image{false};
     bool is_storage_texel_buffer{false};
     const bool is_storage_buffer;
+    const bool is_uniform_buffer;
     bool is_input_attachment{false};
     bool is_storage_tensor{false};
+    bool is_sampler{false};
+
+    bool is_resource_heap{false};
+    bool is_sampler_heap{false};
 
     ResourceInterfaceVariable(const Module &module_state, const EntryPoint &entrypoint, const Instruction &insn,
-                              const StaticImageAccessMap &image_access_map, const AccessChainVariableMap &access_chain_map,
-                              const VariableAccessMap &variable_access_map, const DebugNameMap &debug_name_map);
+                              const ParsedInfo &parsed);
 
   protected:
     static const Instruction &FindBaseType(ResourceInterfaceVariable &variable, const Module &module_state);
     static bool IsStorageBuffer(const ResourceInterfaceVariable &variable);
+    static bool IsUniformBuffer(const ResourceInterfaceVariable &variable);
 };
 
 // Used to help detect if different variable is being used
@@ -514,14 +535,13 @@ struct PushConstantVariable : public VariableBase {
     uint32_t size;    // total size of block
 
     PushConstantVariable(const Module &module_state, const Instruction &insn, VkShaderStageFlagBits stage,
-                         const VariableAccessMap &variable_access_map, const DebugNameMap &debug_name_map);
+                         const ParsedInfo &parsed);
 };
 
 struct TaskPayloadVariable : public VariableBase {
     uint32_t size;
 
-    TaskPayloadVariable(const Module &module_state, const Instruction &insn, VkShaderStageFlagBits stage,
-                        const VariableAccessMap &variable_access_map, const DebugNameMap &debug_name_map);
+    TaskPayloadVariable(const Module &module_state, const Instruction &insn, VkShaderStageFlagBits stage, const ParsedInfo &parsed);
 };
 
 // Represents a single Entrypoint into a Shader Module
@@ -545,11 +565,14 @@ struct EntryPoint {
     const vvl::unordered_set<uint32_t> accessible_ids;
 
     // only one Push Constant block is allowed per entry point
+    // (This assumption is broken with VK_NV_push_constant_bank, but not fully supported)
     std::shared_ptr<const PushConstantVariable> push_constant_variable;
     // For both Task and Mesh entry point, there can be one TaskPayloadWorkgroupEXT variable
     std::shared_ptr<const TaskPayloadVariable> task_payload_variable;
     const std::vector<ResourceInterfaceVariable> resource_interface_variables;
     const std::vector<StageInterfaceVariable> stage_interface_variables;
+    const std::vector<const Instruction *> datagraph_constants;
+
     // Easier to lookup without having to check for the is_builtin bool
     // "Built-in interface variables" - vkspec.html#interfaces-iointerfaces-builtin
     std::vector<const StageInterfaceVariable *> built_in_variables;
@@ -567,39 +590,36 @@ struct EntryPoint {
     const StageInterfaceVariable *max_output_slot_variable = nullptr;
     const InterfaceSlot *max_input_slot = nullptr;
     const InterfaceSlot *max_output_slot = nullptr;
-    uint32_t builtin_input_components = 0;
-    uint32_t builtin_output_components = 0;
+    uint32_t built_in_input_components = 0;
+    uint32_t built_in_output_components = 0;
 
     // Mark if a BuiltIn is written to
-    bool written_builtin_point_size{false};
-    bool written_builtin_layer{false};
-    bool written_builtin_primitive_shading_rate_khr{false};
-    bool written_builtin_viewport_index{false};
-    bool written_builtin_viewport_mask_nv{false};
+    bool written_built_in_point_size{false};
+    bool written_built_in_layer{false};
+    bool written_built_in_primitive_shading_rate_khr{false};
+    bool written_built_in_viewport_index{false};
+    bool written_built_in_viewport_mask_nv{false};
 
     bool has_passthrough{false};
     bool has_alpha_to_coverage_variable{false};  // only for Fragment shaders
 
     bool has_physical_storage_buffer_interface{false};
 
-    EntryPoint(const Module &module_state, const Instruction &entrypoint_insn, const StaticImageAccessMap &image_access_map,
-               const AccessChainVariableMap &access_chain_map, const VariableAccessMap &variable_access_map,
-               const DebugNameMap &debug_name_map);
+    EntryPoint(const Module &module_state, const Instruction &entrypoint_insn, const ParsedInfo &parsed);
 
     bool HasBuiltIn(spv::BuiltIn built_in) const;
 
   protected:
     static vvl::unordered_set<uint32_t> GetAccessibleIds(const Module &module_state, EntryPoint &entrypoint);
     static std::vector<StageInterfaceVariable> GetStageInterfaceVariables(const Module &module_state, EntryPoint &entrypoint,
-                                                                          const VariableAccessMap &variable_access_map,
-                                                                          const DebugNameMap &debug_name_map);
+                                                                          const ParsedInfo &parsed);
     static std::vector<ResourceInterfaceVariable> GetResourceInterfaceVariables(const Module &module_state, EntryPoint &entrypoint,
-                                                                                const StaticImageAccessMap &image_access_map,
-                                                                                const AccessChainVariableMap &access_chain_map,
-                                                                                const VariableAccessMap &variable_access_map,
-                                                                                const DebugNameMap &debug_name_map);
+                                                                                const ParsedInfo &parsed);
+    static std::vector<const Instruction*> GetDataGraphConstants(const Module& module_state, EntryPoint& entrypoint,
+                                                                 const ParsedInfo& parsed);
+
     static bool IsBuiltInWritten(spv::BuiltIn built_in, const Module &module_state, const StageInterfaceVariable &variable,
-                                 const AccessChainVariableMap &access_chain_map);
+                                 const ParsedInfo &parsed);
 };
 
 // Info to capture while parsing the SPIR-V, but will only be used by SpirvValidator::Validate and don't need to save after
@@ -616,11 +636,12 @@ struct StatelessData {
     // OpEmitStreamVertex/OpEndStreamPrimitive - only allowed in Geometry shader
     std::vector<const Instruction *> transform_feedback_stream_inst;
     std::vector<const Instruction *> fma_inst;
+    std::vector<const Instruction *> tensor_inst;
 
     // simpler to just track all OpExecutionModeId and parse things needed later
     std::vector<const Instruction *> execution_mode_id_inst;
 
-    bool has_builtin_fully_covered{false};
+    bool has_built_in_fully_covered{false};
     bool has_invocation_repack_instruction{false};
     bool has_group_decoration{false};
     bool has_ext_inst_with_forward_refs{false};  // OpExtInstWithForwardRefsKHR
@@ -647,6 +668,9 @@ struct Module {
         vvl::unordered_map<uint32_t, DecorationSet> decorations;
         DecorationSet empty_decoration;  // all zero values, allows use to return a reference and not a copy each time
 
+        // Some cases we can give better hints knowing the source shader language
+        spv::SourceLanguage source_language{spv::SourceLanguageUnknown};
+
         // Execution Modes are tied to a Function <id>, multiple EntryPoints can point to the same Funciton <id>
         // Keep a mapping so each EntryPoint can grab a reference to it
         vvl::unordered_map<uint32_t, ExecutionModeSet> execution_modes;
@@ -655,8 +679,7 @@ struct Module {
         // [OpSpecConstant Result ID -> OpDecorate SpecID value] mapping
         vvl::unordered_map<uint32_t, uint32_t> id_to_spec_id;
         // Find all decoration instructions to prevent relooping module later - many checks need this info
-        std::vector<const Instruction *> decoration_inst;
-        std::vector<const Instruction *> member_decoration_inst;
+        std::vector<const Instruction*> decoration_inst;
         // Find all variable instructions to build faster LUT
         std::vector<const Instruction *> variable_inst;
         // Both variables and instruction explicitly accessing untyped variables
@@ -665,20 +688,30 @@ struct Module {
         bool has_shader_tile_image_depth_read{false};
         bool has_shader_tile_image_stencil_read{false};
         bool has_shader_tile_image_color_read{false};
+        // Detects SamplerHeapEXT/ResourceHeapEXT
+        bool has_descriptor_heap{false};
         // BuiltIn we just care about existing or not, don't have to be written to
         // TODO - Make bitmask
-        bool has_builtin_layer{false};
-        bool has_builtin_draw_index{false};
-        bool has_builtin_workgroup_size{false};
-        uint32_t builtin_workgroup_size_id = 0;
+        bool has_built_in_layer{false};
+        bool has_built_in_draw_index{false};
+        bool has_built_in_workgroup_size{false};
+        uint32_t built_in_workgroup_size_id = 0;
 
         std::vector<const Instruction *> cooperative_matrix_inst;
         std::vector<const Instruction *> cooperative_vector_inst;
         std::vector<const Instruction *> emit_mesh_tasks_inst;
+        std::vector<const Instruction*> constant_size_of_inst;
+        std::vector<const Instruction *> array_length_inst;
+        std::vector<const Instruction *> vector_type_inst;
 
-        std::vector<spv::Capability> capability_list;
-        // Code on the hot path can cache capabilities for fast access.
-        bool has_capability_runtime_descriptor_array{false};
+        // For descriptor indexing there are 3 situations
+        //  1. OpConstant is used, we will find later
+        //  2. The value is dynamic, caught in GPU-AV
+        //  3. OpSpecConstant, which we can detect, but not until we have the values
+        // We only need to check index 1, since you can't have double array of descriptors
+        std::vector<const Instruction*> descriptor_indexing_spec_const_ac_inst;
+
+        vvl::unordered_set<spv::Capability> capability_list;
 
         bool has_specialization_constants{false};
         bool uses_interpolate_at_sample{false};
@@ -686,7 +719,12 @@ struct Module {
         // Will check if there is source debug information
         // Won't save any other info and will retrieve the debug info if requested in a VU error message
         bool using_legacy_debug_info{false};
-        uint32_t shader_debug_info_set_id = 0;  // non-zero means shader has NonSemantic.Shader.DebugInfo.100
+
+        // ID from OpExtInstImport required to know if a OpExtInst is from it
+        struct ExtendedInstructionSets {
+            uint32_t glsl_std450 = 0;        // GLSL.std.450
+            uint32_t shader_debug_info = 0;  // NonSemantic.Shader.DebugInfo.100
+        } extended;
 
         // EntryPoint has pointer references inside it that need to be preserved
         std::vector<std::shared_ptr<EntryPoint>> entry_points;
@@ -765,10 +803,13 @@ struct Module {
 
     uint32_t CalculateWorkgroupSharedMemory() const;
 
-    const Instruction *GetConstantDef(uint32_t id) const;
+    const Instruction *GetAnyConstantDef(uint32_t id) const;
     uint32_t GetConstantValueById(uint32_t id) const;
-    uint32_t GetLocationsConsumedByType(uint32_t type) const;
-    uint32_t GetComponentsConsumedByType(uint32_t type) const;
+    bool GetBoolIfConstant(const spirv::Instruction &insn, bool *value) const;
+    bool GetInt32IfConstant(const spirv::Instruction &insn, uint32_t *value) const;
+
+    uint32_t GetLocationsConsumedByType(const Instruction* insn) const;
+    uint32_t GetComponentsConsumedByType(const Instruction* insn) const;
     NumericType GetNumericType(uint32_t type) const;
 
     bool HasRuntimeArray(uint32_t type_id) const;
@@ -778,7 +819,7 @@ struct Module {
     uint32_t GetTypeBitsSize(const Instruction *insn) const;
     uint32_t GetTypeBytesSize(const Instruction *insn) const;
     uint32_t GetBaseType(const Instruction *insn) const;
-    const Instruction *GetBaseTypeInstruction(uint32_t type) const;
+    const Instruction* GetBaseTypeInstruction(const Instruction* insn) const;
     const Instruction *GetVariablePointerType(const spirv::Instruction &var_insn) const;
     const Instruction *GetVariableDataType(const spirv::Instruction &var_insn) const;
     uint32_t GetTypeId(uint32_t id) const;
@@ -788,10 +829,7 @@ struct Module {
     spv::StorageClass StorageClass(const Instruction &insn) const;
     bool UsesStorageCapabilityStorageClass(const Instruction &insn) const;
 
-    bool HasCapability(spv::Capability find_capability) const {
-        return std::any_of(static_data_.capability_list.begin(), static_data_.capability_list.end(),
-                           [find_capability](const spv::Capability &capability) { return capability == find_capability; });
-    }
+    bool HasCapability(spv::Capability find_capability) const { return static_data_.capability_list.count(find_capability) != 0; }
 };
 
 }  // namespace spirv

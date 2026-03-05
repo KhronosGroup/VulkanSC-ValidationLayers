@@ -1,9 +1,9 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2015-2025 The Khronos Group Inc.
-# Copyright (c) 2015-2025 Valve Corporation
-# Copyright (c) 2015-2025 LunarG, Inc.
-# Copyright (c) 2015-2025 Google Inc.
+# Copyright (c) 2015-2026 The Khronos Group Inc.
+# Copyright (c) 2015-2026 Valve Corporation
+# Copyright (c) 2015-2026 LunarG, Inc.
+# Copyright (c) 2015-2026 Google Inc.
 # Copyright (c) 2023-2025 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +21,7 @@
 import os
 from vulkan_object import Command, Param, ExternSync
 from base_generator import BaseGenerator
-from generators.generator_utils import PlatformGuardHelper
+from generators.generator_utils import createObject, destroyObject, PlatformGuardHelper
 
 def GetParentInstance(param: Param) -> str:
     instanceParent = ['VkSurfaceKHR',
@@ -88,10 +88,10 @@ class ThreadSafetyOutputGenerator(BaseGenerator):
 
             /***************************************************************************
             *
-            * Copyright (c) 2015-2025 The Khronos Group Inc.
-            * Copyright (c) 2015-2025 Valve Corporation
-            * Copyright (c) 2015-2025 LunarG, Inc.
-            * Copyright (c) 2015-2025 Google Inc.
+            * Copyright (c) 2015-2026 The Khronos Group Inc.
+            * Copyright (c) 2015-2026 Valve Corporation
+            * Copyright (c) 2015-2026 LunarG, Inc.
+            * Copyright (c) 2015-2026 Google Inc.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.
@@ -174,9 +174,9 @@ class ThreadSafetyOutputGenerator(BaseGenerator):
                         }}\n''')
                 else:
                     out.append(f'{prefix}WriteObject{parent_instance}({param.name}, record_obj.location);\n')
-                    if ('Destroy' in command.name or 'Free' in command.name or 'ReleasePerformanceConfigurationINTEL' in command.name) and prefix == 'Finish':
+                    if destroyObject(command.name) and prefix == 'Finish':
                         out.append(f'DestroyObject{parent_instance}({param.name});\n')
-            elif param.pointer and ('Create' in command.name or 'Allocate' in command.name or 'AcquirePerformanceConfigurationINTEL' in command.name) and prefix == 'Finish':
+            elif param.pointer and createObject(command.name) and command.name != 'vkEnumeratePhysicalDevices' and prefix == 'Finish':
                 if param.type in self.vk.handles:
                     create_pipelines_call = True
                     create_shaders_call = True
@@ -226,6 +226,11 @@ class ThreadSafetyOutputGenerator(BaseGenerator):
                                     {prefix}ReadObject{parent_instance}({param.name}[index], record_obj.location);
                                 }}
                             }}\n''')
+                    elif param.type == "VkQueue":
+                        out.append(f'''
+                            if (!vvl::Contains(internally_synchronized_queues, queue)) {{
+                                {prefix}WriteObject{parent_instance}({param.name}, record_obj.location);
+                            }}\n''')
                     elif not param.pointer:
                         # Pointer params are often being created.
                         # They are not being read from.
@@ -254,6 +259,7 @@ class ThreadSafetyOutputGenerator(BaseGenerator):
         out = []
         out.append('''
             #include "thread_tracker/thread_safety_validation.h"
+            #include "containers/container_utils.h"
 
             namespace threadsafety {
             ''')

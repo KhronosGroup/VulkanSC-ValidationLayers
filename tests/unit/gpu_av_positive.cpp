@@ -1,6 +1,6 @@
-/* Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
+/* Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/buffer_helper.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/shader_helper.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/gpu_av_helper.h"
 #include "../framework/external_memory_sync.h"
@@ -160,7 +161,7 @@ TEST_F(PositiveGpuAV, InlineUniformBlock) {
         )glsl";
 
     CreateComputePipelineHelper pipe1(*this);
-    pipe1.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe1.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe1.cp_ci_.layout = pipeline_layout;
     pipe1.CreateComputePipeline();
 
@@ -262,7 +263,7 @@ TEST_F(PositiveGpuAV, InlineUniformBlockAndRecovery) {
 
     {
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         // We should still be able to use the layout and create a temporary uninstrumented shader module
         pipe.cp_ci_.layout = pl_layout;
         pipe.CreateComputePipeline();
@@ -288,7 +289,7 @@ TEST_F(PositiveGpuAV, InlineUniformBlockAndRecovery) {
     {
         const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
         pipe.cp_ci_.layout = pipeline_layout;
         pipe.CreateComputePipeline();
 
@@ -357,7 +358,7 @@ TEST_F(PositiveGpuAV, InlineUniformBlockUninitialized) {
     vk::UpdateDescriptorSets(device(), 1, &descriptor_writes, 0, nullptr);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
@@ -416,7 +417,7 @@ TEST_F(PositiveGpuAV, InlineUniformBlockUninitializedUpdateAfterBind) {
     descriptor_set.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
@@ -474,10 +475,10 @@ TEST_F(PositiveGpuAV, SetSSBOBindDescriptor) {
         }
     )glsl";
 
-    VkShaderObj cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
     pipe.CreateComputePipeline();
@@ -535,7 +536,7 @@ TEST_F(PositiveGpuAV, SetSSBOPushDescriptor) {
         }
     )glsl";
 
-    VkShaderObj cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
 
     OneOffDescriptorSet descriptor_set_0(m_device,
                                          {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
@@ -660,7 +661,7 @@ TEST_F(PositiveGpuAV, MutableBuffer) {
     mdtci.mutableDescriptorTypeListCount = 3;
     mdtci.pMutableDescriptorTypeLists = lists;
 
-    VkShaderObj cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
 
     OneOffDescriptorSet descriptor_set_0(m_device,
                                          {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
@@ -779,13 +780,14 @@ TEST_F(PositiveGpuAV, SelectInstrumentedShaders) {
         }
     )glsl";
     // Don't instrument buggy vertex shader
-    VkShaderObj vs(this, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
     // Instrument non-buggy fragment shader
     VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT};
     VkValidationFeaturesEXT features = vku::InitStructHelper();
     features.enabledValidationFeatureCount = 1;
     features.pEnabledValidationFeatures = enabled;
-    VkShaderObj fs(this, vertshader, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main", &features);
+    VkShaderObj fs(*m_device, vertshader, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main",
+                   &features);
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_.clear();
     pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
@@ -828,7 +830,7 @@ TEST_F(PositiveGpuAV, DrawingWithUnboundUnusedSet) {
            color += texture(samplerColor, gl_FragCoord.wz);
         }
     )glsl";
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
@@ -1028,7 +1030,7 @@ TEST_P(PositiveGpuAVParameterized, SettingsCombinations) {
 static std::string GetGpuAvSettingsCombinationTestName(const testing::TestParamInfo<PositiveGpuAVParameterized::ParamType> &info) {
     std::vector<const char *> setting_names = std::get<0>(info.param);
     const uint32_t setting_values = std::get<1>(info.param);
-    std::stringstream test_name;
+    std::ostringstream test_name;
     for (auto [setting_name_i, setting_name] : vvl::enumerate(setting_names)) {
         const char *enabled_str = (setting_values & (1u << setting_name_i)) ? "_1" : "_0";
         if (setting_name_i != 0) {
@@ -1148,7 +1150,7 @@ TEST_F(PositiveGpuAV, RestoreUserPushConstants) {
               }
             }
         )glsl";
-    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     const char *fs_source = R"glsl(
             #version 450
@@ -1171,7 +1173,7 @@ TEST_F(PositiveGpuAV, RestoreUserPushConstants) {
                 }
             }
         )glsl";
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1248,7 +1250,7 @@ TEST_F(PositiveGpuAV, RestoreUserPushConstants2) {
               }
             }
         )glsl";
-    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     const char *fs_source = R"glsl(
             #version 450
@@ -1271,7 +1273,7 @@ TEST_F(PositiveGpuAV, RestoreUserPushConstants2) {
                 }
             }
         )glsl";
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPushConstantRange graphics_push_constant_ranges = {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                                          sizeof(PushConstants)};
@@ -1326,7 +1328,7 @@ TEST_F(PositiveGpuAV, RestoreUserPushConstants2) {
               }
             }
         )glsl";
-    VkShaderObj compute(this, compute_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj compute(*m_device, compute_source, VK_SHADER_STAGE_COMPUTE_BIT);
 
     VkPushConstantRange compute_push_constant_ranges = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstants)};
     VkPipelineLayoutCreateInfo compute_plci = vku::InitStructHelper();
@@ -1344,7 +1346,7 @@ TEST_F(PositiveGpuAV, RestoreUserPushConstants2) {
     }
 
     CreateComputePipelineHelper compute_pipe(*this);
-    compute_pipe.cs_ = VkShaderObj(this, compute_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    compute_pipe.cs_ = VkShaderObj(*m_device, compute_source, VK_SHADER_STAGE_COMPUTE_BIT);
     compute_pipe.cp_ci_.layout = compute_pipeline_layout;
     compute_pipe.CreateComputePipeline();
 
@@ -1479,7 +1481,7 @@ TEST_F(PositiveGpuAV, SharedPipelineLayoutSubset) {
         }
     )glsl";
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout_1;
     pipe.CreateComputePipeline();
 
@@ -1557,7 +1559,7 @@ TEST_F(PositiveGpuAV, SharedPipelineLayoutSubsetWithUnboundDescriptorSet) {
         }
     )glsl";
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout_1;
     pipe.CreateComputePipeline();
 
@@ -1646,7 +1648,7 @@ TEST_F(PositiveGpuAV, DestroyedPipelineLayout2) {
             x = 0;
         }
     )glsl";
-    VkShaderObj vs(this, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
 
     vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
@@ -1741,17 +1743,17 @@ TEST_F(PositiveGpuAV, DISABLED_DeviceGeneratedCommandsIES) {
     pipe_flags2.flags = VK_PIPELINE_CREATE_2_INDIRECT_BINDABLE_BIT_EXT;
     CreateComputePipelineHelper init_pipe(*this, &pipe_flags2);
     init_pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
-    init_pipe.cs_ = VkShaderObj(this, shader_source_1, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    init_pipe.cs_ = VkShaderObj(*m_device, shader_source_1, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     init_pipe.CreateComputePipeline();
 
     CreateComputePipelineHelper pipe_1(*this, &pipe_flags2);
     pipe_1.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
-    pipe_1.cs_ = VkShaderObj(this, shader_source_2, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    pipe_1.cs_ = VkShaderObj(*m_device, shader_source_2, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     pipe_1.CreateComputePipeline();
 
     CreateComputePipelineHelper pipe_2(*this, &pipe_flags2);
     pipe_2.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
-    pipe_2.cs_ = VkShaderObj(this, shader_source_3, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    pipe_2.cs_ = VkShaderObj(*m_device, shader_source_3, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     pipe_2.CreateComputePipeline();
 
     vkt::IndirectExecutionSet exe_set(*m_device, init_pipe, 3);
@@ -1812,61 +1814,6 @@ TEST_F(PositiveGpuAV, DISABLED_DeviceGeneratedCommandsIES) {
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, init_pipe.pipeline_layout_, 0, 1,
                               &init_pipe.descriptor_set_.set_, 0, nullptr);
     vk::CmdExecuteGeneratedCommandsEXT(m_command_buffer, false, &generated_commands_info);
-    m_command_buffer.End();
-
-    m_default_queue->SubmitAndWait(m_command_buffer);
-}
-
-TEST_F(PositiveGpuAV, BasicMeshShader) {
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::meshShader);
-    AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitGpuAvFramework());
-    RETURN_IF_SKIP(InitState());
-    InitRenderTarget();
-
-    const char *mesh_source = R"glsl(
-    #version 450
-    #extension GL_EXT_mesh_shader : require
-
-    layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-    layout(triangles, max_vertices = 3, max_primitives = 1) out;
-
-    const vec4[3] positions = {
-        vec4( 0.0, -1.0, 0.0, 1.0),
-        vec4(-1.0,  1.0, 0.0, 1.0),
-        vec4( 1.0,  1.0, 0.0, 1.0)
-    };
-
-    const vec4[3] colors = {
-        vec4(0.0, 1.0, 0.0, 1.0),
-        vec4(0.0, 0.0, 1.0, 1.0),
-        vec4(1.0, 0.0, 0.0, 1.0)
-    };
-
-    void main() {
-        vec4 offset = vec4(0.0, 0.0, gl_GlobalInvocationID.x, 0.0);
-        SetMeshOutputsEXT(3, 1);
-        gl_MeshVerticesEXT[0].gl_Position = (positions[0] + offset);
-        gl_MeshVerticesEXT[1].gl_Position = (positions[1] + offset);
-        gl_MeshVerticesEXT[2].gl_Position = (positions[2] + offset);
-        gl_PrimitiveTriangleIndicesEXT[gl_LocalInvocationIndex] =  uvec3(0, 1, 2);
-    }
-    )glsl";
-
-    VkShaderObj ms(this, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
-
-    CreatePipelineHelper pipe(*this);
-    pipe.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.CreateGraphicsPipeline();
-
-    m_command_buffer.Begin();
-    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-    vk::CmdDrawMeshTasksEXT(m_command_buffer, 1, 1, 1);
-    m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -1936,8 +1883,8 @@ TEST_F(PositiveGpuAV, DualShaderLibraryInline) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const vkt::PipelineLayout pipeline_layout(*m_device, {}, {});
 
@@ -2140,8 +2087,8 @@ TEST_F(PositiveGpuAV, MixDynamicNormalRenderPass) {
         }
     )glsl";
 
-    VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, shader_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, shader_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, shader_source, VK_SHADER_STAGE_FRAGMENT_BIT);
     CreatePipelineHelper g_pipe(*this);
     g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     g_pipe.gp_ci_.layout = g_pipeline_layout;
@@ -2160,7 +2107,7 @@ TEST_F(PositiveGpuAV, MixDynamicNormalRenderPass) {
 
     CreateComputePipelineHelper c_pipe(*this);
     c_pipe.cp_ci_.layout = c_pipeline_layout;
-    c_pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    c_pipe.cs_ = VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     c_pipe.CreateComputePipeline();
 
     vkt::Buffer dispatch_params_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -2444,8 +2391,8 @@ TEST_F(PositiveGpuAV, PipelineBinariesDraw) {
 
         m_command_buffer.Begin();
         m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2);
-        vk::CmdDraw(m_command_buffer.handle(), 3u, 1u, 0u, 0u);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2);
+        vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
         m_command_buffer.EndRenderPass();
         m_command_buffer.End();
 
@@ -2453,6 +2400,148 @@ TEST_F(PositiveGpuAV, PipelineBinariesDraw) {
             vk::DestroyPipelineBinaryKHR(device(), pipeline_binaries[i], nullptr);
         }
     }
+}
+
+TEST_F(PositiveGpuAV, IgnoreFunctionsNoCalled) {
+    TEST_DESCRIPTION("Check no instrumentation is done on functions never called");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    const char* shader_source = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main1 "main1" %_
+               OpEntryPoint GLCompute %main2 "main2" %_
+               OpEntryPoint GLCompute %main3 "main3" %_
+               OpExecutionMode %main1 LocalSize 1 1 1
+               OpExecutionMode %main2 LocalSize 1 1 1
+               OpExecutionMode %main3 LocalSize 1 1 1
+               OpDecorate %SSBO Block
+               OpMemberDecorate %SSBO 0 Offset 0
+               OpMemberDecorate %SSBO 1 Offset 4
+               OpMemberDecorate %SSBO 2 Offset 8
+               OpMemberDecorate %SSBO 3 Offset 12
+               OpDecorate %_ Binding 0
+               OpDecorate %_ DescriptorSet 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+       %SSBO = OpTypeStruct %uint %uint %uint %uint
+%_ptr_StorageBuffer_SSBO = OpTypePointer StorageBuffer %SSBO
+          %_ = OpVariable %_ptr_StorageBuffer_SSBO StorageBuffer
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+     %uint_0 = OpConstant %uint 0
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+
+       %main1 = OpFunction %void None %4
+      %label1 = OpLabel
+         %24 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_2
+               OpStore %24 %uint_0
+         %25 = OpFunctionCall %void %Bar_
+               OpReturn
+               OpFunctionEnd
+
+       %Bar_ = OpFunction %void None %4
+         %10 = OpLabel
+         %21 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_1
+               OpStore %21 %uint_0
+         %22 = OpFunctionCall %void %Foo_
+               OpReturn
+               OpFunctionEnd
+
+       %Foo_ = OpFunction %void None %4
+          %8 = OpLabel
+         %19 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_0
+               OpStore %19 %uint_0
+               OpReturn
+               OpFunctionEnd
+
+       %main2 = OpFunction %void None %4
+      %label2 = OpLabel
+         %34 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_2
+               OpStore %34 %uint_0
+         %35 = OpFunctionCall %void %Bar_
+               OpReturn
+               OpFunctionEnd
+
+      ; Does nothing
+       %main3 = OpFunction %void None %4
+      %label3 = OpLabel
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ =
+        VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, nullptr, "main3");
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+}
+
+TEST_F(PositiveGpuAV, FragCoordNotUsed) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11475#issuecomment-3828732673");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    // The following, but the FragCoord builtin is declared, and not used
+    //
+    // layout(set = 0, binding = 0) uniform UBO { vec4 x; };
+    // layout(location = 0) out vec4 color;
+    // void main() {
+    //     color = x;
+    // }
+    const char* shader_source = R"(
+               OpCapability Shader
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %color %_
+               OpExecutionMode %main OriginUpperLeft
+               OpDecorate %unused BuiltIn FragCoord
+               OpDecorate %color Location 0
+               OpDecorate %UBO Block
+               OpMemberDecorate %UBO 0 Offset 0
+               OpDecorate %_ Binding 0
+               OpDecorate %_ DescriptorSet 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+      %color = OpVariable %_ptr_Output_v4float Output
+        %UBO = OpTypeStruct %v4float
+%_ptr_Uniform_UBO = OpTypePointer Uniform %UBO
+          %_ = OpVariable %_ptr_Uniform_UBO Uniform
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+%_ptr_Uniform_v4float = OpTypePointer Uniform %v4float
+
+ %unused_ptr = OpTypePointer Input %v4float
+     %unused = OpVariable %unused_ptr Input
+
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+         %17 = OpAccessChain %_ptr_Uniform_v4float %_ %int_0
+         %18 = OpLoad %v4float %17
+               OpStore %color %18
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    VkShaderObj vs(*m_device, kVertexDrawPassthroughGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, shader_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
 }
 
 TEST_F(PositiveGpuAV, SafeBuffers) {

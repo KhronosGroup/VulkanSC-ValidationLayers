@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,7 +106,7 @@ bool VkRenderFramework::InstanceLayerSupported(const char *const layer_name, con
 
 // Return true if extension name is found and spec value is >= requested spec value
 // WARNING: for simplicity, does not cover layers' extensions
-bool VkRenderFramework::InstanceExtensionSupported(const char *const extension_name, const uint32_t spec_version) {
+bool VkRenderFramework::InstanceExtensionSupported(const char* const extension_name, const uint32_t spec_version) {
     // WARNING: assume debug and validation feature extensions are always supported, which are usually provided by layers
     if (0 == strncmp(extension_name, VK_EXT_DEBUG_UTILS_EXTENSION_NAME, VK_MAX_EXTENSION_NAME_SIZE)) return true;
     if (0 == strncmp(extension_name, VK_EXT_DEBUG_REPORT_EXTENSION_NAME, VK_MAX_EXTENSION_NAME_SIZE)) return true;
@@ -154,7 +154,11 @@ VkInstanceCreateInfo VkRenderFramework::GetInstanceCreateInfo() const {
     VkInstanceCreateInfo info = vku::InitStructHelper();
     info.pNext = m_errorMonitor->GetDebugCreateInfo();
 #if defined(VK_USE_PLATFORM_METAL_EXT)
-    info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+    const auto IsTheQueriedExtension = [](const char* extension_name) {
+        return strncmp(extension_name, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, VK_MAX_EXTENSION_NAME_SIZE) == 0;
+    };
+    if (std::any_of(m_instance_extension_names.begin(), m_instance_extension_names.end(), IsTheQueriedExtension))
+        info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #endif
     info.pApplicationInfo = &app_info_;
     info.enabledLayerCount = size32(instance_layers_);
@@ -195,7 +199,10 @@ void VkRenderFramework::InitFramework(void *instance_pnext) {
     // Beginning with the 1.3.216 Vulkan SDK, the VK_KHR_PORTABILITY_subset extension is mandatory.
 #ifdef VK_USE_PLATFORM_METAL_EXT
     AddRequiredExtensions(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-    AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+    // VK_KHR_portability_subset requires VK_KHR_get_physical_device_properties2. We always request it since we don't know if we
+    // will be using KK or MoltenVK until device selection, so if we wouldn't enable it, we would have to recreate the instance...
+    if (InstanceExtensionSupported(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME))
+        AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 #else
     // Note by default VK_KHRONOS_PROFILES_EMULATE_PORTABILITY is true.
     if (auto str = GetEnvironment("VK_KHRONOS_PROFILES_EMULATE_PORTABILITY"); !str.empty() && str != "false") {
@@ -312,6 +319,11 @@ void VkRenderFramework::InitFramework(void *instance_pnext) {
         GTEST_SKIP() << "At least Vulkan version 1." << m_target_api_version.Minor() << " is required";
     }
 
+#ifdef VK_USE_PLATFORM_METAL_EXT
+    if (DeviceExtensionSupported(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME))
+        AddRequestedDeviceExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+#endif
+
     for (const auto &ext : m_required_extensions) {
         AddRequestedDeviceExtensions(ext);
     }
@@ -354,7 +366,7 @@ bool VkRenderFramework::IsExtensionsEnabled(const char *ext_name) const {
 }
 
 std::string VkRenderFramework::RequiredExtensionsNotSupported() const {
-    std::stringstream ss;
+    std::ostringstream ss;
     bool first = true;
     for (const auto &ext : m_required_extensions) {
         if (!CanEnableDeviceExtension(ext) && !CanEnableInstanceExtension(ext)) {
@@ -702,6 +714,10 @@ void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *crea
         m_third_queue = queues[2];
         m_third_queue_caps = m_device->Physical().queue_properties_[m_third_queue->family_index].queueFlags;
     }
+    if (queues.size() > 3) {
+        m_fourth_queue = queues[3];
+        m_fourth_queue_caps = m_device->Physical().queue_properties_[m_fourth_queue->family_index].queueFlags;
+    }
 
     m_depthStencil = new vkt::Image();
 
@@ -724,7 +740,7 @@ void VkRenderFramework::InitSurface() {
     if (result != VK_SUCCESS) {
         GTEST_SKIP() << "Failed to create surface.";
     }
-    ASSERT_TRUE(m_surface.Handle() != VK_NULL_HANDLE);
+    ASSERT_TRUE(m_surface != VK_NULL_HANDLE);
 }
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
@@ -861,7 +877,7 @@ void SurfaceContext::Destroy() {
 
 // Queries the info needed to create a swapchain and assigns it to the member variables of VkRenderFramework
 void VkRenderFramework::InitSwapchainInfo() {
-    auto info = GetSwapchainInfo(m_surface.Handle());
+    auto info = GetSwapchainInfo(m_surface);
     m_surface_capabilities = info.surface_capabilities;
     m_surface_formats = info.surface_formats;
     m_surface_present_modes = info.surface_present_modes;
@@ -938,7 +954,7 @@ VkSwapchainCreateInfoKHR VkRenderFramework::GetDefaultSwapchainCreateInfo(VkSurf
 void VkRenderFramework::InitSwapchain(VkImageUsageFlags image_usage) {
     RETURN_IF_SKIP(InitSurface());
     InitSwapchainInfo();
-    m_swapchain = CreateSwapchain(m_surface.Handle(), image_usage, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
+    m_swapchain = CreateSwapchain(m_surface, image_usage, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR);
     ASSERT_TRUE(m_swapchain.initialized());
 }
 

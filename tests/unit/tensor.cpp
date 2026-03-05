@@ -13,6 +13,7 @@
 #include "containers/container_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/data_graph_objects.h"
 #include <vector>
 
 class NegativeTensor : public TensorTest {};
@@ -142,7 +143,7 @@ TEST_F(NegativeTensor, MaxTensorElements) {
     VkPhysicalDeviceTensorPropertiesARM tensor_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(tensor_props);
 
-    std::vector<int64_t> dims(tensor_props.maxTensorDimensionCount, UINT32_MAX);
+    std::vector<int64_t> dims(tensor_props.maxTensorDimensionCount, tensor_props.maxPerDimensionTensorElements - 1);
     desc.pDimensions = dims.data();
     desc.dimensionCount = tensor_props.maxTensorDimensionCount;
     desc.tiling = VK_TENSOR_TILING_OPTIMAL_ARM;
@@ -239,6 +240,52 @@ TEST_F(NegativeTensor, DimensionsHaveZeros) {
     desc.pStrides = nullptr;
 
     m_errorMonitor->SetDesiredError("VUID-VkTensorDescriptionARM-pDimensions-09734");
+    vkt::Tensor tensor(*m_device, info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, PerDimensionsMaxElement) {
+    TEST_DESCRIPTION("Test creating a tensor where the one of the dimensions is greater than maxPerDimensionTensorElements");
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    VkPhysicalDeviceTensorPropertiesARM tensor_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(tensor_props);
+    if (tensor_props.maxPerDimensionTensorElements == tensor_props.maxTensorElements) {
+        GTEST_SKIP() << "The test will fail if maxPerDimensionTensorElements is equal to maxTensorElements";
+    }
+
+    VkTensorDescriptionARM desc = DefaultDesc();
+    VkTensorCreateInfoARM info = DefaultCreateInfo(&desc);
+
+    std::vector<int64_t> dims{static_cast<int64_t>(tensor_props.maxPerDimensionTensorElements + 1), 1};
+    desc.dimensionCount = 2;
+    desc.pDimensions = dims.data();
+    desc.tiling = VK_TENSOR_TILING_OPTIMAL_ARM;
+    desc.pStrides = nullptr;
+
+    m_errorMonitor->SetDesiredError("VUID-VkTensorDescriptionARM-pDimensions-09883");
+    vkt::Tensor tensor(*m_device, info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, StridesAndDimensionsMaxElement) {
+    TEST_DESCRIPTION("Test creating a tensor where the multiplied strides and dimensions are greater than maxTensorSize");
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    VkPhysicalDeviceTensorPropertiesARM tensor_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(tensor_props);
+
+    VkTensorDescriptionARM desc = DefaultDesc();
+    VkTensorCreateInfoARM info = DefaultCreateInfo(&desc);
+    // We want to trigger the layer that checks if strides[0] * dims[0] > maxTensorSize
+    const std::vector<int64_t> strides{8};
+    std::vector<int64_t> dims{static_cast<int64_t>((tensor_props.maxTensorSize / strides[0]) + 10)};
+    desc.dimensionCount = 1;
+    desc.pDimensions = dims.data();
+    desc.format = VK_FORMAT_R64_UINT;
+    desc.pStrides = strides.data();
+
+    m_errorMonitor->SetDesiredError("VUID-VkTensorDescriptionARM-pStrides-09884");
     vkt::Tensor tensor(*m_device, info);
     m_errorMonitor->VerifyFound();
 }
@@ -346,7 +393,7 @@ TEST_F(NegativeTensor, StridesExtremes) {
     GetPhysicalDeviceProperties2(tensor_props);
 
     const std::vector<int64_t> dimensions{2ul, 2ul, 2ul, 2ul};
-    const std::vector<int64_t> strides{-1l, 0l, static_cast<int64_t>(tensor_props.maxTensorStride + 1), 1l};
+    const std::vector<int64_t> strides{0l, -1l, static_cast<int64_t>(tensor_props.maxTensorStride + 1), 1l};
     desc.pDimensions = dimensions.data();
     desc.dimensionCount = dimensions.size();
     desc.pStrides = strides.data();
@@ -356,7 +403,6 @@ TEST_F(NegativeTensor, StridesExtremes) {
     m_errorMonitor->SetDesiredError("VUID-VkTensorDescriptionARM-pStrides-09738");
 
     m_errorMonitor->SetDesiredError("VUID-VkTensorDescriptionARM-None-09740");
-    m_errorMonitor->SetDesiredError("VUID-VkTensorDescriptionARM-pStrides-09739");
     m_errorMonitor->SetDesiredError("VUID-VkTensorDescriptionARM-pStrides-09739");
     vkt::Tensor tensor(*m_device, info);
     m_errorMonitor->VerifyFound();
@@ -449,11 +495,11 @@ TEST_F(NegativeTensor, RebindTensor) {
     vkt::DeviceMemory memory_1(*m_device, tensor_alloc_info);
 
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = tensor.handle();
-    bind_info.memory = memory_0.handle();
+    bind_info.tensor = tensor;
+    bind_info.memory = memory_0;
 
     vk::BindTensorMemoryARM(*m_device, 1, &bind_info);
-    bind_info.memory = memory_1.handle();
+    bind_info.memory = memory_1;
     m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-tensor-09712");
     vk::BindTensorMemoryARM(*m_device, 1, &bind_info);
     m_errorMonitor->VerifyFound();
@@ -473,8 +519,8 @@ TEST_F(NegativeTensor, BindTensorInvalidOffset) {
     vkt::DeviceMemory memory(*m_device, tensor_alloc_info);
 
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = tensor.handle();
-    bind_info.memory = memory.handle();
+    bind_info.tensor = tensor;
+    bind_info.memory = memory;
     bind_info.memoryOffset = mem_reqs.memoryRequirements.size * 2 *
                              mem_reqs.memoryRequirements.alignment; /* Multiply by alignment to ensure that the offset is correctly
                                                                        aligned while still being larger than memory*/
@@ -499,8 +545,8 @@ TEST_F(NegativeTensor, BindTensorInvalidMemoryBits) {
     vkt::DeviceMemory memory(*m_device, tensor_alloc_info);
 
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = tensor.handle();
-    bind_info.memory = memory.handle();
+    bind_info.tensor = tensor;
+    bind_info.memory = memory;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-memory-09714");
     vk::BindTensorMemoryARM(*m_device, 1, &bind_info);
@@ -521,8 +567,8 @@ TEST_F(NegativeTensor, BindTensorOffsetNotAligned) {
     vkt::DeviceMemory memory(*m_device, tensor_alloc_info);
 
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = tensor.handle();
-    bind_info.memory = memory.handle();
+    bind_info.tensor = tensor;
+    bind_info.memory = memory;
     bind_info.memoryOffset = 3;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-memoryOffset-09715");
@@ -546,8 +592,8 @@ TEST_F(NegativeTensor, BindTensorMemoryTooSmall) {
         vkt::DeviceMemory memory(*m_device, tensor_alloc_info);
 
         VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-        bind_info.tensor = tensor.handle();
-        bind_info.memory = memory.handle();
+        bind_info.tensor = tensor;
+        bind_info.memory = memory;
 
         m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-size-09716");
         vk::BindTensorMemoryARM(*m_device, 1, &bind_info);
@@ -561,8 +607,8 @@ TEST_F(NegativeTensor, BindTensorMemoryTooSmall) {
         vkt::DeviceMemory memory(*m_device, tensor_alloc_info);
 
         VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-        bind_info.tensor = tensor.handle();
-        bind_info.memory = memory.handle();
+        bind_info.tensor = tensor;
+        bind_info.memory = memory;
         bind_info.memoryOffset = 64;
 
         m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-size-09716");
@@ -578,7 +624,7 @@ TEST_F(NegativeTensor, BindTensorDedicatedMemoryDifferentTensor) {
     vkt::Tensor tensor(*m_device);
 
     VkTensorMemoryRequirementsInfoARM req_info = vku::InitStructHelper();
-    req_info.tensor = tensor.handle();
+    req_info.tensor = tensor;
 
     VkMemoryDedicatedRequirements dedicated_reqs = vku::InitStructHelper();
     dedicated_reqs.requiresDedicatedAllocation = VK_TRUE;
@@ -587,7 +633,7 @@ TEST_F(NegativeTensor, BindTensorDedicatedMemoryDifferentTensor) {
     vk::GetTensorMemoryRequirementsARM(*m_device, &req_info, &mem_reqs);
 
     VkMemoryDedicatedAllocateInfoTensorARM dedicated_tensor_alloc_info = vku::InitStructHelper();
-    dedicated_tensor_alloc_info.tensor = tensor.handle();
+    dedicated_tensor_alloc_info.tensor = tensor;
     VkMemoryAllocateInfo tensor_alloc_info = vku::InitStructHelper();
     VkMemoryDedicatedAllocateInfo dedicated_alloc_info = vku::InitStructHelper();
     dedicated_alloc_info.pNext = &dedicated_tensor_alloc_info;
@@ -599,8 +645,8 @@ TEST_F(NegativeTensor, BindTensorDedicatedMemoryDifferentTensor) {
     vkt::Tensor wrong_tensor(*m_device);
 
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = wrong_tensor.handle();
-    bind_info.memory = memory.handle();
+    bind_info.tensor = wrong_tensor;
+    bind_info.memory = memory;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-tensor-09717");
     vk::BindTensorMemoryARM(*m_device, 1, &bind_info);
@@ -622,17 +668,17 @@ TEST_F(NegativeTensor, BindTensorNotProtectedToProtectedMemory) {
     vkt::Tensor unprotected_tensor(*m_device, unprotected_tensor_info);
     unprotected_tensor.GetMemoryReqs();
 
-    /* get protected memory (use requirements for protected tensor) */
+    // get protected memory (use requirements for protected tensor)
     VkMemoryRequirements2 mem_reqs = protected_tensor.GetMemoryReqs();
     VkMemoryAllocateInfo mem_alloc = vku::InitStructHelper();
     m_device->Physical().SetMemoryType(mem_reqs.memoryRequirements.memoryTypeBits, &mem_alloc, VK_MEMORY_PROPERTY_PROTECTED_BIT);
     mem_alloc.allocationSize = mem_reqs.memoryRequirements.size;
     vkt::DeviceMemory memory(*m_device, mem_alloc);
 
-    /* bind unprotected tensor with protected memory */
+    // bind unprotected tensor with protected memory
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = unprotected_tensor.handle();
-    bind_info.memory = memory.handle();
+    bind_info.tensor = unprotected_tensor;
+    bind_info.memory = memory;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-tensor-09719");
     // using the wrong type of memory also causes an error with memoryBits
@@ -654,17 +700,17 @@ TEST_F(NegativeTensor, BindTensorProtectedToNotProtectedMemory) {
     auto unprotected_tensor_info = DefaultCreateInfo(&tensor_desc);
     vkt::Tensor unprotected_tensor(*m_device, unprotected_tensor_info);
 
-    /* get unprotected memory (use requirements for unprotected tensor) */
+    // get unprotected memory (use requirements for unprotected tensor)
     VkMemoryRequirements2 mem_reqs = unprotected_tensor.GetMemoryReqs();
     VkMemoryAllocateInfo mem_alloc = vku::InitStructHelper();
     m_device->Physical().SetMemoryType(mem_reqs.memoryRequirements.memoryTypeBits, &mem_alloc, 0);
     mem_alloc.allocationSize = mem_reqs.memoryRequirements.size;
     vkt::DeviceMemory memory(*m_device, mem_alloc);
 
-    /* bind protected tensor with unprotected memory */
+    // bind protected tensor with unprotected memory
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = protected_tensor.handle();
-    bind_info.memory = memory.handle();
+    bind_info.tensor = protected_tensor;
+    bind_info.memory = memory;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-tensor-09718");
     // using the wrong type of memory also causes an error with memoryBits
@@ -699,13 +745,13 @@ TEST_F(NegativeTensor, BindTensorIncompatibleExportHandleType) {
     VkExportMemoryAllocateInfo export_memory_info = vku::InitStructHelper();
     export_memory_info.handleTypes = handle_type2;
     VkMemoryDedicatedAllocateInfoTensorARM dedicated_alloc_info = vku::InitStructHelper();
-    dedicated_alloc_info.tensor = tensor.handle();
+    dedicated_alloc_info.tensor = tensor;
     VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
     dedicated_info.pNext = &dedicated_alloc_info;
     export_memory_info.pNext = &dedicated_info;
 
     VkTensorMemoryRequirementsInfoARM req_info = vku::InitStructHelper();
-    req_info.tensor = tensor.handle();
+    req_info.tensor = tensor;
     VkMemoryRequirements2 mem_reqs = vku::InitStructHelper();
     vk::GetTensorMemoryRequirementsARM(device(), &req_info, &mem_reqs);
     const auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, mem_reqs.memoryRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -713,8 +759,8 @@ TEST_F(NegativeTensor, BindTensorIncompatibleExportHandleType) {
     vkt::DeviceMemory memory(*m_device, alloc_info);
 
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = tensor.handle();
-    bind_info.memory = memory.handle();
+    bind_info.tensor = tensor;
+    bind_info.memory = memory;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-memory-09895");
     vk::BindTensorMemoryARM(device(), 1, &bind_info);
@@ -771,13 +817,72 @@ TEST_F(NegativeTensor, BindTensorImportMemoryHandleType) {
 
     // Bind tensor (with handle_type1) and memory (with handle_type2)
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = tensor.handle();
-    bind_info.memory = memory.handle();
+    bind_info.tensor = tensor;
+    bind_info.memory = memory;
     m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-memory-09896");
     vk::BindTensorMemoryARM(device(), 1, &bind_info);
     m_errorMonitor->VerifyFound();
 
     ::operator delete(host_memory, std::align_val_t(alloc_size));
+}
+
+TEST_F(NegativeTensor, BindTensorCaptureNoDeviceMemFlag) {
+    TEST_DESCRIPTION("Test binding a capture replay tensor where the memory flag is incorrect");
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddressCaptureReplay);
+    AddRequiredFeature(vkt::Feature::descriptorBufferCaptureReplay);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    VkTensorDescriptionARM desc = DefaultDesc();
+    VkTensorCreateInfoARM info = DefaultCreateInfo(&desc);
+    info.flags = VK_TENSOR_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_ARM;
+
+    vkt::Tensor tensor(*m_device, info);
+    auto tensor_mem_reqs = tensor.GetMemoryReqs().memoryRequirements;
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT;
+    alloc_flags.deviceMask = 0x1;
+    VkMemoryAllocateInfo tensor_alloc_info = vku::InitStructHelper(&alloc_flags);
+    tensor_alloc_info.allocationSize = tensor_mem_reqs.size;
+    m_device->Physical().SetMemoryType(tensor_mem_reqs.memoryTypeBits, &tensor_alloc_info, 0);
+    vkt::DeviceMemory memory(*m_device, tensor_alloc_info);
+
+    VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
+    bind_info.tensor = tensor;
+    bind_info.memory = memory;
+
+    m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-tensor-09943");
+    vk::BindTensorMemoryARM(*m_device, 1, &bind_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, BindTensorCaptureNoCaptureMemFlag) {
+    TEST_DESCRIPTION("Test binding a capture replay tensor where the memory flag is partially incorrect");
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::descriptorBufferCaptureReplay);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    VkTensorDescriptionARM desc = DefaultDesc();
+    VkTensorCreateInfoARM info = DefaultCreateInfo(&desc);
+    info.flags = VK_TENSOR_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_ARM;
+
+    vkt::Tensor tensor(*m_device, info);
+    auto tensor_mem_reqs = tensor.GetMemoryReqs().memoryRequirements;
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    VkMemoryAllocateInfo tensor_alloc_info = vku::InitStructHelper(&alloc_flags);
+    tensor_alloc_info.allocationSize = tensor_mem_reqs.size;
+    m_device->Physical().SetMemoryType(tensor_mem_reqs.memoryTypeBits, &tensor_alloc_info, 0);
+    vkt::DeviceMemory memory(*m_device, tensor_alloc_info);
+
+    VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
+    bind_info.tensor = tensor;
+    bind_info.memory = memory;
+
+    m_errorMonitor->SetDesiredError("VUID-VkBindTensorMemoryInfoARM-tensor-09944");
+    vk::BindTensorMemoryARM(*m_device, 1, &bind_info);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeTensor, TensorViewFormatMismatch) {
@@ -787,7 +892,7 @@ TEST_F(NegativeTensor, TensorViewFormatMismatch) {
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = VK_FORMAT_R16_UINT;
 
     m_errorMonitor->SetDesiredError("VUID-VkTensorViewCreateInfoARM-tensor-09743");
@@ -804,7 +909,7 @@ TEST_F(NegativeTensor, TensorViewInvalidUsage) {
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
 
     m_errorMonitor->SetDesiredError("VUID-VkTensorViewCreateInfoARM-usage-09747");
@@ -818,7 +923,7 @@ TEST_F(NegativeTensor, TensorViewNonSparseNotBound) {
     vkt::Tensor tensor(*m_device);
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
 
     m_errorMonitor->SetDesiredError("VUID-VkTensorViewCreateInfoARM-tensor-09749");
@@ -836,7 +941,7 @@ TEST_F(NegativeTensor, TensorViewMutableNotCompatible) {
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = VK_FORMAT_R32_SFLOAT;
 
     m_errorMonitor->SetDesiredError("VUID-VkTensorViewCreateInfoARM-tensor-09744");
@@ -853,7 +958,7 @@ TEST_F(NegativeTensor, TensorViewDescriptorBuffer) {
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
     tensor_view_create_info.flags |= VK_TENSOR_VIEW_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_ARM;
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
 
     m_errorMonitor->SetDesiredError("VUID-VkTensorViewCreateInfoARM-flags-09745");
@@ -879,7 +984,7 @@ TEST_F(NegativeTensor, TensorViewOpaqueCaptureMissingFlag) {
     opaque_capture.opaqueCaptureDescriptorData = opaque_capture_descriptor_data.data();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
     tensor_view_create_info.pNext = &opaque_capture;
 
@@ -909,7 +1014,7 @@ TEST_F(NegativeTensor, TensorViewLinearMissingFeatureFlags) {
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
 
     if (!(lin_features & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT)) {
@@ -945,7 +1050,7 @@ TEST_F(NegativeTensor, TensorViewOptimalMissingFeatureFlags) {
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
 
     if (!(opt_features & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT)) {
@@ -962,6 +1067,11 @@ TEST_F(NegativeTensor, CopyTensorDifferentDimensionCounts) {
     TEST_DESCRIPTION("Test copying 2 tensors with different values for dimensionCount");
     RETURN_IF_SKIP(InitBasicTensor());
 
+    // src Tensor, default rank = 4
+    constexpr bool is_copy_tensor = true;
+    vkt::Tensor src_tensor(*m_device, is_copy_tensor);
+
+    // dst Tensor, make it different rank, 3
     auto dst_desc = DefaultDesc();
     std::vector<int64_t> dst_dimensions{2ul, 2ul, 2ul};
     dst_desc.pDimensions = dst_dimensions.data();
@@ -969,26 +1079,24 @@ TEST_F(NegativeTensor, CopyTensorDifferentDimensionCounts) {
     dst_desc.pStrides = nullptr;
     dst_desc.usage |= VK_TENSOR_USAGE_TRANSFER_DST_BIT_ARM;
     auto dst_info = DefaultCreateInfo(&dst_desc);
-
-    constexpr bool is_copy_tensor = true;
-    vkt::Tensor src_tensor(*m_device, is_copy_tensor);
     vkt::Tensor dst_tensor(*m_device, dst_info);
 
     src_tensor.BindToMem();
     dst_tensor.BindToMem();
 
     VkTensorCopyARM regions = vku::InitStructHelper();
-    regions.dimensionCount = dst_desc.dimensionCount;
+    // set this to max to avoid 09954
+    regions.dimensionCount = std::max(src_tensor.Description().dimensionCount, dst_desc.dimensionCount);
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-dimensionCount-09684");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1016,8 +1124,8 @@ TEST_F(NegativeTensor, CopyTensorDifferentDimensions) {
     regions.dimensionCount = dst_desc.dimensionCount;
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
@@ -1026,7 +1134,7 @@ TEST_F(NegativeTensor, CopyTensorDifferentDimensions) {
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-pDimensions-09685");
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-pDimensions-09685");
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-pDimensions-09685");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1048,14 +1156,14 @@ TEST_F(NegativeTensor, CopyTensorRegionCountTooLarge) {
     VkTensorCopyARM regions_arr[] = {regions, regions};
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 2;
     copy_info.pRegions = regions_arr;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-regionCount-09686");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1077,14 +1185,14 @@ TEST_F(NegativeTensor, CopyTensorSrcOffsetNotAllZero) {
     regions.pSrcOffset = src_offset.data();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-pRegions-09687");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1106,14 +1214,14 @@ TEST_F(NegativeTensor, CopyTensorDstOffsetNotAllZero) {
     regions.pDstOffset = dst_offset.data();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-pRegions-09688");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1135,8 +1243,8 @@ TEST_F(NegativeTensor, CopyTensorExtentDifferentToDimensions) {
     regions.pExtent = extent.data();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
@@ -1146,7 +1254,7 @@ TEST_F(NegativeTensor, CopyTensorExtentDifferentToDimensions) {
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-pRegions-09689");
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-pRegions-09689");
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-pRegions-09689");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1178,14 +1286,14 @@ TEST_F(NegativeTensor, CopyTensorSrcMissingFormatFeatures) {
     regions.dimensionCount = src_tensor.DimensionCount();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-srcTensor-09690");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1205,14 +1313,14 @@ TEST_F(NegativeTensor, CopyTensorSrcNoTransferBit) {
     regions.dimensionCount = src_tensor.DimensionCount();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-srcTensor-09691");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1244,14 +1352,14 @@ TEST_F(NegativeTensor, CopyTensorDstMissingFormatFeatures) {
     regions.dimensionCount = src_tensor.DimensionCount();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-dstTensor-09692");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1271,14 +1379,14 @@ TEST_F(NegativeTensor, CopyTensorDstNoTransferBit) {
     regions.dimensionCount = src_tensor.DimensionCount();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-dstTensor-09693");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1297,14 +1405,14 @@ TEST_F(NegativeTensor, CopyTensorSrcNotBound) {
     regions.dimensionCount = src_tensor.DimensionCount();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-srcTensor-09694");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1323,16 +1431,88 @@ TEST_F(NegativeTensor, CopyTensorDstNotBound) {
     regions.dimensionCount = src_tensor.DimensionCount();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-dstTensor-09695");
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
+}
+
+TEST_F(NegativeTensor, CopyTensorWrongRegionDimensionCount) {
+    TEST_DESCRIPTION("Copy 2 tensors but copy region has wrong dimensionCount");
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    constexpr bool is_copy_tensor = true;
+    vkt::Tensor src_tensor(*m_device, is_copy_tensor);
+    vkt::Tensor dst_tensor(*m_device, is_copy_tensor);
+
+    src_tensor.BindToMem();
+    dst_tensor.BindToMem();
+
+    VkTensorCopyARM regions = vku::InitStructHelper();
+    regions.dimensionCount = src_tensor.DimensionCount() - 1;  // should be identical
+
+    VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
+    copy_info.regionCount = 1;
+    copy_info.pRegions = &regions;
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-VkCopyTensorInfoARM-pRegions-09954");
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeTensor, CopyTensorRegionDimensionCountZero) {
+    TEST_DESCRIPTION(
+        "Copy 2 tensors with a region with non-zero dimensionCount but one of pSrcOffset, pDstOffset or pExtent is not NULL");
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    constexpr bool is_copy_tensor = true;
+    vkt::Tensor src_tensor(*m_device, is_copy_tensor);
+    vkt::Tensor dst_tensor(*m_device, is_copy_tensor);
+
+    src_tensor.BindToMem();
+    dst_tensor.BindToMem();
+
+    std::vector<VkTensorCopyARM> regions{vku::InitStructHelper()};
+    regions[0].dimensionCount = 0;
+
+    VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
+    copy_info.regionCount = 1;
+    copy_info.pRegions = regions.data();
+
+    // in turn, set each one of the 3 relevant vectors to point to some dummy data
+    // NOTE: the only reason we use the tensor pDimensions is to avoid VU 09689 on pExtent
+    const int64_t *dimensions = src_tensor.Description().pDimensions;
+    const std::vector<uint64_t> udims(dimensions, dimensions + src_tensor.Description().dimensionCount);
+    for (int i = 0; i < 3; i++) {
+        regions[0].pSrcOffset = nullptr;
+        regions[0].pDstOffset = nullptr;
+        regions[0].pExtent = nullptr;
+        if (i == 0) {
+            regions[0].pSrcOffset = udims.data();
+        } else if (i == 1) {
+            regions[0].pDstOffset = udims.data();
+        } else if (i == 2) {
+            regions[0].pExtent = udims.data();
+        }
+
+        m_command_buffer.Begin();
+        m_errorMonitor->SetDesiredError("VUID-VkTensorCopyARM-dimensionCount-09955");
+        vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
+        m_errorMonitor->VerifyFound();
+        m_command_buffer.End();
+    }
 }
 
 TEST_F(NegativeTensor, DestroyTensorInUse) {
@@ -1351,13 +1531,13 @@ TEST_F(NegativeTensor, DestroyTensorInUse) {
     regions.dimensionCount = src_tensor.DimensionCount();
 
     VkCopyTensorInfoARM copy_info = vku::InitStructHelper();
-    copy_info.srcTensor = src_tensor.handle();
-    copy_info.dstTensor = dst_tensor.handle();
+    copy_info.srcTensor = src_tensor;
+    copy_info.dstTensor = dst_tensor;
     copy_info.regionCount = 1;
     copy_info.pRegions = &regions;
 
     m_command_buffer.Begin();
-    vk::CmdCopyTensorARM(m_command_buffer.handle(), &copy_info);
+    vk::CmdCopyTensorARM(m_command_buffer, &copy_info);
     m_command_buffer.End();
 
     // Create a timeline semaphore block the command buffer
@@ -1387,15 +1567,15 @@ TEST_F(NegativeTensor, DestroyTensorInUse) {
 
     // Try destroying the tensor before signalling the semaphore
     m_errorMonitor->SetDesiredError("VUID-vkDestroyTensorARM-tensor-09730");
-    vk::DestroyTensorARM(*m_device, src_tensor.handle(), nullptr);
+    vk::DestroyTensorARM(*m_device, src_tensor, nullptr);
     m_errorMonitor->VerifyFound();
     m_errorMonitor->SetDesiredError("VUID-vkDestroyTensorARM-tensor-09730");
-    vk::DestroyTensorARM(*m_device, dst_tensor.handle(), nullptr);
+    vk::DestroyTensorARM(*m_device, dst_tensor, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Signal semaphore to finish execution
     VkSemaphoreSignalInfo signal_sem = vku::InitStructHelper();
-    signal_sem.semaphore = sem.handle();
+    signal_sem.semaphore = sem;
     signal_sem.value = 1;
     vk::SignalSemaphore(*m_device, &signal_sem);
 
@@ -1438,18 +1618,20 @@ TEST_F(NegativeTensor, DestroyTensorViewInUse) {
     AddRequiredFeature(vkt::Feature::timelineSemaphore);
     RETURN_IF_SKIP(InitBasicTensor());
 
-    vkt::Tensor tensor(*m_device);
+    VkTensorDescriptionARM desc = TensorShaderDesc();
+    VkTensorCreateInfoARM info = DefaultCreateInfo(&desc);
+    vkt::Tensor tensor(*m_device, info);
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
     vkt::TensorView view(*m_device, tensor_view_create_info);
 
     vkt::Buffer buffer(*m_device, tensor.GetMemoryReqs().memoryRequirements.size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
     CreateComputePipelineHelper pipe(*m_device);
-    pipe.cs_ = VkShaderObj::CreateFromGLSL(this, tensor_shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj::CreateFromGLSL(this, kMinimalTensorGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings = {
         {0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
@@ -1466,7 +1648,7 @@ TEST_F(NegativeTensor, DestroyTensorViewInUse) {
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1, &pipe.descriptor_set_.set_, 0,
                               nullptr);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
-    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     // Create a timeline semaphore block the command buffer
@@ -1500,7 +1682,7 @@ TEST_F(NegativeTensor, DestroyTensorViewInUse) {
 
     // Signal semaphore to finish execution
     VkSemaphoreSignalInfo signal_sem = vku::InitStructHelper();
-    signal_sem.semaphore = sem.handle();
+    signal_sem.semaphore = sem;
     signal_sem.value = 1;
     vk::SignalSemaphore(*m_device, &signal_sem);
 
@@ -1514,7 +1696,7 @@ TEST_F(NegativeTensor, DestroyTensorViewCreateWithDestroyWithoutCallbacks) {
     vkt::Tensor tensor(*m_device);
     tensor.BindToMem();
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
     VkTensorViewARM view;
     vk::CreateTensorViewARM(*m_device, &tensor_view_create_info, vkt::DefaultAllocator(), &view);
@@ -1532,7 +1714,7 @@ TEST_F(NegativeTensor, DestroyTensorViewCreateWithoutDestroyWithCallbacks) {
     vkt::Tensor tensor(*m_device);
     tensor.BindToMem();
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
     VkTensorViewARM view;
     vk::CreateTensorViewARM(*m_device, &tensor_view_create_info, nullptr, &view);
@@ -1549,7 +1731,7 @@ TEST_F(NegativeTensor, GetTensorOpaqueCaptureFeatureNotEnabled) {
 
     vkt::Tensor tensor(*m_device);
     VkTensorCaptureDescriptorDataInfoARM tensor_capture_desc_data_info = vku::InitStructHelper();
-    tensor_capture_desc_data_info.tensor = tensor.handle();
+    tensor_capture_desc_data_info.tensor = tensor;
     uint32_t data = 0;
     m_errorMonitor->SetDesiredError("VUID-vkGetTensorOpaqueCaptureDescriptorDataARM-descriptorBufferCaptureReplay-09702");
     vk::GetTensorOpaqueCaptureDescriptorDataARM(*m_device, &tensor_capture_desc_data_info, &data);
@@ -1564,7 +1746,7 @@ TEST_F(NegativeTensor, GetTensorOpaqueCaptureMissingFlag) {
 
     vkt::Tensor tensor(*m_device);
     VkTensorCaptureDescriptorDataInfoARM tensor_capture_desc_data_info = vku::InitStructHelper();
-    tensor_capture_desc_data_info.tensor = tensor.handle();
+    tensor_capture_desc_data_info.tensor = tensor;
     uint32_t data = 0;
     m_errorMonitor->SetDesiredError("VUID-VkTensorCaptureDescriptorDataInfoARM-tensor-09705");
     vk::GetTensorOpaqueCaptureDescriptorDataARM(*m_device, &tensor_capture_desc_data_info, &data);
@@ -1579,13 +1761,13 @@ TEST_F(NegativeTensor, GetTensorViewOpaqueCaptureFeatureNotEnabled) {
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
 
     vkt::TensorView view(*m_device, tensor_view_create_info);
 
     VkTensorViewCaptureDescriptorDataInfoARM tensor_capture_desc_data_info = vku::InitStructHelper();
-    tensor_capture_desc_data_info.tensorView = view.handle();
+    tensor_capture_desc_data_info.tensorView = view;
 
     uint32_t data = 0;
     m_errorMonitor->SetDesiredError("VUID-vkGetTensorViewOpaqueCaptureDescriptorDataARM-descriptorBufferCaptureReplay-09706");
@@ -1607,13 +1789,13 @@ TEST_F(NegativeTensor, GetTensorViewOpaqueCaptureMissingFlag) {
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
 
     vkt::TensorView view(*m_device, tensor_view_create_info);
 
     VkTensorViewCaptureDescriptorDataInfoARM tensor_capture_desc_data_info = vku::InitStructHelper();
-    tensor_capture_desc_data_info.tensorView = view.handle();
+    tensor_capture_desc_data_info.tensorView = view;
 
     uint32_t data = 0;
     m_errorMonitor->SetDesiredError("VUID-VkTensorViewCaptureDescriptorDataInfoARM-tensorView-09709");
@@ -1631,7 +1813,7 @@ TEST_F(NegativeTensor, MemoryDedicatedAllocateInfoTensorWrongAllocationSize) {
     VkMemoryRequirements2 mem_reqs = tensor.GetMemoryReqs();
 
     VkMemoryDedicatedAllocateInfoTensorARM dedicated_tensor_alloc_info = vku::InitStructHelper();
-    dedicated_tensor_alloc_info.tensor = tensor.handle();
+    dedicated_tensor_alloc_info.tensor = tensor;
     VkMemoryAllocateInfo tensor_alloc_info = vku::InitStructHelper();
     VkMemoryDedicatedAllocateInfo dedicated_alloc_info = vku::InitStructHelper();
     dedicated_alloc_info.pNext = &dedicated_tensor_alloc_info;
@@ -1652,7 +1834,7 @@ TEST_F(NegativeTensor, WriteDescriptorSetTensorInfoMissing) {
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
 
     vkt::TensorView view(*m_device, tensor_view_create_info);
@@ -1684,7 +1866,7 @@ TEST_F(NegativeTensor, WriteDescriptorSetTensorInfoWrongCount) {
     tensor.BindToMem();
 
     VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
-    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.tensor = tensor;
     tensor_view_create_info.format = tensor.Format();
 
     vkt::TensorView view(*m_device, tensor_view_create_info);
@@ -1696,8 +1878,7 @@ TEST_F(NegativeTensor, WriteDescriptorSetTensorInfoWrongCount) {
                                            {0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, tensor_binding_count, VK_SHADER_STAGE_ALL, nullptr},
                                        });
 
-    const VkTensorViewARM view_writes[tensor_binding_count] = {view.handle(), view.handle(), view.handle(), view.handle(),
-                                                               view.handle()};
+    const VkTensorViewARM view_writes[tensor_binding_count] = {view, view, view, view, view};
     VkWriteDescriptorSetTensorARM tensor_descriptor_write = vku::InitStructHelper();
     tensor_descriptor_write.tensorViewCount = tensor_binding_count;
     tensor_descriptor_write.pTensorViews = view_writes;
@@ -1749,7 +1930,7 @@ TEST_F(NegativeTensor, TensorMemoryBarrierSharingModeConcurrentSrcQueueFamilyNot
     barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
     barrier.srcQueueFamilyIndex = submit_family;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.tensor = tensor.handle();
+    barrier.tensor = tensor;
     VkTensorDependencyInfoARM barrier_dep_info = vku::InitStructHelper();
     barrier_dep_info.tensorMemoryBarrierCount = 1;
     barrier_dep_info.pTensorMemoryBarriers = &barrier;
@@ -1797,7 +1978,7 @@ TEST_F(NegativeTensor, TensorMemoryBarrierSharingModeConcurrentDstQueueFamilyNot
     barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = other_family;
-    barrier.tensor = tensor.handle();
+    barrier.tensor = tensor;
     VkTensorDependencyInfoARM barrier_dep_info = vku::InitStructHelper();
     barrier_dep_info.tensorMemoryBarrierCount = 1;
     barrier_dep_info.pTensorMemoryBarriers = &barrier;
@@ -1828,7 +2009,7 @@ TEST_F(NegativeTensor, TensorMemoryBarrierSrcQueueFamilyIgnoredDstSet) {
     barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = UINT32_MAX - 1;
-    barrier.tensor = tensor.handle();
+    barrier.tensor = tensor;
     VkTensorDependencyInfoARM barrier_dep_info = vku::InitStructHelper();
     barrier_dep_info.tensorMemoryBarrierCount = 1;
     barrier_dep_info.pTensorMemoryBarriers = &barrier;
@@ -1859,7 +2040,7 @@ TEST_F(NegativeTensor, TensorMemoryBarrierDstQueueFamilyIgnoredSrcSet) {
     barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
     barrier.srcQueueFamilyIndex = UINT32_MAX - 1;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.tensor = tensor.handle();
+    barrier.tensor = tensor;
     VkTensorDependencyInfoARM barrier_dep_info = vku::InitStructHelper();
     barrier_dep_info.tensorMemoryBarrierCount = 1;
     barrier_dep_info.pTensorMemoryBarriers = &barrier;
@@ -1906,14 +2087,14 @@ TEST_F(NegativeTensor, TensorMemoryBarrierWrongQueueFamilySets) {
     barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
     barrier.srcQueueFamilyIndex = queue_family;
     barrier.dstQueueFamilyIndex = queue_family;
-    barrier.tensor = tensor.handle();
+    barrier.tensor = tensor;
     VkTensorDependencyInfoARM barrier_dep_info = vku::InitStructHelper();
     barrier_dep_info.tensorMemoryBarrierCount = 1;
     barrier_dep_info.pTensorMemoryBarriers = &barrier;
     VkDependencyInfo dependency_info = vku::InitStructHelper(&barrier_dep_info);
 
     cmd_buff.Begin();
-    vk::CmdPipelineBarrier2(cmd_buff.handle(), &dependency_info);
+    vk::CmdPipelineBarrier2(cmd_buff, &dependency_info);
     cmd_buff.End();
 
     // Submit on the wrong queue
@@ -1944,7 +2125,7 @@ TEST_F(NegativeTensor, TensorMemoryBarrierTensorNotBound) {
     barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.tensor = tensor.handle();
+    barrier.tensor = tensor;
     VkTensorDependencyInfoARM barrier_dep_info = vku::InitStructHelper();
     barrier_dep_info.tensorMemoryBarrierCount = 1;
     barrier_dep_info.pTensorMemoryBarriers = &barrier;
@@ -1966,7 +2147,7 @@ TEST_F(NegativeTensor, BindTensorDedicatedMemoryOffsetNotZero) {
     vkt::Tensor tensor(*m_device);
 
     VkTensorMemoryRequirementsInfoARM req_info = vku::InitStructHelper();
-    req_info.tensor = tensor.handle();
+    req_info.tensor = tensor;
 
     VkMemoryDedicatedRequirements dedicated_reqs = vku::InitStructHelper();
     dedicated_reqs.requiresDedicatedAllocation = VK_TRUE;
@@ -1975,7 +2156,7 @@ TEST_F(NegativeTensor, BindTensorDedicatedMemoryOffsetNotZero) {
     vk::GetTensorMemoryRequirementsARM(*m_device, &req_info, &mem_reqs);
 
     VkMemoryDedicatedAllocateInfoTensorARM dedicated_tensor_alloc_info = vku::InitStructHelper();
-    dedicated_tensor_alloc_info.tensor = tensor.handle();
+    dedicated_tensor_alloc_info.tensor = tensor;
     VkMemoryAllocateInfo tensor_alloc_info = vku::InitStructHelper();
     VkMemoryDedicatedAllocateInfo dedicated_alloc_info = vku::InitStructHelper();
     dedicated_alloc_info.pNext = &dedicated_tensor_alloc_info;
@@ -1985,8 +2166,8 @@ TEST_F(NegativeTensor, BindTensorDedicatedMemoryOffsetNotZero) {
     vkt::DeviceMemory memory(*m_device, tensor_alloc_info);
 
     VkBindTensorMemoryInfoARM bind_info = vku::InitStructHelper();
-    bind_info.tensor = tensor.handle();
-    bind_info.memory = memory.handle();
+    bind_info.tensor = tensor;
+    bind_info.memory = memory;
     bind_info.memoryOffset = mem_reqs.memoryRequirements.alignment;
 
     // We expect this VUID error as the dedicated allocation size MUST match the requirements
@@ -2121,5 +2302,508 @@ TEST_F(NegativeTensor, DescriptorBindingUpdateAfterBindTensorNoFeature) {
     m_errorMonitor->SetDesiredError(
         "VUID-VkDescriptorSetLayoutBindingFlagsCreateInfo-descriptorBindingStorageTensorUpdateAfterBind-09697");
     vkt::DescriptorSetLayout(*m_device, create_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, DispatchShaderSpirvWrongUsage) {
+    TEST_DESCRIPTION("Use a tensor in a Spir-V shader with wrong usage");
+    AddRequiredExtensions(VK_ARM_DATA_GRAPH_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dataGraph);
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    VkTensorDescriptionARM desc = TensorShaderDesc();
+    desc.usage = VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM;  // error: MUST include VK_TENSOR_USAGE_SHADER_BIT_ARM
+
+    vkt::Tensor tensor(*m_device, desc);
+    tensor.BindToMem();
+
+    VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
+    tensor_view_create_info.tensor = tensor;
+    tensor_view_create_info.format = tensor.Format();
+    vkt::TensorView view(*m_device, tensor_view_create_info);
+
+    vkt::Buffer buffer(*m_device, tensor.GetMemoryReqs().memoryRequirements.size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    CreateComputePipelineHelper pipe(*m_device);
+    const std::string spirv_source = vkt::dg::DataGraphPipelineHelper::GetSpirvBasicShader();
+    pipe.cs_ = VkShaderObj(*m_device, spirv_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings = {
+        {0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+
+    pipe.dsl_bindings_.resize(bindings.size());
+    memcpy(pipe.dsl_bindings_.data(), bindings.data(), bindings.size() * sizeof(VkDescriptorSetLayoutBinding));
+    pipe.CreateComputePipeline();
+    pipe.descriptor_set_.WriteDescriptorTensorInfo(0, &view.handle());
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-pDescription-09900");
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeTensor, DispatchShaderSpirvMismatchedRank) {
+    TEST_DESCRIPTION("Use a tensor in a Spir-V shader with mismatched rank in Vulkan description and Spirv type");
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    VkTensorDescriptionARM desc = TensorShaderDesc();
+    std::vector<int64_t> dimensions{1, 4, 4};
+    desc.dimensionCount = dimensions.size();
+    desc.pDimensions = dimensions.data();
+
+    vkt::Tensor tensor(*m_device, desc);
+    tensor.BindToMem();
+
+    VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
+    tensor_view_create_info.tensor = tensor;
+    tensor_view_create_info.format = tensor.Format();
+    vkt::TensorView view(*m_device, tensor_view_create_info);
+
+    vkt::Buffer buffer(*m_device, tensor.GetMemoryReqs().memoryRequirements.size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    CreateComputePipelineHelper pipe(*m_device);
+    const std::string spirv_source = vkt::dg::DataGraphPipelineHelper::GetSpirvBasicShader();
+    pipe.cs_ = VkShaderObj(*m_device, spirv_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings = {
+        {0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+
+    pipe.dsl_bindings_.resize(bindings.size());
+    memcpy(pipe.dsl_bindings_.data(), bindings.data(), bindings.size() * sizeof(VkDescriptorSetLayoutBinding));
+    pipe.CreateComputePipeline();
+    pipe.descriptor_set_.WriteDescriptorTensorInfo(0, &view.handle());
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-dimensionCount-09905");
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeTensor, DispatchShaderSpirvWrongFormat) {
+    TEST_DESCRIPTION("Use a tensor in a Spir-V shader with mismatched VkFormat and Spirv type");
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    // the format matching the SPIRV is VK_FORMAT_R32_SINT: different type, sign or bit width must return an error
+    for (auto format : {VK_FORMAT_R8_SINT, VK_FORMAT_R32_UINT, VK_FORMAT_R32_SFLOAT, VK_FORMAT_R8_BOOL_ARM}) {
+        VkTensorDescriptionARM desc = DefaultDesc();
+        desc.pStrides = nullptr;
+        desc.format = format;
+
+        vkt::Tensor tensor(*m_device, desc);
+        tensor.BindToMem();
+
+        VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
+        tensor_view_create_info.tensor = tensor;
+        tensor_view_create_info.format = tensor.Format();
+        vkt::TensorView view(*m_device, tensor_view_create_info);
+
+        vkt::Buffer buffer(*m_device, tensor.GetMemoryReqs().memoryRequirements.size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+        CreateComputePipelineHelper pipe(*m_device);
+        const std::string spirv_source = vkt::dg::DataGraphPipelineHelper::GetSpirvBasicShader();
+        pipe.cs_ = VkShaderObj(*m_device, spirv_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+
+        std::vector<VkDescriptorSetLayoutBinding> bindings = {
+            {0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+            {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+
+        pipe.dsl_bindings_.resize(bindings.size());
+        memcpy(pipe.dsl_bindings_.data(), bindings.data(), bindings.size() * sizeof(VkDescriptorSetLayoutBinding));
+        pipe.CreateComputePipeline();
+        pipe.descriptor_set_.WriteDescriptorTensorInfo(0, &view.handle());
+        pipe.descriptor_set_.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        pipe.descriptor_set_.UpdateDescriptorSets();
+
+        m_command_buffer.Begin();
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                                &pipe.descriptor_set_.set_, 0, nullptr);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-OpTypeTensorARM-09906");
+        vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+        m_errorMonitor->VerifyFound();
+        m_command_buffer.End();
+    }
+}
+
+TEST_F(NegativeTensor, WrongStageInShader) {
+    TEST_DESCRIPTION("Try to create a shader with a tensor in the wrong stage.");
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    // trivial geometry shader with a dummy OpTypeTensorARM instruction thrown in
+    const char *spirv_string = R"(
+               OpCapability TensorsARM
+               OpCapability Shader
+               OpCapability Geometry
+               OpExtension "SPV_ARM_tensors"
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Geometry %main "main" %_
+               OpExecutionMode %main InputPoints
+               OpExecutionMode %main Invocations 1
+               OpExecutionMode %main OutputPoints
+               OpExecutionMode %main OutputVertices 1
+               OpDecorate %gl_PerVertex Block
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex 2 BuiltIn ClipDistance
+               OpMemberDecorate %gl_PerVertex 3 BuiltIn CullDistance
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+     %tensor = OpTypeTensorARM %uint %uint_1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+%gl_PerVertex = OpTypeStruct %v4float %float %_arr_float_uint_1 %_arr_float_uint_1
+%_ptr_Output_gl_PerVertex = OpTypePointer Output %gl_PerVertex
+          %_ = OpVariable %_ptr_Output_gl_PerVertex Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+    %float_1 = OpConstant %float 1
+  %float_0_5 = OpConstant %float 0.5
+    %float_0 = OpConstant %float 0
+         %20 = OpConstantComposite %v4float %float_1 %float_0_5 %float_0_5 %float_0
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+         %22 = OpAccessChain %_ptr_Output_v4float %_ %int_0
+               OpStore %22 %20
+               OpEmitVertex
+               OpReturn
+               OpFunctionEnd)";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-shaderTensorSupportedStages-09901");
+    VkShaderObj shader(*m_device, spirv_string, VK_SHADER_STAGE_GEOMETRY_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, GraphARMInShader) {
+    TEST_DESCRIPTION("Try to create a shader including the GraphARM capability.");
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    AddRequiredFeature(vkt::Feature::dataGraph);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    vkt::dg::ModifiableShaderParameters params;
+    params.capabilities = "OpCapability GraphARM";
+    const std::string spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifiableShader(params);
+
+    CreateComputePipelineHelper pipeline(*this);
+    // the GraphARM capability is caught also by spirv-val, causing 08737
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkShaderModuleCreateInfo-pCode-08737");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-GraphARM-09922");
+    VkShaderObj shader(*m_device, spirv_string.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, NoRankTensorInShader) {
+    TEST_DESCRIPTION("Try to create a shader including a tensor with no rank.");
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    vkt::dg::ModifiableShaderParameters params;
+    params.types = "%no_rank = OpTypeTensorARM %int";
+    const std::string spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifiableShader(params);
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeTensorARM-09907");
+    VkShaderObj shader(*m_device, spirv_string.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, ShapedTensorInShader) {
+    TEST_DESCRIPTION("Try to create a shader including a tensor with shape.");
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    vkt::dg::ModifiableShaderParameters params;
+    params.types = R"(%uint_arr_2 = OpTypeArray %uint %uint_2
+%shape_2x2 = OpConstantComposite %uint_arr_2 %uint_2 %uint_2
+%has_shape = OpTypeTensorARM %int %uint_2 %shape_2x2)";
+    const std::string spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifiableShader(params);
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeTensorARM-09902");
+    VkShaderObj shader(*m_device, spirv_string.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, TensorReadTooManyElementsInShader) {
+    TEST_DESCRIPTION("Try to read too many bytes from a tensor in a shader.");
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    // the values work with the mock ICD, but the test could fail on other systems
+    VkPhysicalDeviceTensorPropertiesARM tensor_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(tensor_properties);
+    if (tensor_properties.maxTensorShaderAccessSize > 32) {
+        GTEST_SKIP() << "The test will fail if maxTensorShaderAccessArrayLength > 32; the value on this system is "
+                     << tensor_properties.maxTensorShaderAccessArrayLength;
+    }
+
+    vkt::dg::ModifiableShaderParameters params;
+    params.types = R"(%uint_arr_1 = OpTypeArray %uint %uint_1
+%uint_32 = OpConstant %uint 32
+%int_arr_32 = OpTypeArray %int %uint_32
+%uint_arr_1_0 = OpConstantComposite %uint_arr_1 %uint_0)";
+    params.instructions = "%val = OpTensorReadARM %int_arr_32 %loaded_tens %uint_arr_1_0";
+    const std::string spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifiableShader(params);
+
+    // given the values in the mock ICD, an array exceeding rule 9903 also exceeds 9904
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTensorShaderAccessArrayLength-09903");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTensorShaderAccessSize-09904");
+    VkShaderObj shader(*m_device, spirv_string.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, TensorWriteTooManyElementsInShader) {
+    TEST_DESCRIPTION("Try to write too many bytes into a tensor in a shader.");
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    // the values work with the mock ICD, but the test could fail on other systems
+    VkPhysicalDeviceTensorPropertiesARM tensor_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(tensor_properties);
+    if (tensor_properties.maxTensorShaderAccessSize > 32) {
+        GTEST_SKIP() << "The test will fail if maxTensorShaderAccessArrayLength > 32; the value on this system is "
+                     << tensor_properties.maxTensorShaderAccessArrayLength;
+    }
+
+    vkt::dg::ModifiableShaderParameters params;
+    params.types = R"(%uint_arr_1 = OpTypeArray %uint %uint_1
+%uint_32 = OpConstant %uint 32
+%int_arr_32 = OpTypeArray %int %uint_32
+%int_0 = OpConstant %int 0
+%int_arr_32_all_0 = OpConstantComposite %int_arr_32
+    %int_0 %int_0 %int_0 %int_0 %int_0 %int_0 %int_0 %int_0
+    %int_0 %int_0 %int_0 %int_0 %int_0 %int_0 %int_0 %int_0
+    %int_0 %int_0 %int_0 %int_0 %int_0 %int_0 %int_0 %int_0
+    %int_0 %int_0 %int_0 %int_0 %int_0 %int_0 %int_0 %int_0
+%uint_arr_1_0 = OpConstantComposite %uint_arr_1 %uint_0)";
+    params.instructions = "OpTensorWriteARM %loaded_tens %uint_arr_1_0 %int_arr_32_all_0";
+    const std::string spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifiableShader(params);
+
+    // given the values in the mock ICD, an array exceeding rule 9903 also exceeds 9904
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTensorShaderAccessArrayLength-09903");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTensorShaderAccessSize-09904");
+    VkShaderObj shader(*m_device, spirv_string.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, TensorReadTooManyBytesInShader) {
+    TEST_DESCRIPTION("Try to read too many elements (but not bytes) from a tensor in a shader.");
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    // the values in the spirv work with the mock ICD, but the test could fail on other systems
+    VkPhysicalDeviceTensorPropertiesARM tensor_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(tensor_properties);
+    if (tensor_properties.maxTensorShaderAccessSize > 4) {
+        GTEST_SKIP() << "The test will fail if maxTensorShaderAccessSize > 4; the value on this system is "
+                     << tensor_properties.maxTensorShaderAccessSize;
+    }
+
+    vkt::dg::ModifiableShaderParameters params;
+    params.types = R"(%uint_arr_1 = OpTypeArray %uint %uint_1
+%int_arr_2 = OpTypeArray %int %uint_2
+%uint_arr_1_0 = OpConstantComposite %uint_arr_1 %uint_0)";
+    params.instructions = "%val = OpTensorReadARM %int_arr_2 %loaded_tens %uint_arr_1_0";
+    const std::string spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifiableShader(params);
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTensorShaderAccessSize-09904");
+    VkShaderObj shader(*m_device, spirv_string.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, TensorWriteTooManyBytesInShader) {
+    TEST_DESCRIPTION("Try to write too many elements (but not bytes) into a tensor in a shader.");
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    // the values in the spirv work with the mock ICD, but the test could fail on other systems
+    VkPhysicalDeviceTensorPropertiesARM tensor_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(tensor_properties);
+    if (tensor_properties.maxTensorShaderAccessSize > 4) {
+        GTEST_SKIP() << "The test will fail if maxTensorShaderAccessSize > 4; the value on this system is "
+                     << tensor_properties.maxTensorShaderAccessSize;
+    }
+
+    vkt::dg::ModifiableShaderParameters params;
+    params.types = R"(%uint_arr_1 = OpTypeArray %uint %uint_1
+%int_arr_2 = OpTypeArray %int %uint_2
+%int_0 = OpConstant %int 0
+%int_arr_2_0_0 = OpConstantComposite %int_arr_2 %int_0 %int_0
+%uint_arr_1_0 = OpConstantComposite %uint_arr_1 %uint_0)";
+    params.instructions = "OpTensorWriteARM %loaded_tens %uint_arr_1_0 %int_arr_2_0_0";
+    const std::string spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifiableShader(params);
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTensorShaderAccessSize-09904");
+    VkShaderObj shader(*m_device, spirv_string.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_4, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, DescriptorTensorNull) {
+    TEST_DESCRIPTION("DescriptorInfo with Tensor type and null pNext.");
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tensors);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+    uint8_t buffer[128];
+
+    VkDescriptorGetInfoEXT dgi = vku::InitStructHelper();
+    dgi.type = VK_DESCRIPTOR_TYPE_TENSOR_ARM;
+
+    m_errorMonitor->SetDesiredError("VUID-VkDescriptorGetInfoEXT-type-09701");
+    vk::GetDescriptorEXT(device(), &dgi, descriptor_buffer_properties.storageBufferDescriptorSize, &buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, ImportMemoryFdTensorDifferentDedicatedTensor) {
+    TEST_DESCRIPTION("Test imported memory tensor with different dedicated tensor");
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+    // Required to pass in various memory flags without querying for corresponding extensions.
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tensors);
+    RETURN_IF_SKIP(Init());
+
+    const std::vector<int64_t> dimensions{2ul};
+    VkTensorDescriptionARM tensor_desc = vku::InitStructHelper();
+    tensor_desc.tiling = VK_TENSOR_TILING_LINEAR_ARM;
+    tensor_desc.format = VK_FORMAT_R8_SINT;
+    tensor_desc.dimensionCount = dimensions.size();
+    tensor_desc.pDimensions = dimensions.data();
+    tensor_desc.pStrides = nullptr;
+    tensor_desc.usage = VK_TENSOR_USAGE_SHADER_BIT_ARM;
+
+    VkExternalMemoryTensorCreateInfoARM external_tensor_info = vku::InitStructHelper();
+    constexpr auto allowed_handle_bits = static_cast<VkExternalMemoryHandleTypeFlags>(VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT);
+
+    VkExternalMemoryHandleTypeFlags supported_handle_types = 0;
+    VkExternalMemoryHandleTypeFlags any_compatible_group = 0;
+    VkPhysicalDeviceExternalTensorInfoARM external_device_tensor_info = vku::InitStructHelper();
+    external_device_tensor_info.pDescription = &tensor_desc;
+    VkExternalTensorPropertiesARM external_tensor_properties = vku::InitStructHelper();
+
+    IterateFlags<VkExternalMemoryHandleTypeFlagBits>(allowed_handle_bits, [&](VkExternalMemoryHandleTypeFlagBits flag) {
+        external_device_tensor_info.handleType = flag;
+        vk::GetPhysicalDeviceExternalTensorPropertiesARM(m_device->Physical(), &external_device_tensor_info,
+                                                         &external_tensor_properties);
+        const auto features = external_tensor_properties.externalMemoryProperties.externalMemoryFeatures;
+        if (features & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) {
+            supported_handle_types |= flag;
+            any_compatible_group = external_tensor_properties.externalMemoryProperties.compatibleHandleTypes;
+        }
+    });
+
+    external_tensor_info.handleTypes = supported_handle_types;
+    if ((supported_handle_types & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT) == 0) {
+        GTEST_SKIP() << "Unable to find importable handle type";
+    }
+    VkTensorCreateInfoARM tensor_create_info = vku::InitStructHelper();
+    tensor_create_info.pDescription = &tensor_desc;
+    tensor_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    tensor_create_info.pNext = &external_tensor_info;
+
+    vkt::Tensor tensor(*m_device, tensor_create_info);
+    VkMemoryDedicatedAllocateInfoTensorARM dedicated_tensor_info = vku::InitStructHelper();
+    dedicated_tensor_info.tensor = tensor;
+
+    VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
+    dedicated_info.image = VK_NULL_HANDLE;
+    dedicated_info.buffer = VK_NULL_HANDLE;
+    dedicated_info.pNext = &dedicated_tensor_info;
+
+    VkExportMemoryAllocateInfo export_info = vku::InitStructHelper(&dedicated_info);
+    export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+    auto alloc_info =
+        vkt::DeviceMemory::GetResourceAllocInfo(*m_device, tensor.GetMemoryReqs().memoryRequirements, 0, &export_info);
+
+    vkt::DeviceMemory memory_export(*m_device, alloc_info);
+
+    VkMemoryGetFdInfoKHR mgfi = vku::InitStructHelper();
+    mgfi.memory = memory_export;
+    mgfi.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+    int fd;
+    vk::GetMemoryFdKHR(device(), &mgfi, &fd);
+
+    tensor_desc.usage = VK_TENSOR_USAGE_TRANSFER_DST_BIT_ARM;
+
+    vkt::Tensor tensor2(*m_device, tensor_create_info);
+
+    dedicated_tensor_info.tensor = tensor2;
+    dedicated_info.pNext = &dedicated_tensor_info;
+
+    VkImportMemoryFdInfoKHR import_info = vku::InitStructHelper(&dedicated_info);
+    import_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+    import_info.fd = fd;
+
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryDedicatedAllocateInfoTensorARM-tensor-09859");
+    alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, tensor2.GetMemoryReqs().memoryRequirements, 0, &import_info);
+    vkt::DeviceMemory memory_import(*m_device, alloc_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeTensor, WriteDescriptorSetTensorInfoNullViews) {
+    TEST_DESCRIPTION("Test writing a tensor descriptor with null tensor views");
+    RETURN_IF_SKIP(InitBasicTensor());
+
+    vkt::Tensor tensor(*m_device);
+    tensor.BindToMem();
+
+    VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
+    tensor_view_create_info.tensor = tensor.handle();
+    tensor_view_create_info.format = tensor.Format();
+
+    vkt::TensorView view(*m_device, tensor_view_create_info);
+
+    constexpr uint32_t tensor_binding_count = 1;
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, tensor_binding_count, VK_SHADER_STAGE_ALL, nullptr},
+                                       });
+    std::vector<VkTensorViewARM> views = {VK_NULL_HANDLE};
+    VkWriteDescriptorSetTensorARM tensor_descriptor_write = vku::InitStructHelper();
+    tensor_descriptor_write.tensorViewCount = views.size();
+    tensor_descriptor_write.pTensorViews = views.data();
+
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper(&tensor_descriptor_write);
+    descriptor_write.dstSet = descriptor_set.set_;
+    descriptor_write.dstBinding = 0;
+    descriptor_write.descriptorCount = tensor_binding_count;
+    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_TENSOR_ARM;
+
+    m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSetTensorARM-nullDescriptor-09898");
+    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
     m_errorMonitor->VerifyFound();
 }

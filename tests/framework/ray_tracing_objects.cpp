@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2024-2025 Valve Corporation
- * Copyright (c) 2024-2025 LunarG, Inc.
+ * Copyright (c) 2024-2026 Valve Corporation
+ * Copyright (c) 2024-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,20 @@ GeometryKHR &GeometryKHR::SetType(Type type) {
             vk_obj_.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
             vk_obj_.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
             vk_obj_.geometry.instances.pNext = nullptr;
+            break;
+        case Type::Spheres:
+            spheres_.sphere_geometry_ptr = std::make_shared<VkAccelerationStructureGeometrySpheresDataNV>();
+            spheres_.sphere_geometry_ptr->pNext = nullptr;
+            spheres_.sphere_geometry_ptr->sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_SPHERES_DATA_NV;
+            vk_obj_.geometryType = VK_GEOMETRY_TYPE_SPHERES_NV;
+            vk_obj_.pNext = static_cast<const void *>(spheres_.sphere_geometry_ptr.get());
+            break;
+        case Type::LSSpheres:
+            lsspheres_.sphere_geometry_ptr = std::make_shared<VkAccelerationStructureGeometryLinearSweptSpheresDataNV>();
+            lsspheres_.sphere_geometry_ptr->pNext = nullptr;
+            lsspheres_.sphere_geometry_ptr->sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_LINEAR_SWEPT_SPHERES_DATA_NV;
+            vk_obj_.geometryType = VK_GEOMETRY_TYPE_LINEAR_SWEPT_SPHERES_NV;
+            vk_obj_.pNext = static_cast<const void *>(lsspheres_.sphere_geometry_ptr.get());
             break;
         case Type::_INTERNAL_UNSPECIFIED:
             [[fallthrough]];
@@ -112,6 +126,8 @@ GeometryKHR &GeometryKHR::SetTrianglesDeviceIndexBuffer(vkt::Buffer &&index_buff
     vk_obj_.geometry.triangles.indexData.deviceAddress = triangles_.device_index_buffer.Address();
     return *this;
 }
+
+vkt::Buffer &GeometryKHR::GetTrianglesDeviceIndexBuffer() { return triangles_.device_index_buffer; }
 
 GeometryKHR &GeometryKHR::SetTrianglesHostIndexBuffer(std::unique_ptr<uint32_t[]> index_buffer) {
     triangles_.host_index_buffer = std::move(index_buffer);
@@ -184,11 +200,11 @@ GeometryKHR &GeometryKHR::SetAABBsDeviceAddress(VkDeviceAddress address) {
 GeometryKHR &GeometryKHR::AddInstanceDeviceAccelStructRef(const vkt::Device &device, VkAccelerationStructureKHR blas,
                                                           const VkAccelerationStructureInstanceKHR &instance) {
     auto vkGetAccelerationStructureDeviceAddressKHR = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(
-        vk::GetDeviceProcAddr(device.handle(), "vkGetAccelerationStructureDeviceAddressKHR"));
+        vk::GetDeviceProcAddr(device, "vkGetAccelerationStructureDeviceAddressKHR"));
     assert(vkGetAccelerationStructureDeviceAddressKHR);
     VkAccelerationStructureDeviceAddressInfoKHR blas_address_info = vku::InitStructHelper();
     blas_address_info.accelerationStructure = blas;
-    const VkDeviceAddress as_address = vkGetAccelerationStructureDeviceAddressKHR(device.handle(), &blas_address_info);
+    const VkDeviceAddress as_address = vkGetAccelerationStructureDeviceAddressKHR(device, &blas_address_info);
     // Ray Tracing gems 2, page 235, is a good reference on how to fill this affine transform
     // Noting M that transform, (x, y, z) a vertex, transformation is:
     // M * (x, y, z, 1) =
@@ -222,6 +238,13 @@ GeometryKHR &GeometryKHR::AddInstanceDeviceAccelStructRef(const vkt::Device &dev
     return *this;
 }
 
+void GeometryKHR::UpdateAccelerationStructureInstance(size_t i, std::function<void(VkAccelerationStructureInstanceKHR &)> f) {
+    assert(i < instances_.vk_instances.size());
+    f(instances_.vk_instances[i]);
+    auto instance_buffer_ptr = static_cast<VkAccelerationStructureInstanceKHR *>(instances_.buffer.Memory().Map());
+    f(instance_buffer_ptr[i]);
+}
+
 GeometryKHR &GeometryKHR::AddInstanceHostAccelStructRef(VkAccelerationStructureKHR blas) {
     instances_.vk_instances.emplace_back(VkAccelerationStructureInstanceKHR{});
     ++primitive_count_;
@@ -250,6 +273,203 @@ GeometryKHR &GeometryKHR::SetInstanceHostAddress(void *address) {
 
 GeometryKHR &GeometryKHR::SetInstanceShaderBindingTableRecordOffset(uint32_t instance_i, uint32_t instance_sbt_record_offset) {
     instances_.vk_instances[instance_i].instanceShaderBindingTableRecordOffset = instance_sbt_record_offset;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresDeviceVertexBuffer(vkt::Buffer &&vertex_buffer,
+                                                       VkFormat vertex_format /*= VK_FORMAT_R32G32B32_SFLOAT*/,
+                                                       VkDeviceSize stride /*= 3 * sizeof(float)*/) {
+    spheres_.device_vertex_buffer = std::move(vertex_buffer);
+    spheres_.sphere_geometry_ptr->vertexFormat = vertex_format;
+    spheres_.sphere_geometry_ptr->vertexData.deviceAddress = spheres_.device_vertex_buffer.Address();
+    spheres_.sphere_geometry_ptr->vertexStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresDeviceIndexBuffer(vkt::Buffer &&index_buffer,
+                                                      VkIndexType index_type /*= VK_INDEX_TYPE_UINT32*/) {
+    spheres_.device_index_buffer = std::move(index_buffer);
+    spheres_.sphere_geometry_ptr->indexType = index_type;
+    spheres_.sphere_geometry_ptr->indexData.deviceAddress = spheres_.device_index_buffer.Address();
+    spheres_.sphere_geometry_ptr->indexStride = sizeof(uint32_t);
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresDeviceRadiusBuffer(vkt::Buffer &&radius_buffer, VkDeviceSize stride /*=sizeof(float)*/) {
+    spheres_.device_radius_buffer = std::move(radius_buffer);
+    spheres_.sphere_geometry_ptr->radiusFormat = VK_FORMAT_R32_SFLOAT;
+    spheres_.sphere_geometry_ptr->radiusData.deviceAddress = spheres_.device_radius_buffer.Address();
+    spheres_.sphere_geometry_ptr->radiusStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresHostVertexBuffer(std::unique_ptr<float[]> &&vertex_buffer,
+                                                     VkDeviceSize stride /*= 3 * sizeof(float)*/) {
+    spheres_.host_vertex_buffer = std::move(vertex_buffer);
+    spheres_.sphere_geometry_ptr->vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+    spheres_.sphere_geometry_ptr->vertexData.hostAddress = spheres_.host_vertex_buffer.get();
+    spheres_.sphere_geometry_ptr->vertexStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresHostIndexBuffer(std::unique_ptr<uint32_t[]> index_buffer) {
+    spheres_.host_index_buffer = std::move(index_buffer);
+    spheres_.sphere_geometry_ptr->indexType = VK_INDEX_TYPE_UINT32;
+    spheres_.sphere_geometry_ptr->indexData.hostAddress = spheres_.host_index_buffer.get();
+    spheres_.sphere_geometry_ptr->indexStride = sizeof(uint32_t);
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresHostRadiusBuffer(std::unique_ptr<float[]> radius_buffer,
+                                                     VkDeviceSize stride /*=sizeof(float)*/) {
+    spheres_.host_radius_buffer = std::move(radius_buffer);
+    spheres_.sphere_geometry_ptr->radiusFormat = VK_FORMAT_R32_SFLOAT;
+    spheres_.sphere_geometry_ptr->radiusData.hostAddress = spheres_.host_radius_buffer.get();
+    spheres_.sphere_geometry_ptr->radiusStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresVertexStride(VkDeviceSize stride) {
+    spheres_.sphere_geometry_ptr->vertexStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresRadiusStride(VkDeviceSize stride) {
+    spheres_.sphere_geometry_ptr->radiusStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresVertexFormat(VkFormat vertex_format) {
+    spheres_.sphere_geometry_ptr->vertexFormat = vertex_format;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresRadiusFormat(VkFormat radius_format) {
+    spheres_.sphere_geometry_ptr->radiusFormat = radius_format;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresIndexType(VkIndexType index_type) {
+    spheres_.sphere_geometry_ptr->indexType = index_type;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresIndexAddressZero() {
+    spheres_.sphere_geometry_ptr->indexData.deviceAddress = 0;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresVertexAddressZero() {
+    spheres_.sphere_geometry_ptr->vertexData.deviceAddress = 0;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetSpheresRadiusAddressZero() {
+    spheres_.sphere_geometry_ptr->radiusData.deviceAddress = 0;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresDeviceVertexBuffer(vkt::Buffer &&vertex_buffer,
+                                                         VkFormat vertex_format /*= VK_FORMAT_R32G32B32_SFLOAT*/,
+                                                         VkDeviceSize stride /*= 3 * sizeof(float)*/) {
+    lsspheres_.device_vertex_buffer = std::move(vertex_buffer);
+    lsspheres_.sphere_geometry_ptr->vertexFormat = vertex_format;
+    lsspheres_.sphere_geometry_ptr->vertexData.deviceAddress = lsspheres_.device_vertex_buffer.Address();
+    lsspheres_.sphere_geometry_ptr->vertexStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresDeviceIndexBuffer(vkt::Buffer &&index_buffer,
+                                                        VkIndexType index_type /*= VK_INDEX_TYPE_UINT32*/) {
+    lsspheres_.device_index_buffer = std::move(index_buffer);
+    lsspheres_.sphere_geometry_ptr->indexType = index_type;
+    lsspheres_.sphere_geometry_ptr->indexData.deviceAddress = lsspheres_.device_index_buffer.Address();
+    lsspheres_.sphere_geometry_ptr->indexStride = sizeof(uint32_t);
+    lsspheres_.sphere_geometry_ptr->indexingMode = VK_RAY_TRACING_LSS_INDEXING_MODE_SUCCESSIVE_NV;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresDeviceRadiusBuffer(vkt::Buffer &&radius_buffer, VkDeviceSize stride /*=sizeof(float)*/) {
+    lsspheres_.device_radius_buffer = std::move(radius_buffer);
+    lsspheres_.sphere_geometry_ptr->radiusFormat = VK_FORMAT_R32_SFLOAT;
+    lsspheres_.sphere_geometry_ptr->radiusData.deviceAddress = lsspheres_.device_radius_buffer.Address();
+    lsspheres_.sphere_geometry_ptr->radiusStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresHostVertexBuffer(std::unique_ptr<float[]> &&vertex_buffer,
+                                                       VkDeviceSize stride /*= 3 * sizeof(float)*/) {
+    lsspheres_.host_vertex_buffer = std::move(vertex_buffer);
+    lsspheres_.sphere_geometry_ptr->vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+    lsspheres_.sphere_geometry_ptr->vertexData.hostAddress = lsspheres_.host_vertex_buffer.get();
+    lsspheres_.sphere_geometry_ptr->vertexStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresHostIndexBuffer(std::unique_ptr<uint32_t[]> index_buffer) {
+    lsspheres_.host_index_buffer = std::move(index_buffer);
+    lsspheres_.sphere_geometry_ptr->indexType = VK_INDEX_TYPE_UINT32;
+    lsspheres_.sphere_geometry_ptr->indexData.hostAddress = lsspheres_.host_index_buffer.get();
+    lsspheres_.sphere_geometry_ptr->indexStride = sizeof(uint32_t);
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresHostRadiusBuffer(std::unique_ptr<float[]> radius_buffer,
+                                                       VkDeviceSize stride /*=sizeof(float)*/) {
+    lsspheres_.host_radius_buffer = std::move(radius_buffer);
+    lsspheres_.sphere_geometry_ptr->radiusFormat = VK_FORMAT_R32_SFLOAT;
+    lsspheres_.sphere_geometry_ptr->radiusData.hostAddress = lsspheres_.host_radius_buffer.get();
+    lsspheres_.sphere_geometry_ptr->radiusStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresVertexStride(VkDeviceSize stride) {
+    lsspheres_.sphere_geometry_ptr->vertexStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresRadiusStride(VkDeviceSize stride) {
+    lsspheres_.sphere_geometry_ptr->radiusStride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresVertexFormat(VkFormat vertex_format) {
+    lsspheres_.sphere_geometry_ptr->vertexFormat = vertex_format;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresRadiusFormat(VkFormat radius_format) {
+    lsspheres_.sphere_geometry_ptr->radiusFormat = radius_format;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresIndexType(VkIndexType index_type) {
+    lsspheres_.sphere_geometry_ptr->indexType = index_type;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresIndexingMode(VkRayTracingLssIndexingModeNV index_mode) {
+    lsspheres_.sphere_geometry_ptr->indexingMode = index_mode;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresIndexDataNull() {
+    lsspheres_.sphere_geometry_ptr->indexData = {};
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresIndexAddressZero() {
+    lsspheres_.sphere_geometry_ptr->indexData.deviceAddress = 0;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresVertexAddressZero() {
+    lsspheres_.sphere_geometry_ptr->vertexData.deviceAddress = 0;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetLSSpheresRadiusAddressZero() {
+    lsspheres_.sphere_geometry_ptr->radiusData.deviceAddress = 0;
     return *this;
 }
 
@@ -343,7 +563,7 @@ void AccelerationStructureKHR::Create() {
             device_buffer_.Init(*device_, ci, buffer_memory_property_flags_, &alloc_flags);
         }
     }
-    vk_info_.buffer = device_buffer_.handle();
+    vk_info_.buffer = device_buffer_;
 
     // Create acceleration structure
     VkAccelerationStructureKHR handle;
@@ -918,6 +1138,166 @@ GeometryKHR GeometrySimpleOnDeviceIndexedTriangleInfo(const vkt::Device &device,
     return triangle_geometry;
 }
 
+GeometryKHR GeometrySimpleOnDeviceSpheresInfo(const vkt::Device &device) {
+    GeometryKHR sphere_geometry;
+    sphere_geometry.SetType(GeometryKHR::Type::Spheres);
+
+    // Allocate vertex and index buffers
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    const VkBufferUsageFlags buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+                                            VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
+                                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    vkt::Buffer vertex_buffer(device, 1024, buffer_usage,
+                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
+    vkt::Buffer index_buffer(device, 1024, buffer_usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                             &alloc_flags);
+    vkt::Buffer radius_buffer(device, 1024, buffer_usage,
+                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
+
+    // Fill vertex and index buffers with one sphere
+    sphere_geometry.SetPrimitiveCount(1);
+    constexpr std::array vertices = {
+        -8.0f, 7.0f,  -15.0f, 7.0f, 7.0f,  -15.0f, 6.0f, 6.0f,  -15.0f, -7.0f, 5.0f,  -15.0f,
+        -8.0f, 3.0f,  -15.0f, 4.0f, 2.0f,  -15.0f, 6.0f, 1.0f,  -15.0f, -9.0f, 1.0f,  -15.0f,
+        -6.0f, 0.0f,  -15.0f, 5.0f, -1.0f, -15.0f, 8.0f, -2.0f, -15.0f, -8.0f, -3.0f, -15.0f,
+        -6.0f, -5.0f, -15.0f, 7.0f, -6.0f, -15.0f, 5.0f, -7.0f, -15.0f, -8.0f, -6.0f, -15.0f,
+    };
+    constexpr std::array<uint32_t, 8> indices = {15, 13, 11, 9, 7, 5, 3, 1};
+    constexpr std::array radius = {
+        0.5f, 0.6f, 0.7f, 0.8f, 0.6f, 0.5f, 0.9f, 0.4f, 0.7f, 0.6f, 0.9f, 0.5f, 0.9f, 0.6f, 0.8f, 0.5f,
+    };
+
+    auto mapped_vbo_buffer_data = static_cast<float *>(vertex_buffer.Memory().Map());
+    std::copy(vertices.begin(), vertices.end(), mapped_vbo_buffer_data);
+    vertex_buffer.Memory().Unmap();
+    auto mapped_ibo_buffer_data = static_cast<uint32_t *>(index_buffer.Memory().Map());
+    std::copy(indices.begin(), indices.end(), mapped_ibo_buffer_data);
+    index_buffer.Memory().Unmap();
+    auto mapped_rbo_buffer_data = static_cast<float *>(radius_buffer.Memory().Map());
+    std::copy(radius.begin(), radius.end(), mapped_rbo_buffer_data);
+    radius_buffer.Memory().Unmap();
+
+    // Assign vertex and index buffers to out geometry
+    sphere_geometry.SetSpheresDeviceVertexBuffer(std::move(vertex_buffer));
+    sphere_geometry.SetSpheresDeviceIndexBuffer(std::move(index_buffer));
+    sphere_geometry.SetSpheresDeviceRadiusBuffer(std::move(radius_buffer));
+    return sphere_geometry;
+}
+
+GeometryKHR GeometrySimpleOnHostSpheresInfo() {
+    GeometryKHR sphere_geometry;
+    sphere_geometry.SetType(GeometryKHR::Type::Spheres);
+
+    // Fill vertex and index buffers with sphere
+    constexpr std::array vertices = {
+        -8.0f, 7.0f,  -15.0f, 7.0f, 7.0f,  -15.0f, 6.0f, 6.0f,  -15.0f, -7.0f, 5.0f,  -15.0f,
+        -8.0f, 3.0f,  -15.0f, 4.0f, 2.0f,  -15.0f, 6.0f, 1.0f,  -15.0f, -9.0f, 1.0f,  -15.0f,
+        -6.0f, 0.0f,  -15.0f, 5.0f, -1.0f, -15.0f, 8.0f, -2.0f, -15.0f, -8.0f, -3.0f, -15.0f,
+        -6.0f, -5.0f, -15.0f, 7.0f, -6.0f, -15.0f, 5.0f, -7.0f, -15.0f, -8.0f, -6.0f, -15.0f,
+    };
+    constexpr std::array<uint32_t, 8> indices = {15, 13, 11, 9, 7, 5, 3, 1};
+    constexpr std::array radius = {
+        0.5f, 0.6f, 0.7f, 0.8f, 0.6f, 0.5f, 0.9f, 0.4f, 0.7f, 0.6f, 0.9f, 0.5f, 0.9f, 0.6f, 0.8f, 0.5f,
+    };
+
+    sphere_geometry.SetPrimitiveCount(1);
+    auto vertex_buffer = std::make_unique<float[]>(vertices.size());
+    std::copy(vertices.data(), vertices.data() + vertices.size(), vertex_buffer.get());
+    auto index_buffer = std::make_unique<uint32_t[]>(indices.size());
+    std::copy(indices.data(), indices.data() + indices.size(), index_buffer.get());
+    auto radius_buffer = std::make_unique<float[]>(radius.size());
+    std::copy(radius.data(), radius.data() + radius.size(), radius_buffer.get());
+    sphere_geometry.SetSpheresHostVertexBuffer(std::move(vertex_buffer));
+    sphere_geometry.SetSpheresHostIndexBuffer(std::move(index_buffer));
+    sphere_geometry.SetSpheresHostRadiusBuffer(std::move(radius_buffer));
+
+    return sphere_geometry;
+}
+
+GeometryKHR GeometrySimpleOnDeviceLSSpheresInfo(const vkt::Device &device) {
+    GeometryKHR sphere_geometry;
+    sphere_geometry.SetType(GeometryKHR::Type::LSSpheres);
+
+    // Allocate vertex and index buffers
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    const VkBufferUsageFlags buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+                                            VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
+                                            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    vkt::Buffer vertex_buffer(device, 1024, buffer_usage,
+                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
+    vkt::Buffer index_buffer(device, 1024, buffer_usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                             &alloc_flags);
+    vkt::Buffer radius_buffer(device, 1024, buffer_usage,
+                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
+
+    // Fill vertex and index buffers with one sphere
+    sphere_geometry.SetPrimitiveCount(1);
+    constexpr std::array vertices = {
+        -8.0f, 7.0f,  -15.0f, 7.0f, 7.0f,  -15.0f, 6.0f, 6.0f,  -15.0f, -7.0f, 5.0f,  -15.0f,
+        -8.0f, 3.0f,  -15.0f, 4.0f, 2.0f,  -15.0f, 6.0f, 1.0f,  -15.0f, -9.0f, 1.0f,  -15.0f,
+        -6.0f, 0.0f,  -15.0f, 5.0f, -1.0f, -15.0f, 8.0f, -2.0f, -15.0f, -8.0f, -3.0f, -15.0f,
+        -6.0f, -5.0f, -15.0f, 7.0f, -6.0f, -15.0f, 5.0f, -7.0f, -15.0f, -8.0f, -6.0f, -15.0f,
+    };
+    constexpr std::array<uint32_t, 12> indices = {
+        0, 2, 2, 4, 4, 6, 8, 10, 10, 12, 12, 14,
+    };
+    constexpr std::array radius = {
+        0.5f, 0.6f, 0.7f, 0.8f, 0.6f, 0.5f, 0.9f, 0.4f, 0.7f, 0.6f, 0.9f, 0.5f, 0.9f, 0.6f, 0.8f, 0.5f,
+    };
+
+    auto mapped_vbo_buffer_data = static_cast<float *>(vertex_buffer.Memory().Map());
+    std::copy(vertices.begin(), vertices.end(), mapped_vbo_buffer_data);
+    vertex_buffer.Memory().Unmap();
+    auto mapped_ibo_buffer_data = static_cast<uint32_t *>(index_buffer.Memory().Map());
+    std::copy(indices.begin(), indices.end(), mapped_ibo_buffer_data);
+    index_buffer.Memory().Unmap();
+    auto mapped_rbo_buffer_data = static_cast<float *>(radius_buffer.Memory().Map());
+    std::copy(radius.begin(), radius.end(), mapped_rbo_buffer_data);
+    radius_buffer.Memory().Unmap();
+
+    // Assign vertex and index buffers to out geometry
+    sphere_geometry.SetLSSpheresDeviceVertexBuffer(std::move(vertex_buffer));
+    sphere_geometry.SetLSSpheresDeviceIndexBuffer(std::move(index_buffer));
+    sphere_geometry.SetLSSpheresDeviceRadiusBuffer(std::move(radius_buffer));
+
+    return sphere_geometry;
+}
+
+GeometryKHR GeometrySimpleOnHostLSSpheresInfo() {
+    GeometryKHR sphere_geometry;
+    sphere_geometry.SetType(GeometryKHR::Type::LSSpheres);
+
+    // Fill vertex and index buffers with sphere
+    constexpr std::array vertices = {
+        -8.0f, 7.0f,  -15.0f, 7.0f, 7.0f,  -15.0f, 6.0f, 6.0f,  -15.0f, -7.0f, 5.0f,  -15.0f,
+        -8.0f, 3.0f,  -15.0f, 4.0f, 2.0f,  -15.0f, 6.0f, 1.0f,  -15.0f, -9.0f, 1.0f,  -15.0f,
+        -6.0f, 0.0f,  -15.0f, 5.0f, -1.0f, -15.0f, 8.0f, -2.0f, -15.0f, -8.0f, -3.0f, -15.0f,
+        -6.0f, -5.0f, -15.0f, 7.0f, -6.0f, -15.0f, 5.0f, -7.0f, -15.0f, -8.0f, -6.0f, -15.0f,
+    };
+    constexpr std::array<uint32_t, 12> indices = {
+        0, 2, 2, 4, 4, 6, 8, 10, 10, 12, 12, 14,
+    };
+    constexpr std::array radius = {
+        0.5f, 0.6f, 0.7f, 0.8f, 0.6f, 0.5f, 0.9f, 0.4f, 0.7f, 0.6f, 0.9f, 0.5f, 0.9f, 0.6f, 0.8f, 0.5f,
+    };
+
+    sphere_geometry.SetPrimitiveCount(1);
+    auto vertex_buffer = std::make_unique<float[]>(vertices.size());
+    std::copy(vertices.data(), vertices.data() + vertices.size(), vertex_buffer.get());
+    auto index_buffer = std::make_unique<uint32_t[]>(indices.size());
+    std::copy(indices.data(), indices.data() + indices.size(), index_buffer.get());
+    auto radius_buffer = std::make_unique<float[]>(radius.size());
+    std::copy(radius.data(), radius.data() + radius.size(), radius_buffer.get());
+    sphere_geometry.SetLSSpheresHostVertexBuffer(std::move(vertex_buffer));
+    sphere_geometry.SetLSSpheresHostIndexBuffer(std::move(index_buffer));
+    sphere_geometry.SetLSSpheresHostRadiusBuffer(std::move(radius_buffer));
+    return sphere_geometry;
+}
+
 GeometryKHR GeometrySimpleOnDeviceTriangleInfo(const vkt::Device &device, VkBufferUsageFlags additional_geometry_buffer_flags) {
     GeometryKHR triangle_geometry;
 
@@ -1216,6 +1596,12 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceBottomLevel(const vkt::Devic
             break;
         case GeometryKHR::Type::Instance:
             [[fallthrough]];
+        case GeometryKHR::Type::Spheres:
+            geometry = GeometrySimpleOnDeviceSpheresInfo(device);
+            break;
+        case GeometryKHR::Type::LSSpheres:
+            geometry = GeometrySimpleOnDeviceLSSpheresInfo(device);
+            break;
         case GeometryKHR::Type::_INTERNAL_UNSPECIFIED:
             assert(false);
             break;
@@ -1267,6 +1653,12 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostBottomLevel(const vkt::Device 
         case GeometryKHR::Type::AABB:
             geometries.emplace_back(GeometrySimpleOnHostAABBInfo());
             break;
+        case GeometryKHR::Type::Spheres:
+            geometries.emplace_back(GeometrySimpleOnHostSpheresInfo());
+            break;
+        case GeometryKHR::Type::LSSpheres:
+            geometries.emplace_back(GeometrySimpleOnHostLSSpheresInfo());
+            break;
         case GeometryKHR::Type::Instance:
             [[fallthrough]];
         case GeometryKHR::Type::_INTERNAL_UNSPECIFIED:
@@ -1301,7 +1693,7 @@ vkt::as::BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceTopLevel(const vkt:
 
     // Set geometry to one instance pointing to bottom level acceleration structure
     std::vector<GeometryKHR> geometries;
-    geometries.emplace_back(GeometrySimpleDeviceInstance(device, on_device_blas.handle()));
+    geometries.emplace_back(GeometrySimpleDeviceInstance(device, on_device_blas));
     out_build_info.SetGeometries(std::move(geometries));
     out_build_info.SetBuildRanges(out_build_info.GetBuildRangeInfosFromGeometries());
 
@@ -1389,12 +1781,6 @@ vkt::as::BuildGeometryInfoKHR GetCubesTLAS(vkt::Device &device, vkt::CommandBuff
     queue.Submit(cb);
     device.Wait();
 
-    vkt::as::BuildGeometryInfoKHR tlas(&device);
-
-    tlas.SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
-    tlas.SetBuildType(VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR);
-    tlas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR);
-
     std::vector<vkt::as::GeometryKHR> cube_instances(1);
     cube_instances[0].SetType(vkt::as::GeometryKHR::Type::Instance);
 
@@ -1422,22 +1808,10 @@ vkt::as::BuildGeometryInfoKHR GetCubesTLAS(vkt::Device &device, vkt::CommandBuff
     cube_instance_2.instanceCustomIndex = 0;
     // Cube instance 2 will be associated to closest hit shader 2
     cube_instance_2.instanceShaderBindingTableRecordOffset = 1;
+
     cube_instances[0].AddInstanceDeviceAccelStructRef(device, out_cube_blas->GetDstAS()->handle(), cube_instance_2);
 
-    tlas.SetGeometries(std::move(cube_instances));
-    tlas.SetBuildRanges(tlas.GetBuildRangeInfosFromGeometries());
-
-    // Set source and destination acceleration structures info. Does not create handles, it is done in Build()
-    tlas.SetSrcAS(vkt::as::blueprint::AccelStructNull(device));
-    auto dstAsSize = tlas.GetSizeInfo().accelerationStructureSize;
-    auto dst_as = vkt::as::blueprint::AccelStructSimpleOnDeviceBottomLevel(device, dstAsSize);
-    dst_as->SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
-    tlas.SetDstAS(std::move(dst_as));
-    tlas.SetUpdateDstAccelStructSizeBeforeBuild(true);
-
-    tlas.SetInfoCount(1);
-    tlas.SetNullInfos(false);
-    tlas.SetNullBuildRangeInfos(false);
+    vkt::as::BuildGeometryInfoKHR tlas = CreateTLAS(device, std::move(cube_instances));
 
     cb.Begin();
     tlas.BuildCmdBuffer(cb);
@@ -1445,6 +1819,30 @@ vkt::as::BuildGeometryInfoKHR GetCubesTLAS(vkt::Device &device, vkt::CommandBuff
 
     queue.Submit(cb);
     device.Wait();
+
+    return tlas;
+}
+
+vkt::as::BuildGeometryInfoKHR CreateTLAS(vkt::Device &device, std::vector<vkt::as::GeometryKHR> &&blas_vec) {
+    vkt::as::BuildGeometryInfoKHR tlas(&device);
+
+    tlas.SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
+    tlas.SetBuildType(VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR);
+    tlas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR);
+
+    tlas.SetGeometries(std::move(blas_vec));
+    tlas.SetBuildRanges(tlas.GetBuildRangeInfosFromGeometries());
+
+    // Set source and destination acceleration structures info. Does not create handles, it is done in Build()
+    tlas.SetSrcAS(vkt::as::blueprint::AccelStructNull(device));
+    const VkDeviceSize dst_as_size = tlas.GetSizeInfo().accelerationStructureSize;
+    auto dst_as = vkt::as::blueprint::AccelStructSimpleOnDeviceTopLevel(device, dst_as_size);
+    tlas.SetDstAS(std::move(dst_as));
+    tlas.SetUpdateDstAccelStructSizeBeforeBuild(true);
+
+    tlas.SetInfoCount(1);
+    tlas.SetNullInfos(false);
+    tlas.SetNullBuildRangeInfos(false);
 
     return tlas;
 }
@@ -1520,47 +1918,49 @@ void Pipeline::SetPipelineSetLayouts(uint32_t set_layout_count, const VkDescript
 
 void Pipeline::SetPushConstantRangeSize(uint32_t byte_size) { push_constant_range_size_ = byte_size; }
 
-void Pipeline::SetGlslRayGenShader(const char *glsl, void *pNext) {
-    ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, glsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2,
-                                                                SPV_SOURCE_GLSL, nullptr, "main", pNext));
+void Pipeline::SetGlslRayGenShader(const char* glsl, const void* shader_module_create_info_pnext,
+                                   const void* pipeline_shader_stage_create_info_pNext) {
+    ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(*device_, glsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2,
+                                                                SPV_SOURCE_GLSL, nullptr, "main", shader_module_create_info_pnext,
+                                                                pipeline_shader_stage_create_info_pNext));
 }
 
 void Pipeline::AddSpirvRayGenShader(const char *spirv, const char *entry_point) {
-    ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, spirv, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2,
+    ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(*device_, spirv, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2,
                                                                 SPV_SOURCE_ASM, nullptr, entry_point));
 }
 
 void Pipeline::AddSlangRayGenShader(const char *slang, const char *entry_point) {
-    ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, slang, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2,
+    ray_gen_shaders_.emplace_back(std::make_unique<VkShaderObj>(*device_, slang, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2,
                                                                 SPV_SOURCE_SLANG, nullptr, entry_point));
 }
 
 void Pipeline::AddGlslMissShader(const char *glsl) {
-    miss_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, glsl, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2));
+    miss_shaders_.emplace_back(std::make_unique<VkShaderObj>(*device_, glsl, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2));
 }
 
 void Pipeline::AddSpirvMissShader(const char *spirv, const char *entry_point) {
-    miss_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, spirv, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2,
+    miss_shaders_.emplace_back(std::make_unique<VkShaderObj>(*device_, spirv, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2,
                                                              SPV_SOURCE_ASM, nullptr, entry_point));
 }
 
 void Pipeline::AddSlangMissShader(const char *slang, const char *entry_point) {
-    miss_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, slang, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2,
+    miss_shaders_.emplace_back(std::make_unique<VkShaderObj>(*device_, slang, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2,
                                                              SPV_SOURCE_SLANG, nullptr, entry_point));
 }
 
 void Pipeline::AddGlslClosestHitShader(const char *glsl) {
     closest_hit_shaders_.emplace_back(
-        std::make_unique<VkShaderObj>(&test_, glsl, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2));
+        std::make_unique<VkShaderObj>(*device_, glsl, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2));
 }
 
 void Pipeline::AddSpirvClosestHitShader(const char *spirv, const char *entry_point) {
-    closest_hit_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, spirv, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+    closest_hit_shaders_.emplace_back(std::make_unique<VkShaderObj>(*device_, spirv, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
                                                                     SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, nullptr, entry_point));
 }
 
 void Pipeline::AddSlangClosestHitShader(const char *slang, const char *entry_point) {
-    closest_hit_shaders_.emplace_back(std::make_unique<VkShaderObj>(&test_, slang, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+    closest_hit_shaders_.emplace_back(std::make_unique<VkShaderObj>(*device_, slang, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
                                                                     SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG, nullptr, entry_point));
 }
 
@@ -1588,7 +1988,7 @@ void Pipeline::BuildPipeline() {
     push_constant_range.size = push_constant_range_size_;
 
     // Create pipeline layout
-    if (!pipeline_layout_.initialized()) {
+    if (!pipeline_layout_.initialized() && (create_flags_2_.flags & VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT) == 0) {
         if (push_constant_range_size_ > 0) {
             pipeline_layout_ci_.pushConstantRangeCount = 1;
             pipeline_layout_ci_.pPushConstantRanges = &push_constant_range;
@@ -1619,6 +2019,7 @@ void Pipeline::BuildPipeline() {
         raygen_stage_ci.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
         raygen_stage_ci.module = ray_gen_shader->handle();
         raygen_stage_ci.pName = ray_gen_shader->GetStageCreateInfo().pName;
+        raygen_stage_ci.pNext = ray_gen_shader->GetStageCreateInfo().pNext;
         pipeline_stage_cis.emplace_back(raygen_stage_ci);
 
         VkRayTracingShaderGroupCreateInfoKHR raygen_group_ci = vku::InitStructHelper();
@@ -1634,6 +2035,7 @@ void Pipeline::BuildPipeline() {
         miss_stage_ci.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
         miss_stage_ci.module = miss_shader->handle();
         miss_stage_ci.pName = miss_shader->GetStageCreateInfo().pName;
+        miss_stage_ci.pNext = miss_shader->GetStageCreateInfo().pNext;
         pipeline_stage_cis.emplace_back(miss_stage_ci);
 
         VkRayTracingShaderGroupCreateInfoKHR miss_group_ci = vku::InitStructHelper();
@@ -1649,6 +2051,7 @@ void Pipeline::BuildPipeline() {
         closest_hit_stage_ci.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
         closest_hit_stage_ci.module = closest_hit->handle();
         closest_hit_stage_ci.pName = closest_hit->GetStageCreateInfo().pName;
+        closest_hit_stage_ci.pNext = closest_hit->GetStageCreateInfo().pNext;
         pipeline_stage_cis.emplace_back(closest_hit_stage_ci);
 
         VkRayTracingShaderGroupCreateInfoKHR closest_hit_group_ci = vku::InitStructHelper();
@@ -2052,7 +2455,7 @@ vkt::rt::TraceRaysSbt Pipeline::GetTraceRaysSbt(uint32_t ray_gen_shader_i /*= 0*
     return out;
 }
 
-const vkt::Buffer& Pipeline::GetTraceRaysSbtBuffer() { return sbt_buffer_; }
+const vkt::Buffer &Pipeline::GetTraceRaysSbtBuffer() { return sbt_buffer_; }
 
 vkt::Buffer Pipeline::GetTraceRaysSbtIndirectBuffer(uint32_t ray_gen_shader_i, uint32_t width, uint32_t height, uint32_t depth) {
     TraceRaysSbt sbt = GetTraceRaysSbt(ray_gen_shader_i);

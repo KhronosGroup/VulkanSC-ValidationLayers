@@ -1,7 +1,8 @@
-/* Copyright (c) 2024-2025 The Khronos Group Inc.
- * Copyright (c) 2024-2025 Valve Corporation
- * Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 The Khronos Group Inc.
+ * Copyright (c) 2024-2026 Valve Corporation
+ * Copyright (c) 2024-2026 LunarG, Inc.
  * Copyright (c) 2025 Arm Limited.
+ * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +17,10 @@
  * limitations under the License.
  */
 #include "cc_vuid_maps.h"
+#include "containers/container_utils.h"
 #include "error_message/error_location.h"
+#include "error_message/logging.h"
 #include "generated/error_location_helper.h"
-#include "state_tracker/pipeline_state.h"
 #include <map>
 
 namespace vvl {
@@ -146,7 +148,7 @@ const std::string &GetCopyBufferImageDeviceVUID(const Location &loc, CopyError e
 
 const std::string &GetCopyBufferImageVUID(const Location &loc, CopyError error) {
     static const std::map<CopyError, std::array<Entry, 6>> errors{
-        {CopyError::ImageOffest_07971,
+        {CopyError::ImageOffset_07971,
          {{
              {Key(Func::vkCmdCopyBufferToImage), "VUID-vkCmdCopyBufferToImage-imageSubresource-07971"},
              {Key(Func::vkCmdCopyImageToBuffer), "VUID-vkCmdCopyImageToBuffer-imageSubresource-07971"},
@@ -155,7 +157,7 @@ const std::string &GetCopyBufferImageVUID(const Location &loc, CopyError error) 
              {Key(Struct::VkCopyMemoryToImageInfo), "VUID-VkCopyMemoryToImageInfo-imageSubresource-07971"},
              {Key(Struct::VkCopyImageToMemoryInfo), "VUID-VkCopyImageToMemoryInfo-imageSubresource-07971"},
          }}},
-        {CopyError::ImageOffest_07972,
+        {CopyError::ImageOffset_07972,
          {{
              {Key(Func::vkCmdCopyBufferToImage), "VUID-vkCmdCopyBufferToImage-imageSubresource-07972"},
              {Key(Func::vkCmdCopyImageToBuffer), "VUID-vkCmdCopyImageToBuffer-imageSubresource-07972"},
@@ -254,7 +256,7 @@ const std::string &GetCopyBufferImageVUID(const Location &loc, CopyError error) 
              {Key(Struct::VkCopyMemoryToImageInfo), "VUID-VkCopyMemoryToImageInfo-dstImage-07981"},
              {Key(Struct::VkCopyImageToMemoryInfo), "VUID-VkCopyImageToMemoryInfo-srcImage-07981"},
          }}},
-        {CopyError::ImageOffest_09104,
+        {CopyError::ImageOffset_09104,
          {{
              {Key(Func::vkCmdCopyBufferToImage), "VUID-vkCmdCopyBufferToImage-imageOffset-09104"},
              {Key(Func::vkCmdCopyImageToBuffer), "VUID-vkCmdCopyImageToBuffer-imageOffset-09104"},
@@ -596,6 +598,92 @@ const std::string &GetImageImageLayoutVUID(const Location &loc) {
     return result;
 }
 
+const char* GetBuildASVUID(const Location& loc, BuildASError error) {
+    // clang-format off
+    switch (error) {
+        case BuildASError::IsBuilt_03667:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03667" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03667" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03667" :
+                kVUIDUndefined;
+        case BuildASError::SameCount_03758:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03758" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03758" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03758" :
+                kVUIDUndefined;
+        case BuildASError::SameFlags_03759:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03759" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03759" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03759" :
+                kVUIDUndefined;
+        case BuildASError::SameType_03760:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03760" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03760" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03760" :
+                kVUIDUndefined;
+        case BuildASError::SameType_03761:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03761" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03761" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03761" :
+                kVUIDUndefined;
+        case BuildASError::SameFlags_03762:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03762" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03762" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03762" :
+                kVUIDUndefined;
+        case BuildASError::TriangleVertexFormat_03763:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03763" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03763" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03763" :
+                kVUIDUndefined;
+        case BuildASError::TriangleMaxVertex_03764:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03764" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03764" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03764" :
+                kVUIDUndefined;
+        case BuildASError::TriangleIndexType_03765:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03765" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03765" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03765" :
+                kVUIDUndefined;
+        case BuildASError::TriangleTransformData_03766:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03766" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03766" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03766" :
+                kVUIDUndefined;
+        case BuildASError::TriangleTransformData_03767:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03767" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03767" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03767" :
+                kVUIDUndefined;
+        case BuildASError::DstTop_03699:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03699" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03699" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03699" :
+                kVUIDUndefined;
+        case BuildASError::DstBottom_03700:
+            return
+                loc.function == Func::vkBuildAccelerationStructuresKHR  ? "VUID-vkBuildAccelerationStructuresKHR-pInfos-03700" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresKHR  ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03700" :
+                loc.function == Func::vkCmdBuildAccelerationStructuresIndirectKHR  ? "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03700" :
+                kVUIDUndefined;
+    }
+    return "UNASSIGNED-CoreChecks-unhandled-build-as";
+    // clang-format on
+}
+
 const std::string &GetSubresourceRangeVUID(const Location &loc, SubresourceRangeError error) {
     static const std::map<SubresourceRangeError, std::array<Entry, 6>> errors{
         {SubresourceRangeError::BaseMip_01486,
@@ -672,37 +760,70 @@ const std::string &GetSubresourceRangeVUID(const Location &loc, SubresourceRange
     return result;
 }
 
-const char *GetPipelineInterfaceVariableVUID(const vvl::Pipeline &pipeline, PipelineInterfaceVariableError error) {
-    VkStructureType sType = pipeline.GetCreateInfoSType();
+const char *GetSpirvInterfaceVariableVUID(const Location &loc, SpirvInterfaceVariableError error) {
+    // clang-format off
     switch (error) {
-        case PipelineInterfaceVariableError::ShaderStage_07988:
-            return sType == VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO  ? "VUID-VkGraphicsPipelineCreateInfo-layout-07988"
-                   : sType == VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO ? "VUID-VkComputePipelineCreateInfo-layout-07988"
-                   : sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR
-                       ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07988"
-                       : "VUID-VkRayTracingPipelineCreateInfoNV-layout-07988";
-        case PipelineInterfaceVariableError::Mutable_07990:
-            return sType == VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO  ? "VUID-VkGraphicsPipelineCreateInfo-layout-07990"
-                   : sType == VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO ? "VUID-VkComputePipelineCreateInfo-layout-07990"
-                   : sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR
-                       ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07990"
-                       : sType == VK_STRUCTURE_TYPE_DATA_GRAPH_PIPELINE_CREATE_INFO_ARM
-                                ? "VUID-VkDataGraphPipelineCreateInfoARM-layout-09769"
-                                : "VUID-VkRayTracingPipelineCreateInfoNV-layout-07990";
-        case PipelineInterfaceVariableError::DescriptorCount_07991:
-            return sType == VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO  ? "VUID-VkGraphicsPipelineCreateInfo-layout-07991"
-                   : sType == VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO ? "VUID-VkComputePipelineCreateInfo-layout-07991"
-                   : sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR
-                       ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07991"
-                       : "VUID-VkRayTracingPipelineCreateInfoNV-layout-07991";
-        case PipelineInterfaceVariableError::Inline_10391:
-            return sType == VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO  ? "VUID-VkGraphicsPipelineCreateInfo-None-10391"
-                   : sType == VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO ? "VUID-VkComputePipelineCreateInfo-None-10391"
-                   : sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR
-                       ? "VUID-VkRayTracingPipelineCreateInfoKHR-None-10391"
-                       : "VUID-VkRayTracingPipelineCreateInfoNV-None-10391";
+        case SpirvInterfaceVariableError::ShaderStage_07988:
+            return
+                loc.function == Func::vkCreateGraphicsPipelines  ? "VUID-VkGraphicsPipelineCreateInfo-layout-07988" :
+                loc.function == Func::vkCreateComputePipelines   ? "VUID-VkComputePipelineCreateInfo-layout-07988" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR  ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07988" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV   ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-07988" :
+                loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10383" :
+                kVUIDUndefined;
+        case SpirvInterfaceVariableError::Mutable_07990:
+            return
+                loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-layout-07990" :
+                loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-layout-07990" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07990" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-07990" :
+                loc.function == Func::vkCreateDataGraphPipelinesARM  ? "VUID-VkDataGraphPipelineCreateInfoARM-layout-09769" :
+                loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10384" :
+                kVUIDUndefined;
+        case SpirvInterfaceVariableError::DescriptorCount_07991:
+            return
+                loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-layout-07991" :
+                loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-layout-07991" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07991" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-07991" :
+                loc.function == Func::vkCreateDataGraphPipelinesARM  ? "VUID-VkDataGraphPipelineCreateInfoARM-layout-09934" :
+                loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10385" :
+                kVUIDUndefined;
+        case SpirvInterfaceVariableError::Inline_10391:
+            return
+                loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-None-10391" :
+                loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-None-10391" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-None-10391" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-None-10391" :
+                loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10386" :
+                kVUIDUndefined;
+        case SpirvInterfaceVariableError::DescriptorHeapMapping_11312:
+            return
+                loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-flags-11312" :
+                loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-flags-11312" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-flags-11312" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-flags-11312" :
+                loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-flags-11292" :
+                kVUIDUndefined;
+        case SpirvInterfaceVariableError::PushConstantStage_07987:
+            return
+                loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-layout-07987" :
+                loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-layout-07987" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07987" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-07987" :
+                loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10064" :
+                kVUIDUndefined;
+        case SpirvInterfaceVariableError::PushConstantRange_10069:
+            return
+                loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-layout-10069" :
+                loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-layout-10069" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-10069" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-10069" :
+                loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10065" :
+                kVUIDUndefined;
     }
     return "UNASSIGNED-CoreChecks-unhandled-pipeline-interface-variable";
+    // clang-format on
 }
 
 }  // namespace vvl

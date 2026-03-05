@@ -586,10 +586,9 @@ TEST_F(NegativeTransformFeedback, DrawIndirectByteCountEXT) {
     rp_info.pSubpasses = &subpass;
     rp_info.subpassCount = 1;
     vkt::RenderPass renderpass(test_device, rp_info);
-    ASSERT_TRUE(renderpass.handle());
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
     vs.InitFromGLSLTry(&test_device);
     fs.InitFromGLSLTry(&test_device);
 
@@ -652,7 +651,7 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
     }
 
     {
-        std::stringstream vsSource;
+        std::ostringstream vsSource;
         vsSource << R"asm(
                OpCapability Shader
                OpCapability TransformFeedback
@@ -692,7 +691,7 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
     }
 
     {
-        std::stringstream gsSource;
+        std::ostringstream gsSource;
         gsSource << R"asm(
                OpCapability Geometry
                OpCapability TransformFeedback
@@ -799,7 +798,7 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
     }
 
     {
-        std::stringstream gsSource;
+        std::ostringstream gsSource;
         gsSource << R"asm(
                OpCapability Geometry
                OpCapability TransformFeedback
@@ -854,7 +853,7 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
     }
 
     {
-        std::stringstream gsSource;
+        std::ostringstream gsSource;
         gsSource << R"asm(
                OpCapability Geometry
                OpCapability TransformFeedback
@@ -909,7 +908,7 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
         uint32_t count = transform_feedback_props.maxTransformFeedbackStreamDataSize / offset + 1;
         // Limit to 25, because we are dynamically adding variables using letters as names
         if (count < 25) {
-            std::stringstream gsSource;
+            std::ostringstream gsSource;
             gsSource << R"asm(
                OpCapability Geometry
                OpCapability TransformFeedback
@@ -1095,7 +1094,7 @@ TEST_F(NegativeTransformFeedback, XfbExecutionModePipeline) {
     InitRenderTarget();
 
     auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj gs(this, kGeometryMinimalGlsl, VK_SHADER_STAGE_GEOMETRY_BIT);
+    VkShaderObj gs(*m_device, kGeometryMinimalGlsl, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};

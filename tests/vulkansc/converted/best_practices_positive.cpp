@@ -210,8 +210,8 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PushConstantSet) {
         }
     )glsl";
 
-    VkShaderObj const vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj const fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     uint32_t data[5];
     std::vector<VkPushConstantRange> push_constant_ranges = {{VK_SHADER_STAGE_VERTEX_BIT, 0, 16},
@@ -265,10 +265,10 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_VertexBufferNotForAllDraws) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vbo.handle(), &kZeroDeviceSize);
 
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe0.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe0);
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
 
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1);
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -387,7 +387,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
     InitSwapchainInfo();
 
     VkBool32 supported;
-    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface.Handle(), &supported);
+    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
     if (!supported) {
         GTEST_SKIP() << "Graphics queue does not support present";
     }
@@ -407,7 +407,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
     VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
     VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
-    swapchain_create_info.surface = m_surface.Handle();
+    swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = 2;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
     swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
@@ -473,7 +473,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ShaderObjectDraw) {
 
     VkVertexInputBindingDescription2EXT binding_desc = vku::InitStructHelper();
     binding_desc.binding = 0u;
-    binding_desc.stride = sizeof(float);
+    binding_desc.stride = sizeof(float) * 3u;
     binding_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     binding_desc.divisor = 1u;
 
@@ -540,5 +540,5 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateDeviceWithFeatures) {
     }
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kPerformanceWarningBit);
-    vkt::Device device(phys_device_obj.handle(), device_ci);
+    vkt::Device device(phys_device_obj, device_ci);
 }

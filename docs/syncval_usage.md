@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD041 -->
-<!-- Copyright 2015-2025 LunarG, Inc. -->
+<!-- Copyright 2015-2026 LunarG, Inc. -->
 [![Khronos Vulkan][1]][2]
 
 [1]: https://vulkan.lunarg.com/img/Vulkan_100px_Dec16.png "https://www.khronos.org/vulkan/"
@@ -41,10 +41,10 @@ instance_ci.pNext = &layer_settings_create_info;
 
 ```bash
 # Windows
-set VK_LAYER_VALIDATE_SYNC=1
+set VK_VALIDATION_VALIDATE_SYNC=1
 
 # Linux
-export VK_LAYER_VALIDATE_SYNC=1
+export VK_VALIDATION_VALIDATE_SYNC=1
 
 # Android
 adb shell setprop debug.vulkan.khronos_validation.validate_sync=1
@@ -123,16 +123,15 @@ The pipelined and multi-threaded nature of Vulkan makes it particularly importan
 - Dynamic Rendering support
 
 ### Known Limitations
-- Does not support precise tracking of descriptors accessed by the shader (requires integration with GPU-AV)
+- Does not support precise tracking of descriptors accessed by the shader (requires integration with GPU-AV). This includes both classic VkDescriptorSet and VK_EXT_descriptor_buffer APIs
 - Hazards related to memory aliasing are not detected properly
-- Indirectly accessed (indirect/indexed) buffers validated at *binding* granularity. (Every valid location assumed to be accessed.)
-- Queue family ownership transfer not supported
-- Host set event not supported.
-- No dedicated support for sparse resources. Need to investigate which kind of support is needed.
-- Host memory accesses are not tracked. Corresponding race conditions are not reported.
-- Does not include implementation of multi-view renderpass support.
-- Memory access checks not suppressed for VK_CULL_MODE_FRONT_AND_BACK.
-- Does not include component granularity access tracking, or correctly support swizzling.
+- Indirectly accessed buffers (indirect data/indexed vertex data) are not validated
+- Host set event not supported
+- No dedicated support for sparse resources. Need to investigate which kind of support is needed
+- Host memory accesses are not tracked. Corresponding race conditions are not reported
+- Does not include implementation of multi-view renderpass support
+- Memory access checks not suppressed for VK_CULL_MODE_FRONT_AND_BACK
+- Does not include component granularity access tracking, or correctly support swizzling
 
 ## Typical Synchronization Validation Usage
 

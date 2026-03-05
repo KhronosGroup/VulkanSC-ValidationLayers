@@ -122,8 +122,8 @@ CreatePipelineHelper::~CreatePipelineHelper() { Destroy(); }
 void CreatePipelineHelper::InitShaderInfo() { ResetShaderInfo(kVertexMinimalGlsl, kFragmentMinimalGlsl); }
 
 void CreatePipelineHelper::ResetShaderInfo(const char *vertex_shader_text, const char *fragment_shader_text) {
-    vs_ = std::make_unique<VkShaderObj>(&layer_test_, vertex_shader_text, VK_SHADER_STAGE_VERTEX_BIT);
-    fs_ = std::make_unique<VkShaderObj>(&layer_test_, fragment_shader_text, VK_SHADER_STAGE_FRAGMENT_BIT);
+    vs_ = std::make_unique<VkShaderObj>(*device_, vertex_shader_text, VK_SHADER_STAGE_VERTEX_BIT);
+    fs_ = std::make_unique<VkShaderObj>(*device_, fragment_shader_text, VK_SHADER_STAGE_FRAGMENT_BIT);
     // We shouldn't need a fragment shader but add it to be able to run on more devices
     shader_stages_ = {vs_->GetStageCreateInfo(), fs_->GetStageCreateInfo()};
 }
@@ -259,7 +259,7 @@ void CreatePipelineHelper::LateBindPipelineInfo() {
     // By value or dynamically located items must be late bound
     if (gp_ci_.layout == VK_NULL_HANDLE) {
         // Create a default descriptor and pipeline layout
-        if (pipeline_layout_.handle() == VK_NULL_HANDLE) {
+        if (pipeline_layout_ == VK_NULL_HANDLE) {
             if (!descriptor_set_) {
                 // User can pass in own bindings
                 descriptor_set_.reset(new OneOffDescriptorSet(device_, dsl_bindings_));
@@ -271,7 +271,7 @@ void CreatePipelineHelper::LateBindPipelineInfo() {
                 pipeline_layout_ci_.pPushConstantRanges + pipeline_layout_ci_.pushConstantRangeCount);
             pipeline_layout_ = vkt::PipelineLayout(*device_, {&descriptor_set_->layout_}, push_ranges, pipeline_layout_ci_.flags);
         }
-        gp_ci_.layout = pipeline_layout_.handle();
+        gp_ci_.layout = pipeline_layout_;
     }
     if (gp_ci_.stageCount == 0) {
         gp_ci_.stageCount = shader_stages_.size();
@@ -385,7 +385,7 @@ void CreateComputePipelineHelper::LateBindPipelineInfo() {
     // By value or dynamically located items must be late bound
     if (cp_ci_.layout == VK_NULL_HANDLE) {
         // Create a default descriptor and pipeline layout
-        if (pipeline_layout_.handle() == VK_NULL_HANDLE) {
+        if (pipeline_layout_ == VK_NULL_HANDLE) {
             if (!descriptor_set_.Initialized()) {
                 // User can pass in own bindings
                 descriptor_set_ = OneOffDescriptorSet(device_, dsl_bindings_);
@@ -398,7 +398,7 @@ void CreateComputePipelineHelper::LateBindPipelineInfo() {
             pipeline_layout_ = vkt::PipelineLayout(*device_, {&descriptor_set_.layout_}, push_ranges, pipeline_layout_ci_.flags);
         }
 
-        cp_ci_.layout = pipeline_layout_.handle();
+        cp_ci_.layout = pipeline_layout_;
     }
     cp_ci_.stage = cs_.GetStageCreateInfo();
 }

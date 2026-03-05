@@ -3,9 +3,9 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@
 
 #include "thread_tracker/thread_safety_validation.h"
 #include "stateless/stateless_validation.h"
-#include "generated/deprecation.h"
+#include "generated/legacy.h"
 #include "object_tracker/object_lifetime_validation.h"
 #include "state_tracker/state_tracker.h"
 #include "core_checks/core_validation.h"
@@ -52,8 +52,8 @@ void Instance::InitValidationObjects() {
     if (!settings.disabled[stateless_checks]) {
         object_dispatch.emplace_back(new stateless::Instance(this));
     }
-    if (settings.enabled[deprecation_detection]) {
-        object_dispatch.emplace_back(new deprecation::Instance(this));
+    if (settings.enabled[legacy_detection]) {
+        object_dispatch.emplace_back(new legacy::Instance(this));
     }
     if (!settings.disabled[object_tracking]) {
         object_dispatch.emplace_back(new object_lifetimes::Instance(this));
@@ -87,9 +87,9 @@ void Device::InitValidationObjects() {
         object_dispatch.emplace_back(new stateless::Device(
             this, static_cast<stateless::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeParameterValidation))));
     }
-    if (settings.enabled[deprecation_detection]) {
-        object_dispatch.emplace_back(new deprecation::Device(
-            this, static_cast<deprecation::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeDeprecation))));
+    if (settings.enabled[legacy_detection]) {
+        object_dispatch.emplace_back(new legacy::Device(
+            this, static_cast<legacy::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeLegacy))));
     }
     if (!settings.disabled[object_tracking]) {
         object_dispatch.emplace_back(new object_lifetimes::Device(
@@ -216,6 +216,49 @@ void HandleWrapper::UnwrapPnextChainHandles(const void* pNext) {
                 }
             } break;
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+            case VK_STRUCTURE_TYPE_SHADER_DESCRIPTOR_SET_AND_BINDING_MAPPING_INFO_EXT: {
+                auto* safe_struct = reinterpret_cast<vku::safe_VkShaderDescriptorSetAndBindingMappingInfoEXT*>(cur_pnext);
+                if (safe_struct->pMappings) {
+                    for (uint32_t index0 = 0; index0 < safe_struct->mappingCount; ++index0) {
+                        if (safe_struct->pMappings[index0].source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT) {
+                            if (safe_struct->pMappings[index0].sourceData.constantOffset.pEmbeddedSampler) {
+                                UnwrapPnextChainHandles(
+                                    safe_struct->pMappings[index0].sourceData.constantOffset.pEmbeddedSampler->pNext);
+                            }
+                        }
+                        if (safe_struct->pMappings[index0].source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT) {
+                            if (safe_struct->pMappings[index0].sourceData.pushIndex.pEmbeddedSampler) {
+                                UnwrapPnextChainHandles(
+                                    safe_struct->pMappings[index0].sourceData.pushIndex.pEmbeddedSampler->pNext);
+                            }
+                        }
+                        if (safe_struct->pMappings[index0].source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT) {
+                            if (safe_struct->pMappings[index0].sourceData.indirectIndex.pEmbeddedSampler) {
+                                UnwrapPnextChainHandles(
+                                    safe_struct->pMappings[index0].sourceData.indirectIndex.pEmbeddedSampler->pNext);
+                            }
+                        }
+                        if (safe_struct->pMappings[index0].source ==
+                            VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT) {
+                            if (safe_struct->pMappings[index0].sourceData.indirectIndexArray.pEmbeddedSampler) {
+                                UnwrapPnextChainHandles(
+                                    safe_struct->pMappings[index0].sourceData.indirectIndexArray.pEmbeddedSampler->pNext);
+                            }
+                        }
+                        if (safe_struct->pMappings[index0].source == VK_DESCRIPTOR_MAPPING_SOURCE_RESOURCE_HEAP_DATA_EXT) {
+                        }
+                        if (safe_struct->pMappings[index0].source == VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT) {
+                        }
+                        if (safe_struct->pMappings[index0].source ==
+                            VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT) {
+                            if (safe_struct->pMappings[index0].sourceData.shaderRecordIndex.pEmbeddedSampler) {
+                                UnwrapPnextChainHandles(
+                                    safe_struct->pMappings[index0].sourceData.shaderRecordIndex.pEmbeddedSampler->pNext);
+                            }
+                        }
+                    }
+                }
+            } break;
             case VK_STRUCTURE_TYPE_FRAME_BOUNDARY_EXT: {
                 auto* safe_struct = reinterpret_cast<vku::safe_VkFrameBoundaryEXT*>(cur_pnext);
                 if (safe_struct->pImages) {
@@ -497,6 +540,13 @@ void HandleWrapper::UnwrapPnextChainHandles(const void* pNext) {
 
                 if (safe_struct->quantizationMap) {
                     safe_struct->quantizationMap = Unwrap(safe_struct->quantizationMap);
+                }
+            } break;
+            case VK_STRUCTURE_TYPE_SWAPCHAIN_CALIBRATED_TIMESTAMP_INFO_EXT: {
+                auto* safe_struct = reinterpret_cast<vku::safe_VkSwapchainCalibratedTimestampInfoEXT*>(cur_pnext);
+
+                if (safe_struct->swapchain) {
+                    safe_struct->swapchain = Unwrap(safe_struct->swapchain);
                 }
             } break;
 #ifdef VK_USE_PLATFORM_METAL_EXT
@@ -1586,12 +1636,18 @@ void Device::UpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount
                     local_pDescriptorWrites[index0].dstSet = Unwrap(pDescriptorWrites[index0].dstSet);
                 }
                 if (local_pDescriptorWrites[index0].pImageInfo) {
+                    // need for when updating VkDescriptorImageInfo
+                    bool has_sampler =
+                        local_pDescriptorWrites[index0].descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+                        local_pDescriptorWrites[index0].descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER;
+                    bool has_image_view = local_pDescriptorWrites[index0].descriptorType != VK_DESCRIPTOR_TYPE_SAMPLER;
+
                     for (uint32_t index1 = 0; index1 < local_pDescriptorWrites[index0].descriptorCount; ++index1) {
-                        if (pDescriptorWrites[index0].pImageInfo[index1].sampler) {
+                        if (pDescriptorWrites[index0].pImageInfo[index1].sampler && has_sampler) {
                             local_pDescriptorWrites[index0].pImageInfo[index1].sampler =
                                 Unwrap(pDescriptorWrites[index0].pImageInfo[index1].sampler);
                         }
-                        if (pDescriptorWrites[index0].pImageInfo[index1].imageView) {
+                        if (pDescriptorWrites[index0].pImageInfo[index1].imageView && has_image_view) {
                             local_pDescriptorWrites[index0].pImageInfo[index1].imageView =
                                 Unwrap(pDescriptorWrites[index0].pImageInfo[index1].imageView);
                         }
@@ -2924,12 +2980,18 @@ void Device::CmdPushDescriptorSet(VkCommandBuffer commandBuffer, VkPipelineBindP
                     local_pDescriptorWrites[index0].dstSet = Unwrap(pDescriptorWrites[index0].dstSet);
                 }
                 if (local_pDescriptorWrites[index0].pImageInfo) {
+                    // need for when updating VkDescriptorImageInfo
+                    bool has_sampler =
+                        local_pDescriptorWrites[index0].descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+                        local_pDescriptorWrites[index0].descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER;
+                    bool has_image_view = local_pDescriptorWrites[index0].descriptorType != VK_DESCRIPTOR_TYPE_SAMPLER;
+
                     for (uint32_t index1 = 0; index1 < local_pDescriptorWrites[index0].descriptorCount; ++index1) {
-                        if (pDescriptorWrites[index0].pImageInfo[index1].sampler) {
+                        if (pDescriptorWrites[index0].pImageInfo[index1].sampler && has_sampler) {
                             local_pDescriptorWrites[index0].pImageInfo[index1].sampler =
                                 Unwrap(pDescriptorWrites[index0].pImageInfo[index1].sampler);
                         }
-                        if (pDescriptorWrites[index0].pImageInfo[index1].imageView) {
+                        if (pDescriptorWrites[index0].pImageInfo[index1].imageView && has_image_view) {
                             local_pDescriptorWrites[index0].pImageInfo[index1].imageView =
                                 Unwrap(pDescriptorWrites[index0].pImageInfo[index1].imageView);
                         }
@@ -3019,13 +3081,21 @@ void Device::CmdPushDescriptorSet2(VkCommandBuffer commandBuffer, const VkPushDe
                             Unwrap(pPushDescriptorSetInfo->pDescriptorWrites[index1].dstSet);
                     }
                     if (local_pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo) {
+                        // need for when updating VkDescriptorImageInfo
+                        bool has_sampler =
+                            local_pPushDescriptorSetInfo->pDescriptorWrites[index1].descriptorType ==
+                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+                            local_pPushDescriptorSetInfo->pDescriptorWrites[index1].descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER;
+                        bool has_image_view =
+                            local_pPushDescriptorSetInfo->pDescriptorWrites[index1].descriptorType != VK_DESCRIPTOR_TYPE_SAMPLER;
+
                         for (uint32_t index2 = 0; index2 < local_pPushDescriptorSetInfo->pDescriptorWrites[index1].descriptorCount;
                              ++index2) {
-                            if (pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].sampler) {
+                            if (pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].sampler && has_sampler) {
                                 local_pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].sampler =
                                     Unwrap(pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].sampler);
                             }
-                            if (pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].imageView) {
+                            if (pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].imageView && has_image_view) {
                                 local_pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].imageView =
                                     Unwrap(pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].imageView);
                             }
@@ -3882,12 +3952,18 @@ void Device::CmdPushDescriptorSetKHR(VkCommandBuffer commandBuffer, VkPipelineBi
                     local_pDescriptorWrites[index0].dstSet = Unwrap(pDescriptorWrites[index0].dstSet);
                 }
                 if (local_pDescriptorWrites[index0].pImageInfo) {
+                    // need for when updating VkDescriptorImageInfo
+                    bool has_sampler =
+                        local_pDescriptorWrites[index0].descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+                        local_pDescriptorWrites[index0].descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER;
+                    bool has_image_view = local_pDescriptorWrites[index0].descriptorType != VK_DESCRIPTOR_TYPE_SAMPLER;
+
                     for (uint32_t index1 = 0; index1 < local_pDescriptorWrites[index0].descriptorCount; ++index1) {
-                        if (pDescriptorWrites[index0].pImageInfo[index1].sampler) {
+                        if (pDescriptorWrites[index0].pImageInfo[index1].sampler && has_sampler) {
                             local_pDescriptorWrites[index0].pImageInfo[index1].sampler =
                                 Unwrap(pDescriptorWrites[index0].pImageInfo[index1].sampler);
                         }
-                        if (pDescriptorWrites[index0].pImageInfo[index1].imageView) {
+                        if (pDescriptorWrites[index0].pImageInfo[index1].imageView && has_image_view) {
                             local_pDescriptorWrites[index0].pImageInfo[index1].imageView =
                                 Unwrap(pDescriptorWrites[index0].pImageInfo[index1].imageView);
                         }
@@ -5035,8 +5111,23 @@ VkResult Instance::GetPhysicalDeviceCalibrateableTimeDomainsKHR(VkPhysicalDevice
 VkResult Device::GetCalibratedTimestampsKHR(VkDevice device, uint32_t timestampCount,
                                             const VkCalibratedTimestampInfoKHR* pTimestampInfos, uint64_t* pTimestamps,
                                             uint64_t* pMaxDeviation) {
-    VkResult result =
-        device_dispatch_table.GetCalibratedTimestampsKHR(device, timestampCount, pTimestampInfos, pTimestamps, pMaxDeviation);
+    if (!wrap_handles)
+        return device_dispatch_table.GetCalibratedTimestampsKHR(device, timestampCount, pTimestampInfos, pTimestamps,
+                                                                pMaxDeviation);
+    small_vector<vku::safe_VkCalibratedTimestampInfoKHR, DISPATCH_MAX_STACK_ALLOCATIONS> var_local_pTimestampInfos;
+    vku::safe_VkCalibratedTimestampInfoKHR* local_pTimestampInfos = nullptr;
+    {
+        if (pTimestampInfos) {
+            var_local_pTimestampInfos.resize(timestampCount);
+            local_pTimestampInfos = var_local_pTimestampInfos.data();
+            for (uint32_t index0 = 0; index0 < timestampCount; ++index0) {
+                local_pTimestampInfos[index0].initialize(&pTimestampInfos[index0]);
+                UnwrapPnextChainHandles(local_pTimestampInfos[index0].pNext);
+            }
+        }
+    }
+    VkResult result = device_dispatch_table.GetCalibratedTimestampsKHR(
+        device, timestampCount, (const VkCalibratedTimestampInfoKHR*)local_pTimestampInfos, pTimestamps, pMaxDeviation);
 
     return result;
 }
@@ -5104,13 +5195,21 @@ void Device::CmdPushDescriptorSet2KHR(VkCommandBuffer commandBuffer, const VkPus
                             Unwrap(pPushDescriptorSetInfo->pDescriptorWrites[index1].dstSet);
                     }
                     if (local_pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo) {
+                        // need for when updating VkDescriptorImageInfo
+                        bool has_sampler =
+                            local_pPushDescriptorSetInfo->pDescriptorWrites[index1].descriptorType ==
+                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+                            local_pPushDescriptorSetInfo->pDescriptorWrites[index1].descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER;
+                        bool has_image_view =
+                            local_pPushDescriptorSetInfo->pDescriptorWrites[index1].descriptorType != VK_DESCRIPTOR_TYPE_SAMPLER;
+
                         for (uint32_t index2 = 0; index2 < local_pPushDescriptorSetInfo->pDescriptorWrites[index1].descriptorCount;
                              ++index2) {
-                            if (pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].sampler) {
+                            if (pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].sampler && has_sampler) {
                                 local_pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].sampler =
                                     Unwrap(pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].sampler);
                             }
-                            if (pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].imageView) {
+                            if (pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].imageView && has_image_view) {
                                 local_pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].imageView =
                                     Unwrap(pPushDescriptorSetInfo->pDescriptorWrites[index1].pImageInfo[index2].imageView);
                             }
@@ -5441,6 +5540,12 @@ VkResult Device::GetImageViewAddressNVX(VkDevice device, VkImageView imageView, 
     if (!wrap_handles) return device_dispatch_table.GetImageViewAddressNVX(device, imageView, pProperties);
     { imageView = Unwrap(imageView); }
     VkResult result = device_dispatch_table.GetImageViewAddressNVX(device, imageView, pProperties);
+
+    return result;
+}
+
+uint64_t Device::GetDeviceCombinedImageSamplerIndexNVX(VkDevice device, uint64_t imageViewIndex, uint64_t samplerIndex) {
+    uint64_t result = device_dispatch_table.GetDeviceCombinedImageSamplerIndexNVX(device, imageViewIndex, samplerIndex);
 
     return result;
 }
@@ -5887,6 +5992,95 @@ void Device::CmdDispatchGraphIndirectCountAMDX(VkCommandBuffer commandBuffer, Vk
 }
 #endif  // VK_ENABLE_BETA_EXTENSIONS
 
+VkResult Device::WriteSamplerDescriptorsEXT(VkDevice device, uint32_t samplerCount, const VkSamplerCreateInfo* pSamplers,
+                                            const VkHostAddressRangeEXT* pDescriptors) {
+    if (!wrap_handles) return device_dispatch_table.WriteSamplerDescriptorsEXT(device, samplerCount, pSamplers, pDescriptors);
+    small_vector<vku::safe_VkSamplerCreateInfo, DISPATCH_MAX_STACK_ALLOCATIONS> var_local_pSamplers;
+    vku::safe_VkSamplerCreateInfo* local_pSamplers = nullptr;
+    {
+        if (pSamplers) {
+            var_local_pSamplers.resize(samplerCount);
+            local_pSamplers = var_local_pSamplers.data();
+            for (uint32_t index0 = 0; index0 < samplerCount; ++index0) {
+                local_pSamplers[index0].initialize(&pSamplers[index0]);
+                UnwrapPnextChainHandles(local_pSamplers[index0].pNext);
+            }
+        }
+    }
+    VkResult result = device_dispatch_table.WriteSamplerDescriptorsEXT(device, samplerCount,
+                                                                       (const VkSamplerCreateInfo*)local_pSamplers, pDescriptors);
+
+    return result;
+}
+
+void Device::CmdBindSamplerHeapEXT(VkCommandBuffer commandBuffer, const VkBindHeapInfoEXT* pBindInfo) {
+    device_dispatch_table.CmdBindSamplerHeapEXT(commandBuffer, pBindInfo);
+}
+
+void Device::CmdBindResourceHeapEXT(VkCommandBuffer commandBuffer, const VkBindHeapInfoEXT* pBindInfo) {
+    device_dispatch_table.CmdBindResourceHeapEXT(commandBuffer, pBindInfo);
+}
+
+void Device::CmdPushDataEXT(VkCommandBuffer commandBuffer, const VkPushDataInfoEXT* pPushDataInfo) {
+    device_dispatch_table.CmdPushDataEXT(commandBuffer, pPushDataInfo);
+}
+
+VkResult Device::GetImageOpaqueCaptureDataEXT(VkDevice device, uint32_t imageCount, const VkImage* pImages,
+                                              VkHostAddressRangeEXT* pDatas) {
+    if (!wrap_handles) return device_dispatch_table.GetImageOpaqueCaptureDataEXT(device, imageCount, pImages, pDatas);
+    small_vector<VkImage, DISPATCH_MAX_STACK_ALLOCATIONS> var_local_pImages;
+    VkImage* local_pImages = nullptr;
+    {
+        if (pImages) {
+            var_local_pImages.resize(imageCount);
+            local_pImages = var_local_pImages.data();
+            for (uint32_t index0 = 0; index0 < imageCount; ++index0) {
+                local_pImages[index0] = Unwrap(pImages[index0]);
+            }
+        }
+    }
+    VkResult result = device_dispatch_table.GetImageOpaqueCaptureDataEXT(device, imageCount, (const VkImage*)local_pImages, pDatas);
+
+    return result;
+}
+
+VkDeviceSize Instance::GetPhysicalDeviceDescriptorSizeEXT(VkPhysicalDevice physicalDevice, VkDescriptorType descriptorType) {
+    VkDeviceSize result = instance_dispatch_table.GetPhysicalDeviceDescriptorSizeEXT(physicalDevice, descriptorType);
+
+    return result;
+}
+
+VkResult Device::RegisterCustomBorderColorEXT(VkDevice device, const VkSamplerCustomBorderColorCreateInfoEXT* pBorderColor,
+                                              VkBool32 requestIndex, uint32_t* pIndex) {
+    VkResult result = device_dispatch_table.RegisterCustomBorderColorEXT(device, pBorderColor, requestIndex, pIndex);
+
+    return result;
+}
+
+void Device::UnregisterCustomBorderColorEXT(VkDevice device, uint32_t index) {
+    device_dispatch_table.UnregisterCustomBorderColorEXT(device, index);
+}
+
+VkResult Device::GetTensorOpaqueCaptureDataARM(VkDevice device, uint32_t tensorCount, const VkTensorARM* pTensors,
+                                               VkHostAddressRangeEXT* pDatas) {
+    if (!wrap_handles) return device_dispatch_table.GetTensorOpaqueCaptureDataARM(device, tensorCount, pTensors, pDatas);
+    small_vector<VkTensorARM, DISPATCH_MAX_STACK_ALLOCATIONS> var_local_pTensors;
+    VkTensorARM* local_pTensors = nullptr;
+    {
+        if (pTensors) {
+            var_local_pTensors.resize(tensorCount);
+            local_pTensors = var_local_pTensors.data();
+            for (uint32_t index0 = 0; index0 < tensorCount; ++index0) {
+                local_pTensors[index0] = Unwrap(pTensors[index0]);
+            }
+        }
+    }
+    VkResult result =
+        device_dispatch_table.GetTensorOpaqueCaptureDataARM(device, tensorCount, (const VkTensorARM*)local_pTensors, pDatas);
+
+    return result;
+}
+
 void Device::CmdSetSampleLocationsEXT(VkCommandBuffer commandBuffer, const VkSampleLocationsInfoEXT* pSampleLocationsInfo) {
     device_dispatch_table.CmdSetSampleLocationsEXT(commandBuffer, pSampleLocationsInfo);
 }
@@ -6241,8 +6435,23 @@ VkResult Instance::GetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice
 VkResult Device::GetCalibratedTimestampsEXT(VkDevice device, uint32_t timestampCount,
                                             const VkCalibratedTimestampInfoKHR* pTimestampInfos, uint64_t* pTimestamps,
                                             uint64_t* pMaxDeviation) {
-    VkResult result =
-        device_dispatch_table.GetCalibratedTimestampsEXT(device, timestampCount, pTimestampInfos, pTimestamps, pMaxDeviation);
+    if (!wrap_handles)
+        return device_dispatch_table.GetCalibratedTimestampsEXT(device, timestampCount, pTimestampInfos, pTimestamps,
+                                                                pMaxDeviation);
+    small_vector<vku::safe_VkCalibratedTimestampInfoKHR, DISPATCH_MAX_STACK_ALLOCATIONS> var_local_pTimestampInfos;
+    vku::safe_VkCalibratedTimestampInfoKHR* local_pTimestampInfos = nullptr;
+    {
+        if (pTimestampInfos) {
+            var_local_pTimestampInfos.resize(timestampCount);
+            local_pTimestampInfos = var_local_pTimestampInfos.data();
+            for (uint32_t index0 = 0; index0 < timestampCount; ++index0) {
+                local_pTimestampInfos[index0].initialize(&pTimestampInfos[index0]);
+                UnwrapPnextChainHandles(local_pTimestampInfos[index0].pNext);
+            }
+        }
+    }
+    VkResult result = device_dispatch_table.GetCalibratedTimestampsEXT(
+        device, timestampCount, (const VkCalibratedTimestampInfoKHR*)local_pTimestampInfos, pTimestamps, pMaxDeviation);
 
     return result;
 }
@@ -6293,6 +6502,63 @@ void Device::GetQueueCheckpointDataNV(VkQueue queue, uint32_t* pCheckpointDataCo
 
 void Device::GetQueueCheckpointData2NV(VkQueue queue, uint32_t* pCheckpointDataCount, VkCheckpointData2NV* pCheckpointData) {
     device_dispatch_table.GetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData);
+}
+
+VkResult Device::SetSwapchainPresentTimingQueueSizeEXT(VkDevice device, VkSwapchainKHR swapchain, uint32_t size) {
+    if (!wrap_handles) return device_dispatch_table.SetSwapchainPresentTimingQueueSizeEXT(device, swapchain, size);
+    { swapchain = Unwrap(swapchain); }
+    VkResult result = device_dispatch_table.SetSwapchainPresentTimingQueueSizeEXT(device, swapchain, size);
+
+    return result;
+}
+
+VkResult Device::GetSwapchainTimingPropertiesEXT(VkDevice device, VkSwapchainKHR swapchain,
+                                                 VkSwapchainTimingPropertiesEXT* pSwapchainTimingProperties,
+                                                 uint64_t* pSwapchainTimingPropertiesCounter) {
+    if (!wrap_handles)
+        return device_dispatch_table.GetSwapchainTimingPropertiesEXT(device, swapchain, pSwapchainTimingProperties,
+                                                                     pSwapchainTimingPropertiesCounter);
+    { swapchain = Unwrap(swapchain); }
+    VkResult result = device_dispatch_table.GetSwapchainTimingPropertiesEXT(device, swapchain, pSwapchainTimingProperties,
+                                                                            pSwapchainTimingPropertiesCounter);
+
+    return result;
+}
+
+VkResult Device::GetSwapchainTimeDomainPropertiesEXT(VkDevice device, VkSwapchainKHR swapchain,
+                                                     VkSwapchainTimeDomainPropertiesEXT* pSwapchainTimeDomainProperties,
+                                                     uint64_t* pTimeDomainsCounter) {
+    if (!wrap_handles)
+        return device_dispatch_table.GetSwapchainTimeDomainPropertiesEXT(device, swapchain, pSwapchainTimeDomainProperties,
+                                                                         pTimeDomainsCounter);
+    { swapchain = Unwrap(swapchain); }
+    VkResult result = device_dispatch_table.GetSwapchainTimeDomainPropertiesEXT(device, swapchain, pSwapchainTimeDomainProperties,
+                                                                                pTimeDomainsCounter);
+
+    return result;
+}
+
+VkResult Device::GetPastPresentationTimingEXT(VkDevice device, const VkPastPresentationTimingInfoEXT* pPastPresentationTimingInfo,
+                                              VkPastPresentationTimingPropertiesEXT* pPastPresentationTimingProperties) {
+    if (!wrap_handles)
+        return device_dispatch_table.GetPastPresentationTimingEXT(device, pPastPresentationTimingInfo,
+                                                                  pPastPresentationTimingProperties);
+    vku::safe_VkPastPresentationTimingInfoEXT var_local_pPastPresentationTimingInfo;
+    vku::safe_VkPastPresentationTimingInfoEXT* local_pPastPresentationTimingInfo = nullptr;
+    {
+        if (pPastPresentationTimingInfo) {
+            local_pPastPresentationTimingInfo = &var_local_pPastPresentationTimingInfo;
+            local_pPastPresentationTimingInfo->initialize(pPastPresentationTimingInfo);
+
+            if (pPastPresentationTimingInfo->swapchain) {
+                local_pPastPresentationTimingInfo->swapchain = Unwrap(pPastPresentationTimingInfo->swapchain);
+            }
+        }
+    }
+    VkResult result = device_dispatch_table.GetPastPresentationTimingEXT(
+        device, (const VkPastPresentationTimingInfoEXT*)local_pPastPresentationTimingInfo, pPastPresentationTimingProperties);
+
+    return result;
 }
 
 VkResult Device::InitializePerformanceApiINTEL(VkDevice device, const VkInitializePerformanceApiInfoINTEL* pInitializeInfo) {
@@ -7858,6 +8124,36 @@ VkDeviceAddress Device::GetPipelineIndirectDeviceAddressNV(VkDevice device, cons
 
     return result;
 }
+#ifdef VK_USE_PLATFORM_OHOS
+
+VkResult Device::GetNativeBufferPropertiesOHOS(VkDevice device, const struct OH_NativeBuffer* buffer,
+                                               VkNativeBufferPropertiesOHOS* pProperties) {
+    VkResult result = device_dispatch_table.GetNativeBufferPropertiesOHOS(device, buffer, pProperties);
+
+    return result;
+}
+
+VkResult Device::GetMemoryNativeBufferOHOS(VkDevice device, const VkMemoryGetNativeBufferInfoOHOS* pInfo,
+                                           struct OH_NativeBuffer** pBuffer) {
+    if (!wrap_handles) return device_dispatch_table.GetMemoryNativeBufferOHOS(device, pInfo, pBuffer);
+    vku::safe_VkMemoryGetNativeBufferInfoOHOS var_local_pInfo;
+    vku::safe_VkMemoryGetNativeBufferInfoOHOS* local_pInfo = nullptr;
+    {
+        if (pInfo) {
+            local_pInfo = &var_local_pInfo;
+            local_pInfo->initialize(pInfo);
+
+            if (pInfo->memory) {
+                local_pInfo->memory = Unwrap(pInfo->memory);
+            }
+        }
+    }
+    VkResult result =
+        device_dispatch_table.GetMemoryNativeBufferOHOS(device, (const VkMemoryGetNativeBufferInfoOHOS*)local_pInfo, pBuffer);
+
+    return result;
+}
+#endif  // VK_USE_PLATFORM_OHOS
 
 void Device::CmdSetDepthClampEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthClampEnable) {
     device_dispatch_table.CmdSetDepthClampEnableEXT(commandBuffer, depthClampEnable);
@@ -8818,47 +9114,6 @@ VkResult Instance::CreateSurfaceOHOS(VkInstance instance, const VkSurfaceCreateI
     }
     return result;
 }
-
-VkResult Device::GetSwapchainGrallocUsageOHOS(VkDevice device, VkFormat format, VkImageUsageFlags imageUsage,
-                                              uint64_t* grallocUsage) {
-    VkResult result = device_dispatch_table.GetSwapchainGrallocUsageOHOS(device, format, imageUsage, grallocUsage);
-
-    return result;
-}
-
-VkResult Device::AcquireImageOHOS(VkDevice device, VkImage image, int32_t nativeFenceFd, VkSemaphore semaphore, VkFence fence) {
-    if (!wrap_handles) return device_dispatch_table.AcquireImageOHOS(device, image, nativeFenceFd, semaphore, fence);
-    {
-        image = Unwrap(image);
-        semaphore = Unwrap(semaphore);
-        fence = Unwrap(fence);
-    }
-    VkResult result = device_dispatch_table.AcquireImageOHOS(device, image, nativeFenceFd, semaphore, fence);
-
-    return result;
-}
-
-VkResult Device::QueueSignalReleaseImageOHOS(VkQueue queue, uint32_t waitSemaphoreCount, const VkSemaphore* pWaitSemaphores,
-                                             VkImage image, int32_t* pNativeFenceFd) {
-    if (!wrap_handles)
-        return device_dispatch_table.QueueSignalReleaseImageOHOS(queue, waitSemaphoreCount, pWaitSemaphores, image, pNativeFenceFd);
-    small_vector<VkSemaphore, DISPATCH_MAX_STACK_ALLOCATIONS> var_local_pWaitSemaphores;
-    VkSemaphore* local_pWaitSemaphores = nullptr;
-    {
-        if (pWaitSemaphores) {
-            var_local_pWaitSemaphores.resize(waitSemaphoreCount);
-            local_pWaitSemaphores = var_local_pWaitSemaphores.data();
-            for (uint32_t index0 = 0; index0 < waitSemaphoreCount; ++index0) {
-                local_pWaitSemaphores[index0] = Unwrap(pWaitSemaphores[index0]);
-            }
-        }
-        image = Unwrap(image);
-    }
-    VkResult result = device_dispatch_table.QueueSignalReleaseImageOHOS(
-        queue, waitSemaphoreCount, (const VkSemaphore*)local_pWaitSemaphores, image, pNativeFenceFd);
-
-    return result;
-}
 #endif  // VK_USE_PLATFORM_OHOS
 
 VkResult Instance::GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(
@@ -8901,9 +9156,47 @@ VkResult Device::GetMemoryMetalHandlePropertiesEXT(VkDevice device, VkExternalMe
 }
 #endif  // VK_USE_PLATFORM_METAL_EXT
 
+VkResult Instance::EnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM(
+    VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, uint32_t* pCounterCount, VkPerformanceCounterARM* pCounters,
+    VkPerformanceCounterDescriptionARM* pCounterDescriptions) {
+    VkResult result = instance_dispatch_table.EnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM(
+        physicalDevice, queueFamilyIndex, pCounterCount, pCounters, pCounterDescriptions);
+
+    return result;
+}
+
 void Device::CmdEndRendering2EXT(VkCommandBuffer commandBuffer, const VkRenderingEndInfoKHR* pRenderingEndInfo) {
     device_dispatch_table.CmdEndRendering2EXT(commandBuffer, pRenderingEndInfo);
 }
+
+void Device::CmdBeginCustomResolveEXT(VkCommandBuffer commandBuffer, const VkBeginCustomResolveInfoEXT* pBeginCustomResolveInfo) {
+    device_dispatch_table.CmdBeginCustomResolveEXT(commandBuffer, pBeginCustomResolveInfo);
+}
+
+void Device::CmdSetComputeOccupancyPriorityNV(VkCommandBuffer commandBuffer,
+                                              const VkComputeOccupancyPriorityParametersNV* pParameters) {
+    device_dispatch_table.CmdSetComputeOccupancyPriorityNV(commandBuffer, pParameters);
+}
+#ifdef VK_USE_PLATFORM_UBM_SEC
+
+VkResult Instance::CreateUbmSurfaceSEC(VkInstance instance, const VkUbmSurfaceCreateInfoSEC* pCreateInfo,
+                                       const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
+    if (!wrap_handles) return instance_dispatch_table.CreateUbmSurfaceSEC(instance, pCreateInfo, pAllocator, pSurface);
+
+    VkResult result = instance_dispatch_table.CreateUbmSurfaceSEC(instance, pCreateInfo, pAllocator, pSurface);
+    if (result == VK_SUCCESS) {
+        *pSurface = WrapNew(*pSurface);
+    }
+    return result;
+}
+
+VkBool32 Instance::GetPhysicalDeviceUbmPresentationSupportSEC(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
+                                                              struct ubm_device* device) {
+    VkBool32 result = instance_dispatch_table.GetPhysicalDeviceUbmPresentationSupportSEC(physicalDevice, queueFamilyIndex, device);
+
+    return result;
+}
+#endif  // VK_USE_PLATFORM_UBM_SEC
 
 VkResult Device::CreateAccelerationStructureKHR(VkDevice device, const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
                                                 const VkAllocationCallbacks* pAllocator,

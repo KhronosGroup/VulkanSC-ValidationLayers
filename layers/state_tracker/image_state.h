@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+/* Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (C) 2015-2025 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
@@ -282,7 +282,8 @@ class ImageView : public StateObject, public SubStateManager<ImageViewSubState> 
     const VkImageSubresourceRange normalized_subresource_range;
     const subresource_adapter::RangeGenerator range_generator;
     const VkSampleCountFlagBits samples;
-    const VkSamplerYcbcrConversion samplerConversion;  // Handle of the ycbcr sampler conversion the image was created with, if any
+    // VK_NULL_HANDLE if it doesn't have one chained in the pNext at creation time
+    const VkSamplerYcbcrConversion sampler_conversion;
     const VkFilterCubicImageViewImageFormatPropertiesEXT filter_cubic_props;
     const float min_lod;
     const VkFormatFeatureFlags2 format_features;
@@ -317,8 +318,14 @@ class ImageView : public StateObject, public SubStateManager<ImageViewSubState> 
     static VkImageSubresourceRange NormalizeImageViewSubresourceRange(const Image &image_state,
                                                                       const VkImageViewCreateInfo &image_view_ci);
 
-  private:
+    // The range that defines indexing space of all possible image layouts for this image view.
+    // It is used by the RangeGenerator and the image layout maps.
+    // In the general case, it is different than the number of subresources (described by
+    // normalized_subresource_range), so when dealing with image layouts this function should
+    // always be used instead
     VkImageSubresourceRange GetRangeGeneratorRange(const DeviceExtensions &extensions) const;
+
+    std::string DescribeImageUsage(const Logger& logger) const;
 };
 
 class ImageViewSubState {

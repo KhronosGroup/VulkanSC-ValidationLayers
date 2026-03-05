@@ -38,6 +38,19 @@ static const char kVertexDrawPassthroughGlsl[] = R"glsl(
     }
 )glsl";
 
+static const char kMeshPassthroughGlsl[] = R"glsl(
+    #version 450
+    #extension GL_EXT_mesh_shader : require
+    layout(triangles, max_vertices = 3, max_primitives = 1) out;
+    void main() {
+        SetMeshOutputsEXT(3, 1);
+        gl_MeshVerticesEXT[0].gl_Position = vec4(0.0, -1.0, 0.0, 1.0);
+        gl_MeshVerticesEXT[1].gl_Position = vec4(-1.0, 1.0, 0.0, 1.0);
+        gl_MeshVerticesEXT[2].gl_Position = vec4(1.0, 1.0, 0.0, 1.0);
+        gl_PrimitiveTriangleIndicesEXT[gl_LocalInvocationIndex] =  uvec3(0, 1, 2);
+    }
+)glsl";
+
 static const char kVertexPointSizeGlsl[] = R"glsl(
     #version 460
     out gl_PerVertex {
@@ -339,3 +352,22 @@ static const char kShaderTileImageDepthStencilReadSpv[] = R"(
     )glsl";
 
 [[maybe_unused]] static const char *kMissGlsl = kRayTracingPayloadMinimalGlsl;
+
+[[maybe_unused]] static const char *kMinimalTensorGlsl = R"glsl(
+    #version 450
+    #extension GL_ARM_tensors : require
+    #extension GL_EXT_shader_explicit_arithmetic_types : require
+    layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+    layout(set=0, binding=0) uniform tensorARM<int32_t, 1> tens;
+    layout(set=0, binding=1, std430) buffer asd {
+        int32_t out_data[];
+    };
+    void main()
+    {
+        const uint size_x = tensorSizeARM(tens, 0);
+        const uint x = gl_GlobalInvocationID.x % size_x;
+        const uint out_index = gl_GlobalInvocationID.x;
+
+        tensorReadARM(tens, uint[](x), out_data[out_index]);
+    }
+)glsl";

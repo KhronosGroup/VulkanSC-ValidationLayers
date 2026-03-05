@@ -118,7 +118,7 @@ bool DebugReport::LogMessage(VkFlags msg_flags, std::string_view vuid_text, cons
         // We want to print DebugPrintf message forever, otherwise user will mistake duplicate limit for things not printing
         (vuid_hash == 0x4fe1fef9) ||
         // GPU-AV gives lots of warnings on setup to inform user which settings we are adjusting under them
-        (vuid_hash == 0x24b5c69f);
+        (vuid_hash == 0x86fe6721);
 
     // This lock needs to be here, duplicate_message_count_map is not safe to update on multiple threads
     // see https://issues.angleproject.org/issues/450466850
@@ -302,14 +302,16 @@ std::string DebugReport::CreateMessageText(const Location &loc, std::string_view
 #endif
 #endif  // VULKANSC
 
+            const auto last_char = main_message.back();
             // Add period at end if forgotten
             // This provides better seperation between error message and spec text
-            if (main_message.back() != '.' && main_message.back() != '\n') {
+            // (Don't add if end with a number, otherwise it looks like a floating point number)
+            if (last_char != '.' && last_char != '\n' && (last_char < '0' || last_char > '9')) {
                 oss << '.';
             }
 
             // Start Vulkan spec text with a new line to make it easier visually
-            if (main_message.back() != '\n') {
+            if (last_char != '\n') {
                 oss << '\n';
             }
 
@@ -815,16 +817,14 @@ VKAPI_ATTR VkBool32 VKAPI_CALL MessengerLogCallback(VkDebugUtilsMessageSeverityF
     return false;
 }
 
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 VKAPI_ATTR VkBool32 VKAPI_CALL MessengerWin32DebugOutputMsg(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                                                             VkDebugUtilsMessageTypeFlagsEXT message_type,
                                                             const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
                                                             [[maybe_unused]] void *user_data) {
     const std::string msg_buffer_str = CreateDefaultCallbackMessage(message_severity, message_type, *callback_data);
-    [[maybe_unused]] const char *cstr = msg_buffer_str.c_str();
-
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-    OutputDebugString(cstr);
-#endif
-
+    const char *cstr = msg_buffer_str.c_str();
+    OutputDebugStringA(cstr);
     return false;
 }
+#endif

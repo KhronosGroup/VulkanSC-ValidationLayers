@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -108,8 +108,9 @@ class VkRenderFramework : public VkTestFramework {
     // Functions to create surfaces and swapchains that *aren't* member variables of VkRenderFramework
     VkResult CreateSurface(SurfaceContext &surface_context, vkt::Surface &surface, VkInstance custom_instance = VK_NULL_HANDLE);
     SurfaceInformation GetSwapchainInfo(const VkSurfaceKHR surface);
-    static VkSwapchainCreateInfoKHR GetDefaultSwapchainCreateInfo(VkSurfaceKHR surface, const SurfaceInformation &surface_info,
-                                                                  VkImageUsageFlags image_usage);
+    static VkSwapchainCreateInfoKHR GetDefaultSwapchainCreateInfo(
+        VkSurfaceKHR surface, const SurfaceInformation &surface_info,
+        VkImageUsageFlags image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::Swapchain CreateSwapchain(VkSurfaceKHR surface, VkImageUsageFlags image_usage, VkSurfaceTransformFlagBitsKHR pre_transform,
                                    VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
 
@@ -237,7 +238,8 @@ class VkRenderFramework : public VkTestFramework {
     VkFormat m_depth_stencil_fmt;
     VkClearColorValue m_clear_color;
     vkt::Image *m_depthStencil;
-    // first graphics queue, used must often, don't overwrite, use Device class
+
+    // First graphics queue, used must often
     vkt::Queue *m_default_queue = nullptr;
     VkQueueFlags m_default_queue_caps = 0;
 
@@ -246,15 +248,20 @@ class VkRenderFramework : public VkTestFramework {
     // Supports transfer capabilities; check m_second_queue_caps for compute/graphics support.
     vkt::Queue *m_second_queue = nullptr;
     VkQueueFlags m_second_queue_caps = 0;
+    vkt::CommandPool m_second_command_pool;  // associated with a queue family of the second command queue
+    vkt::CommandBuffer m_second_command_buffer;
 
-    // A queue different from the default or the second one (can be null).
+    // A queue different from the default/second queues (can be null).
     // The queue with the most capabilities is selected (graphics > compute > transfer).
     // Supports transfer capabilities; check m_third_queue_caps for compute/graphics support.
     vkt::Queue *m_third_queue = nullptr;
     VkQueueFlags m_third_queue_caps = 0;
 
-    vkt::CommandPool m_second_command_pool;  // associated with a queue family of the second command queue
-    vkt::CommandBuffer m_second_command_buffer;
+    // A queue different from the default/second/third queues (can be null).
+    // The queue with the most capabilities is selected (graphics > compute > transfer).
+    // Supports transfer capabilities; check m_fourth_queue_caps for compute/graphics support.
+    vkt::Queue *m_fourth_queue = nullptr;
+    VkQueueFlags m_fourth_queue_caps = 0;
 
     // Requested extensions to enable at device creation time
     std::vector<const char *> m_required_extensions;

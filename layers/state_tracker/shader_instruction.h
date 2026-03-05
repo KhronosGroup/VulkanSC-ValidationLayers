@@ -48,7 +48,7 @@ class Instruction {
     uint32_t Word(uint32_t index) const { return words_[index]; }
     // Skips pass any optional Result or Result Type word
     uint32_t Operand(uint32_t index) const { return words_[operand_index_ + index]; }
-
+    // Length of words_ array, saved in 2 higher bytes of the first element
     uint32_t Length() const { return words_[0] >> 16; }
 
     uint32_t Opcode() const { return words_[0] & 0x0ffffu; }
@@ -75,12 +75,16 @@ class Instruction {
     spv::BuiltIn GetBuiltIn() const;
     uint32_t GetPositionOffset() const { return position_offset_; }
     bool IsArray() const;
+    bool IsVector() const;
     bool IsNonPtrAccessChain() const;
     bool IsAccessChain() const;
     // Helpers for OpTypeImage
     spv::Dim FindImageDim() const;
     bool IsImageArray() const;
     bool IsImageMultisampled() const;
+    bool IsTensor() const;
+    bool IsConstant() const;
+    bool IsSpecConstant() const;
 
     // Auto-generated helper functions
     spv::StorageClass StorageClass() const;
@@ -88,13 +92,15 @@ class Instruction {
     bool operator==(Instruction const& other) const { return words_ == other.words_; }
     bool operator!=(Instruction const& other) const { return words_ != other.words_; }
 
+    uint32_t GetEntryPointInterfaceStart() const;
+
     // The following is only used for GPU-AV where we need to possibly update an Instruction
     Instruction(spirv_iterator it, uint32_t position_offset);
     // Assumes caller will fill remaining words
     Instruction(uint32_t length, spv::Op opcode);
     void Fill(const std::vector<uint32_t>& words);
     void UpdateWord(uint32_t index, uint32_t data);
-    void ToBinary(std::vector<uint32_t>& out);
+    void ToBinary(std::vector<uint32_t>& out) const;
     // Increments Length() as well
     void AppendWord(uint32_t word);
     void ReplaceResultId(uint32_t new_result_id);
@@ -114,7 +120,7 @@ class Instruction {
     //   414 of 423 had 6 or less operands
     //   361 of 423 had 5 or less operands
     //   287 of 423 had 4 or less operands
-    // An extra word is still needed because each insturction has one word prior to the operands
+    // An extra word is still needed because each instruction has one word prior to the operands
     static constexpr uint32_t word_vector_length = 7;
 
     // Max capacity needs to be uint32_t because an instruction can have a string operand that is (2^16)-1 bytes long

@@ -3,10 +3,10 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -661,6 +661,7 @@ static VKAPI_ATTR uint64_t VKAPI_CALL StubGetImageViewHandle64NVX(VkDevice, cons
 static VKAPI_ATTR VkResult VKAPI_CALL StubGetImageViewAddressNVX(VkDevice, VkImageView, VkImageViewAddressPropertiesNVX*) {
     return VK_SUCCESS;
 }
+static VKAPI_ATTR uint64_t VKAPI_CALL StubGetDeviceCombinedImageSamplerIndexNVX(VkDevice, uint64_t, uint64_t) { return 0; }
 static VKAPI_ATTR void VKAPI_CALL StubCmdDrawIndirectCountAMD(VkCommandBuffer, VkBuffer, VkDeviceSize, VkBuffer, VkDeviceSize,
                                                               uint32_t, uint32_t) {}
 static VKAPI_ATTR void VKAPI_CALL StubCmdDrawIndexedIndirectCountAMD(VkCommandBuffer, VkBuffer, VkDeviceSize, VkBuffer,
@@ -802,6 +803,30 @@ static VKAPI_ATTR void VKAPI_CALL StubCmdDispatchGraphIndirectAMDX(VkCommandBuff
 static VKAPI_ATTR void VKAPI_CALL StubCmdDispatchGraphIndirectCountAMDX(VkCommandBuffer, VkDeviceAddress, VkDeviceSize,
                                                                         VkDeviceAddress) {}
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+static VKAPI_ATTR VkResult VKAPI_CALL StubWriteSamplerDescriptorsEXT(VkDevice, uint32_t, const VkSamplerCreateInfo*,
+                                                                     const VkHostAddressRangeEXT*) {
+    return VK_SUCCESS;
+}
+static VKAPI_ATTR VkResult VKAPI_CALL StubWriteResourceDescriptorsEXT(VkDevice, uint32_t, const VkResourceDescriptorInfoEXT*,
+                                                                      const VkHostAddressRangeEXT*) {
+    return VK_SUCCESS;
+}
+static VKAPI_ATTR void VKAPI_CALL StubCmdBindSamplerHeapEXT(VkCommandBuffer, const VkBindHeapInfoEXT*) {}
+static VKAPI_ATTR void VKAPI_CALL StubCmdBindResourceHeapEXT(VkCommandBuffer, const VkBindHeapInfoEXT*) {}
+static VKAPI_ATTR void VKAPI_CALL StubCmdPushDataEXT(VkCommandBuffer, const VkPushDataInfoEXT*) {}
+static VKAPI_ATTR VkResult VKAPI_CALL StubGetImageOpaqueCaptureDataEXT(VkDevice, uint32_t, const VkImage*, VkHostAddressRangeEXT*) {
+    return VK_SUCCESS;
+}
+static VKAPI_ATTR VkDeviceSize VKAPI_CALL StubGetPhysicalDeviceDescriptorSizeEXT(VkPhysicalDevice, VkDescriptorType) { return 0; }
+static VKAPI_ATTR VkResult VKAPI_CALL StubRegisterCustomBorderColorEXT(VkDevice, const VkSamplerCustomBorderColorCreateInfoEXT*,
+                                                                       VkBool32, uint32_t*) {
+    return VK_SUCCESS;
+}
+static VKAPI_ATTR void VKAPI_CALL StubUnregisterCustomBorderColorEXT(VkDevice, uint32_t) {}
+static VKAPI_ATTR VkResult VKAPI_CALL StubGetTensorOpaqueCaptureDataARM(VkDevice, uint32_t, const VkTensorARM*,
+                                                                        VkHostAddressRangeEXT*) {
+    return VK_SUCCESS;
+}
 static VKAPI_ATTR void VKAPI_CALL StubCmdSetSampleLocationsEXT(VkCommandBuffer, const VkSampleLocationsInfoEXT*) {}
 static VKAPI_ATTR void VKAPI_CALL StubGetPhysicalDeviceMultisamplePropertiesEXT(VkPhysicalDevice, VkSampleCountFlagBits,
                                                                                 VkMultisamplePropertiesEXT*) {}
@@ -892,6 +917,21 @@ static VKAPI_ATTR void VKAPI_CALL StubCmdSetExclusiveScissorNV(VkCommandBuffer, 
 static VKAPI_ATTR void VKAPI_CALL StubCmdSetCheckpointNV(VkCommandBuffer, const void*) {}
 static VKAPI_ATTR void VKAPI_CALL StubGetQueueCheckpointDataNV(VkQueue, uint32_t*, VkCheckpointDataNV*) {}
 static VKAPI_ATTR void VKAPI_CALL StubGetQueueCheckpointData2NV(VkQueue, uint32_t*, VkCheckpointData2NV*) {}
+static VKAPI_ATTR VkResult VKAPI_CALL StubSetSwapchainPresentTimingQueueSizeEXT(VkDevice, VkSwapchainKHR, uint32_t) {
+    return VK_SUCCESS;
+}
+static VKAPI_ATTR VkResult VKAPI_CALL StubGetSwapchainTimingPropertiesEXT(VkDevice, VkSwapchainKHR, VkSwapchainTimingPropertiesEXT*,
+                                                                          uint64_t*) {
+    return VK_SUCCESS;
+}
+static VKAPI_ATTR VkResult VKAPI_CALL StubGetSwapchainTimeDomainPropertiesEXT(VkDevice, VkSwapchainKHR,
+                                                                              VkSwapchainTimeDomainPropertiesEXT*, uint64_t*) {
+    return VK_SUCCESS;
+}
+static VKAPI_ATTR VkResult VKAPI_CALL StubGetPastPresentationTimingEXT(VkDevice, const VkPastPresentationTimingInfoEXT*,
+                                                                       VkPastPresentationTimingPropertiesEXT*) {
+    return VK_SUCCESS;
+}
 static VKAPI_ATTR VkResult VKAPI_CALL StubInitializePerformanceApiINTEL(VkDevice, const VkInitializePerformanceApiInfoINTEL*) {
     return VK_SUCCESS;
 }
@@ -1215,6 +1255,16 @@ static VKAPI_ATTR VkDeviceAddress VKAPI_CALL StubGetPipelineIndirectDeviceAddres
                                                                                     const VkPipelineIndirectDeviceAddressInfoNV*) {
     return 0;
 }
+#ifdef VK_USE_PLATFORM_OHOS
+static VKAPI_ATTR VkResult VKAPI_CALL StubGetNativeBufferPropertiesOHOS(VkDevice, const struct OH_NativeBuffer*,
+                                                                        VkNativeBufferPropertiesOHOS*) {
+    return VK_SUCCESS;
+}
+static VKAPI_ATTR VkResult VKAPI_CALL StubGetMemoryNativeBufferOHOS(VkDevice, const VkMemoryGetNativeBufferInfoOHOS*,
+                                                                    struct OH_NativeBuffer**) {
+    return VK_SUCCESS;
+}
+#endif  // VK_USE_PLATFORM_OHOS
 static VKAPI_ATTR void VKAPI_CALL StubCmdSetDepthClampEnableEXT(VkCommandBuffer, VkBool32) {}
 static VKAPI_ATTR void VKAPI_CALL StubCmdSetPolygonModeEXT(VkCommandBuffer, VkPolygonMode) {}
 static VKAPI_ATTR void VKAPI_CALL StubCmdSetRasterizationSamplesEXT(VkCommandBuffer, VkSampleCountFlagBits) {}
@@ -1434,13 +1484,6 @@ static VKAPI_ATTR VkResult VKAPI_CALL StubCreateSurfaceOHOS(VkInstance, const Vk
                                                             const VkAllocationCallbacks*, VkSurfaceKHR*) {
     return VK_SUCCESS;
 }
-static VKAPI_ATTR VkResult VKAPI_CALL StubGetSwapchainGrallocUsageOHOS(VkDevice, VkFormat, VkImageUsageFlags, uint64_t*) {
-    return VK_SUCCESS;
-}
-static VKAPI_ATTR VkResult VKAPI_CALL StubAcquireImageOHOS(VkDevice, VkImage, int32_t, VkSemaphore, VkFence) { return VK_SUCCESS; }
-static VKAPI_ATTR VkResult VKAPI_CALL StubQueueSignalReleaseImageOHOS(VkQueue, uint32_t, const VkSemaphore*, VkImage, int32_t*) {
-    return VK_SUCCESS;
-}
 #endif  // VK_USE_PLATFORM_OHOS
 static VKAPI_ATTR VkResult VKAPI_CALL StubGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(
     VkPhysicalDevice, uint32_t*, VkCooperativeMatrixFlexibleDimensionsPropertiesNV*) {
@@ -1455,7 +1498,24 @@ static VKAPI_ATTR VkResult VKAPI_CALL StubGetMemoryMetalHandlePropertiesEXT(VkDe
     return VK_SUCCESS;
 }
 #endif  // VK_USE_PLATFORM_METAL_EXT
+static VKAPI_ATTR VkResult VKAPI_CALL StubEnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM(
+    VkPhysicalDevice, uint32_t, uint32_t*, VkPerformanceCounterARM*, VkPerformanceCounterDescriptionARM*) {
+    return VK_SUCCESS;
+}
 static VKAPI_ATTR void VKAPI_CALL StubCmdEndRendering2EXT(VkCommandBuffer, const VkRenderingEndInfoKHR*) {}
+static VKAPI_ATTR void VKAPI_CALL StubCmdBeginCustomResolveEXT(VkCommandBuffer, const VkBeginCustomResolveInfoEXT*) {}
+static VKAPI_ATTR void VKAPI_CALL StubCmdSetComputeOccupancyPriorityNV(VkCommandBuffer,
+                                                                       const VkComputeOccupancyPriorityParametersNV*) {}
+#ifdef VK_USE_PLATFORM_UBM_SEC
+static VKAPI_ATTR VkResult VKAPI_CALL StubCreateUbmSurfaceSEC(VkInstance, const VkUbmSurfaceCreateInfoSEC*,
+                                                              const VkAllocationCallbacks*, VkSurfaceKHR*) {
+    return VK_SUCCESS;
+}
+static VKAPI_ATTR VkBool32 VKAPI_CALL StubGetPhysicalDeviceUbmPresentationSupportSEC(VkPhysicalDevice, uint32_t,
+                                                                                     struct ubm_device*) {
+    return VK_FALSE;
+}
+#endif  // VK_USE_PLATFORM_UBM_SEC
 static VKAPI_ATTR VkResult VKAPI_CALL StubCreateAccelerationStructureKHR(VkDevice, const VkAccelerationStructureCreateInfoKHR*,
                                                                          const VkAllocationCallbacks*,
                                                                          VkAccelerationStructureKHR*) {
@@ -1769,6 +1829,7 @@ const auto& GetApiExtensionMap() {
         {"vkGetImageViewHandleNVX", {vvl::Extension::_VK_NVX_image_view_handle}},
         {"vkGetImageViewHandle64NVX", {vvl::Extension::_VK_NVX_image_view_handle}},
         {"vkGetImageViewAddressNVX", {vvl::Extension::_VK_NVX_image_view_handle}},
+        {"vkGetDeviceCombinedImageSamplerIndexNVX", {vvl::Extension::_VK_NVX_image_view_handle}},
         {"vkCmdDrawIndirectCountAMD", {vvl::Extension::_VK_AMD_draw_indirect_count}},
         {"vkCmdDrawIndexedIndirectCountAMD", {vvl::Extension::_VK_AMD_draw_indirect_count}},
         {"vkGetShaderInfoAMD", {vvl::Extension::_VK_AMD_shader_info}},
@@ -1803,6 +1864,15 @@ const auto& GetApiExtensionMap() {
         {"vkCmdDispatchGraphAMDX", {vvl::Extension::_VK_AMDX_shader_enqueue}},
         {"vkCmdDispatchGraphIndirectAMDX", {vvl::Extension::_VK_AMDX_shader_enqueue}},
         {"vkCmdDispatchGraphIndirectCountAMDX", {vvl::Extension::_VK_AMDX_shader_enqueue}},
+        {"vkWriteSamplerDescriptorsEXT", {vvl::Extension::_VK_EXT_descriptor_heap}},
+        {"vkWriteResourceDescriptorsEXT", {vvl::Extension::_VK_EXT_descriptor_heap}},
+        {"vkCmdBindSamplerHeapEXT", {vvl::Extension::_VK_EXT_descriptor_heap}},
+        {"vkCmdBindResourceHeapEXT", {vvl::Extension::_VK_EXT_descriptor_heap}},
+        {"vkCmdPushDataEXT", {vvl::Extension::_VK_EXT_descriptor_heap}},
+        {"vkGetImageOpaqueCaptureDataEXT", {vvl::Extension::_VK_EXT_descriptor_heap}},
+        {"vkRegisterCustomBorderColorEXT", {vvl::Extension::_VK_EXT_descriptor_heap}},
+        {"vkUnregisterCustomBorderColorEXT", {vvl::Extension::_VK_EXT_descriptor_heap}},
+        {"vkGetTensorOpaqueCaptureDataARM", {vvl::Extension::_VK_EXT_descriptor_heap}},
         {"vkCmdSetSampleLocationsEXT", {vvl::Extension::_VK_EXT_sample_locations}},
         {"vkGetImageDrmFormatModifierPropertiesEXT", {vvl::Extension::_VK_EXT_image_drm_format_modifier}},
         {"vkCreateValidationCacheEXT", {vvl::Extension::_VK_EXT_validation_cache}},
@@ -1837,6 +1907,10 @@ const auto& GetApiExtensionMap() {
         {"vkCmdSetCheckpointNV", {vvl::Extension::_VK_NV_device_diagnostic_checkpoints}},
         {"vkGetQueueCheckpointDataNV", {vvl::Extension::_VK_NV_device_diagnostic_checkpoints}},
         {"vkGetQueueCheckpointData2NV", {vvl::Extension::_VK_NV_device_diagnostic_checkpoints}},
+        {"vkSetSwapchainPresentTimingQueueSizeEXT", {vvl::Extension::_VK_EXT_present_timing}},
+        {"vkGetSwapchainTimingPropertiesEXT", {vvl::Extension::_VK_EXT_present_timing}},
+        {"vkGetSwapchainTimeDomainPropertiesEXT", {vvl::Extension::_VK_EXT_present_timing}},
+        {"vkGetPastPresentationTimingEXT", {vvl::Extension::_VK_EXT_present_timing}},
         {"vkInitializePerformanceApiINTEL", {vvl::Extension::_VK_INTEL_performance_query}},
         {"vkUninitializePerformanceApiINTEL", {vvl::Extension::_VK_INTEL_performance_query}},
         {"vkCmdSetPerformanceMarkerINTEL", {vvl::Extension::_VK_INTEL_performance_query}},
@@ -1958,6 +2032,8 @@ const auto& GetApiExtensionMap() {
         {"vkGetPipelineIndirectMemoryRequirementsNV", {vvl::Extension::_VK_NV_device_generated_commands_compute}},
         {"vkCmdUpdatePipelineIndirectBufferNV", {vvl::Extension::_VK_NV_device_generated_commands_compute}},
         {"vkGetPipelineIndirectDeviceAddressNV", {vvl::Extension::_VK_NV_device_generated_commands_compute}},
+        {"vkGetNativeBufferPropertiesOHOS", {vvl::Extension::_VK_OHOS_external_memory}},
+        {"vkGetMemoryNativeBufferOHOS", {vvl::Extension::_VK_OHOS_external_memory}},
         {"vkCmdSetDepthClampEnableEXT", {vvl::Extension::_VK_EXT_extended_dynamic_state3, vvl::Extension::_VK_EXT_shader_object}},
         {"vkCmdSetPolygonModeEXT", {vvl::Extension::_VK_EXT_extended_dynamic_state3, vvl::Extension::_VK_EXT_shader_object}},
         {"vkCmdSetRasterizationSamplesEXT",
@@ -2069,12 +2145,11 @@ const auto& GetApiExtensionMap() {
         {"vkDestroyIndirectExecutionSetEXT", {vvl::Extension::_VK_EXT_device_generated_commands}},
         {"vkUpdateIndirectExecutionSetPipelineEXT", {vvl::Extension::_VK_EXT_device_generated_commands}},
         {"vkUpdateIndirectExecutionSetShaderEXT", {vvl::Extension::_VK_EXT_device_generated_commands}},
-        {"vkGetSwapchainGrallocUsageOHOS", {vvl::Extension::_VK_OHOS_native_buffer}},
-        {"vkAcquireImageOHOS", {vvl::Extension::_VK_OHOS_native_buffer}},
-        {"vkQueueSignalReleaseImageOHOS", {vvl::Extension::_VK_OHOS_native_buffer}},
         {"vkGetMemoryMetalHandleEXT", {vvl::Extension::_VK_EXT_external_memory_metal}},
         {"vkGetMemoryMetalHandlePropertiesEXT", {vvl::Extension::_VK_EXT_external_memory_metal}},
         {"vkCmdEndRendering2EXT", {vvl::Extension::_VK_EXT_fragment_density_map_offset}},
+        {"vkCmdBeginCustomResolveEXT", {vvl::Extension::_VK_EXT_custom_resolve}},
+        {"vkCmdSetComputeOccupancyPriorityNV", {vvl::Extension::_VK_NV_compute_occupancy_priority}},
         {"vkCreateAccelerationStructureKHR", {vvl::Extension::_VK_KHR_acceleration_structure}},
         {"vkDestroyAccelerationStructureKHR", {vvl::Extension::_VK_KHR_acceleration_structure}},
         {"vkCmdBuildAccelerationStructuresKHR", {vvl::Extension::_VK_KHR_acceleration_structure}},
@@ -3244,6 +3319,12 @@ void layer_init_device_dispatch_table(VkDevice device, VkLayerDispatchTable* tab
     if (table->GetImageViewAddressNVX == nullptr) {
         table->GetImageViewAddressNVX = (PFN_vkGetImageViewAddressNVX)StubGetImageViewAddressNVX;
     }
+    table->GetDeviceCombinedImageSamplerIndexNVX =
+        (PFN_vkGetDeviceCombinedImageSamplerIndexNVX)gpa(device, "vkGetDeviceCombinedImageSamplerIndexNVX");
+    if (table->GetDeviceCombinedImageSamplerIndexNVX == nullptr) {
+        table->GetDeviceCombinedImageSamplerIndexNVX =
+            (PFN_vkGetDeviceCombinedImageSamplerIndexNVX)StubGetDeviceCombinedImageSamplerIndexNVX;
+    }
     table->CmdDrawIndirectCountAMD = (PFN_vkCmdDrawIndirectCountAMD)gpa(device, "vkCmdDrawIndirectCountAMD");
     if (table->CmdDrawIndirectCountAMD == nullptr) {
         table->CmdDrawIndirectCountAMD = (PFN_vkCmdDrawIndirectCountAMD)StubCmdDrawIndirectCountAMD;
@@ -3401,6 +3482,42 @@ void layer_init_device_dispatch_table(VkDevice device, VkLayerDispatchTable* tab
         table->CmdDispatchGraphIndirectCountAMDX = (PFN_vkCmdDispatchGraphIndirectCountAMDX)StubCmdDispatchGraphIndirectCountAMDX;
     }
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+    table->WriteSamplerDescriptorsEXT = (PFN_vkWriteSamplerDescriptorsEXT)gpa(device, "vkWriteSamplerDescriptorsEXT");
+    if (table->WriteSamplerDescriptorsEXT == nullptr) {
+        table->WriteSamplerDescriptorsEXT = (PFN_vkWriteSamplerDescriptorsEXT)StubWriteSamplerDescriptorsEXT;
+    }
+    table->WriteResourceDescriptorsEXT = (PFN_vkWriteResourceDescriptorsEXT)gpa(device, "vkWriteResourceDescriptorsEXT");
+    if (table->WriteResourceDescriptorsEXT == nullptr) {
+        table->WriteResourceDescriptorsEXT = (PFN_vkWriteResourceDescriptorsEXT)StubWriteResourceDescriptorsEXT;
+    }
+    table->CmdBindSamplerHeapEXT = (PFN_vkCmdBindSamplerHeapEXT)gpa(device, "vkCmdBindSamplerHeapEXT");
+    if (table->CmdBindSamplerHeapEXT == nullptr) {
+        table->CmdBindSamplerHeapEXT = (PFN_vkCmdBindSamplerHeapEXT)StubCmdBindSamplerHeapEXT;
+    }
+    table->CmdBindResourceHeapEXT = (PFN_vkCmdBindResourceHeapEXT)gpa(device, "vkCmdBindResourceHeapEXT");
+    if (table->CmdBindResourceHeapEXT == nullptr) {
+        table->CmdBindResourceHeapEXT = (PFN_vkCmdBindResourceHeapEXT)StubCmdBindResourceHeapEXT;
+    }
+    table->CmdPushDataEXT = (PFN_vkCmdPushDataEXT)gpa(device, "vkCmdPushDataEXT");
+    if (table->CmdPushDataEXT == nullptr) {
+        table->CmdPushDataEXT = (PFN_vkCmdPushDataEXT)StubCmdPushDataEXT;
+    }
+    table->GetImageOpaqueCaptureDataEXT = (PFN_vkGetImageOpaqueCaptureDataEXT)gpa(device, "vkGetImageOpaqueCaptureDataEXT");
+    if (table->GetImageOpaqueCaptureDataEXT == nullptr) {
+        table->GetImageOpaqueCaptureDataEXT = (PFN_vkGetImageOpaqueCaptureDataEXT)StubGetImageOpaqueCaptureDataEXT;
+    }
+    table->RegisterCustomBorderColorEXT = (PFN_vkRegisterCustomBorderColorEXT)gpa(device, "vkRegisterCustomBorderColorEXT");
+    if (table->RegisterCustomBorderColorEXT == nullptr) {
+        table->RegisterCustomBorderColorEXT = (PFN_vkRegisterCustomBorderColorEXT)StubRegisterCustomBorderColorEXT;
+    }
+    table->UnregisterCustomBorderColorEXT = (PFN_vkUnregisterCustomBorderColorEXT)gpa(device, "vkUnregisterCustomBorderColorEXT");
+    if (table->UnregisterCustomBorderColorEXT == nullptr) {
+        table->UnregisterCustomBorderColorEXT = (PFN_vkUnregisterCustomBorderColorEXT)StubUnregisterCustomBorderColorEXT;
+    }
+    table->GetTensorOpaqueCaptureDataARM = (PFN_vkGetTensorOpaqueCaptureDataARM)gpa(device, "vkGetTensorOpaqueCaptureDataARM");
+    if (table->GetTensorOpaqueCaptureDataARM == nullptr) {
+        table->GetTensorOpaqueCaptureDataARM = (PFN_vkGetTensorOpaqueCaptureDataARM)StubGetTensorOpaqueCaptureDataARM;
+    }
     table->CmdSetSampleLocationsEXT = (PFN_vkCmdSetSampleLocationsEXT)gpa(device, "vkCmdSetSampleLocationsEXT");
     if (table->CmdSetSampleLocationsEXT == nullptr) {
         table->CmdSetSampleLocationsEXT = (PFN_vkCmdSetSampleLocationsEXT)StubCmdSetSampleLocationsEXT;
@@ -3552,6 +3669,27 @@ void layer_init_device_dispatch_table(VkDevice device, VkLayerDispatchTable* tab
     table->GetQueueCheckpointData2NV = (PFN_vkGetQueueCheckpointData2NV)gpa(device, "vkGetQueueCheckpointData2NV");
     if (table->GetQueueCheckpointData2NV == nullptr) {
         table->GetQueueCheckpointData2NV = (PFN_vkGetQueueCheckpointData2NV)StubGetQueueCheckpointData2NV;
+    }
+    table->SetSwapchainPresentTimingQueueSizeEXT =
+        (PFN_vkSetSwapchainPresentTimingQueueSizeEXT)gpa(device, "vkSetSwapchainPresentTimingQueueSizeEXT");
+    if (table->SetSwapchainPresentTimingQueueSizeEXT == nullptr) {
+        table->SetSwapchainPresentTimingQueueSizeEXT =
+            (PFN_vkSetSwapchainPresentTimingQueueSizeEXT)StubSetSwapchainPresentTimingQueueSizeEXT;
+    }
+    table->GetSwapchainTimingPropertiesEXT =
+        (PFN_vkGetSwapchainTimingPropertiesEXT)gpa(device, "vkGetSwapchainTimingPropertiesEXT");
+    if (table->GetSwapchainTimingPropertiesEXT == nullptr) {
+        table->GetSwapchainTimingPropertiesEXT = (PFN_vkGetSwapchainTimingPropertiesEXT)StubGetSwapchainTimingPropertiesEXT;
+    }
+    table->GetSwapchainTimeDomainPropertiesEXT =
+        (PFN_vkGetSwapchainTimeDomainPropertiesEXT)gpa(device, "vkGetSwapchainTimeDomainPropertiesEXT");
+    if (table->GetSwapchainTimeDomainPropertiesEXT == nullptr) {
+        table->GetSwapchainTimeDomainPropertiesEXT =
+            (PFN_vkGetSwapchainTimeDomainPropertiesEXT)StubGetSwapchainTimeDomainPropertiesEXT;
+    }
+    table->GetPastPresentationTimingEXT = (PFN_vkGetPastPresentationTimingEXT)gpa(device, "vkGetPastPresentationTimingEXT");
+    if (table->GetPastPresentationTimingEXT == nullptr) {
+        table->GetPastPresentationTimingEXT = (PFN_vkGetPastPresentationTimingEXT)StubGetPastPresentationTimingEXT;
     }
     table->InitializePerformanceApiINTEL = (PFN_vkInitializePerformanceApiINTEL)gpa(device, "vkInitializePerformanceApiINTEL");
     if (table->InitializePerformanceApiINTEL == nullptr) {
@@ -4090,6 +4228,16 @@ void layer_init_device_dispatch_table(VkDevice device, VkLayerDispatchTable* tab
         table->GetPipelineIndirectDeviceAddressNV =
             (PFN_vkGetPipelineIndirectDeviceAddressNV)StubGetPipelineIndirectDeviceAddressNV;
     }
+#ifdef VK_USE_PLATFORM_OHOS
+    table->GetNativeBufferPropertiesOHOS = (PFN_vkGetNativeBufferPropertiesOHOS)gpa(device, "vkGetNativeBufferPropertiesOHOS");
+    if (table->GetNativeBufferPropertiesOHOS == nullptr) {
+        table->GetNativeBufferPropertiesOHOS = (PFN_vkGetNativeBufferPropertiesOHOS)StubGetNativeBufferPropertiesOHOS;
+    }
+    table->GetMemoryNativeBufferOHOS = (PFN_vkGetMemoryNativeBufferOHOS)gpa(device, "vkGetMemoryNativeBufferOHOS");
+    if (table->GetMemoryNativeBufferOHOS == nullptr) {
+        table->GetMemoryNativeBufferOHOS = (PFN_vkGetMemoryNativeBufferOHOS)StubGetMemoryNativeBufferOHOS;
+    }
+#endif  // VK_USE_PLATFORM_OHOS
     table->CmdSetDepthClampEnableEXT = (PFN_vkCmdSetDepthClampEnableEXT)gpa(device, "vkCmdSetDepthClampEnableEXT");
     if (table->CmdSetDepthClampEnableEXT == nullptr) {
         table->CmdSetDepthClampEnableEXT = (PFN_vkCmdSetDepthClampEnableEXT)StubCmdSetDepthClampEnableEXT;
@@ -4520,20 +4668,6 @@ void layer_init_device_dispatch_table(VkDevice device, VkLayerDispatchTable* tab
         table->UpdateIndirectExecutionSetShaderEXT =
             (PFN_vkUpdateIndirectExecutionSetShaderEXT)StubUpdateIndirectExecutionSetShaderEXT;
     }
-#ifdef VK_USE_PLATFORM_OHOS
-    table->GetSwapchainGrallocUsageOHOS = (PFN_vkGetSwapchainGrallocUsageOHOS)gpa(device, "vkGetSwapchainGrallocUsageOHOS");
-    if (table->GetSwapchainGrallocUsageOHOS == nullptr) {
-        table->GetSwapchainGrallocUsageOHOS = (PFN_vkGetSwapchainGrallocUsageOHOS)StubGetSwapchainGrallocUsageOHOS;
-    }
-    table->AcquireImageOHOS = (PFN_vkAcquireImageOHOS)gpa(device, "vkAcquireImageOHOS");
-    if (table->AcquireImageOHOS == nullptr) {
-        table->AcquireImageOHOS = (PFN_vkAcquireImageOHOS)StubAcquireImageOHOS;
-    }
-    table->QueueSignalReleaseImageOHOS = (PFN_vkQueueSignalReleaseImageOHOS)gpa(device, "vkQueueSignalReleaseImageOHOS");
-    if (table->QueueSignalReleaseImageOHOS == nullptr) {
-        table->QueueSignalReleaseImageOHOS = (PFN_vkQueueSignalReleaseImageOHOS)StubQueueSignalReleaseImageOHOS;
-    }
-#endif  // VK_USE_PLATFORM_OHOS
 #ifdef VK_USE_PLATFORM_METAL_EXT
     table->GetMemoryMetalHandleEXT = (PFN_vkGetMemoryMetalHandleEXT)gpa(device, "vkGetMemoryMetalHandleEXT");
     if (table->GetMemoryMetalHandleEXT == nullptr) {
@@ -4548,6 +4682,15 @@ void layer_init_device_dispatch_table(VkDevice device, VkLayerDispatchTable* tab
     table->CmdEndRendering2EXT = (PFN_vkCmdEndRendering2EXT)gpa(device, "vkCmdEndRendering2EXT");
     if (table->CmdEndRendering2EXT == nullptr) {
         table->CmdEndRendering2EXT = (PFN_vkCmdEndRendering2EXT)StubCmdEndRendering2EXT;
+    }
+    table->CmdBeginCustomResolveEXT = (PFN_vkCmdBeginCustomResolveEXT)gpa(device, "vkCmdBeginCustomResolveEXT");
+    if (table->CmdBeginCustomResolveEXT == nullptr) {
+        table->CmdBeginCustomResolveEXT = (PFN_vkCmdBeginCustomResolveEXT)StubCmdBeginCustomResolveEXT;
+    }
+    table->CmdSetComputeOccupancyPriorityNV =
+        (PFN_vkCmdSetComputeOccupancyPriorityNV)gpa(device, "vkCmdSetComputeOccupancyPriorityNV");
+    if (table->CmdSetComputeOccupancyPriorityNV == nullptr) {
+        table->CmdSetComputeOccupancyPriorityNV = (PFN_vkCmdSetComputeOccupancyPriorityNV)StubCmdSetComputeOccupancyPriorityNV;
     }
     table->CreateAccelerationStructureKHR = (PFN_vkCreateAccelerationStructureKHR)gpa(device, "vkCreateAccelerationStructureKHR");
     if (table->CreateAccelerationStructureKHR == nullptr) {
@@ -5110,6 +5253,12 @@ void layer_init_instance_dispatch_table(VkInstance instance, VkLayerInstanceDisp
     if (table->SubmitDebugUtilsMessageEXT == nullptr) {
         table->SubmitDebugUtilsMessageEXT = (PFN_vkSubmitDebugUtilsMessageEXT)StubSubmitDebugUtilsMessageEXT;
     }
+    table->GetPhysicalDeviceDescriptorSizeEXT =
+        (PFN_vkGetPhysicalDeviceDescriptorSizeEXT)gpa(instance, "vkGetPhysicalDeviceDescriptorSizeEXT");
+    if (table->GetPhysicalDeviceDescriptorSizeEXT == nullptr) {
+        table->GetPhysicalDeviceDescriptorSizeEXT =
+            (PFN_vkGetPhysicalDeviceDescriptorSizeEXT)StubGetPhysicalDeviceDescriptorSizeEXT;
+    }
     table->GetPhysicalDeviceMultisamplePropertiesEXT =
         (PFN_vkGetPhysicalDeviceMultisamplePropertiesEXT)gpa(instance, "vkGetPhysicalDeviceMultisamplePropertiesEXT");
     if (table->GetPhysicalDeviceMultisamplePropertiesEXT == nullptr) {
@@ -5254,6 +5403,26 @@ void layer_init_instance_dispatch_table(VkInstance instance, VkLayerInstanceDisp
             (PFN_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV)
                 StubGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV;
     }
+    table->EnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM =
+        (PFN_vkEnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM)gpa(
+            instance, "vkEnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM");
+    if (table->EnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM == nullptr) {
+        table->EnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM =
+            (PFN_vkEnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM)
+                StubEnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM;
+    }
+#ifdef VK_USE_PLATFORM_UBM_SEC
+    table->CreateUbmSurfaceSEC = (PFN_vkCreateUbmSurfaceSEC)gpa(instance, "vkCreateUbmSurfaceSEC");
+    if (table->CreateUbmSurfaceSEC == nullptr) {
+        table->CreateUbmSurfaceSEC = (PFN_vkCreateUbmSurfaceSEC)StubCreateUbmSurfaceSEC;
+    }
+    table->GetPhysicalDeviceUbmPresentationSupportSEC =
+        (PFN_vkGetPhysicalDeviceUbmPresentationSupportSEC)gpa(instance, "vkGetPhysicalDeviceUbmPresentationSupportSEC");
+    if (table->GetPhysicalDeviceUbmPresentationSupportSEC == nullptr) {
+        table->GetPhysicalDeviceUbmPresentationSupportSEC =
+            (PFN_vkGetPhysicalDeviceUbmPresentationSupportSEC)StubGetPhysicalDeviceUbmPresentationSupportSEC;
+    }
+#endif  // VK_USE_PLATFORM_UBM_SEC
 }
 
 // NOLINTEND

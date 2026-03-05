@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -267,10 +267,7 @@ TEST_F(NegativeYcbcr, Swizzle) {
     image_view_create_info.image = image;
     image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
     image_view_create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
-    image_view_create_info.subresourceRange.layerCount = 1;
-    image_view_create_info.subresourceRange.baseMipLevel = 0;
-    image_view_create_info.subresourceRange.levelCount = 1;
-    image_view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image_view_create_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     image_view_create_info.components = identity;
     image_view_create_info.components.r = VK_COMPONENT_SWIZZLE_B;
     CreateImageViewTest(image_view_create_info, "VUID-VkImageViewCreateInfo-pNext-01970");
@@ -349,6 +346,25 @@ TEST_F(NegativeYcbcr, Formats) {
     image_create_info.flags = VK_IMAGE_CREATE_DISJOINT_BIT;
     CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-imageCreateFormatFeatures-02260");
     image_create_info = reset_create_info;
+
+    {
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-format-parameter");
+        m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-None-12279");
+        image_create_info.format = VK_FORMAT_G16_B16R16_2PLANE_444_UNORM;
+        vkt::Image image(*m_device, image_create_info, vkt::no_mem);
+        image_create_info = reset_create_info;
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        vkt::Image image(*m_device, image_create_info, vkt::no_mem);
+        VkImageViewCreateInfo image_view_ci = image.BasicViewCreatInfo();
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageViewCreateInfo-format-parameter");
+        m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-None-12280");
+        image_view_ci.format = VK_FORMAT_G16_B16R16_2PLANE_444_UNORM;
+        vkt::ImageView image_view(*m_device, image_view_ci);
+        m_errorMonitor->VerifyFound();
+    }
 }
 
 TEST_F(NegativeYcbcr, FormatsLimits) {
@@ -414,9 +430,7 @@ TEST_F(NegativeYcbcr, ImageViewFormat) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
-    image_create_info.extent.width = 31;
-    image_create_info.extent.height = 32;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {31, 32, 1};
     image_create_info.mipLevels = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -823,9 +837,7 @@ TEST_F(NegativeYcbcr, BindMemoryDisjoint) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = mp_format;
-    image_create_info.extent.width = 64;
-    image_create_info.extent.height = 64;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {64, 64, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -897,9 +909,7 @@ TEST_F(NegativeYcbcr, BindMemoryNoDisjoint) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = mp_format;
-    image_create_info.extent.width = 64;
-    image_create_info.extent.height = 64;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {64, 64, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -945,9 +955,7 @@ TEST_F(NegativeYcbcr, BindMemory2Disjoint) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = tex_format;
-    image_create_info.extent.width = 256;
-    image_create_info.extent.height = 256;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {256, 256, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1141,9 +1149,7 @@ TEST_F(NegativeYcbcr, BindMemory2DisjointUnsupported) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = tex_format;
-    image_create_info.extent.width = 256;
-    image_create_info.extent.height = 256;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {256, 256, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1329,10 +1335,7 @@ TEST_F(NegativeYcbcr, MismatchedImageViewAndSamplerFormat) {
     view_info.image = image;
     view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
     view_info.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
-    view_info.subresourceRange.layerCount = 1;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    view_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     CreateImageViewTest(view_info, "VUID-VkImageViewCreateInfo-pNext-06658");
 }
@@ -1631,9 +1634,7 @@ TEST_F(NegativeYcbcr, DisjointImageWithDrmFormatModifier) {
     image_create_info.flags = VK_IMAGE_CREATE_DISJOINT_BIT;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = format;
-    image_create_info.extent.width = 64;
-    image_create_info.extent.height = 64;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {64, 64, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1675,12 +1676,12 @@ TEST_F(NegativeYcbcr, TexelFetch) {
             out_color = texelFetch(ycbcr, ivec2(0), 0);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10716");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeSampledImage-12206");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -1712,12 +1713,12 @@ TEST_F(NegativeYcbcr, TexelFetchArray) {
             out_color = texelFetch(ycbcr[1], ivec2(0), 0);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10716");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeSampledImage-12206");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -1751,12 +1752,12 @@ TEST_F(NegativeYcbcr, TexelFetchIndexed) {
             gl_Position = texelFetch(ycbcr[index], ivec2(0), 0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_[0] = vs.GetStageCreateInfo();
     pipe.gp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10716");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeSampledImage-12206");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -1791,12 +1792,49 @@ TEST_F(NegativeYcbcr, TexelFetchNonArrayPartiallyBound) {
             gl_Position = texelFetch(ycbcr, ivec2(0), 0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_[0] = vs.GetStageCreateInfo();
     pipe.gp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10716");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeSampledImage-12206");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeYcbcr, TexelFetchDestroyedSampler) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::SamplerYcbcrConversion conversion(*m_device, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM);
+    auto conversion_info = conversion.ConversionInfo();
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
+
+    OneOffDescriptorSet descriptor_set(
+        m_device, {
+                      {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler.handle()},
+                  });
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    // Sampler was baked into the pipeline layout, valid to destroy now
+    sampler.Destroy();
+
+    const char fsSource[] = R"glsl(
+        #version 450
+        layout (set = 0, binding = 0) uniform sampler2D ycbcr;
+        layout(location=0) out vec4 out_color;
+        void main() {
+            out_color = texelFetch(ycbcr, ivec2(0), 0);
+        }
+    )glsl";
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.layout = pipeline_layout;
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeSampledImage-12206");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -1826,12 +1864,12 @@ TEST_F(NegativeYcbcr, TextureGather) {
             out_color = textureGather(ycbcr, ivec2(0), 0);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10716");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeSampledImage-12206");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -1890,7 +1928,7 @@ TEST_F(NegativeYcbcr, ConstOffset) {
                OpReturn
                OpFunctionEnd
     )";
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -2031,8 +2069,7 @@ TEST_F(NegativeYcbcr, MultiplaneImageCopyAspectMask) {
     m_command_buffer.End();
 }
 
-// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9893
-TEST_F(NegativeYcbcr, DISABLED_DescriptorIndexCombinedSampledImage) {
+TEST_F(NegativeYcbcr, DescriptorIndexCombinedSampledImage) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
     RETURN_IF_SKIP(Init());
@@ -2067,15 +2104,14 @@ TEST_F(NegativeYcbcr, DISABLED_DescriptorIndexCombinedSampledImage) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10715");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-12205");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
 }
 
-// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9893
-TEST_F(NegativeYcbcr, DISABLED_DescriptorIndexNonCombinedSampledImage) {
+TEST_F(NegativeYcbcr, DescriptorIndexNonCombinedSampledImage) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
     RETURN_IF_SKIP(Init());
@@ -2084,43 +2120,92 @@ TEST_F(NegativeYcbcr, DISABLED_DescriptorIndexNonCombinedSampledImage) {
     auto conversion_info = conversion.ConversionInfo();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
     VkSampler samplers[4] = {sampler, sampler, sampler, sampler};
+
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, samplers};
+    VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper();
+    ds_layout_ci.bindingCount = 1;
+    ds_layout_ci.pBindings = &binding;
+
+    VkDescriptorSetLayout ds_layout = VK_NULL_HANDLE;
+    m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutBinding-descriptorType-12215");
+    vk::CreateDescriptorSetLayout(*m_device, &ds_layout_ci, nullptr, &ds_layout);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeYcbcr, MixingYcbcrWithNonYcbcrInArray) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+
+    vkt::SamplerYcbcrConversion conversion(*m_device, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM);
+    auto conversion_info = conversion.ConversionInfo();
+    vkt::Sampler sampler_ycbcr(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+    VkSampler samplers[4] = {sampler, sampler_ycbcr, sampler, sampler};
+
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, samplers};
+    VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper();
+    ds_layout_ci.bindingCount = 1;
+    ds_layout_ci.pBindings = &binding;
+
+    VkDescriptorSetLayout ds_layout = VK_NULL_HANDLE;
+    m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutBinding-descriptorType-12200");
+    vk::CreateDescriptorSetLayout(*m_device, &ds_layout_ci, nullptr, &ds_layout);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeYcbcr, DescriptorIndexSlang) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::computeDerivativeGroupQuads);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(CheckSlangSupport());
+
+    vkt::SamplerYcbcrConversion conversion(*m_device, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM);
+    auto conversion_info = conversion.ConversionInfo();
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
+
+    VkSampler samplers[4] = {sampler, sampler, sampler, sampler};
     OneOffDescriptorSet descriptor_set(m_device,
                                        {
-                                           {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                           {1, VK_DESCRIPTOR_TYPE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, samplers},
-                                           {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, samplers},
+                                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                                        });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    const char *cs_source = R"glsl(
-        #version 460
-        #extension GL_EXT_nonuniform_qualifier : require
-        layout(set = 0, binding = 0) uniform texture2D kTextures2D[4];
-        layout(set = 0, binding = 1) uniform sampler kSamplers[4];
-        layout(set = 0, binding = 2) buffer SSBO {
-            vec4 result;
-            uint x;
+    const char *cs_source = R"slang(
+        [[vk::binding(0, 0)]]
+        uniform Sampler2D ycbcr[4];
+
+        struct Payload {
+            float4 result;
+            uint   x;
         };
 
+        [[vk::binding(1, 0)]]
+        RWStructuredBuffer<Payload> ssbo;
+
+        [shader("compute")]
+        [numthreads(2, 2, 1)]
         void main() {
-            // try and mask with valid access before and after
-            result = texture(sampler2D(kTextures2D[3], kSamplers[0]), vec2(0));
-            result = texture(sampler2D(kTextures2D[3], kSamplers[x]), vec2(0));
-            result = texture(sampler2D(kTextures2D[3], kSamplers[0]), vec2(0));
+            ssbo[0].result = ycbcr[2].Sample(float2(0.0, 0.0));
+            ssbo[0].result = ycbcr[ssbo[0].x].Sample(float2(0.0, 0.0));
         }
-    )glsl";
+    )slang";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_SLANG);
     pipe.cp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10715");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-12205");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
 }
 
-// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9893
-TEST_F(NegativeYcbcr, DISABLED_DescriptorIndexNonCombinedSampledImage2) {
+TEST_F(NegativeYcbcr, DescriptorIndexShaderObject) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
     AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
     RETURN_IF_SKIP(Init());
 
@@ -2131,174 +2216,29 @@ TEST_F(NegativeYcbcr, DISABLED_DescriptorIndexNonCombinedSampledImage2) {
     VkSampler samplers[4] = {sampler, sampler, sampler, sampler};
     OneOffDescriptorSet descriptor_set(m_device,
                                        {
-                                           {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                           {1, VK_DESCRIPTOR_TYPE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, samplers},
-                                           {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, samplers},
+                                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                                        });
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
     const char *cs_source = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : require
-        layout(set = 0, binding = 0) uniform texture2D kTextures2D[4];
-        layout(set = 0, binding = 1) uniform sampler kSamplers[4];
-        layout(set = 0, binding = 2) buffer SSBO {
+        layout(set = 0, binding = 0) uniform sampler2D ycbcr[4];
+        layout(set = 0, binding = 1) buffer SSBO {
             vec4 result;
             uint x;
         };
 
         void main() {
             // try and mask with valid access before and after
-            result = texture(sampler2D(kTextures2D[0], kSamplers[2]), vec2(0));
-            result = texture(sampler2D(kTextures2D[x], kSamplers[2]), vec2(0));
-            result = texture(sampler2D(kTextures2D[0], kSamplers[2]), vec2(0));
+            result = texture(ycbcr[2], vec2(0));
+            result = texture(ycbcr[x], vec2(0));
+            result = texture(ycbcr[1], vec2(0));
         }
     )glsl";
 
-    CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10715");
-    pipe.CreateComputePipeline();
-    m_errorMonitor->VerifyFound();
-}
-
-// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9893
-TEST_F(NegativeYcbcr, DISABLED_DescriptorIndexNonCombinedSampledImage3) {
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
-    RETURN_IF_SKIP(Init());
-
-    vkt::SamplerYcbcrConversion conversion(*m_device, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM);
-    auto conversion_info = conversion.ConversionInfo();
-    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
-    OneOffDescriptorSet descriptor_set(m_device,
-                                       {
-                                           {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                           {1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &sampler.handle()},
-                                           {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                       });
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-
-    const char *cs_source = R"glsl(
-        #version 460
-        #extension GL_EXT_nonuniform_qualifier : require
-        layout(set = 0, binding = 0) uniform texture2D kTextures2D[4];
-        layout(set = 0, binding = 1) uniform sampler kSamplers;
-        layout(set = 0, binding = 2) buffer SSBO {
-            vec4 result;
-            uint x;
-        };
-
-        void main() {
-            // try and mask with valid access before and after
-            result = texture(sampler2D(kTextures2D[3], kSamplers), vec2(0));
-            result = texture(sampler2D(kTextures2D[x], kSamplers), vec2(0));
-            result = texture(sampler2D(kTextures2D[3], kSamplers), vec2(0));
-        }
-    )glsl";
-
-    CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10715");
-    pipe.CreateComputePipeline();
-    m_errorMonitor->VerifyFound();
-}
-
-// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9893
-TEST_F(NegativeYcbcr, DISABLED_DescriptorIndexNonCombinedSampledImage4) {
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
-    RETURN_IF_SKIP(Init());
-
-    vkt::SamplerYcbcrConversion conversion(*m_device, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM);
-    auto conversion_info = conversion.ConversionInfo();
-    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
-    VkSampler samplers[4] = {sampler, sampler, sampler, sampler};
-    OneOffDescriptorSet descriptor_set(m_device,
-                                       {
-                                           {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                           {1, VK_DESCRIPTOR_TYPE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, samplers},
-                                           {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                       });
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-
-    const char *cs_source = R"glsl(
-        #version 460
-        #extension GL_EXT_nonuniform_qualifier : require
-        layout(set = 0, binding = 0) uniform texture2D kTextures2D;
-        layout(set = 0, binding = 1) uniform sampler kSamplers[4];
-        layout(set = 0, binding = 2) buffer SSBO {
-            vec4 result;
-            uint x;
-        };
-
-        void main() {
-            // try and mask with valid access before and after
-            result = texture(sampler2D(kTextures2D, kSamplers[3]), vec2(0));
-            result = texture(sampler2D(kTextures2D, kSamplers[x]), vec2(0));
-            result = texture(sampler2D(kTextures2D, kSamplers[3]), vec2(0));
-        }
-    )glsl";
-
-    CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10715");
-    pipe.CreateComputePipeline();
-    m_errorMonitor->VerifyFound();
-}
-
-// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9893
-TEST_F(NegativeYcbcr, DISABLED_DescriptorIndexNonCombinedSampledImageMix) {
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
-    RETURN_IF_SKIP(Init());
-
-    vkt::SamplerYcbcrConversion conversion(*m_device, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM);
-    auto conversion_info = conversion.ConversionInfo();
-    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
-
-    VkSampler samplers[4] = {sampler, sampler, sampler, sampler};
-    OneOffDescriptorSet descriptor_set0(m_device,
-                                        {
-                                            {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                            {1, VK_DESCRIPTOR_TYPE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, samplers},
-                                            {2, VK_DESCRIPTOR_TYPE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                            {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                        });
-    OneOffDescriptorSet descriptor_set1(m_device, {
-                                                      {0, VK_DESCRIPTOR_TYPE_SAMPLER, 4, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                                  });
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set0.layout_, &descriptor_set1.layout_});
-
-    const char *cs_source = R"glsl(
-        #version 460
-        layout(set = 0, binding = 0) uniform texture2D kTextures2D[4];
-        layout(set = 0, binding = 1) uniform sampler normal0[4];
-        layout(set = 1, binding = 0) uniform sampler normal1[4];
-        layout(set = 0, binding = 2) uniform sampler ycbcr[4];
-        layout(set = 0, binding = 3) buffer SSBO {
-            vec4 result;
-            uint x;
-        };
-
-        void main() {
-            result = texture(sampler2D(kTextures2D[1], normal0[1]), vec2(0));
-            result += texture(sampler2D(kTextures2D[1], normal0[1]), vec2(0));
-            result += texture(sampler2D(kTextures2D[1], ycbcr[0]), vec2(0));
-            result += texture(sampler2D(kTextures2D[1], ycbcr[x]), vec2(0));
-            result += texture(sampler2D(kTextures2D[1], ycbcr[2]), vec2(0));
-            result += texture(sampler2D(kTextures2D[1], normal1[1]), vec2(0));
-            result += texture(sampler2D(kTextures2D[1], normal1[1]), vec2(0));
-        }
-    )glsl";
-
-    CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.cp_ci_.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10715");
-    pipe.CreateComputePipeline();
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-12205");
+    const vkt::Shader comp_shader(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
+                                  &descriptor_set.layout_.handle());
     m_errorMonitor->VerifyFound();
 }

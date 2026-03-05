@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2025 Valve Corporation
- * Copyright (c) 2019-2025 LunarG, Inc.
+ * Copyright (c) 2019-2026 Valve Corporation
+ * Copyright (c) 2019-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -272,18 +272,17 @@ QueueBatchContext::QueueBatchContext(const SyncValidator& sync_state, const Queu
     : CommandExecutionContext(sync_state, queue_state.GetQueueFlags()),
       queue_state_(&queue_state),
       tag_range_(0, 0),
+      access_context_(sync_state),
       current_access_context_(&access_context_),
-      batch_log_(),
       queue_sync_tag_(sync_state.GetQueueIdLimit(), ResourceUsageTag(0)) {
     sync_state_.stats.AddQueueBatchContext();
 }
 
 QueueBatchContext::QueueBatchContext(const SyncValidator& sync_state)
     : CommandExecutionContext(sync_state, 0),
-      queue_state_(),
       tag_range_(0, 0),
+      access_context_(sync_state),
       current_access_context_(&access_context_),
-      batch_log_(),
       queue_sync_tag_(sync_state.GetQueueIdLimit(), ResourceUsageTag(0)) {
     sync_state_.stats.AddQueueBatchContext();
 }
@@ -336,29 +335,76 @@ void QueueBatchContext::ApplyPredicatedWait(Predicate& predicate, const LastSync
     });
 }
 
+struct WaitQueueTagPredicate {
+    QueueId queue;
+    ResourceUsageTag tag;
+
+    bool operator()(const ReadState& read_access) const {
+        return read_access.queue == queue && read_access.tag <= tag &&
+               read_access.stage != VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL;
+    }
+    bool operator()(const AccessState& access) const {
+        if (!access.HasWriteOp()) {
+            return false;
+        }
+        const WriteState& write_state = access.LastWrite();
+        return write_state.queue == queue && write_state.tag <= tag &&
+               write_state.access_index != SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_PRESENTED_SYNCVAL;
+    }
+};
+
+struct DeviceWaitPredicate {
+    bool operator()(const ReadState& read_access) const {
+        return read_access.stage != VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL;
+    }
+    bool operator()(const AccessState& access) const {
+        if (!access.HasWriteOp()) {
+            return false;
+        }
+        return access.LastWrite().access_index != SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_PRESENTED_SYNCVAL;
+    }
+};
+
+// Present operations matching only the *exactly* tagged present and acquire operations
+struct WaitAcquirePredicate {
+    ResourceUsageTag present_tag;
+    ResourceUsageTag acquire_tag;
+
+    bool operator()(const ReadState& read_access) const {
+        return read_access.tag == acquire_tag && read_access.stage == VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL;
+    }
+    bool operator()(const AccessState& access) const {
+        if (!access.HasWriteOp()) {
+            return false;
+        }
+        const WriteState& write_state = access.LastWrite();
+        return write_state.tag == present_tag && write_state.access_index == SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_PRESENTED_SYNCVAL;
+    }
+};
+
 void QueueBatchContext::ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag,
                                         const LastSynchronizedPresent& last_synchronized_present) {
-    const bool any_queue = (queue_id == kQueueAny);
+    WaitQueueTagPredicate predicate{queue_id, tag};
+    ApplyPredicatedWait(predicate, last_synchronized_present);
 
-    if (any_queue) {
-        // This isn't just avoid an unneeded test, but to allow *all* queues to to be waited in a single pass
-        // (and it does avoid doing the same test for every access, as well as avoiding the need for the predicate
-        // to grok Queue/Device/Wait differences.
-        AccessState::WaitTagPredicate predicate{tag};
-        ApplyPredicatedWait(predicate, last_synchronized_present);
-    } else {
-        AccessState::WaitQueueTagPredicate predicate{queue_id, tag};
-        ApplyPredicatedWait(predicate, last_synchronized_present);
-    }
-
-    // SwapChain acquire QBC's have no queue, but also, events are always empty.
-    if (queue_state_ && (queue_id == GetQueueId() || any_queue)) {
+    // SwapChain acquire batch contexts have no queue
+    if (queue_state_ && queue_id == GetQueueId()) {
         events_context_.ApplyTaggedWait(queue_state_->GetQueueFlags(), tag);
     }
 }
 
+void QueueBatchContext::ApplyDeviceWait(const LastSynchronizedPresent& last_synchronized_present) {
+    DeviceWaitPredicate predicate;
+    ApplyPredicatedWait(predicate, last_synchronized_present);
+
+    // SwapChain acquire batch contexts have no queue
+    if (queue_state_) {
+        events_context_.ApplyTaggedWait(queue_state_->GetQueueFlags(), ResourceUsageRecord::kMaxIndex);
+    }
+}
+
 void QueueBatchContext::ApplyAcquireWait(const AcquiredImage& acquired) {
-    AccessState::WaitAcquirePredicate predicate{acquired.present_tag, acquired.acquire_tag};
+    WaitAcquirePredicate predicate{acquired.present_tag, acquired.acquire_tag};
     ApplyPredicatedWait(predicate, {});
 }
 
@@ -404,15 +450,13 @@ void QueueBatchContext::ResolvePresentSemaphoreWait(const SignalInfo& signal_inf
 
     // For each presented image
     for (const auto& presented : presented_images) {
-        // Need a copy that can be used as the pseudo-iterator...
-        subresource_adapter::ImageRangeGenerator range_gen(presented.range_gen);
         if (signal_scope.queue == wait_scope.queue) {
             // If signal queue == wait queue, signal is treated as a memory barrier with an access scope equal to the
             // valid accesses for the sync scope.
-            access_context_.ResolveFromContext(sem_same_queue_op, from_context, range_gen);
+            access_context_.ResolveFromContext(sem_same_queue_op, from_context, presented.range_gen);
             access_context_.ResolveFromContext(noop_barrier_op, from_context);
         } else {
-            access_context_.ResolveFromContext(sem_not_same_queue_op, from_context, range_gen);
+            access_context_.ResolveFromContext(sem_not_same_queue_op, from_context, presented.range_gen);
             access_context_.ResolveFromContext(noop_sem_op, from_context);
         }
     }
@@ -500,15 +544,15 @@ bool QueueBatchContext::DoQueuePresentValidate(const Location& loc, const Presen
     bool skip = false;
     // Tag the presented images so record doesn't have to know the tagging scheme
     for (const PresentedImage& presented : presented_images) {
-        HazardResult hazard =
-            access_context_.DetectHazard(presented.range_gen, SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_PRESENTED_SYNCVAL);
+        ImageRangeGen range_gen = presented.range_gen;
+        HazardResult hazard = access_context_.DetectHazard(range_gen, SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_PRESENTED_SYNCVAL);
         if (hazard.IsHazard()) {
             const VulkanTypedHandle swapchain_handle = vvl::StateObject::Handle(presented.swapchain_state.lock());
             const VulkanTypedHandle image_handle = vvl::StateObject::Handle(presented.image);
 
             LogObjectList objlist(queue_state_->Handle(), swapchain_handle, image_handle);
 
-            std::stringstream ss;
+            std::ostringstream ss;
             ss << "swapchain image " << presented.image_index << " (";
             ss << sync_state_.FormatHandle(image_handle);
             ss << " from " << sync_state_.FormatHandle(swapchain_handle) << ")";
@@ -961,8 +1005,8 @@ void PresentedImage::SetImage(uint32_t at_index) {
 
 void PresentedImage::UpdateMemoryAccess(SyncAccessIndex usage, ResourceUsageTag tag, AccessContext& access_context,
                                         SyncFlags flags) const {
-    // Intentional copy. The range_gen argument is not copied by the Update... call below
-    access_context.UpdateAccessState(range_gen, usage, SyncOrdering::kNonAttachment, ResourceUsageTagEx{tag}, flags);
+    ImageRangeGen mutable_range_gen = range_gen;
+    access_context.UpdateAccessState(mutable_range_gen, usage, ResourceUsageTagEx{tag}, flags);
 }
 
 }  // namespace syncval

@@ -152,7 +152,7 @@ TEST_F(PositivePipelineBinary, GetPipelineKey) {
     AddRequiredFeature(vkt::Feature::pipelineBinaries);
     RETURN_IF_SKIP(Init());
 
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
     const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
@@ -286,8 +286,8 @@ TEST_F(PositivePipelineBinary, Draw) {
 
         m_command_buffer.Begin();
         m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2);
-        vk::CmdDraw(m_command_buffer.handle(), 3u, 1u, 0u, 0u);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2);
+        vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
         m_command_buffer.EndRenderPass();
         m_command_buffer.End();
 

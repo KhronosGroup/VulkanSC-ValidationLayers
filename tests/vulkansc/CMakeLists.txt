@@ -75,6 +75,8 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/sync_helper.cpp
     ../framework/data_graph_objects.h
     ../framework/data_graph_objects.cpp
+    ../framework/cooperative_matrix_helper.h
+    ../framework/cooperative_matrix_helper.cpp
     negative/command.cpp
     negative/device_create.cpp
     negative/implicit.cpp

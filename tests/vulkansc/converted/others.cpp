@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +14,7 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
+// stype-check off
 
 #include <vulkan/vulkan_core.h>
 #include <algorithm>
@@ -25,6 +26,10 @@
 TEST_F(VkLayerTest, VersionCheckPromotedAPIs) {
     TEST_DESCRIPTION("Validate that promoted APIs are not valid in old versions.");
     SetTargetApiVersion(VK_API_VERSION_1_0);
+
+#ifdef VK_USE_PLATFORM_METAL_EXT
+    GTEST_SKIP() << "VK_KHR_get_physical_device_properties2 is enabled due to VK_KHR_portability_subset";
+#endif
 
     RETURN_IF_SKIP(Init());
 
@@ -87,7 +92,7 @@ TEST_F(VkLayerTest, VuidHashStability) {
     ASSERT_TRUE(hash_util::VuidHash("VUID-RayTmaxKHR-RayTmaxKHR-04349") == 0x8e67514c);
     ASSERT_TRUE(hash_util::VuidHash("VUID-RuntimeSpirv-SubgroupUniformControlFlowKHR-06379") == 0x2f574188);
     ASSERT_TRUE(hash_util::VuidHash("VVL-DEBUG-PRINTF") == 0x4fe1fef9);
-    ASSERT_TRUE(hash_util::VuidHash("WARNING-GPU-Assisted-Validation") == 0x24b5c69f);
+    ASSERT_TRUE(hash_util::VuidHash("WARNING-Setting-Limit-Adjusted") == 0x86fe6721);
 }
 
 TEST_F(VkLayerTest, RequiredParameter) {
@@ -1455,4 +1460,67 @@ TEST_F(VkLayerTest, DISABLED_MultipleExtensionOrDependency) {
     m_errorMonitor->SetDesiredError("VUID-vkCreateDevice-ppEnabledExtensionNames-01387");
     RETURN_IF_SKIP(Init());
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkLayerTest, CooperativeMatrixProps) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-Docs/issues/2613");
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::cooperativeMatrix);
+    RETURN_IF_SKIP(Init());
+    uint32_t count = 1;
+    {
+        VkCooperativeMatrixPropertiesKHR props;
+        props.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        props.pNext = nullptr;
+        m_errorMonitor->SetDesiredError("VUID-VkCooperativeMatrixPropertiesKHR-sType-sType");
+        vk::GetPhysicalDeviceCooperativeMatrixPropertiesKHR(Gpu(), &count, &props);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        VkQueueFamilyProperties2 props;
+        props.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        props.pNext = nullptr;
+        m_errorMonitor->SetDesiredError("VUID-VkQueueFamilyProperties2-sType-sType");
+        vk::GetPhysicalDeviceQueueFamilyProperties2KHR(Gpu(), &count, &props);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(VkLayerTest, FeatureNotPresentNoCoreFeatures) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11390");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitFramework());
+
+    VkPhysicalDeviceVulkan13Features enabled_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(enabled_features);
+    if (enabled_features.textureCompressionASTC_HDR) {
+        GTEST_SKIP() << "Need feature to not be supported";
+    }
+
+    enabled_features.textureCompressionASTC_HDR = VK_TRUE;
+
+    float priority = 1.0f;
+    VkDeviceQueueCreateInfo queue_info = vku::InitStructHelper();
+    queue_info.queueFamilyIndex = 0;
+    queue_info.queueCount = 1;
+    queue_info.pQueuePriorities = &priority;
+
+    VkDeviceCreateInfo dev_info = vku::InitStructHelper(&enabled_features);
+    dev_info.flags = 0;
+    dev_info.queueCreateInfoCount = 1;
+    dev_info.pQueueCreateInfos = &queue_info;
+    dev_info.enabledLayerCount = 0;
+    dev_info.ppEnabledLayerNames = nullptr;
+    dev_info.enabledExtensionCount = 0;
+    dev_info.ppEnabledExtensionNames = nullptr;
+    dev_info.pEnabledFeatures = nullptr;
+
+    VkDevice device = VK_NULL_HANDLE;
+    m_errorMonitor->SetDesiredWarning("WARNING-vkCreateDevice-FeatureNotPresent");
+    vk::CreateDevice(Gpu(), &dev_info, nullptr, &device);
+    m_errorMonitor->VerifyFound();
+    if (device != VK_NULL_HANDLE) {
+        vk::DestroyDevice(device, nullptr);
+    }
 }

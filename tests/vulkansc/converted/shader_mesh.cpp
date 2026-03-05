@@ -33,7 +33,7 @@ TEST_F(NegativeShaderMesh, SharedMemoryOverLimit) {
     const uint32_t max_shared_memory_size = mesh_shader_properties.maxMeshSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream mesh_source;
+    std::ostringstream mesh_source;
     mesh_source << R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require
@@ -45,7 +45,7 @@ TEST_F(NegativeShaderMesh, SharedMemoryOverLimit) {
         void main(){}
     )glsl";
 
-    VkShaderObj mesh(this, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj mesh(*m_device, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {helper.fs_->GetStageCreateInfo(), mesh.GetStageCreateInfo()};
@@ -73,7 +73,7 @@ TEST_F(NegativeShaderMesh, SharedMemoryOverLimitWorkgroupMemoryExplicitLayout) {
     const uint32_t max_shared_memory_size = mesh_shader_properties.maxMeshSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream mesh_source;
+    std::ostringstream mesh_source;
     mesh_source << R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require
@@ -98,7 +98,7 @@ TEST_F(NegativeShaderMesh, SharedMemoryOverLimitWorkgroupMemoryExplicitLayout) {
         }
     )glsl";
 
-    VkShaderObj mesh(this, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj mesh(*m_device, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {helper.fs_->GetStageCreateInfo(), mesh.GetStageCreateInfo()};
@@ -122,7 +122,7 @@ TEST_F(NegativeShaderMesh, SharedMemorySpecConstantDefault) {
     const uint32_t max_shared_memory_size = mesh_shader_properties.maxMeshSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream mesh_source;
+    std::ostringstream mesh_source;
     mesh_source << R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require
@@ -138,7 +138,7 @@ TEST_F(NegativeShaderMesh, SharedMemorySpecConstantDefault) {
         void main(){}
     )glsl";
 
-    VkShaderObj mesh(this, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj mesh(*m_device, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {helper.fs_->GetStageCreateInfo(), mesh.GetStageCreateInfo()};
@@ -162,7 +162,7 @@ TEST_F(NegativeShaderMesh, SharedMemorySpecConstantSet) {
     const uint32_t max_shared_memory_size = mesh_shader_properties.maxMeshSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream mesh_source;
+    std::ostringstream mesh_source;
     mesh_source << R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require
@@ -191,7 +191,7 @@ TEST_F(NegativeShaderMesh, SharedMemorySpecConstantSet) {
     specialization_info.dataSize = sizeof(uint32_t);
     specialization_info.pData = &data;
 
-    VkShaderObj mesh(this, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_GLSL,
+    VkShaderObj mesh(*m_device, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_GLSL,
                      &specialization_info);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
@@ -206,7 +206,6 @@ TEST_F(NegativeShaderMesh, TaskSharedMemoryOverLimit) {
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::meshShader);
     AddRequiredFeature(vkt::Feature::taskShader);
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -216,7 +215,7 @@ TEST_F(NegativeShaderMesh, TaskSharedMemoryOverLimit) {
     const uint32_t max_shared_memory_size = mesh_shader_properties.maxTaskSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream task_source;
+    std::ostringstream task_source;
     task_source << R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require
@@ -226,13 +225,18 @@ TEST_F(NegativeShaderMesh, TaskSharedMemoryOverLimit) {
         void main(){}
     )glsl";
 
-    VkShaderObj task(this, task_source.str().c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj mesh(this, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj task(*m_device, task_source.str().c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj mesh(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
-        helper.shader_stages_ = {task.GetStageCreateInfo(), mesh.GetStageCreateInfo()};
-    };
-    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-maxTaskSharedMemorySize-08759");
+    if (mesh_shader_properties.maxTaskSharedMemorySize == mesh_shader_properties.maxTaskPayloadAndSharedMemorySize) {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTaskPayloadAndSharedMemorySize-08760");
+    }
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {task.GetStageCreateInfo(), mesh.GetStageCreateInfo()};
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTaskSharedMemorySize-08759");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeShaderMesh, MeshAndTaskShaderDerivatives) {
@@ -288,19 +292,21 @@ TEST_F(NegativeShaderMesh, MeshAndTaskShaderDerivatives) {
     )";
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-meshAndTaskShaderDerivatives-10153");
-    VkShaderObj ms(this, ms_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    VkShaderObj ms(*m_device, ms_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeShaderMesh, MeshShaderPayloadMemoryOverLimit) {
-    TEST_DESCRIPTION("Validate Mesh shader shared memory limit");
-
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::taskShader);
     AddRequiredFeature(vkt::Feature::meshShader);
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    if (!IsPlatformMockICD()) {
+        GTEST_SKIP() << "Hard to get limit tests to work everywhere without being too complex";
+    }
 
     VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(mesh_shader_properties);
@@ -308,7 +314,23 @@ TEST_F(NegativeShaderMesh, MeshShaderPayloadMemoryOverLimit) {
     const uint32_t max_mesh_payload_and_shared_memory_size = mesh_shader_properties.maxMeshPayloadAndSharedMemorySize;
     const uint32_t max_mesh_payload_and_shared_ints = max_mesh_payload_and_shared_memory_size / 4;
 
-    std::stringstream mesh_source;
+    std::ostringstream task_source;
+    task_source << R"glsl(
+            #version 460
+            #extension GL_EXT_mesh_shader : require
+            struct Task {
+                uint baseID[)glsl";
+    task_source << (max_mesh_payload_and_shared_ints / 2 + 1);
+    task_source << R"glsl(];
+            };
+            taskPayloadSharedEXT Task IN;
+            void main(){
+                IN.baseID[0] = 0;
+                EmitMeshTasksEXT(1u, 1u, 1u);
+            }
+        )glsl";
+
+    std::ostringstream mesh_source;
     mesh_source << R"glsl(
             #version 460
             #extension GL_EXT_mesh_shader : require
@@ -326,20 +348,25 @@ TEST_F(NegativeShaderMesh, MeshShaderPayloadMemoryOverLimit) {
             void main(){}
         )glsl";
 
-    VkShaderObj mesh(this, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    const auto set_info = [&](CreatePipelineHelper &helper) { helper.shader_stages_ = {mesh.GetStageCreateInfo()}; };
+    VkShaderObj task(*m_device, task_source.str().c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj mesh(*m_device, mesh_source.str().c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    const auto set_info = [&](CreatePipelineHelper &helper) {
+        helper.shader_stages_ = {task.GetStageCreateInfo(), mesh.GetStageCreateInfo()};
+    };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-maxMeshPayloadAndSharedMemorySize-08755");
 }
 
 TEST_F(NegativeShaderMesh, MeshShaderPayloadSpecConstantSet) {
-    TEST_DESCRIPTION("Validate Mesh shader shared memory limit");
-
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::meshShader);
-
+    AddRequiredFeature(vkt::Feature::taskShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
+
+    if (!IsPlatformMockICD()) {
+        GTEST_SKIP() << "Hard to get limit tests to work everywhere without being too complex";
+    }
 
     VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(mesh_shader_properties);
@@ -347,19 +374,33 @@ TEST_F(NegativeShaderMesh, MeshShaderPayloadSpecConstantSet) {
     const uint32_t max_mesh_payload_and_shared_memory_size = mesh_shader_properties.maxMeshPayloadAndSharedMemorySize;
     const uint32_t max_mesh_payload_and_shared_ints = max_mesh_payload_and_shared_memory_size / 4;
 
+    const char *task_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : require
+        layout(constant_id = 0) const int SIZE = 64;
+        struct Task {
+            uint baseID[SIZE];
+        };
+        taskPayloadSharedEXT Task IN;
+        void main() {
+            IN.baseID[0] = 0;
+            EmitMeshTasksEXT(1u, 1u, 1u);
+        }
+    )glsl";
+
     const char *mesh_source = R"glsl(
-            #version 460
-            #extension GL_EXT_mesh_shader : require
-            layout(max_vertices = 3, max_primitives=1) out;
-            layout(triangles) out;
-            layout(constant_id = 0) const int SIZE = 64;
-            struct Task {
-                uint baseID[SIZE];
-            };
-            taskPayloadSharedEXT Task IN;
-            shared int a[SIZE];
-            void main(){}
-        )glsl";
+        #version 460
+        #extension GL_EXT_mesh_shader : require
+        layout(max_vertices = 3, max_primitives=1) out;
+        layout(triangles) out;
+        layout(constant_id = 0) const int SIZE = 64;
+        struct Task {
+            uint baseID[SIZE];
+        };
+        taskPayloadSharedEXT Task IN;
+        shared int a[SIZE];
+        void main(){}
+    )glsl";
 
     uint32_t size = max_mesh_payload_and_shared_ints / 2 + 1;
 
@@ -374,7 +415,104 @@ TEST_F(NegativeShaderMesh, MeshShaderPayloadSpecConstantSet) {
     spec_info.dataSize = sizeof(uint32_t);
     spec_info.pData = &size;
 
-    VkShaderObj mesh(this, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_GLSL, &spec_info);
-    const auto set_info = [&](CreatePipelineHelper &helper) { helper.shader_stages_ = {mesh.GetStageCreateInfo()}; };
+    VkShaderObj task(*m_device, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj mesh(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_GLSL, &spec_info);
+    const auto set_info = [&](CreatePipelineHelper &helper) {
+        helper.shader_stages_ = {task.GetStageCreateInfo(), mesh.GetStageCreateInfo()};
+        ;
+    };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-maxMeshPayloadAndSharedMemorySize-08755");
+}
+
+TEST_F(NegativeShaderMesh, TaskPayloadMemoryOverLimit) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::taskShader);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(mesh_shader_properties);
+
+    const uint32_t max_payload_memory_size = mesh_shader_properties.maxTaskPayloadSize;
+    const uint32_t max_payload_ints = max_payload_memory_size / 4;
+
+    VkShaderObj mesh(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+
+    std::ostringstream task_source;
+    task_source << R"glsl(
+            #version 460
+            #extension GL_EXT_mesh_shader : require
+            struct Task {
+                uint baseID[)glsl";
+    task_source << (max_payload_ints + 16);
+    task_source << R"glsl(];
+            };
+            taskPayloadSharedEXT Task OUT;
+            void main(){}
+        )glsl";
+
+    VkShaderObj task(*m_device, task_source.str().c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    if (mesh_shader_properties.maxTaskPayloadSize == mesh_shader_properties.maxTaskPayloadAndSharedMemorySize) {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTaskPayloadAndSharedMemorySize-08760");
+    }
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {task.GetStageCreateInfo(), mesh.GetStageCreateInfo()};
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTaskPayloadSize-08758");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderMesh, TaskShaderAndPayloadMemoryOverLimit) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::taskShader);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(mesh_shader_properties);
+
+    const uint32_t max_shared_memory_size = mesh_shader_properties.maxTaskSharedMemorySize;
+    const uint32_t max_shared_ints = max_shared_memory_size / 4;
+    const uint32_t max_payload_memory_size = mesh_shader_properties.maxTaskPayloadSize;
+    const uint32_t max_payload_ints = max_payload_memory_size / 4;
+    const uint32_t max_payload_and_shared_memory_size = mesh_shader_properties.maxTaskPayloadAndSharedMemorySize;
+    const uint32_t max_payload_and_shared_ints = max_payload_and_shared_memory_size / 4;
+
+    VkShaderObj mesh(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+
+    std::ostringstream task_source;
+    task_source << R"glsl(
+            #version 460
+            #extension GL_EXT_mesh_shader : require
+            struct Task {
+                uint baseID[)glsl";
+    task_source << (max_payload_and_shared_ints / 2 + 1);
+    task_source << R"glsl(];
+            };
+            taskPayloadSharedEXT Task OUT;
+            shared int a[)glsl";
+    task_source << (max_payload_and_shared_ints / 2 + 1);
+    task_source << R"glsl(];
+            void main(){}
+        )glsl";
+
+    VkShaderObj task(*m_device, task_source.str().c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+
+    if (max_payload_and_shared_ints / 2 + 1 > max_payload_ints) {
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-maxTaskPayloadSize-08758");
+    }
+    if (max_payload_and_shared_ints / 2 + 1 > max_shared_ints) {
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-maxTaskSharedMemorySize-08759");
+    }
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {task.GetStageCreateInfo(), mesh.GetStageCreateInfo()};
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxTaskPayloadAndSharedMemorySize-08760");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
 }

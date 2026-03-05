@@ -1,6 +1,7 @@
-/* Copyright (c) 2024-2025 The Khronos Group Inc.
- * Copyright (c) 2024-2025 Valve Corporation
- * Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 The Khronos Group Inc.
+ * Copyright (c) 2024-2026 Valve Corporation
+ * Copyright (c) 2024-2026 LunarG, Inc.
+ * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,8 +38,8 @@ enum class CopyError {
     AspectMaskSingleBit_09103,
     ExceedBufferBounds_00171,
 
-    ImageOffest_07971,
-    ImageOffest_07972,
+    ImageOffset_07971,
+    ImageOffset_07972,
     Image1D_07979,
     Image1D_07980,
     Image3D_07983,
@@ -49,7 +50,7 @@ enum class CopyError {
     TexelBlockExtentHeight_00208,
     TexelBlockExtentDepth_00209,
     MultiPlaneAspectMask_07981,
-    ImageOffest_09104,
+    ImageOffset_09104,
     AspectMask_09105,
     bufferRowLength_09106,
     bufferImageHeight_09107,
@@ -98,6 +99,23 @@ const std::string &GetImageMipLevelVUID(const Location &loc);
 const std::string &GetImageArrayLayerRangeVUID(const Location &loc);
 const std::string &GetImageImageLayoutVUID(const Location &loc);
 
+enum class BuildASError {
+    IsBuilt_03667,
+    SameCount_03758,
+    SameFlags_03759,
+    SameType_03760,
+    SameType_03761,
+    SameFlags_03762,
+    TriangleVertexFormat_03763,
+    TriangleMaxVertex_03764,
+    TriangleIndexType_03765,
+    TriangleTransformData_03766,
+    TriangleTransformData_03767,
+    DstTop_03699,
+    DstBottom_03700,
+};
+const char* GetBuildASVUID(const Location& loc, BuildASError error);
+
 enum class SubresourceRangeError {
     BaseMip_01486,
     MipCount_01724,
@@ -109,12 +127,15 @@ enum class SubresourceRangeError {
 };
 const std::string &GetSubresourceRangeVUID(const Location &loc, SubresourceRangeError error);
 
-enum class PipelineInterfaceVariableError {
+enum class SpirvInterfaceVariableError {
     ShaderStage_07988,
     Mutable_07990,
     DescriptorCount_07991,
     Inline_10391,
+    DescriptorHeapMapping_11312,
+    PushConstantStage_07987,
+    PushConstantRange_10069,
 };
-const char *GetPipelineInterfaceVariableVUID(const vvl::Pipeline &pipeline, PipelineInterfaceVariableError error);
+const char *GetSpirvInterfaceVariableVUID(const Location &loc, SpirvInterfaceVariableError error);
 
 }  // namespace vvl

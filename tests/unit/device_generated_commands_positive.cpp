@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +35,9 @@ void DeviceGeneratedCommandsTest::InitBasicDeviceGeneratedCommands() {
 
 // "If vkGetGeneratedCommandsMemoryRequirementsEXT returns a non-zero size, preprocessAddress must not be NULL"
 // Does the query and updates with preprocessAddress if needed
-void DeviceGeneratedCommandsTest::SetPreProcessBuffer(VkGeneratedCommandsInfoEXT& generated_commands_info) {
-    VkGeneratedCommandsMemoryRequirementsInfoEXT dgc_mem_reqs = vku::InitStructHelper();
+void DeviceGeneratedCommandsTest::SetPreProcessBuffer(VkGeneratedCommandsInfoEXT& generated_commands_info,
+                                                      void* pipeline_or_shader_object) {
+    VkGeneratedCommandsMemoryRequirementsInfoEXT dgc_mem_reqs = vku::InitStructHelper(pipeline_or_shader_object);
     dgc_mem_reqs.indirectCommandsLayout = generated_commands_info.indirectCommandsLayout;
     dgc_mem_reqs.indirectExecutionSet = generated_commands_info.indirectExecutionSet;
     dgc_mem_reqs.maxSequenceCount = generated_commands_info.maxSequenceCount;
@@ -162,6 +163,35 @@ TEST_F(PositiveDeviceGeneratedCommands, PushConstant) {
     VkIndirectCommandsLayoutTokenEXT tokens[2];
     tokens[0] = vku::InitStructHelper();
     tokens[0].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_PUSH_CONSTANT_EXT;
+    tokens[0].data.pPushConstant = &pc_token;
+    tokens[0].offset = 0;
+
+    tokens[1] = vku::InitStructHelper();
+    tokens[1].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_EXT;
+    tokens[1].offset = 8;
+
+    const std::vector<VkPushConstantRange> pc_range = {{VK_SHADER_STAGE_VERTEX_BIT, 4, 12}};
+    vkt::PipelineLayout pipeline_layout(*m_device, {}, pc_range);
+    VkIndirectCommandsLayoutCreateInfoEXT command_layout_ci = vku::InitStructHelper();
+    command_layout_ci.shaderStages = VK_SHADER_STAGE_VERTEX_BIT;
+    command_layout_ci.pipelineLayout = pipeline_layout;
+    command_layout_ci.tokenCount = 2;
+    command_layout_ci.pTokens = tokens;
+
+    vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
+}
+
+TEST_F(PositiveDeviceGeneratedCommands, PushData) {
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    RETURN_IF_SKIP(InitBasicDeviceGeneratedCommands());
+
+    VkIndirectCommandsPushConstantTokenEXT pc_token;
+    pc_token.updateRange = {VK_SHADER_STAGE_ALL, 8, 8};
+
+    VkIndirectCommandsLayoutTokenEXT tokens[2];
+    tokens[0] = vku::InitStructHelper();
+    tokens[0].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_PUSH_DATA_EXT;
     tokens[0].data.pPushConstant = &pc_token;
     tokens[0].offset = 0;
 
@@ -359,7 +389,7 @@ TEST_F(PositiveDeviceGeneratedCommands, ExecuteShaderObjectVertex) {
     tokens[1].offset = 8;
 
     VkIndirectCommandsLayoutCreateInfoEXT command_layout_ci = vku::InitStructHelper();
-    command_layout_ci.shaderStages = VK_INDIRECT_EXECUTION_SET_INFO_TYPE_SHADER_OBJECTS_EXT;
+    command_layout_ci.shaderStages = VK_SHADER_STAGE_VERTEX_BIT;
     command_layout_ci.pipelineLayout = VK_NULL_HANDLE;
     command_layout_ci.tokenCount = 2;
     command_layout_ci.pTokens = tokens;
@@ -402,6 +432,72 @@ TEST_F(PositiveDeviceGeneratedCommands, ExecuteShaderObjectVertex) {
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT};
     vk::CmdBindShadersEXT(m_command_buffer, 1u, stages, shaders);
+    SetDefaultDynamicStatesAll(m_command_buffer);
+    vk::CmdExecuteGeneratedCommandsEXT(m_command_buffer, false, &generated_commands_info);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDeviceGeneratedCommands, ExecuteShaderObjectMesh) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    AddRequiredFeature(vkt::Feature::taskShader);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitBasicDeviceGeneratedCommands());
+    InitRenderTarget();
+
+    VkIndirectCommandsLayoutTokenEXT tokens = vku::InitStructHelper();
+    tokens.type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_MESH_TASKS_EXT;
+    tokens.offset = 0;
+
+    VkIndirectCommandsLayoutCreateInfoEXT command_layout_ci = vku::InitStructHelper();
+    command_layout_ci.shaderStages = VK_SHADER_STAGE_MESH_BIT_EXT;
+    command_layout_ci.pipelineLayout = VK_NULL_HANDLE;
+    command_layout_ci.tokenCount = 1;
+    command_layout_ci.pTokens = &tokens;
+    vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
+
+    const auto spv = GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, kMeshMinimalGlsl, SPV_ENV_VULKAN_1_3);
+    VkShaderCreateInfoEXT mesh_create_info = ShaderCreateInfoFlag(
+        spv, VK_SHADER_STAGE_MESH_BIT_EXT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT | VK_SHADER_CREATE_NO_TASK_SHADER_BIT_EXT);
+    const vkt::Shader mesh_shader(*m_device, mesh_create_info);
+    const VkShaderEXT shaders[] = {mesh_shader};
+
+    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
+    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, kHostVisibleMemProps, &allocate_flag_info);
+
+    VkGeneratedCommandsShaderInfoEXT init_shader_info = vku::InitStructHelper();
+    init_shader_info.shaderCount = 1;
+    init_shader_info.pShaders = shaders;
+
+    VkGeneratedCommandsInfoEXT generated_commands_info = vku::InitStructHelper(&init_shader_info);
+    generated_commands_info.shaderStages = VK_SHADER_STAGE_MESH_BIT_EXT;
+    generated_commands_info.indirectExecutionSet = VK_NULL_HANDLE;
+    generated_commands_info.indirectCommandsLayout = command_layout;
+    generated_commands_info.indirectAddressSize = 64;
+    generated_commands_info.indirectAddress = block_buffer.Address();
+    generated_commands_info.sequenceCountAddress = 0;
+    generated_commands_info.maxSequenceCount = 1;
+    generated_commands_info.maxDrawCount = 1;
+    SetPreProcessBuffer(generated_commands_info, &init_shader_info);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_MESH_BIT_EXT};
+    vk::CmdBindShadersEXT(m_command_buffer, 1u, stages, shaders);
+    const VkShaderEXT null_shader = VK_NULL_HANDLE;
+    VkShaderStageFlagBits null_stages = VK_SHADER_STAGE_VERTEX_BIT;
+    vk::CmdBindShadersEXT(m_command_buffer, 1u, &null_stages, &null_shader);
+    null_stages = VK_SHADER_STAGE_FRAGMENT_BIT;
+    vk::CmdBindShadersEXT(m_command_buffer, 1u, &null_stages, &null_shader);
+    null_stages = VK_SHADER_STAGE_TASK_BIT_EXT;
+    vk::CmdBindShadersEXT(m_command_buffer, 1u, &null_stages, &null_shader);
     SetDefaultDynamicStatesAll(m_command_buffer);
     vk::CmdExecuteGeneratedCommandsEXT(m_command_buffer, false, &generated_commands_info);
     m_command_buffer.EndRendering();
@@ -468,4 +564,71 @@ TEST_F(PositiveDeviceGeneratedCommands, IndirectExecutionSetNullLayout) {
     VkIndirectExecutionSetEXT indirect_execution_set;
     vk::CreateIndirectExecutionSetEXT(*m_device, &indirect_execution_set_ci, nullptr, &indirect_execution_set);
     vk::DestroyIndirectExecutionSetEXT(*m_device, indirect_execution_set, nullptr);
+}
+
+TEST_F(PositiveDeviceGeneratedCommands, PushConstantMultipleRanges) {
+    RETURN_IF_SKIP(InitBasicDeviceGeneratedCommands());
+
+    VkIndirectCommandsPushConstantTokenEXT pc_token_vert;
+    pc_token_vert.updateRange = {VK_SHADER_STAGE_VERTEX_BIT, 0, 16};
+
+    VkIndirectCommandsPushConstantTokenEXT pc_token_frag;
+    pc_token_frag.updateRange = {VK_SHADER_STAGE_FRAGMENT_BIT, 16, 16};
+
+    VkIndirectCommandsLayoutTokenEXT tokens[3];
+    tokens[0] = vku::InitStructHelper();
+    tokens[0].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_PUSH_CONSTANT_EXT;
+    tokens[0].data.pPushConstant = &pc_token_vert;
+    tokens[0].offset = 0;
+
+    tokens[1] = vku::InitStructHelper();
+    tokens[1].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_PUSH_CONSTANT_EXT;
+    tokens[1].data.pPushConstant = &pc_token_frag;
+    tokens[1].offset = 8;
+
+    tokens[2] = vku::InitStructHelper();
+    tokens[2].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_EXT;
+    tokens[2].offset = 16;
+
+    std::vector<VkPushConstantRange> pc_ranges = {
+        {VK_SHADER_STAGE_VERTEX_BIT, 0, 16},
+        {VK_SHADER_STAGE_FRAGMENT_BIT, 16, 16},
+    };
+
+    vkt::PipelineLayout pipeline_layout(*m_device, {}, pc_ranges);
+    VkIndirectCommandsLayoutCreateInfoEXT command_layout_ci = vku::InitStructHelper();
+    command_layout_ci.shaderStages = VK_SHADER_STAGE_VERTEX_BIT;
+    command_layout_ci.pipelineLayout = pipeline_layout;
+    command_layout_ci.tokenCount = 3;
+    command_layout_ci.pTokens = tokens;
+
+    vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
+}
+
+TEST_F(PositiveDeviceGeneratedCommands, IndirectCommandsLayoutDescriptorHeap) {
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    RETURN_IF_SKIP(InitBasicDeviceGeneratedCommands());
+
+    VkIndirectCommandsPushConstantTokenEXT pc_token;
+    pc_token.updateRange = {VK_SHADER_STAGE_ALL, 4, 8};
+
+    VkIndirectCommandsLayoutTokenEXT tokens[2];
+    tokens[0] = vku::InitStructHelper();
+    tokens[0].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_PUSH_DATA_EXT;
+    tokens[0].data.pPushConstant = &pc_token;
+    tokens[0].offset = 0;
+
+    tokens[1] = vku::InitStructHelper();
+    tokens[1].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_EXT;
+    tokens[1].offset = 8;
+
+    VkIndirectCommandsLayoutCreateInfoEXT command_layout_ci = vku::InitStructHelper();
+    command_layout_ci.shaderStages = VK_SHADER_STAGE_VERTEX_BIT;
+    command_layout_ci.tokenCount = 2;
+    command_layout_ci.pTokens = tokens;
+
+    VkIndirectCommandsLayoutEXT command_layout;
+    vk::CreateIndirectCommandsLayoutEXT(device(), &command_layout_ci, nullptr, &command_layout);
+    vk::DestroyIndirectCommandsLayoutEXT(device(), command_layout, nullptr);
 }

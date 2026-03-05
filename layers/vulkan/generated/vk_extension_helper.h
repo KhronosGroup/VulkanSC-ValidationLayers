@@ -3,10 +3,10 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -132,6 +132,7 @@ struct InstanceExtensions {
     ExtEnabled vk_ext_layer_settings{kNotSupported};
     ExtEnabled vk_nv_display_stereo{kNotSupported};
     ExtEnabled vk_ohos_surface{kNotSupported};
+    ExtEnabled vk_sec_ubm_surface{kNotSupported};
 
     struct Requirement {
         const ExtEnabled InstanceExtensions::*enabled;
@@ -248,6 +249,7 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_khr_ray_tracing_position_fetch{kNotSupported};
     ExtEnabled vk_khr_pipeline_binary{kNotSupported};
     ExtEnabled vk_khr_swapchain_maintenance1{kNotSupported};
+    ExtEnabled vk_khr_internally_synchronized_queues{kNotSupported};
     ExtEnabled vk_khr_cooperative_matrix{kNotSupported};
     ExtEnabled vk_khr_compute_shader_derivatives{kNotSupported};
     ExtEnabled vk_khr_video_decode_av1{kNotSupported};
@@ -325,6 +327,7 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_ext_sampler_filter_minmax{kNotSupported};
     ExtEnabled vk_amd_gpu_shader_int16{kNotSupported};
     ExtEnabled vk_amdx_shader_enqueue{kNotSupported};
+    ExtEnabled vk_ext_descriptor_heap{kNotSupported};
     ExtEnabled vk_amd_mixed_attachment_samples{kNotSupported};
     ExtEnabled vk_amd_shader_fragment_mask{kNotSupported};
     ExtEnabled vk_ext_inline_uniform_block{kNotSupported};
@@ -345,6 +348,7 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_nv_representative_fragment_test{kNotSupported};
     ExtEnabled vk_ext_filter_cubic{kNotSupported};
     ExtEnabled vk_qcom_render_pass_shader_resolve{kNotSupported};
+    ExtEnabled vk_qcom_cooperative_matrix_conversion{kNotSupported};
     ExtEnabled vk_ext_global_priority{kNotSupported};
     ExtEnabled vk_ext_external_memory_host{kNotSupported};
     ExtEnabled vk_amd_buffer_marker{kNotSupported};
@@ -362,6 +366,7 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_nv_shader_image_footprint{kNotSupported};
     ExtEnabled vk_nv_scissor_exclusive{kNotSupported};
     ExtEnabled vk_nv_device_diagnostic_checkpoints{kNotSupported};
+    ExtEnabled vk_ext_present_timing{kNotSupported};
     ExtEnabled vk_intel_shader_integer_functions2{kNotSupported};
     ExtEnabled vk_intel_performance_query{kNotSupported};
     ExtEnabled vk_ext_pci_bus_info{kNotSupported};
@@ -404,6 +409,7 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_ext_device_memory_report{kNotSupported};
     ExtEnabled vk_ext_robustness2{kNotSupported};
     ExtEnabled vk_ext_custom_border_color{kNotSupported};
+    ExtEnabled vk_ext_texture_compression_astc_3d{kNotSupported};
     ExtEnabled vk_google_user_type{kNotSupported};
     ExtEnabled vk_nv_present_barrier{kNotSupported};
     ExtEnabled vk_ext_private_data{kNotSupported};
@@ -477,6 +483,7 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_ext_image_compression_control_swapchain{kNotSupported};
     ExtEnabled vk_qcom_image_processing{kNotSupported};
     ExtEnabled vk_ext_nested_command_buffer{kNotSupported};
+    ExtEnabled vk_ohos_external_memory{kNotSupported};
     ExtEnabled vk_ext_external_memory_acquire_unmodified{kNotSupported};
     ExtEnabled vk_ext_extended_dynamic_state3{kNotSupported};
     ExtEnabled vk_ext_subpass_merge_feedback{kNotSupported};
@@ -526,12 +533,14 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_nv_partitioned_acceleration_structure{kNotSupported};
     ExtEnabled vk_ext_device_generated_commands{kNotSupported};
     ExtEnabled vk_mesa_image_alignment_control{kNotSupported};
+    ExtEnabled vk_nv_push_constant_bank{kNotSupported};
+    ExtEnabled vk_ext_ray_tracing_invocation_reorder{kNotSupported};
     ExtEnabled vk_ext_depth_clamp_control{kNotSupported};
-    ExtEnabled vk_ohos_native_buffer{kNotSupported};
     ExtEnabled vk_huawei_hdr_vivid{kNotSupported};
     ExtEnabled vk_nv_cooperative_matrix2{kNotSupported};
     ExtEnabled vk_arm_pipeline_opacity_micromap{kNotSupported};
     ExtEnabled vk_ext_external_memory_metal{kNotSupported};
+    ExtEnabled vk_arm_performance_counters_by_region{kNotSupported};
     ExtEnabled vk_ext_vertex_attribute_robustness{kNotSupported};
     ExtEnabled vk_arm_format_pack{kNotSupported};
     ExtEnabled vk_valve_fragment_density_map_layered{kNotSupported};
@@ -539,8 +548,14 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_ext_fragment_density_map_offset{kNotSupported};
     ExtEnabled vk_ext_zero_initialize_device_memory{kNotSupported};
     ExtEnabled vk_ext_shader_64bit_indexing{kNotSupported};
+    ExtEnabled vk_ext_custom_resolve{kNotSupported};
+    ExtEnabled vk_qcom_data_graph_model{kNotSupported};
+    ExtEnabled vk_ext_shader_long_vector{kNotSupported};
     ExtEnabled vk_sec_pipeline_cache_incremental_mode{kNotSupported};
     ExtEnabled vk_ext_shader_uniform_buffer_unsized_array{kNotSupported};
+    ExtEnabled vk_nv_compute_occupancy_priority{kNotSupported};
+    ExtEnabled vk_ext_shader_subgroup_partitioned{kNotSupported};
+    ExtEnabled vk_valve_shader_mixed_float_dot_product{kNotSupported};
     ExtEnabled vk_khr_acceleration_structure{kNotSupported};
     ExtEnabled vk_khr_ray_tracing_pipeline{kNotSupported};
     ExtEnabled vk_khr_ray_query{kNotSupported};
@@ -616,6 +631,7 @@ constexpr bool IsInstanceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_EXT_layer_settings:
         case vvl::Extension::_VK_NV_display_stereo:
         case vvl::Extension::_VK_OHOS_surface:
+        case vvl::Extension::_VK_SEC_ubm_surface:
             return true;
         default:
             return false;
@@ -716,6 +732,7 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_KHR_ray_tracing_position_fetch:
         case vvl::Extension::_VK_KHR_pipeline_binary:
         case vvl::Extension::_VK_KHR_swapchain_maintenance1:
+        case vvl::Extension::_VK_KHR_internally_synchronized_queues:
         case vvl::Extension::_VK_KHR_cooperative_matrix:
         case vvl::Extension::_VK_KHR_compute_shader_derivatives:
         case vvl::Extension::_VK_KHR_video_decode_av1:
@@ -793,6 +810,7 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_EXT_sampler_filter_minmax:
         case vvl::Extension::_VK_AMD_gpu_shader_int16:
         case vvl::Extension::_VK_AMDX_shader_enqueue:
+        case vvl::Extension::_VK_EXT_descriptor_heap:
         case vvl::Extension::_VK_AMD_mixed_attachment_samples:
         case vvl::Extension::_VK_AMD_shader_fragment_mask:
         case vvl::Extension::_VK_EXT_inline_uniform_block:
@@ -813,6 +831,7 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_NV_representative_fragment_test:
         case vvl::Extension::_VK_EXT_filter_cubic:
         case vvl::Extension::_VK_QCOM_render_pass_shader_resolve:
+        case vvl::Extension::_VK_QCOM_cooperative_matrix_conversion:
         case vvl::Extension::_VK_EXT_global_priority:
         case vvl::Extension::_VK_EXT_external_memory_host:
         case vvl::Extension::_VK_AMD_buffer_marker:
@@ -830,6 +849,7 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_NV_shader_image_footprint:
         case vvl::Extension::_VK_NV_scissor_exclusive:
         case vvl::Extension::_VK_NV_device_diagnostic_checkpoints:
+        case vvl::Extension::_VK_EXT_present_timing:
         case vvl::Extension::_VK_INTEL_shader_integer_functions2:
         case vvl::Extension::_VK_INTEL_performance_query:
         case vvl::Extension::_VK_EXT_pci_bus_info:
@@ -872,6 +892,7 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_EXT_device_memory_report:
         case vvl::Extension::_VK_EXT_robustness2:
         case vvl::Extension::_VK_EXT_custom_border_color:
+        case vvl::Extension::_VK_EXT_texture_compression_astc_3d:
         case vvl::Extension::_VK_GOOGLE_user_type:
         case vvl::Extension::_VK_NV_present_barrier:
         case vvl::Extension::_VK_EXT_private_data:
@@ -945,6 +966,7 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_EXT_image_compression_control_swapchain:
         case vvl::Extension::_VK_QCOM_image_processing:
         case vvl::Extension::_VK_EXT_nested_command_buffer:
+        case vvl::Extension::_VK_OHOS_external_memory:
         case vvl::Extension::_VK_EXT_external_memory_acquire_unmodified:
         case vvl::Extension::_VK_EXT_extended_dynamic_state3:
         case vvl::Extension::_VK_EXT_subpass_merge_feedback:
@@ -994,12 +1016,14 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_NV_partitioned_acceleration_structure:
         case vvl::Extension::_VK_EXT_device_generated_commands:
         case vvl::Extension::_VK_MESA_image_alignment_control:
+        case vvl::Extension::_VK_NV_push_constant_bank:
+        case vvl::Extension::_VK_EXT_ray_tracing_invocation_reorder:
         case vvl::Extension::_VK_EXT_depth_clamp_control:
-        case vvl::Extension::_VK_OHOS_native_buffer:
         case vvl::Extension::_VK_HUAWEI_hdr_vivid:
         case vvl::Extension::_VK_NV_cooperative_matrix2:
         case vvl::Extension::_VK_ARM_pipeline_opacity_micromap:
         case vvl::Extension::_VK_EXT_external_memory_metal:
+        case vvl::Extension::_VK_ARM_performance_counters_by_region:
         case vvl::Extension::_VK_EXT_vertex_attribute_robustness:
         case vvl::Extension::_VK_ARM_format_pack:
         case vvl::Extension::_VK_VALVE_fragment_density_map_layered:
@@ -1007,8 +1031,14 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_EXT_fragment_density_map_offset:
         case vvl::Extension::_VK_EXT_zero_initialize_device_memory:
         case vvl::Extension::_VK_EXT_shader_64bit_indexing:
+        case vvl::Extension::_VK_EXT_custom_resolve:
+        case vvl::Extension::_VK_QCOM_data_graph_model:
+        case vvl::Extension::_VK_EXT_shader_long_vector:
         case vvl::Extension::_VK_SEC_pipeline_cache_incremental_mode:
         case vvl::Extension::_VK_EXT_shader_uniform_buffer_unsized_array:
+        case vvl::Extension::_VK_NV_compute_occupancy_priority:
+        case vvl::Extension::_VK_EXT_shader_subgroup_partitioned:
+        case vvl::Extension::_VK_VALVE_shader_mixed_float_dot_product:
         case vvl::Extension::_VK_KHR_acceleration_structure:
         case vvl::Extension::_VK_KHR_ray_tracing_pipeline:
         case vvl::Extension::_VK_KHR_ray_query:

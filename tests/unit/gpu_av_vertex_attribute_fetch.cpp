@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2020-2025 The Khronos Group Inc.
- * Copyright (c) 2020-2025 Valve Corporation
- * Copyright (c) 2020-2025 LunarG, Inc.
- * Copyright (c) 2020-2025 Google, Inc.
+ * Copyright (c) 2020-2026 The Khronos Group Inc.
+ * Copyright (c) 2020-2026 Valve Corporation
+ * Copyright (c) 2020-2026 LunarG, Inc.
+ * Copyright (c) 2020-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -112,7 +112,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, IndirectDrawBadVertexIndex32) {
             gl_Position = vec4(pos, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
@@ -167,7 +167,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, IndirectDrawBadVertexIndex16) {
             gl_Position = vec4(pos, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
@@ -225,7 +225,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, IndirectDrawBadVertexIndex8) {
             gl_Position = vec4(pos, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
@@ -280,7 +280,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex32) {
             gl_Position = vec4(pos, gl_VertexIndex);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
@@ -387,7 +387,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawInSecondaryCmdBufferBadVertexIndex
             gl_Position = vec4(pos, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
@@ -466,7 +466,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex16) {
             gl_Position = vec4(pos, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
@@ -523,7 +523,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex16_2) {
             gl_Position = vec4(pos + uv.xyx + normal, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     // "Array of structs" style vertices
@@ -588,7 +588,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex8) {
             gl_Position = vec4(pos, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
@@ -648,7 +648,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex16DebugLabel) {
             gl_Position = vec4(pos + uv.xyx + normal, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     // "Array of structs" style vertices
@@ -723,7 +723,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, IndirectDrawBadVertexIndex32DebugLabel
             gl_Position = vec4(pos, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
@@ -799,7 +799,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, InstanceIndex) {
             gl_Position = vec4(pos + uv.xyx + normal + instance_float, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     // "Array of structs" style vertices
@@ -836,7 +836,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, InstanceIndex) {
     }
     vkt::Buffer vertex_buffer = vkt::VertexBuffer<Vertex>(*m_device, vertices);
     // Offset vertex buffer so that only first Vertex can correctly be fetched
-    const VkDeviceSize vertex_buffer_offset = 2 * sizeof(Vertex);
+    const VkDeviceSize vertex_buffer_offset = 0;
     vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vertex_buffer.handle(), &vertex_buffer_offset);
 
     std::vector<float> instance_data = {42.0f};
@@ -844,10 +844,14 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, InstanceIndex) {
     const VkDeviceSize instance_data_offset = 0;
     vk::CmdBindVertexBuffers(m_command_buffer, 1, 1, &instance_buffer.handle(), &instance_data_offset);
 
-    vkt::Buffer index_buffer = vkt::IndexBuffer<uint16_t>(*m_device, {0, 0, 0});
+    vkt::Buffer index_buffer = vkt::IndexBuffer<uint16_t>(*m_device, {0, 1, 2});
     vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT16);
 
     m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 1");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 1");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 1");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 2");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 2");
     m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 2");
 
     vk::CmdDrawIndexed(m_command_buffer, 3, 3, 0, 0, 0);
@@ -883,7 +887,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, InstanceIndexVertexAttributeDivisor) {
             gl_Position = vec4(pos + uv.xyx + normal + instance_float, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     // "Array of structs" style vertices
@@ -928,7 +932,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, InstanceIndexVertexAttributeDivisor) {
     }
     vkt::Buffer vertex_buffer = vkt::VertexBuffer<Vertex>(*m_device, vertices);
     // Offset vertex buffer so that only first Vertex can correctly be fetched
-    const VkDeviceSize vertex_buffer_offset = 2 * sizeof(Vertex);
+    const VkDeviceSize vertex_buffer_offset = 0;
     vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vertex_buffer.handle(), &vertex_buffer_offset);
 
     std::vector<float> instance_data = {42.0f};
@@ -936,11 +940,13 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, InstanceIndexVertexAttributeDivisor) {
     const VkDeviceSize instance_data_offset = 0;
     vk::CmdBindVertexBuffers(m_command_buffer, 1, 1, &instance_buffer.handle(), &instance_data_offset);
 
-    vkt::Buffer index_buffer = vkt::IndexBuffer<uint16_t>(*m_device, {0, 0, 0});
+    vkt::Buffer index_buffer = vkt::IndexBuffer<uint16_t>(*m_device, {0, 1, 2});
     vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT16);
 
     // gl_InstanceIndex of 1 divided by 2 => effective instance index of 0, so no OOB
     // m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 1");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 2");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 2");
     m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 2");
 
     vk::CmdDrawIndexed(m_command_buffer, 3, 3, 0, 0, 0);
@@ -980,7 +986,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, InstanceIndexVertexAttributeDivisorDyn
             gl_Position = vec4(pos + uv.xyx + normal + instance_float, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     // "Array of structs" style vertices
@@ -1045,7 +1051,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, InstanceIndexVertexAttributeDivisorDyn
     }
     vkt::Buffer vertex_buffer = vkt::VertexBuffer<Vertex>(*m_device, vertices);
     // Offset vertex buffer so that only first Vertex can correctly be fetched
-    const VkDeviceSize vertex_buffer_offset = 2 * sizeof(Vertex);
+    const VkDeviceSize vertex_buffer_offset = 0;
     vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vertex_buffer.handle(), &vertex_buffer_offset);
 
     std::vector<float> instance_data = {42.0f};
@@ -1053,11 +1059,13 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, InstanceIndexVertexAttributeDivisorDyn
     const VkDeviceSize instance_data_offset = 0;
     vk::CmdBindVertexBuffers(m_command_buffer, 1, 1, &instance_buffer.handle(), &instance_data_offset);
 
-    vkt::Buffer index_buffer = vkt::IndexBuffer<uint16_t>(*m_device, {0, 0, 0});
+    vkt::Buffer index_buffer = vkt::IndexBuffer<uint16_t>(*m_device, {0, 1, 2});
     vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT16);
 
     // gl_InstanceIndex of 1 divided by 2 => effective instance index of 0, so no OOB
     // m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 1");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 2");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 2");
     m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDrawIndexed-None-02721", "Instance index 2");
 
     vk::CmdDrawIndexed(m_command_buffer, 3, 3, 0, 0, 0);
@@ -1094,7 +1102,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, CmdSetVertexInputEXT) {
             gl_Position = vec4(pos + uv.xyx + normal, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
@@ -1187,7 +1195,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, CmdBindVertexBuffers2EXT) {
             gl_Position = vec4(pos + uv.xyx + normal, 1.0);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
@@ -1270,7 +1278,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex32MultiDraw) {
             gl_Position = vec4(pos, gl_VertexIndex);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};

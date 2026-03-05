@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -14,6 +14,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "shader_templates.h"
 
 class NegativeMesh : public MeshTest {};
 
@@ -86,11 +87,12 @@ TEST_F(NegativeMesh, BasicUsage) {
        %void = OpTypeVoid
           %3 = OpTypeFunction %void
       %float = OpTypeFloat 32
-%_ptr_Output_float = OpTypePointer Output %float
-         %tf = OpVariable %_ptr_Output_float Output
        %uint = OpTypeInt 32 0
      %uint_2 = OpConstant %uint 2
      %uint_1 = OpConstant %uint 1
+    %array = OpTypeArray %float %uint_1
+%_ptr_Output_float = OpTypePointer Output %array
+         %tf = OpVariable %_ptr_Output_float Output
      %v3uint = OpTypeVector %uint 3
          %10 = OpConstantComposite %v3uint %uint_2 %uint_1 %uint_1
        %main = OpFunction %void None %3
@@ -99,10 +101,10 @@ TEST_F(NegativeMesh, BasicUsage) {
                OpFunctionEnd
     )";
 
-    VkShaderObj vs(this, vert_shader_text, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj ms(this, mesh_shader_text, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
-    VkShaderObj ms_xfb(this, mesh_shader_xfb_text, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vert_shader_text, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj ms(*m_device, mesh_shader_text, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj ms_xfb(*m_device, mesh_shader_xfb_text, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Test pipeline creation
     {
@@ -133,7 +135,7 @@ TEST_F(NegativeMesh, BasicUsage) {
             helper.shader_stages_ = {ms_xfb.GetStageCreateInfo(), fs.GetStageCreateInfo()};
         };
         CreatePipelineHelper::OneshotTest(*this, break_vp4, kErrorBit,
-                                          std::vector<std::string>({" VUID-VkGraphicsPipelineCreateInfo-None-02322"}));
+                                          std::vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-None-02322"}));
 
         // invalid dynamic state with mesh shader
         std::vector<VkDynamicState> dyn_states[] = {
@@ -182,9 +184,9 @@ TEST_F(NegativeMesh, ExtensionDisabled) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    VkShaderObj task_shader(this, kTaskMinimalGlsl, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
-    VkShaderObj mesh_shader(this, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj task_shader(*m_device, kTaskMinimalGlsl, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // mesh and task shaders not supported
     const auto break_vp = [&](CreatePipelineHelper &helper) {
@@ -304,9 +306,9 @@ TEST_F(NegativeMesh, RuntimeSpirv) {
     // lazy way to not check limits
     m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-MeshEXT-07115");
     m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-MeshEXT-07116");
-    VkShaderObj task_shader(this, task_src.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
-    VkShaderObj mesh_shader(this, mesh_src.c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj task_shader(*m_device, task_src.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
+    VkShaderObj mesh_shader(*m_device, mesh_src.c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // mesh and task shaders which exceeds workgroup size limits
     const auto break_vp = [&](CreatePipelineHelper &helper) {
@@ -374,7 +376,7 @@ TEST_F(NegativeMesh, RuntimeSpirv2) {
                OpFunctionEnd
     )";
 
-    VkShaderObj mesh_shader(this, mesh_src.c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
+    VkShaderObj mesh_shader(*m_device, mesh_src.c_str(), VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
 
@@ -476,9 +478,9 @@ TEST_F(NegativeMesh, BasicUsageNV) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vertShaderText, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj ms(this, meshShaderText, VK_SHADER_STAGE_MESH_BIT_NV);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vertShaderText, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj ms(*m_device, meshShaderText, VK_SHADER_STAGE_MESH_BIT_NV);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Test pipeline creation
     {
@@ -611,7 +613,7 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
 
     m_default_queue->Wait();
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     // #version 450
     // #extension GL_NV_mesh_shader : require
     // layout(local_size_x = 1) in;
@@ -671,9 +673,9 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
         }
     )glsl";
 
-    VkShaderObj task_shader(this, task_src, VK_SHADER_STAGE_TASK_BIT_NV, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    VkShaderObj mesh_shader(this, mesh_src, VK_SHADER_STAGE_MESH_BIT_NV);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj task_shader(*m_device, task_src, VK_SHADER_STAGE_TASK_BIT_NV, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj mesh_shader(*m_device, mesh_src, VK_SHADER_STAGE_MESH_BIT_NV);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // mesh and task shaders not supported
     const auto break_vp = [&](CreatePipelineHelper &helper) {
@@ -685,7 +687,6 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
 }
 
 TEST_F(NegativeMesh, DrawCmds) {
-    TEST_DESCRIPTION("Test VK_EXT_mesh_shader draw commands.");
     AddRequiredFeature(vkt::Feature::maintenance4);
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
@@ -693,44 +694,7 @@ TEST_F(NegativeMesh, DrawCmds) {
     VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(mesh_shader_properties);
 
-    // #version 450
-    // #extension GL_EXT_mesh_shader : enable
-    // layout (triangles) out;
-    // layout (max_vertices = 3, max_primitives = 1) out;
-    // struct Task {
-    //     uint baseID;
-    // };
-    // taskPayloadSharedEXT Task IN;
-    // void main() {}
-    const char *mesh_src = R"(
-               OpCapability MeshShadingEXT
-               OpExtension "SPV_EXT_mesh_shader"
-          %1 = OpExtInstImport "GLSL.std.450"
-               OpMemoryModel Logical GLSL450
-               OpEntryPoint MeshEXT %main "main" %IN
-               OpExecutionMode %main LocalSize 1 1 1
-               OpExecutionMode %main OutputVertices 3
-               OpExecutionMode %main OutputPrimitivesEXT 1
-               OpExecutionMode %main OutputTrianglesEXT
-               OpSource GLSL 450
-               OpSourceExtension "GL_EXT_mesh_shader"
-               OpName %main "main"
-               OpName %Task "Task"
-               OpMemberName %Task 0 "baseID"
-               OpName %IN "IN"
-       %void = OpTypeVoid
-          %3 = OpTypeFunction %void
-       %uint = OpTypeInt 32 0
-       %Task = OpTypeStruct %uint
-%_ptr_TaskPayloadWorkgroupEXT_Task = OpTypePointer TaskPayloadWorkgroupEXT %Task
-         %IN = OpVariable %_ptr_TaskPayloadWorkgroupEXT_Task TaskPayloadWorkgroupEXT
-       %main = OpFunction %void None %3
-          %5 = OpLabel
-               OpReturn
-               OpFunctionEnd
-    )";
-
-    VkShaderObj mesh_shader(this, mesh_src, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
+    VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
     vkt::Buffer buffer(*m_device, 2 * sizeof(VkDrawMeshTasksIndirectCommandEXT), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
     vkt::Buffer count_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
@@ -746,27 +710,27 @@ TEST_F(NegativeMesh, DrawCmds) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
-    uint32_t max_group_count_X = mesh_shader_properties.maxTaskWorkGroupCount[0];
-    uint32_t max_group_count_Y = mesh_shader_properties.maxTaskWorkGroupCount[1];
-    uint32_t max_group_count_Z = mesh_shader_properties.maxTaskWorkGroupCount[2];
+    uint32_t max_group_count_x = mesh_shader_properties.maxTaskWorkGroupCount[0];
+    uint32_t max_group_count_y = mesh_shader_properties.maxTaskWorkGroupCount[1];
+    uint32_t max_group_count_z = mesh_shader_properties.maxTaskWorkGroupCount[2];
 
-    if (max_group_count_X < vvl::kU32Max) {
-        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07322");
-        max_group_count_X = vvl::kU32Max;
+    if (max_group_count_x < vvl::kU32Max) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07326");
+        max_group_count_x = vvl::kU32Max;
     }
 
-    if (max_group_count_Y < vvl::kU32Max) {
-        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07323");
-        max_group_count_Y = vvl::kU32Max;
+    if (max_group_count_y < vvl::kU32Max) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07327");
+        max_group_count_y = vvl::kU32Max;
     }
 
-    if (max_group_count_Z < vvl::kU32Max) {
-        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07324");
-        max_group_count_Z = vvl::kU32Max;
+    if (max_group_count_z < vvl::kU32Max) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07328");
+        max_group_count_z = vvl::kU32Max;
     }
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07325");
-    vk::CmdDrawMeshTasksEXT(m_command_buffer, max_group_count_X, max_group_count_Y, max_group_count_Z);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07329");
+    vk::CmdDrawMeshTasksEXT(m_command_buffer, max_group_count_x, max_group_count_y, max_group_count_z);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksIndirectEXT-drawCount-02718");
@@ -812,6 +776,50 @@ TEST_F(NegativeMesh, DrawCmds) {
     m_command_buffer.End();
 }
 
+TEST_F(NegativeMesh, TaskShaderLimits) {
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
+    InitRenderTarget();
+
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(mesh_shader_properties);
+
+    VkShaderObj ts(*m_device, kTaskMinimalGlsl, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj ms(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj fs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {ts.GetStageCreateInfo(), ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    uint32_t max_group_count_x = mesh_shader_properties.maxTaskWorkGroupCount[0];
+    uint32_t max_group_count_y = mesh_shader_properties.maxTaskWorkGroupCount[1];
+    uint32_t max_group_count_z = mesh_shader_properties.maxTaskWorkGroupCount[2];
+
+    if (max_group_count_x < vvl::kU32Max) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07322");
+        max_group_count_x = vvl::kU32Max;
+    }
+
+    if (max_group_count_y < vvl::kU32Max) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07323");
+        max_group_count_y = vvl::kU32Max;
+    }
+
+    if (max_group_count_z < vvl::kU32Max) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07324");
+        max_group_count_z = vvl::kU32Max;
+    }
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07325");
+    vk::CmdDrawMeshTasksEXT(m_command_buffer, max_group_count_x, max_group_count_y, max_group_count_z);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeMesh, MultiDrawIndirect) {
     TEST_DESCRIPTION("Test VK_EXT_mesh_shader indirect draw command.");
     AddRequiredFeature(vkt::Feature::maintenance4);
@@ -822,48 +830,7 @@ TEST_F(NegativeMesh, MultiDrawIndirect) {
     VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(mesh_shader_properties);
 
-    // #version 450
-    // #extension GL_EXT_mesh_shader : require
-    // layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-    // layout(max_vertices = 3, max_primitives = 1) out;
-    // layout(triangles) out;
-    // struct Task {
-    //   uint baseID;
-    // };
-    // taskPayloadSharedEXT Task IN;
-    // void main() {}
-    const char mesh_src[] = R"(
-               OpCapability MeshShadingEXT
-               OpExtension "SPV_EXT_mesh_shader"
-          %1 = OpExtInstImport "GLSL.std.450"
-               OpMemoryModel Logical GLSL450
-               OpEntryPoint MeshEXT %main "main" %IN
-               OpExecutionModeId %main LocalSizeId %uint_1 %uint_1 %uint_1
-               OpExecutionMode %main OutputVertices 3
-               OpExecutionMode %main OutputPrimitivesNV 1
-               OpExecutionMode %main OutputTrianglesNV
-               OpSource GLSL 450
-               OpSourceExtension "GL_EXT_mesh_shader"
-               OpName %main "main"
-               OpName %Task "Task"
-               OpMemberName %Task 0 "baseID"
-               OpName %IN "IN"
-       %void = OpTypeVoid
-          %3 = OpTypeFunction %void
-       %uint = OpTypeInt 32 0
-     %uint_1 = OpConstant %uint 1
-     %v3uint = OpTypeVector %uint 3
-          %9 = OpConstantComposite %v3uint %uint_1 %uint_1 %uint_1
-       %Task = OpTypeStruct %uint
-%_ptr_TaskPayloadWorkgroupEXT_Task = OpTypePointer TaskPayloadWorkgroupEXT %Task
-         %IN = OpVariable %_ptr_TaskPayloadWorkgroupEXT_Task TaskPayloadWorkgroupEXT
-       %main = OpFunction %void None %3
-          %5 = OpLabel
-               OpReturn
-               OpFunctionEnd
-    )";
-
-    VkShaderObj mesh_shader(this, mesh_src, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
+    VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
@@ -958,7 +925,7 @@ TEST_F(NegativeMesh, DrawCmdsNV) {
         }
     )glsl";
 
-    VkShaderObj mesh_shader(this, mesh_src, VK_SHADER_STAGE_MESH_BIT_NV);
+    VkShaderObj mesh_shader(*m_device, mesh_src, VK_SHADER_STAGE_MESH_BIT_NV);
 
     vkt::Buffer buffer(*m_device, 2 * sizeof(VkDrawMeshTasksIndirectCommandNV), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
     vkt::Buffer count_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
@@ -1067,11 +1034,11 @@ TEST_F(NegativeMesh, MeshTasksWorkgroupCount) {
         }
     )glsl";
 
-    VkShaderObj task_shader_x(this, task_src_x.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
-    VkShaderObj task_shader_y(this, task_src_y.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
-    VkShaderObj task_shader_z(this, task_src_z.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
-    VkShaderObj mesh_shader(this, mesh_src, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
-    VkShaderObj frag_shader(this, frag_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj task_shader_x(*m_device, task_src_x.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj task_shader_y(*m_device, task_src_y.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj task_shader_z(*m_device, task_src_z.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj mesh_shader(*m_device, mesh_src, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj frag_shader(*m_device, frag_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3);
 
     // mesh and task shaders not supported
     const auto mesh_tasks_x = [&](CreatePipelineHelper &helper) {
@@ -1121,7 +1088,7 @@ TEST_F(NegativeMesh, MeshShaderConservativeRasterization) {
         }
     )glsl";
 
-    VkShaderObj ms(this, meshShaderText, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj ms(*m_device, meshShaderText, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
     VkPhysicalDeviceConservativeRasterizationPropertiesEXT conservative_rasterization_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(conservative_rasterization_props);
@@ -1152,7 +1119,7 @@ TEST_F(NegativeMesh, MeshIncompatibleActiveQueries) {
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
-    VkShaderObj ms(this, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj ms(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {ms.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
@@ -1208,9 +1175,9 @@ TEST_F(NegativeMesh, DrawIndexMesh) {
         }
     )glsl";
 
-    VkShaderObj ts(this, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj ms(this, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj ts(*m_device, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {ts.GetStageCreateInfo(), ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1267,12 +1234,37 @@ TEST_F(NegativeMesh, TaskPayloadSharedMissing) {
         }
     )glsl";
 
-    VkShaderObj ts(this, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj ms(this, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj ts(*m_device, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {ts.GetStageCreateInfo(), ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-MeshEXT-10883");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeMesh, TaskPayloadSharedMissing2) {
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
+    InitRenderTarget();
+
+    const char *mesh_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : enable
+        layout(max_vertices = 32, max_primitives = 32, triangles) out;
+        taskPayloadSharedEXT uint payload;
+        void main() {
+            uint x = payload;
+            SetMeshOutputsEXT(3,1);
+        }
+    )glsl";
+
+    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-MeshEXT-10883");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
@@ -1307,9 +1299,9 @@ TEST_F(NegativeMesh, TaskPayloadSharedDifferent) {
         }
     )glsl";
 
-    VkShaderObj ts(this, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj ms(this, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj ts(*m_device, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {ts.GetStageCreateInfo(), ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1359,4 +1351,82 @@ TEST_F(NegativeMesh, TaskPayloadSharedMissingShaderObject) {
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRendering();
     m_command_buffer.End();
+}
+
+TEST_F(NegativeMesh, RenderPassViewMask) {
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::multiview);
+    AddRequiredFeature(vkt::Feature::multiviewMeshShader);
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
+
+    VkPhysicalDeviceVulkan11Properties props = vku::InitStructHelper();
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper(&props);
+    GetPhysicalDeviceProperties2(mesh_shader_properties);
+
+    if (props.maxMultiviewViewCount == mesh_shader_properties.maxMeshMultiviewViewCount) {
+        GTEST_SKIP() << "Test requires maxMultiviewViewCount to be greater than maxMeshMultiviewViewCount";
+    }
+
+    VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+
+    VkAttachmentDescription2 attach_desc = vku::InitStructHelper();
+    attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
+    attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attach_desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attach_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attach_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attach_desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attach_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attach_desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription2 subpass = vku::InitStructHelper();
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.viewMask = 1u << mesh_shader_properties.maxMeshMultiviewViewCount;
+
+    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
+    render_pass_ci.attachmentCount = 1u;
+    render_pass_ci.pAttachments = &attach_desc;
+    render_pass_ci.subpassCount = 1u;
+    render_pass_ci.pSubpasses = &subpass;
+    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.gp_ci_.renderPass = render_pass;
+    pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-renderPass-12325");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeMesh, RenderingViewMask) {
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::multiview);
+    AddRequiredFeature(vkt::Feature::multiviewMeshShader);
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
+
+    VkPhysicalDeviceVulkan11Properties props = vku::InitStructHelper();
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper(&props);
+    GetPhysicalDeviceProperties2(mesh_shader_properties);
+
+    if (props.maxMultiviewViewCount == mesh_shader_properties.maxMeshMultiviewViewCount) {
+        GTEST_SKIP() << "Test requires maxMultiviewViewCount to be greater than maxMeshMultiviewViewCount";
+    }
+
+    VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+
+    VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
+
+    VkPipelineRenderingCreateInfo pipeline_rendering_ci = vku::InitStructHelper();
+    pipeline_rendering_ci.viewMask = 1u << mesh_shader_properties.maxMeshMultiviewViewCount;
+    pipeline_rendering_ci.colorAttachmentCount = 1u;
+    pipeline_rendering_ci.pColorAttachmentFormats = &color_format;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_ci);
+    pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
+    pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-renderPass-12326");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
 }

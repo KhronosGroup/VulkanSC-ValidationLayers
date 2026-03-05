@@ -1,4 +1,4 @@
-/* Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ uint32_t DescriptorClassTexelBufferPass::GetLinkFunctionId() { return GetLinkFun
 
 void DescriptorClassTexelBufferPass::CreateFunctionCall(BasicBlock& block, InstructionIt* inst_it, const InstructionMeta& meta) {
     assert(meta.access_chain_inst && meta.var_inst);
-    const Constant& set_constant = module_.type_manager_.GetConstantUInt32(meta.descriptor_set);
+    const Constant& set_constant = type_manager_.GetConstantUInt32(meta.descriptor_set);
     const uint32_t descriptor_index_id = CastToUint32(meta.descriptor_index_id, block, inst_it);  // might be int32
 
     const uint32_t opcode = meta.target_instruction->Opcode();
@@ -55,15 +55,16 @@ void DescriptorClassTexelBufferPass::CreateFunctionCall(BasicBlock& block, Instr
     // TODO - This assumes no depth/arrayed/ms from RequiresInstrumentation
     const uint32_t descriptor_offset_id = CastToUint32(meta.target_instruction->Operand(1), block, inst_it);
 
-    BindingLayout binding_layout = module_.set_index_to_bindings_layout_lut_[meta.descriptor_set][meta.descriptor_binding];
-    const Constant& binding_layout_offset = module_.type_manager_.GetConstantUInt32(binding_layout.start);
+    const auto& layout_lut = module_.interface_.instrumentation_dsl.set_index_to_bindings_layout_lut;
+    BindingLayout binding_layout = layout_lut[meta.descriptor_set][meta.descriptor_binding];
+    const Constant& binding_layout_offset = type_manager_.GetConstantUInt32(binding_layout.start);
 
     const uint32_t inst_position = meta.target_instruction->GetPositionOffset();
-    const uint32_t inst_position_id = module_.type_manager_.CreateConstantUInt32(inst_position).Id();
+    const uint32_t inst_position_id = type_manager_.CreateConstantUInt32(inst_position).Id();
 
     const uint32_t function_result = module_.TakeNextId();
     const uint32_t function_def = GetLinkFunctionId();
-    const uint32_t void_type = module_.type_manager_.GetTypeVoid().Id();
+    const uint32_t void_type = type_manager_.GetTypeVoid().Id();
 
     block.CreateInstruction(spv::OpFunctionCall,
                             {void_type, function_result, function_def, inst_position_id, set_constant.Id(), descriptor_index_id,
@@ -84,7 +85,7 @@ bool DescriptorClassTexelBufferPass::RequiresInstrumentation(const Function& fun
 
     meta.image_inst = function.FindInstruction(inst.Word(image_word));
     if (!meta.image_inst) return false;
-    const Type* image_type = module_.type_manager_.FindTypeById(meta.image_inst->TypeId());
+    const Type* image_type = type_manager_.FindTypeById(meta.image_inst->TypeId());
     if (!image_type) return false;
 
     const uint32_t dim = image_type->inst_.Operand(1);
@@ -112,7 +113,7 @@ bool DescriptorClassTexelBufferPass::RequiresInstrumentation(const Function& fun
     meta.var_inst = function.FindInstruction(load_inst->Operand(0));
     if (!meta.var_inst) {
         // can be a global variable
-        const Variable* global_var = module_.type_manager_.FindVariableById(load_inst->Operand(0));
+        const Variable* global_var = type_manager_.FindVariableById(load_inst->Operand(0));
         meta.var_inst = global_var ? &global_var->inst_ : nullptr;
     }
     if (!meta.var_inst || (!meta.var_inst->IsNonPtrAccessChain() && meta.var_inst->Opcode() != spv::OpVariable)) {
@@ -130,7 +131,7 @@ bool DescriptorClassTexelBufferPass::RequiresInstrumentation(const Function& fun
             return false;
         }
 
-        const Variable* variable = module_.type_manager_.FindVariableById(meta.var_inst->Operand(0));
+        const Variable* variable = type_manager_.FindVariableById(meta.var_inst->Operand(0));
         if (!variable) {
             module_.InternalError(Name(), "OpAccessChain base is not a variable");
             return false;
@@ -138,7 +139,7 @@ bool DescriptorClassTexelBufferPass::RequiresInstrumentation(const Function& fun
         meta.var_inst = &variable->inst_;
     } else {
         // There is no array of this descriptor, so we essentially have an array of 1
-        meta.descriptor_index_id = module_.type_manager_.GetConstantZeroUint32().Id();
+        meta.descriptor_index_id = type_manager_.GetConstantZeroUint32().Id();
     }
 
     uint32_t variable_id = meta.var_inst->ResultId();
@@ -169,26 +170,34 @@ void DescriptorClassTexelBufferPass::PrintDebugInfo() const {
 
 // Created own Instrument() because need to control finding the largest offset in a given block
 bool DescriptorClassTexelBufferPass::Instrument() {
-    if (module_.set_index_to_bindings_layout_lut_.empty()) {
+    if (module_.interface_.instrumentation_dsl.set_index_to_bindings_layout_lut.empty()) {
         return false;  // If there is no bindings, nothing to instrument
     }
 
     // Can safely loop function list as there is no injecting of new Functions until linking time
-    for (const auto& function : module_.functions_) {
-        if (function->instrumentation_added_) continue;
-        for (auto block_it = function->blocks_.begin(); block_it != function->blocks_.end(); ++block_it) {
+    for (Function& function : module_.functions_) {
+        if (!function.called_from_target_) {
+            continue;
+        }
+        for (auto block_it = function.blocks_.begin(); block_it != function.blocks_.end(); ++block_it) {
             BasicBlock& current_block = **block_it;
 
             cf_.Update(current_block);
-            if (debug_disable_loops_ && cf_.in_loop) continue;
+            if (debug_disable_loops_ && cf_.in_loop) {
+                continue;
+            }
 
             auto& block_instructions = current_block.instructions_;
             for (auto inst_it = block_instructions.begin(); inst_it != block_instructions.end(); ++inst_it) {
                 InstructionMeta meta;
                 // Every instruction is analyzed by the specific pass and lets us know if we need to inject a function or not
-                if (!RequiresInstrumentation(*function, *(inst_it->get()), meta)) continue;
+                if (!RequiresInstrumentation(function, *(inst_it->get()), meta)) {
+                    continue;
+                }
 
-                if (IsMaxInstrumentationsCount()) continue;
+                if (IsMaxInstrumentationsCount()) {
+                    continue;
+                }
                 instrumentations_count_++;
 
                 // inst_it is updated to the instruction after the new function call, it will not add/remove any Blocks

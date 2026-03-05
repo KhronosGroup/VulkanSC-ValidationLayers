@@ -1,7 +1,8 @@
-/* Copyright (c) 2015-2017, 2019-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2017, 2019-2025 Valve Corporation
- * Copyright (c) 2015-2017, 2019-2025 LunarG, Inc.
+/* Copyright (c) 2015-2017, 2019-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2017, 2019-2026 Valve Corporation
+ * Copyright (c) 2015-2017, 2019-2026 LunarG, Inc.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
+ * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,6 +96,15 @@ constexpr T Align(T x, T p2) {
     return (x + p2 - 1) & ~(p2 - 1);
 }
 
+// Given any positive p (not necessarily power of two),
+// returns the smallest multiple of p greater than or equal to x
+template <typename T>
+constexpr T AlignToMultiple(T x, T p) {
+    static_assert(std::numeric_limits<T>::is_integer, "Unsigned integer required.");
+    static_assert(std::is_unsigned<T>::value, "Unsigned integer required.");
+    return ((x + p - 1) / p) * p;
+}
+
 // Returns the 0-based index of the LSB. An input mask of 0 yields -1
 static inline int LeastSignificantBit(uint32_t mask) { return u_ffs(static_cast<int>(mask)) - 1; }
 
@@ -110,7 +120,7 @@ static inline bool IsBetweenInclusive(VkDeviceSize value, VkDeviceSize min, VkDe
     return (value >= min) && (value <= max);
 }
 
-static inline bool IsBetweenInclusive(const VkExtent2D &value, const VkExtent2D &min, const VkExtent2D &max) {
+static inline bool IsBetweenInclusive(const VkExtent2D& value, const VkExtent2D& min, const VkExtent2D& max) {
     return IsBetweenInclusive(value.width, min.width, max.width) && IsBetweenInclusive(value.height, min.height, max.height);
 }
 
@@ -125,17 +135,17 @@ static inline bool IsIntegerMultipleOf(VkDeviceSize value, VkDeviceSize granular
     }
 }
 
-static inline bool IsIntegerMultipleOf(const VkOffset2D &value, const VkOffset2D &granularity) {
+static inline bool IsIntegerMultipleOf(const VkOffset2D& value, const VkOffset2D& granularity) {
     return IsIntegerMultipleOf(value.x, granularity.x) && IsIntegerMultipleOf(value.y, granularity.y);
 }
 
-// Perform a zero-tolerant modulo operation
-static inline VkDeviceSize SafeModulo(VkDeviceSize dividend, VkDeviceSize divisor) {
-    VkDeviceSize result = 0;
-    if (divisor != 0) {
-        result = dividend % divisor;
-    }
-    return result;
+static inline bool IsPointerAligned(const void* address, VkDeviceSize alignment) {
+    auto ptr = reinterpret_cast<std::uintptr_t>(address);
+    return alignment != 0 && (ptr % alignment == 0);
+}
+
+static inline bool IsPointerAligned(VkDeviceAddress address, VkDeviceSize alignment) {
+    return alignment != 0 && (address % alignment == 0);
 }
 
 static inline VkDeviceSize SafeDivision(VkDeviceSize dividend, VkDeviceSize divisor) {
@@ -147,9 +157,26 @@ static inline VkDeviceSize SafeDivision(VkDeviceSize dividend, VkDeviceSize divi
 }
 
 // For spots we care if one pointer is null, or if both are not null, are the same values
-static inline bool EqualValuesOrBothNull(const uint32_t *a, const uint32_t *b) {
+static inline bool EqualValuesOrBothNull(const uint32_t* a, const uint32_t* b) {
     if (!a || !b) {
         return a == b;
     }
     return *a == *b;
+}
+
+template <typename T>
+constexpr T AbsDiff(T a, T b) {
+    static_assert(std::is_unsigned_v<T>);
+    return a > b ? a - b : b - a;
+}
+
+static inline uint32_t GetSmallestGreaterOrEquallPowerOfTwo(uint32_t v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
 }

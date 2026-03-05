@@ -1,6 +1,7 @@
 ﻿/*
  * Copyright (c) 2023-2025 Nintendo
- * Copyright (c) 2023-2025 LunarG, Inc.
+ * Copyright (c) 2023-2026 LunarG, Inc.
+ * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,8 @@
 #include "../framework/render_pass_helper.h"
 #include "../framework/shader_helper.h"
 #include "generated/vk_function_pointers.h"
+#include "shader_templates.h"
+#include "utils/math_utils.h"
 
 class NegativeShaderObject : public ShaderObjectTest {};
 
@@ -61,8 +64,10 @@ TEST_F(NegativeShaderObject, LinkedComputeShader) {
 }
 
 TEST_F(NegativeShaderObject, InvalidFlags) {
-    TEST_DESCRIPTION("Create shader with invalid flags.");
-
+    AddRequiredExtensions(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::computeFullSubgroups);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     RETURN_IF_SKIP(InitBasicShaderObject());
 
     const auto spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
@@ -87,11 +92,6 @@ TEST_F(NegativeShaderObject, InvalidFlags) {
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-flags-08486");
     create_info.flags = VK_SHADER_CREATE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_EXT;
-    vk::CreateShadersEXT(*m_device, 1u, &create_info, nullptr, &shader);
-    m_errorMonitor->VerifyFound();
-
-    m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-flags-08488");
-    create_info.flags = VK_SHADER_CREATE_FRAGMENT_DENSITY_MAP_ATTACHMENT_BIT_EXT;
     vk::CreateShadersEXT(*m_device, 1u, &create_info, nullptr, &shader);
     m_errorMonitor->VerifyFound();
 }
@@ -404,6 +404,29 @@ TEST_F(NegativeShaderObject, InvalidStage) {
     createInfo.stage = VK_SHADER_STAGE_CLUSTER_CULLING_BIT_HUAWEI;
     vk::CreateShadersEXT(*m_device, 1u, &createInfo, nullptr, &shader);
 
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderObject, ExceedsSetLimit) {
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    vkt::DescriptorSetLayout ds_layout(*m_device, {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr});
+    const uint32_t excess_layouts = 1 + m_device->Physical().limits_.maxBoundDescriptorSets;
+    std::vector<VkDescriptorSetLayout> dsl_array(excess_layouts, ds_layout);
+
+    const auto spv = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, kMinimalShaderGlsl);
+    VkShaderCreateInfoEXT create_info = vku::InitStructHelper();
+    create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    create_info.codeSize = spv.size() * sizeof(spv[0]);
+    create_info.pCode = spv.data();
+    create_info.pName = "main";
+    create_info.setLayoutCount = excess_layouts;
+    create_info.pSetLayouts = dsl_array.data();
+
+    VkShaderEXT shader;
+    m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-setLayoutCount-12257");
+    vk::CreateShadersEXT(*m_device, 1u, &create_info, nullptr, &shader);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1051,8 +1074,7 @@ TEST_F(NegativeShaderObject, DrawWithShadersInNonDynamicRenderPass) {
 
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
@@ -2844,7 +2866,7 @@ TEST_F(NegativeShaderObject, BindShaderBetweenLinkedShaders) {
     m_command_buffer.End();
 }
 
-TEST_F(NegativeShaderObject, DifferentShaderPushConstantRangesSizee) {
+TEST_F(NegativeShaderObject, DifferentShaderPushConstantRangesSize) {
     TEST_DESCRIPTION("Draw with shaders that have different push constant ranges.");
     RETURN_IF_SKIP(InitBasicShaderObject());
     InitDynamicRenderTarget();
@@ -2857,6 +2879,62 @@ TEST_F(NegativeShaderObject, DifferentShaderPushConstantRangesSizee) {
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     SetDefaultDynamicStatesExclude();
     m_command_buffer.BindShaders(vert_shader, frag_shader);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08878");
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderObject, DifferentMultiPushConstantRanges) {
+    TEST_DESCRIPTION("Draw with shaders that have different push constant ranges.");
+    AddRequiredFeature(vkt::Feature::tessellationShader);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    VkPushConstantRange push_ranges[2];
+    push_ranges[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    push_ranges[0].offset = 0u;
+    push_ranges[0].size = 4u;
+    push_ranges[1].stageFlags = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+    push_ranges[1].offset = 4u;
+    push_ranges[1].size = 4u;
+
+    VkShaderCreateInfoEXT vert_create_info = vku::InitStructHelper();
+    vert_create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vert_create_info.nextStage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    vert_create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    vert_create_info.codeSize = vert_spv.size() * sizeof(vert_spv[0]);
+    vert_create_info.pCode = vert_spv.data();
+    vert_create_info.pName = "main";
+    vert_create_info.pushConstantRangeCount = 2u;
+    vert_create_info.pPushConstantRanges = push_ranges;
+
+    VkShaderCreateInfoEXT frag_create_info = vku::InitStructHelper();
+    frag_create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    frag_create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    frag_create_info.codeSize = frag_spv.size() * sizeof(frag_spv[0]);
+    frag_create_info.pCode = frag_spv.data();
+    frag_create_info.pName = "main";
+    frag_create_info.pushConstantRangeCount = 2u;
+    frag_create_info.pPushConstantRanges = push_ranges;
+
+    const vkt::Shader vert_shader(*m_device, vert_create_info);
+    push_ranges[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    const vkt::Shader frag_shader(*m_device, frag_create_info);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    VkShaderStageFlagBits tess_stages[2] = {VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT};
+    VkShaderEXT null_shaders[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+    vk::CmdBindShadersEXT(m_command_buffer, 2u, tess_stages, null_shaders);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08878");
     vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
@@ -3588,7 +3666,7 @@ TEST_F(NegativeShaderObject, SharedMemoryOverLimit) {
     const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
-    std::stringstream cs_src;
+    std::ostringstream cs_src;
     // Make sure compute pipeline has a compute shader stage set
     cs_src << R"glsl(
         #version 450
@@ -3610,7 +3688,8 @@ TEST_F(NegativeShaderObject, SharedMemoryOverLimit) {
 }
 
 TEST_F(NegativeShaderObject, InvalidRequireFullSubgroupsFlag) {
-    TEST_DESCRIPTION("Create shader with invalid spirv code size.");
+    AddRequiredExtensions(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::computeFullSubgroups);
     RETURN_IF_SKIP(InitBasicShaderObject());
     const auto spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
     VkShaderCreateInfoEXT create_info =
@@ -3624,8 +3703,10 @@ TEST_F(NegativeShaderObject, InvalidRequireFullSubgroupsFlag) {
 
 TEST_F(NegativeShaderObject, SpecializationMapEntryOffset) {
     TEST_DESCRIPTION("Create shader with invalid specialization map entry offset.");
-    RETURN_IF_SKIP(InitBasicShaderObject());
-
+    // Should work without looking at the SPIR-V
+    const VkLayerSettingEXT settings[] = {{OBJECT_LAYER_NAME, "check_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse}};
+    VkLayerSettingsCreateInfoEXT layer_settings_ci = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, settings};
+    RETURN_IF_SKIP(InitBasicShaderObject(&layer_settings_ci));
     const char kVertexSource[] = R"glsl(
         #version 460
         layout (constant_id = 0) const int v = 0;
@@ -3660,7 +3741,10 @@ TEST_F(NegativeShaderObject, SpecializationMapEntryOffset) {
 
 TEST_F(NegativeShaderObject, SpecializationMapEntrySize) {
     TEST_DESCRIPTION("Create shader with specialization map entry out of bounds.");
-    RETURN_IF_SKIP(InitBasicShaderObject());
+    // Should work without looking at the SPIR-V
+    const VkLayerSettingEXT settings[] = {{OBJECT_LAYER_NAME, "check_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse}};
+    VkLayerSettingsCreateInfoEXT layer_settings_ci = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, settings};
+    RETURN_IF_SKIP(InitBasicShaderObject(&layer_settings_ci));
 
     const char kVertexSource[] = R"glsl(
         #version 460
@@ -3732,7 +3816,10 @@ TEST_F(NegativeShaderObject, SpecializationMismatch) {
 
 TEST_F(NegativeShaderObject, SpecializationSameConstantId) {
     TEST_DESCRIPTION("Create shader with non unique specialization map entries.");
-    RETURN_IF_SKIP(InitBasicShaderObject());
+    // Should work without looking at the SPIR-V
+    const VkLayerSettingEXT settings[] = {{OBJECT_LAYER_NAME, "check_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkFalse}};
+    VkLayerSettingsCreateInfoEXT layer_settings_ci = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, settings};
+    RETURN_IF_SKIP(InitBasicShaderObject(&layer_settings_ci));
 
     const char kVertexSource[] = R"glsl(
         #version 460
@@ -4083,7 +4170,7 @@ TEST_F(NegativeShaderObject, MaxTransformFeedbackStream) {
         GTEST_SKIP() << "maxTransformFeedbackStreams is zero";
     }
 
-    std::stringstream gsSource;
+    std::ostringstream gsSource;
     gsSource << R"asm(
                OpCapability Geometry
                OpCapability TransformFeedback
@@ -4148,7 +4235,7 @@ TEST_F(NegativeShaderObject, TransformFeedbackStride) {
         GTEST_SKIP() << "maxTransformFeedbackStreams is zero";
     }
 
-    std::stringstream vs_src;
+    std::ostringstream vs_src;
     vs_src << R"asm(
                OpCapability Shader
                OpCapability TransformFeedback
@@ -5000,7 +5087,7 @@ TEST_F(NegativeShaderObject, MismatchedFormat64Components) {
 
     VkVertexInputBindingDescription2EXT vertex_binding_description = vku::InitStructHelper();
     vertex_binding_description.binding = 0u;
-    vertex_binding_description.stride = 16u;
+    vertex_binding_description.stride = 24u;
     vertex_binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     vertex_binding_description.divisor = 1u;
 
@@ -5537,10 +5624,6 @@ TEST_F(NegativeShaderObject, CooperativeMatrix) {
     if (props11.subgroupSize > 32) {
         GTEST_SKIP() << "local_size_x (32) is not a multiple of subgroupSize";
     }
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout dsl(*m_device, bindings);
-    const vkt::PipelineLayout pl(*m_device, {&dsl});
 
     // Tests are assume that Float16 3*5 is not available
     const char* comp_src = R"glsl(
@@ -6176,7 +6259,7 @@ TEST_F(NegativeShaderObject, MissingTessellationControlPatchSize) {
     ASMtoSPV(SPV_ENV_VULKAN_1_0, 0, tesc_src, spv);
     VkShaderCreateInfoEXT create_info = ShaderCreateInfo(spv, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
     VkShaderEXT shader;
-    m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-codeType-08875");
+    m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-codeType-12226");
     vk::CreateShadersEXT(*m_device, 1u, &create_info, nullptr, &shader);
     m_errorMonitor->VerifyFound();
 }
@@ -6615,10 +6698,8 @@ TEST_F(NegativeShaderObject, TaskMeshShadersDrawWithoutBindingVertex) {
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.flags = 0u;
-    begin_rendering_info.renderArea.offset.x = 0;
-    begin_rendering_info.renderArea.offset.y = 0;
-    begin_rendering_info.renderArea.extent.width = static_cast<uint32_t>(m_width);
-    begin_rendering_info.renderArea.extent.height = static_cast<uint32_t>(m_height);
+    begin_rendering_info.renderArea.offset = {0, 0};
+    begin_rendering_info.renderArea.extent = {m_width, m_height};
     begin_rendering_info.layerCount = 1u;
     begin_rendering_info.viewMask = 0x0;
     begin_rendering_info.colorAttachmentCount = 1u;
@@ -6652,10 +6733,8 @@ TEST_F(NegativeShaderObject, DrawMeshTasksWithoutMeshShader) {
 
     VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.flags = 0u;
-    begin_rendering_info.renderArea.offset.x = 0;
-    begin_rendering_info.renderArea.offset.y = 0;
-    begin_rendering_info.renderArea.extent.width = static_cast<uint32_t>(m_width);
-    begin_rendering_info.renderArea.extent.height = static_cast<uint32_t>(m_height);
+    begin_rendering_info.renderArea.offset = {0, 0};
+    begin_rendering_info.renderArea.extent = {m_width, m_height};
     begin_rendering_info.layerCount = 1u;
     begin_rendering_info.viewMask = 0x0;
     begin_rendering_info.colorAttachmentCount = 1u;
@@ -6749,7 +6828,7 @@ TEST_F(NegativeShaderObject, MeshShaderPayloadMemoryOverLimit) {
     const uint32_t max_mesh_payload_and_shared_memory_size = mesh_shader_properties.maxMeshPayloadAndSharedMemorySize;
     const uint32_t max_mesh_payload_and_shared_ints = max_mesh_payload_and_shared_memory_size / 4;
 
-    std::stringstream mesh_source;
+    std::ostringstream mesh_source;
     mesh_source << R"glsl(
             #version 460
             #extension GL_EXT_mesh_shader : require
@@ -6946,4 +7025,904 @@ TEST_F(NegativeShaderObject, AdvancedBlendMaxAttachments) {
 
     m_command_buffer.EndRendering();
     m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderObject, DescriptorHeapShaderObjectCreateFlag) {
+    TEST_DESCRIPTION("Validate descriptor heap flag influence onto shader object creation.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    const auto spv = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, kMinimalShaderGlsl);
+
+    VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+    VkShaderCreateInfoEXT create_info = vku::InitStructHelper();
+    create_info.flags = VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+    create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    create_info.codeSize = spv.size() * sizeof(spv[0]);
+    create_info.pCode = spv.data();
+    create_info.pName = "main";
+
+    {
+        create_info.setLayoutCount = 1;
+        create_info.pSetLayouts = nullptr;
+
+        VkShaderEXT shader = VK_NULL_HANDLE;
+        m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-flags-11290");
+        vk::CreateShadersEXT(m_device->handle(), 1u, &create_info, nullptr, &shader);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        create_info.setLayoutCount = 0;
+        create_info.pSetLayouts = &layout;
+
+        VkShaderEXT shader = VK_NULL_HANDLE;
+        m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-flags-11291");
+        vk::CreateShadersEXT(m_device->handle(), 1u, &create_info, nullptr, &shader);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeShaderObject, PipelineShaderStageCreateInfoNotEnabled) {
+    TEST_DESCRIPTION("Validate VkPipelineShaderStageCreateInfo mappingCount to be zero when descriptorHeap is not enabled");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    const auto spv = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, kMinimalShaderGlsl);
+
+    VkDescriptorSetAndBindingMappingEXT mapping =
+        MakeSetAndBindingMapping(0, 0, 1, VK_SPIRV_RESOURCE_TYPE_READ_ONLY_STORAGE_BUFFER_BIT_EXT);
+    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT;
+
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 1;
+    mapping_info.pMappings = &mapping;
+
+    VkShaderCreateInfoEXT create_info = vku::InitStructHelper(&mapping_info);
+    create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    create_info.codeSize = spv.size() * sizeof(spv[0]);
+    create_info.pCode = spv.data();
+    create_info.pName = "main";
+
+    VkShaderEXT shader = VK_NULL_HANDLE;
+    m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-descriptorHeap-11314");
+    vk::CreateShadersEXT(m_device->handle(), 1u, &create_info, nullptr, &shader);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderObject, EmbeddedSamplerReservedArea) {
+    TEST_DESCRIPTION("Validate that embedded sampler mapping have reserved area");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(heap_props);
+
+    char const* cs_source = R"glsl(
+        #version 450
+        layout(local_size_x = 1) in;
+        layout(set = 0, binding = 0) buffer Output { int result[]; };
+        layout(set = 0, binding = 1) uniform sampler samp;
+        layout(set = 0, binding = 2) uniform texture2D tex;
+        void main() {
+            ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
+            vec2 texCoord = vec2(gl_GlobalInvocationID.xy) / 1.0;
+            vec4 color = texture(sampler2D(tex, samp), texCoord);
+            result[gl_LocalInvocationIndex] = int(color.r);
+        }
+    )glsl";
+
+    if (heap_props.minSamplerHeapReservedRangeWithEmbedded < 1) {
+        GTEST_SKIP() << "Cannot test minSamplerHeapReservedRangeWithEmbedded less than 1";
+    }
+
+    const VkDeviceSize bdsize = 2 * heap_props.samplerDescriptorSize + heap_props.minSamplerHeapReservedRangeWithEmbedded;
+    vkt::Buffer buffer(*m_device, bdsize, VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT, vkt::device_address);
+
+    // reservedRangeOffset check
+    VkBindHeapInfoEXT bind_info = vku::InitStructHelper();
+    bind_info.heapRange = {buffer.Address(), bdsize};
+    bind_info.reservedRangeSize = heap_props.minSamplerHeapReservedRangeWithEmbedded - 1;
+
+    // Resource descriptor heap buffer
+    const VkDeviceSize resourceStride = Align(heap_props.bufferDescriptorSize, heap_props.samplerDescriptorAlignment);
+    const VkDeviceSize resource_descriptor_count = 4;
+    const VkDeviceSize resource_heap_size_app = Align(resource_descriptor_count * resourceStride, heap_props.resourceHeapAlignment);
+    const VkDeviceSize resource_heap_size_driver = resource_heap_size_app + heap_props.minResourceHeapReservedRange;
+    const VkDeviceSize out_data_buffer_size = m_device->Physical().limits_.minStorageBufferOffsetAlignment;
+
+    vkt::Buffer resource_heap(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT, vkt::device_address);
+    const auto resource_heap_ptr = static_cast<char*>(resource_heap.Memory().Map());
+
+    // Sampler descriptor heap buffer
+    const VkDeviceSize sampler_stride = heap_props.samplerDescriptorSize;
+    const VkDeviceSize sampler_descriptor_count = 4;
+    const VkDeviceSize sampler_heap_size_app = Align(sampler_descriptor_count * sampler_stride, heap_props.resourceHeapAlignment);
+    const VkDeviceSize sampler_heap_size_driver = sampler_heap_size_app + heap_props.minSamplerHeapReservedRange;
+
+    vkt::Buffer sampler_heap(*m_device, sampler_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT, vkt::device_address);
+    const auto sampler_heap_ptr = static_cast<char*>(sampler_heap.Memory().Map());
+
+    // Output buffer descriptor
+    vkt::Buffer out_buffer(*m_device, out_data_buffer_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT_KHR, vkt::device_address);
+
+    VkHostAddressRangeEXT out_descriptor{resource_heap_ptr, static_cast<size_t>(resourceStride)};
+    VkDeviceAddressRangeEXT out_address_range = {out_buffer.Address(), out_data_buffer_size};
+    VkResourceDescriptorInfoEXT out_descriptor_info = vku::InitStructHelper();
+    out_descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    out_descriptor_info.data.pAddressRange = &out_address_range;
+    vk::WriteResourceDescriptorsEXT(*m_device, 1, &out_descriptor_info, &out_descriptor);
+
+    VkSamplerCreateInfo sampler_ci = vku::InitStructHelper();
+    VkHostAddressRangeEXT input_descriptor{sampler_heap_ptr + sampler_stride, static_cast<size_t>(sampler_stride)};
+    vk::WriteSamplerDescriptorsEXT(*m_device, 1, &sampler_ci, &input_descriptor);
+
+    VkDescriptorSetAndBindingMappingEXT mappings[3];
+    mappings[0] = MakeSetAndBindingMapping(0, 0);
+    mappings[0].source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mappings[0].sourceData.constantOffset.heapOffset = 0u * (uint32_t)resourceStride;
+    mappings[0].sourceData.constantOffset.heapArrayStride = 0;
+
+    VkSamplerCreateInfo embedded_sampler = vku::InitStructHelper();
+    mappings[1] = MakeSetAndBindingMapping(0, 1);
+    mappings[1].source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mappings[1].sourceData.constantOffset.heapOffset = 1u * (uint32_t)resourceStride;
+    mappings[1].sourceData.constantOffset.heapArrayStride = 0;
+    mappings[1].sourceData.constantOffset.pEmbeddedSampler = &embedded_sampler;
+
+    mappings[2] = MakeSetAndBindingMapping(0, 2);
+    mappings[2].source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mappings[2].sourceData.constantOffset.heapOffset = 2u * (uint32_t)resourceStride;
+    mappings[2].sourceData.constantOffset.heapArrayStride = 0;
+
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 3;
+    mapping_info.pMappings = mappings;
+
+    const auto spv = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source);
+
+    VkShaderCreateInfoEXT create_info = vku::InitStructHelper(&mapping_info);
+    create_info.flags = VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+    create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+    create_info.codeSize = spv.size() * sizeof(spv[0]);
+    create_info.pCode = spv.data();
+    create_info.pName = "main";
+
+    const vkt::Shader compShader(*m_device, create_info);
+
+    m_command_buffer.Begin();
+
+    VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
+    bind_resource_info.heapRange = resource_heap.AddressRange();
+    bind_resource_info.reservedRangeOffset = resource_heap_size_app;
+    bind_resource_info.reservedRangeSize = heap_props.minResourceHeapReservedRange;
+    vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
+
+    vk::CmdBindSamplerHeapEXT(m_command_buffer, &bind_info);
+    vk::CmdBindShadersEXT(m_command_buffer, 1u, &create_info.stage, &compShader.handle());
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-pBindInfo-11375");
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(NegativeShaderObject, DescriptorHeapOpTypeImage) {
+    TEST_DESCRIPTION("Validate that mapping is aligned for OpTypeImage");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(heap_props);
+
+    char const* cs_source = R"glsl(
+        #version 450
+        layout(local_size_x = 1) in;
+        layout(set = 0, binding = 0, rgba8) uniform image2D color_out;
+        void main() {
+            vec4 color = gl_GlobalInvocationID.xxyy;
+            ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
+            imageStore(color_out, pixelCoords, color);
+        }
+    )glsl";
+
+    if (heap_props.imageDescriptorAlignment < 2) {
+        GTEST_SKIP() << "Cannot be unaligned with imageDescriptorAlignment less than 2";
+    }
+
+    // Resource descriptor heap buffer
+    const VkDeviceSize resource_stride = heap_props.bufferDescriptorSize;
+    const VkDeviceSize resource_descriptor_count = 4;
+    const VkDeviceSize resource_heap_size_app =
+        Align(resource_descriptor_count * resource_stride, heap_props.resourceHeapAlignment);
+    const VkDeviceSize resource_heap_size_driver = resource_heap_size_app + heap_props.minResourceHeapReservedRange;
+    const VkDeviceSize out_data_buffer_size = 256;
+
+    vkt::Buffer resource_heap(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT, vkt::device_address);
+    const auto resource_heap_ptr = static_cast<char*>(resource_heap.Memory().Map());
+
+    // Output buffer descriptor
+    vkt::Buffer out_buffer(*m_device, out_data_buffer_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT, vkt::device_address);
+
+    VkHostAddressRangeEXT out_descriptor{resource_heap_ptr, static_cast<size_t>(resource_stride)};
+    VkDeviceAddressRangeEXT out_address_range = {out_buffer.Address(), out_data_buffer_size};
+    VkResourceDescriptorInfoEXT out_descriptor_info = vku::InitStructHelper();
+    out_descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    out_descriptor_info.data.pAddressRange = &out_address_range;
+
+    vk::WriteResourceDescriptorsEXT(*m_device, 1, &out_descriptor_info, &out_descriptor);
+
+    VkDescriptorSetAndBindingMappingEXT mappings = MakeSetAndBindingMapping(0, 0);
+    mappings.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mappings.sourceData.constantOffset.heapOffset = 1;
+    mappings.sourceData.constantOffset.heapArrayStride = 0;
+
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 1;
+    mapping_info.pMappings = &mappings;
+
+    for (int i = 0; i < 2; i++) {
+        const auto spv = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source);
+
+        VkShaderCreateInfoEXT create_info = vku::InitStructHelper(&mapping_info);
+        create_info.flags = VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+        create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
+        create_info.codeSize = spv.size() * sizeof(spv[0]);
+        create_info.pCode = spv.data();
+        create_info.pName = "main";
+
+        mappings.sourceData.constantOffset.heapOffset = (i == 0) ? 1 : 0;
+        mappings.sourceData.constantOffset.heapArrayStride = (i == 0) ? 0 : 1;
+
+        VkShaderEXT shader;
+        m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11251");
+        vk::CreateShadersEXT(*m_device, 1u, &create_info, nullptr, &shader);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeShaderObject, CustomResolveSampleShadingImplicit) {
+    AddRequiredExtensions(VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::customResolve);
+    AddRequiredFeature(vkt::Feature::sampleRateShading);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    CreateMinimalShaders();
+
+    const char* fs_source = R"glsl(
+        #version 450
+        layout(location = 0) out vec4 color;
+        void main() {
+            color = vec4(gl_SamplePosition.xyxy);
+        }
+    )glsl";
+
+    const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fs_source);
+    VkShaderCreateInfoEXT fs_ci = ShaderCreateInfo(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    const vkt::Shader frag_shader(*m_device, fs_ci);
+
+    vkt::Image color_image(*m_device, 128, 128, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView color_view = color_image.CreateView();
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.imageView = color_view;
+
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.flags = VK_RENDERING_CUSTOM_RESOLVE_BIT_EXT | VK_RENDERING_FRAGMENT_REGION_BIT_EXT;
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment;
+    begin_rendering_info.layerCount = 1;
+    begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    SetDefaultDynamicStatesExclude({}, false, m_command_buffer);
+    VkBeginCustomResolveInfoEXT begin_resolve_info = vku::InitStructHelper();
+    vk::CmdBeginCustomResolveEXT(m_command_buffer, &begin_resolve_info);
+    m_command_buffer.BindShaders(m_vert_shader, frag_shader);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-flags-11521");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderObject, InvalidVertexBuffer) {
+    TEST_DESCRIPTION("Have Binding not be in a linear order");
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitRenderTarget();
+
+    const char* vs_source = R"glsl(
+        #version 450
+        layout(location=0) in vec4 x;
+        layout(location=1) in vec4 y;
+        layout(location=2) in vec4 z;
+        void main(){}
+    )glsl";
+
+    vkt::Buffer vtx_buf(*m_device, 32, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+    const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source);
+    auto vs_shader_ci = ShaderCreateInfoNoNextStage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
+    vs_shader_ci.nextStage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    const vkt::Shader vert_shader(*m_device, vs_shader_ci);
+
+    const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+    const vkt::Shader frag_shader(*m_device, ShaderCreateInfoNoNextStage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT));
+
+    VkVertexInputBindingDescription2EXT vtx_binding_des[3];
+    vtx_binding_des[0] = vku::InitStructHelper();
+    vtx_binding_des[0].binding = 3u;
+    vtx_binding_des[0].stride = 0u;
+    vtx_binding_des[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    vtx_binding_des[0].divisor = 1u;
+    vtx_binding_des[1] = vku::InitStructHelper();
+    vtx_binding_des[1].binding = 5u;
+    vtx_binding_des[1].stride = 0u;
+    vtx_binding_des[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    vtx_binding_des[1].divisor = 1u;
+    vtx_binding_des[2] = vku::InitStructHelper();
+    vtx_binding_des[2].binding = 2u;
+    vtx_binding_des[2].stride = 0u;
+    vtx_binding_des[2].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    vtx_binding_des[2].divisor = 1u;
+
+    VkVertexInputAttributeDescription2EXT vtx_attri_des[3];
+    vtx_attri_des[0] = vku::InitStructHelper();
+    vtx_attri_des[0].location = 0u;
+    vtx_attri_des[0].binding = 5u;
+    vtx_attri_des[0].format = VK_FORMAT_R8G8B8A8_UNORM;
+    vtx_attri_des[0].offset = 0u;
+    vtx_attri_des[1] = vku::InitStructHelper();
+    vtx_attri_des[1].location = 1u;
+    vtx_attri_des[1].binding = 3u;
+    vtx_attri_des[1].format = VK_FORMAT_R8G8B8A8_UNORM;
+    vtx_attri_des[1].offset = 0u;
+    vtx_attri_des[2] = vku::InitStructHelper();
+    vtx_attri_des[2].location = 2u;
+    vtx_attri_des[2].binding = 2u;
+    vtx_attri_des[2].format = VK_FORMAT_R8G8B8A8_UNORM;
+    vtx_attri_des[2].offset = 0u;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    VkDeviceSize offset = 0;
+    // Forget to update binding 2
+    vk::CmdBindVertexBuffers(m_command_buffer, 5, 1, &vtx_buf.handle(), &offset);
+    vk::CmdBindVertexBuffers(m_command_buffer, 3, 1, &vtx_buf.handle(), &offset);
+    vk::CmdSetVertexInputEXT(m_command_buffer, 3u, vtx_binding_des, 3u, vtx_attri_des);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-04007");
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderObject, VertexStride) {
+    TEST_DESCRIPTION("Draw with vertex format components not matching vertex input format components.");
+
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+
+    const char vert_src[] = R"glsl(
+        #version 460
+        layout(location = 0) in vec4 pos;
+        void main() {
+           gl_Position = vec4(pos.xy, pos.xy);
+        }
+    )glsl";
+
+    const vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vert_src);
+    const vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+
+    VkVertexInputBindingDescription2EXT vertex_binding_description = vku::InitStructHelper();
+    vertex_binding_description.binding = 0u;
+    vertex_binding_description.stride = 8u;
+    vertex_binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    vertex_binding_description.divisor = 1u;
+
+    VkVertexInputAttributeDescription2EXT vertex_attribute_description = vku::InitStructHelper();
+    vertex_attribute_description.location = 0u;
+    vertex_attribute_description.binding = 0u;
+    vertex_attribute_description.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    vertex_attribute_description.offset = 0u;
+
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1u, &vertex_binding_description, 1u, &vertex_attribute_description);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindVertexBuffers2-pStrides-06209");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderObject, VertexMisalignedAccess) {
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+
+    const char vert_src[] = R"glsl(
+        #version 460
+        layout(location = 0) in vec4 pos;
+        void main() {
+           gl_Position = pos;
+        }
+    )glsl";
+
+    const vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vert_src);
+    const vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    m_vertex_buffer = new vkt::Buffer(*m_device, 256u, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+
+    VkVertexInputBindingDescription2EXT vertex_binding_description = vku::InitStructHelper();
+    vertex_binding_description.binding = 0u;
+    vertex_binding_description.stride = 48u;
+    vertex_binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    vertex_binding_description.divisor = 1u;
+
+    VkVertexInputAttributeDescription2EXT vertex_attribute_description = vku::InitStructHelper();
+    vertex_attribute_description.location = 0u;
+    vertex_attribute_description.binding = 0u;
+    vertex_attribute_description.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    vertex_attribute_description.offset = 6u;
+
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1u, &vertex_binding_description, 1u, &vertex_attribute_description);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderObject, InvalidImageLayout) {
+    TEST_DESCRIPTION("Test sampling from an image whose layout was never transitioned.");
+
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+                                       });
+
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    const char frag_src[] = R"glsl(
+        #version 460
+        layout(set = 0, binding = 0) uniform sampler2D s;
+        layout(location = 0) out vec4 uFragColor;
+        void main(){
+           uFragColor = texture(s, vec2(0.5f));
+        }
+    )glsl";
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag_src);
+
+    VkDescriptorSetLayout descdriptor_set_layout = descriptor_set.layout_;
+
+    const vkt::Shader vert_shader(*m_device, ShaderCreateInfo(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, 1u, &descdriptor_set_layout));
+    const vkt::Shader frag_shader(*m_device, ShaderCreateInfo(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT, 1u, &descdriptor_set_layout));
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 2, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, image_ci);
+    vkt::ImageView view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1, 1, 1);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    descriptor_set.WriteDescriptorImageInfo(0, view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    descriptor_set.UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0u, 1u, &descriptor_set.set_, 0u,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    // Draw expects VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL layout of sampled image
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09600");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderObject, HeapFlags) {
+    TEST_DESCRIPTION("Create a linked shaders with mismatched heap flags.");
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    VkShaderCreateInfoEXT createInfos[2];
+    createInfos[0] = ShaderCreateInfoLink(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT);
+    createInfos[0].flags |= VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+    createInfos[1] = ShaderCreateInfoLink(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkShaderEXT shaders[2];
+    m_errorMonitor->SetDesiredError("VUID-vkCreateShadersEXT-flags-11472");
+    vk::CreateShadersEXT(*m_device, 2u, createInfos, nullptr, shaders);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderObject, DrawWithHeap) {
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+
+    const char vert_src[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer Output {
+            uint values[16];
+        } buffer_out;
+
+        void main() {
+            buffer_out.values[gl_VertexIndex] = gl_VertexIndex + 1;
+            gl_Position = vec4(1.0f);
+        }
+    )glsl";
+
+    VkDescriptorSetAndBindingMappingEXT mappings = MakeSetAndBindingMapping(0, 0);
+    mappings.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mappings.sourceData.constantOffset.heapOffset = 0;
+    mappings.sourceData.constantOffset.heapArrayStride = 0;
+
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 1;
+    mapping_info.pMappings = &mappings;
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert_src);
+    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    VkShaderCreateInfoEXT create_infos[2];
+    create_infos[0] = ShaderCreateInfo(vert_spv, VK_SHADER_STAGE_VERTEX_BIT);
+    create_infos[0].pNext = &mapping_info;
+    create_infos[0].flags |= VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+    create_infos[1] = ShaderCreateInfo(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    const vkt::Shader vert_shader(*m_device, create_infos[0]);
+    const vkt::Shader frag_shader(*m_device, create_infos[1]);
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(heap_props);
+
+    VkDeviceSize resource_heap_size = Align(heap_props.bufferDescriptorAlignment, heap_props.imageDescriptorAlignment);
+    VkDeviceSize total_heap_size = resource_heap_size + heap_props.minResourceHeapReservedRange;
+    vkt::Buffer resource_heap(*m_device, total_heap_size, VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT, vkt::device_address);
+    uint8_t* resource_heap_data = static_cast<uint8_t*>(resource_heap.Memory().Map());
+
+    VkDeviceSize buffer_size = sizeof(uint32_t) * 16u;
+    vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT_KHR, vkt::device_address);
+
+    VkDeviceAddressRangeEXT buffer_address_range = {buffer.Address(), buffer_size};
+    VkHostAddressRangeEXT resource_host = {resource_heap_data, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+
+    VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
+    descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_info.data.pAddressRange = &buffer_address_range;
+    vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &resource_host);
+
+    VkBindHeapInfoEXT resource_bind_info = vku::InitStructHelper();
+    resource_bind_info.heapRange = {resource_heap.Address(), total_heap_size};
+    resource_bind_info.reservedRangeOffset = resource_heap_size;
+    resource_bind_info.reservedRangeSize = heap_props.minResourceHeapReservedRange;
+
+    m_command_buffer.Begin();
+    vk::CmdBindResourceHeapEXT(m_command_buffer, &resource_bind_info);
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08879");
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderObject, MissingTessellationOrientation) {
+    TEST_DESCRIPTION("Create linked tessellation control and evaluation shaders with neither specifying orientation.");
+
+    AddRequiredFeature(vkt::Feature::tessellationShader);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    const char* tesc_src = R"(
+               OpCapability Tessellation
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationControl %main "main" %gl_TessLevelOuter %gl_TessLevelInner
+               OpExecutionMode %main OutputVertices 3
+
+               ; Annotations
+               OpDecorate %gl_TessLevelOuter Patch
+               OpDecorate %gl_TessLevelOuter BuiltIn TessLevelOuter
+               OpDecorate %gl_TessLevelInner Patch
+               OpDecorate %gl_TessLevelInner BuiltIn TessLevelInner
+
+               ; Types, variables and constants
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %uint_4 = OpConstant %uint 4
+%_arr_float_uint_4 = OpTypeArray %float %uint_4
+%_ptr_Output__arr_float_uint_4 = OpTypePointer Output %_arr_float_uint_4
+%gl_TessLevelOuter = OpVariable %_ptr_Output__arr_float_uint_4 Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+    %float_1 = OpConstant %float 1
+%_ptr_Output_float = OpTypePointer Output %float
+     %uint_2 = OpConstant %uint 2
+%_arr_float_uint_2 = OpTypeArray %float %uint_2
+%_ptr_Output__arr_float_uint_2 = OpTypePointer Output %_arr_float_uint_2
+%gl_TessLevelInner = OpVariable %_ptr_Output__arr_float_uint_2 Output
+
+               ; Function main
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %18 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_2
+               OpStore %18 %float_1
+         %19 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_1
+               OpStore %19 %float_1
+         %20 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_0
+               OpStore %20 %float_1
+         %25 = OpAccessChain %_ptr_Output_float %gl_TessLevelInner %int_0
+               OpStore %25 %float_1
+               OpReturn
+               OpFunctionEnd)";
+
+    const char* tese_src = R"(
+               OpCapability Tessellation
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationEvaluation %main "main" %_
+               OpExecutionMode %main Triangles
+               OpExecutionMode %main SpacingFractionalOdd
+
+               ; Annotations
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex 2 BuiltIn ClipDistance
+               OpMemberDecorate %gl_PerVertex 3 BuiltIn CullDistance
+               OpDecorate %gl_PerVertex Block
+
+               ; Types, variables and constants
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+%gl_PerVertex = OpTypeStruct %v4float %float %_arr_float_uint_1 %_arr_float_uint_1
+%_ptr_Output_gl_PerVertex = OpTypePointer Output %gl_PerVertex
+          %_ = OpVariable %_ptr_Output_gl_PerVertex Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+    %float_1 = OpConstant %float 1
+         %17 = OpConstantComposite %v4float %float_1 %float_1 %float_1 %float_1
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+
+               ; Function main
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %19 = OpAccessChain %_ptr_Output_v4float %_ %int_0
+               OpStore %19 %17
+               OpReturn
+               OpFunctionEnd)";
+
+    std::vector<uint32_t> tesc_spv;
+    ASMtoSPV(SPV_ENV_VULKAN_1_0, 0, tesc_src, tesc_spv);
+    std::vector<uint32_t> tese_spv;
+    ASMtoSPV(SPV_ENV_VULKAN_1_0, 0, tese_src, tese_spv);
+
+    VkShaderCreateInfoEXT createInfos[2];
+    createInfos[0] =
+        ShaderCreateInfoLink(tesc_spv, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+    createInfos[1] = ShaderCreateInfoLink(tese_spv, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+
+    VkShaderEXT shaders[2];
+    m_errorMonitor->SetDesiredError("VUID-vkCreateShadersEXT-pCreateInfos-12224");
+    vk::CreateShadersEXT(*m_device, 2u, createInfos, nullptr, shaders);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderObject, MissingTessellationSpacing) {
+    TEST_DESCRIPTION("Create linked tessellation control and evaluation shaders with different spacing.");
+
+    AddRequiredFeature(vkt::Feature::tessellationShader);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+
+    const char* tesc_src = R"(
+               OpCapability Tessellation
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationControl %main "main" %gl_TessLevelOuter %gl_TessLevelInner
+               OpExecutionMode %main OutputVertices 3
+
+               ; Annotations
+               OpDecorate %gl_TessLevelOuter Patch
+               OpDecorate %gl_TessLevelOuter BuiltIn TessLevelOuter
+               OpDecorate %gl_TessLevelInner Patch
+               OpDecorate %gl_TessLevelInner BuiltIn TessLevelInner
+
+               ; Types, variables and constants
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %uint_4 = OpConstant %uint 4
+%_arr_float_uint_4 = OpTypeArray %float %uint_4
+%_ptr_Output__arr_float_uint_4 = OpTypePointer Output %_arr_float_uint_4
+%gl_TessLevelOuter = OpVariable %_ptr_Output__arr_float_uint_4 Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+    %float_1 = OpConstant %float 1
+%_ptr_Output_float = OpTypePointer Output %float
+     %uint_2 = OpConstant %uint 2
+%_arr_float_uint_2 = OpTypeArray %float %uint_2
+%_ptr_Output__arr_float_uint_2 = OpTypePointer Output %_arr_float_uint_2
+%gl_TessLevelInner = OpVariable %_ptr_Output__arr_float_uint_2 Output
+
+               ; Function main
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %18 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_2
+               OpStore %18 %float_1
+         %19 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_1
+               OpStore %19 %float_1
+         %20 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_0
+               OpStore %20 %float_1
+         %25 = OpAccessChain %_ptr_Output_float %gl_TessLevelInner %int_0
+               OpStore %25 %float_1
+               OpReturn
+               OpFunctionEnd)";
+
+    const char* tese_src = R"(
+               OpCapability Tessellation
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationEvaluation %main "main" %_
+               OpExecutionMode %main Triangles
+               OpExecutionMode %main VertexOrderCw
+
+               ; Annotations
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex 2 BuiltIn ClipDistance
+               OpMemberDecorate %gl_PerVertex 3 BuiltIn CullDistance
+               OpDecorate %gl_PerVertex Block
+
+               ; Types, variables and constants
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+%gl_PerVertex = OpTypeStruct %v4float %float %_arr_float_uint_1 %_arr_float_uint_1
+%_ptr_Output_gl_PerVertex = OpTypePointer Output %gl_PerVertex
+          %_ = OpVariable %_ptr_Output_gl_PerVertex Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+    %float_1 = OpConstant %float 1
+         %17 = OpConstantComposite %v4float %float_1 %float_1 %float_1 %float_1
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+
+               ; Function main
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %19 = OpAccessChain %_ptr_Output_v4float %_ %int_0
+               OpStore %19 %17
+               OpReturn
+               OpFunctionEnd)";
+
+    std::vector<uint32_t> tesc_spv;
+    ASMtoSPV(SPV_ENV_VULKAN_1_0, 0, tesc_src, tesc_spv);
+    std::vector<uint32_t> tese_spv;
+    ASMtoSPV(SPV_ENV_VULKAN_1_0, 0, tese_src, tese_spv);
+
+    VkShaderCreateInfoEXT createInfos[2];
+    createInfos[0] =
+        ShaderCreateInfoLink(tesc_spv, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+    createInfos[1] = ShaderCreateInfoLink(tese_spv, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+
+    VkShaderEXT shaders[2];
+    m_errorMonitor->SetDesiredError("VUID-vkCreateShadersEXT-pCreateInfos-12225");
+    vk::CreateShadersEXT(*m_device, 2u, createInfos, nullptr, shaders);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderObject, MissingHeapBind) {
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+
+    const char vert_src[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer Output {
+            uint values[16];
+        } buffer_out;
+
+        void main() {
+            buffer_out.values[gl_VertexIndex] = gl_VertexIndex + 1;
+            gl_Position = vec4(1.0f);
+        }
+    )glsl";
+
+    VkDescriptorSetAndBindingMappingEXT mappings = MakeSetAndBindingMapping(0, 0);
+    mappings.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mappings.sourceData.constantOffset.heapOffset = 0;
+    mappings.sourceData.constantOffset.heapArrayStride = 0;
+
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 1;
+    mapping_info.pMappings = &mappings;
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert_src);
+    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    VkShaderCreateInfoEXT create_infos[2];
+    create_infos[0] = ShaderCreateInfo(vert_spv, VK_SHADER_STAGE_VERTEX_BIT);
+    create_infos[0].pNext = &mapping_info;
+    create_infos[0].flags |= VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+    create_infos[1] = ShaderCreateInfo(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    create_infos[1].flags |= VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
+
+    const vkt::Shader vert_shader(*m_device, create_infos[0]);
+    const vkt::Shader frag_shader(*m_device, create_infos[1]);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-11308");
+    vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }

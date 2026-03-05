@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,8 +44,8 @@ TEST_F(PositiveVertexInput, AttributeMatrixType) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
@@ -82,8 +82,8 @@ TEST_F(PositiveVertexInput, AttributeArrayType) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
@@ -130,8 +130,8 @@ TEST_F(PositiveVertexInput, AttributeStructType) {
                OpFunctionEnd
     )";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
@@ -190,8 +190,8 @@ TEST_F(PositiveVertexInput, AttributeStructTypeWithArray) {
                OpFunctionEnd
     )";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
@@ -242,8 +242,8 @@ TEST_F(PositiveVertexInput, AttributeStructTypeSecondLocation) {
                OpFunctionEnd
     )";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
@@ -293,8 +293,8 @@ TEST_F(PositiveVertexInput, AttributeStructTypeBlockLocation) {
                OpFunctionEnd
     )";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
@@ -349,17 +349,15 @@ TEST_F(PositiveVertexInput, AttributeComponents) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Create a renderPass with two color attachments
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED);
     rp.AddAttachmentDescription(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
-    rp.AddColorAttachment(1);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+    rp.AddColorAttachment(1, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     VkPipelineColorBlendAttachmentState cb_attachments[2];
@@ -418,8 +416,8 @@ TEST_F(PositiveVertexInput, CreatePipeline64BitAttributes) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.vi_ci_.pVertexBindingDescriptions = input_bindings;
@@ -450,7 +448,7 @@ TEST_F(PositiveVertexInput, VertexAttribute64bit) {
         layout(location = 0) in float64_t pos;
         void main() {}
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 0, VK_VERTEX_INPUT_RATE_VERTEX};
@@ -481,7 +479,7 @@ TEST_F(PositiveVertexInput, VertexAttribute64bitExtraInput) {
         layout(location = 0) in float64_t pos; // Uses only 1 of the 4 components
         void main() {}
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 8, VK_VERTEX_INPUT_RATE_VERTEX};
@@ -542,8 +540,8 @@ TEST_F(PositiveVertexInput, AttributeStructTypeBlockLocation64bit) {
                OpFunctionEnd
     )";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
@@ -572,7 +570,7 @@ TEST_F(PositiveVertexInput, Attribute64bitMissingComponent) {
         layout(location = 0) in f64vec2 pos;
         void main() {}
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 32, VK_VERTEX_INPUT_RATE_VERTEX};
@@ -903,7 +901,7 @@ TEST_F(PositiveVertexInput, LegacyVertexAttributes) {
            gl_Position = vec4(x);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
@@ -946,14 +944,14 @@ TEST_F(PositiveVertexInput, ResetCmdSetVertexInput) {
         layout(location=0) in uvec4 x;
         void main(){}
     )glsl";
-    VkShaderObj vs_int(this, vs_source_int, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs_int(*m_device, vs_source_int, VK_SHADER_STAGE_VERTEX_BIT);
 
     const char *vs_source_float = R"glsl(
         #version 450
         layout(location=0) in vec4 x;
         void main(){}
     )glsl";
-    VkShaderObj vs_float(this, vs_source_float, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs_float(*m_device, vs_source_float, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe_int(*this);
     pipe_int.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
@@ -1009,7 +1007,7 @@ TEST_F(PositiveVertexInput, VertexAttributeRobustness) {
            gl_Position = x;
         }
     )glsl";
-    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
@@ -1034,7 +1032,7 @@ TEST_F(PositiveVertexInput, VertexAttributeRobustnessDynamic) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
@@ -1081,7 +1079,7 @@ TEST_F(PositiveVertexInput, VertexInputRebinding) {
             gl_Position = vec4(a);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
@@ -1112,7 +1110,7 @@ TEST_F(PositiveVertexInput, VertexInputRebinding) {
 
     vkt::Buffer vertex_buffer(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     VkDeviceSize offsets[2] = {0, 0};
-    VkBuffer buffers[2] = {vertex_buffer.handle(), vertex_buffer.handle()};
+    VkBuffer buffers[2] = {vertex_buffer, vertex_buffer};
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -1142,7 +1140,7 @@ TEST_F(PositiveVertexInput, UnusedInputBinding) {
            gl_Position = x + y;
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     // input_binding[1] is not accessed from either attributes
     VkVertexInputBindingDescription input_binding[2] = {{0, 16, VK_VERTEX_INPUT_RATE_VERTEX}, {1, 16, VK_VERTEX_INPUT_RATE_VERTEX}};
@@ -1185,7 +1183,7 @@ TEST_F(PositiveVertexInput, UnusedInputBindingDynamic) {
            gl_Position = x + y;
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
@@ -1365,7 +1363,7 @@ TEST_F(PositiveVertexInput, AttributeNotProvided) {
            gl_Position = x;
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
@@ -1400,4 +1398,66 @@ TEST_F(PositiveVertexInput, NoInputLocation) {
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 1);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
+}
+
+TEST_F(PositiveVertexInput, MatrixComponentNotConsumed) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11355");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+    m_errorMonitor->ExpectSuccess(kPerformanceWarningBit | kWarningBit | kErrorBit);
+
+    VkVertexInputBindingDescription input_binding = {0, 4, VK_VERTEX_INPUT_RATE_VERTEX};
+
+    VkVertexInputAttributeDescription attributes[4] = {{0, 0, VK_FORMAT_R8G8B8_UNORM, 0},
+                                                       {1, 0, VK_FORMAT_R8G8B8_UNORM, 0},
+                                                       {2, 0, VK_FORMAT_R8G8B8_UNORM, 0},
+                                                       {3, 0, VK_FORMAT_R8G8B8_UNORM, 0}};
+
+    const char* vs_source = R"glsl(
+        #version 450
+        layout(location = 0) in mat4x3 a;
+        void main(){
+           gl_Position = vec4(a[0], 1.0);
+        }
+    )glsl";
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
+    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
+    pipe.vi_ci_.pVertexAttributeDescriptions = attributes;
+    pipe.vi_ci_.vertexAttributeDescriptionCount = 4;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositiveVertexInput, MatrixArrayComponentNotConsumed) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11355");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+    m_errorMonitor->ExpectSuccess(kPerformanceWarningBit | kWarningBit | kErrorBit);
+
+    VkVertexInputBindingDescription input_binding = {0, 4, VK_VERTEX_INPUT_RATE_VERTEX};
+
+    VkVertexInputAttributeDescription attributes[4] = {{0, 0, VK_FORMAT_R8G8B8_UNORM, 0},
+                                                       {1, 0, VK_FORMAT_R8G8B8_UNORM, 0},
+                                                       {2, 0, VK_FORMAT_R8G8B8_UNORM, 0},
+                                                       {3, 0, VK_FORMAT_R8G8B8_UNORM, 0}};
+
+    const char* vs_source = R"glsl(
+        #version 450
+        layout(location = 0) in mat2x3 a[2];
+        void main(){
+           gl_Position = vec4(a[0][0], 1.0);
+        }
+    )glsl";
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
+    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
+    pipe.vi_ci_.pVertexAttributeDescriptions = attributes;
+    pipe.vi_ci_.vertexAttributeDescriptionCount = 4;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
 }

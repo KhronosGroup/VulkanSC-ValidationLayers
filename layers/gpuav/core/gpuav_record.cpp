@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2025 The Khronos Group Inc.
- * Copyright (c) 2018-2025 Valve Corporation
- * Copyright (c) 2018-2025 LunarG, Inc.
+/* Copyright (c) 2018-2026 The Khronos Group Inc.
+ * Copyright (c) 2018-2026 Valve Corporation
+ * Copyright (c) 2018-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,24 +15,25 @@
  * limitations under the License.
  */
 
-#include <cstdint>
-#include <vulkan/utility/vk_safe_struct.hpp>
 #include "chassis/chassis_modification_state.h"
 #include "gpuav/core/gpuav.h"
 #include "gpuav/core/gpuav_constants.h"
 #include "gpuav/debug_printf/debug_printf.h"
 #include "gpuav/descriptor_validation/gpuav_descriptor_validation.h"
-#include "gpuav/instrumentation/buffer_device_address.h"
 #include "gpuav/instrumentation/descriptor_checks.h"
 #include "gpuav/instrumentation/gpuav_instrumentation.h"
-#include "gpuav/instrumentation/post_process_descriptor_indexing.h"
+#include "gpuav/instrumentation/register_validation.h"
 #include "gpuav/resources/gpuav_state_trackers.h"
 #include "gpuav/shaders/gpuav_shaders_constants.h"
 #include "gpuav/validation_cmd/gpuav_copy_buffer_to_image.h"
+#include "gpuav/validation_cmd/gpuav_copy_memory_indirect.h"
 #include "gpuav/validation_cmd/gpuav_dispatch.h"
 #include "gpuav/validation_cmd/gpuav_draw.h"
-#include "gpuav/validation_cmd/gpuav_trace_rays.h"
+#include "gpuav/validation_cmd/gpuav_ray_tracing.h"
 #include "utils/math_utils.h"
+
+#include <cstdint>
+#include <vulkan/utility/vk_safe_struct.hpp>
 
 namespace gpuav {
 
@@ -81,25 +82,25 @@ void Validator::PostCallRecordCreateBuffer(VkDevice device, const VkBufferCreate
     const VkBufferUsageFlags2 in_usage = flags2 ? flags2->usage : pCreateInfo->usage;
 
     if (in_usage & VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT) {
-        resource_descriptor_buffer_handles_.emplace(*pBuffer);
+        descriptor_buffer.resource_handles_.emplace(*pBuffer);
     }
 }
 
 void Validator::PreCallRecordDestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks *pAllocator,
                                            const RecordObject &record_obj) {
-    resource_descriptor_buffer_handles_.erase(buffer);
+    descriptor_buffer.resource_handles_.erase(buffer);
 }
 
 void Validator::PreCallRecordFreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks *pAllocator,
                                         const RecordObject &record_obj) {
-    if (resource_descriptor_buffer_memory_handles_.find(memory) != resource_descriptor_buffer_memory_handles_.end()) {
-        resource_descriptor_buffer_memory_handles_.erase(memory);
+    if (descriptor_buffer.resource_memory_handles_.find(memory) != descriptor_buffer.resource_memory_handles_.end()) {
+        descriptor_buffer.resource_memory_handles_.erase(memory);
     }
 }
 
 void Validator::BindBufferMemory(VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize offset) {
-    if (resource_descriptor_buffer_handles_.find(buffer) != resource_descriptor_buffer_handles_.end()) {
-        resource_descriptor_buffer_memory_handles_.emplace(memory);
+    if (descriptor_buffer.resource_handles_.find(buffer) != descriptor_buffer.resource_handles_.end()) {
+        descriptor_buffer.resource_memory_handles_.emplace(memory);
     }
 }
 
@@ -133,7 +134,7 @@ void Validator::PreCallRecordCmdBindDescriptorBuffersEXT(VkCommandBuffer command
 
     vku::safe_VkDescriptorBufferBindingInfoEXT &modified_binding_info = chassis_state.modified_binding_infos[bufferCount];
     modified_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
-    modified_binding_info.address = global_resource_descriptor_buffer_.Address();
+    modified_binding_info.address = GetGlobalDescriptorBuffer().Address();
 
     auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     CommandBufferSubState &gpuav_cb_state = SubState(*cb_state);
@@ -155,13 +156,19 @@ void Validator::PreCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer, c
     RegisterDescriptorChecksValidation(*this, gpuav_cb_state);
     RegisterPostProcessingValidation(*this, gpuav_cb_state);
     RegisterBufferDeviceAddressValidation(*this, gpuav_cb_state);
+    RegisterVertexAttributeFetchOobValidation(*this, gpuav_cb_state);
+    RegisterMeshShadingValidation(*this, gpuav_cb_state);
+    RegisterRayQueryValidation(*this, gpuav_cb_state);
+    RegisterRayHitObjectValidation(*this, gpuav_cb_state);
+    RegisterSanitizer(*this, gpuav_cb_state);
     debug_printf::RegisterDebugPrintf(*this, gpuav_cb_state);
 }
 
-// Dedicated warning VUID that likely can be ignored. We want to always warn the user when adjusting settings/limits/features/etc on
-// them
+// Dedicated warning VUID that likely can be ignored.
+// We want to always warn the user when adjusting settings/limits/features/etc on them
 void Instance::AdjustmentWarning(LogObjectList objlist, const Location &loc, const char *const specific_message) const {
-    LogWarning("WARNING-Setting-Limit-Adjusted", objlist, loc, "Internal Warning: %s", specific_message);
+    LogWarning("WARNING-Setting-Limit-Adjusted", objlist, loc, "Warning that validation is adjusting settings:\n%s",
+               specific_message);
 }
 
 void Instance::InternalWarning(LogObjectList objlist, const Location &loc, const char *const specific_message) const {
@@ -174,7 +181,7 @@ void Instance::ReserveBindingSlot(VkPhysicalDevice physicalDevice, VkPhysicalDev
     if (limits.maxBoundDescriptorSets == 0) return;
 
     if (limits.maxBoundDescriptorSets > kMaxAdjustedBoundDescriptorSet) {
-        std::stringstream ss;
+        std::ostringstream ss;
         ss << "A descriptor binding slot is required to store GPU-side information, but the device maxBoundDescriptorSets is "
            << limits.maxBoundDescriptorSets << " which is too large, so we will be trying to use slot "
            << kMaxAdjustedBoundDescriptorSet;
@@ -198,23 +205,27 @@ void Instance::PostCallRecordGetPhysicalDeviceProperties(VkPhysicalDevice physic
 void Instance::PostCallRecordGetPhysicalDeviceProperties2(VkPhysicalDevice physicalDevice,
                                                           VkPhysicalDeviceProperties2 *device_props2,
                                                           const RecordObject &record_obj) {
+    std::string adjustment_warnings;
+
     // override all possible places maxUpdateAfterBindDescriptorsInAllPools can be set
     auto *desc_indexing_props = vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingProperties>(device_props2->pNext);
     if (desc_indexing_props &&
         desc_indexing_props->maxUpdateAfterBindDescriptorsInAllPools > glsl::kDebugInputBindlessMaxDescriptors) {
-        std::stringstream ss;
-        ss << "Setting VkPhysicalDeviceDescriptorIndexingProperties::maxUpdateAfterBindDescriptorsInAllPools to "
+        std::ostringstream ss;
+        ss << "\tSetting VkPhysicalDeviceDescriptorIndexingProperties::maxUpdateAfterBindDescriptorsInAllPools to "
            << glsl::kDebugInputBindlessMaxDescriptors;
-        AdjustmentWarning(physicalDevice, record_obj.location, ss.str().c_str());
+        adjustment_warnings += ss.str();
+        adjustment_warnings += '\n';
         desc_indexing_props->maxUpdateAfterBindDescriptorsInAllPools = glsl::kDebugInputBindlessMaxDescriptors;
     }
 
     auto *vk12_props = vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Properties>(device_props2->pNext);
     if (vk12_props && vk12_props->maxUpdateAfterBindDescriptorsInAllPools > glsl::kDebugInputBindlessMaxDescriptors) {
-        std::stringstream ss;
-        ss << "Setting VkPhysicalDeviceVulkan12Properties::maxUpdateAfterBindDescriptorsInAllPools to "
+        std::ostringstream ss;
+        ss << "\tSetting VkPhysicalDeviceVulkan12Properties::maxUpdateAfterBindDescriptorsInAllPools to "
            << glsl::kDebugInputBindlessMaxDescriptors;
-        AdjustmentWarning(physicalDevice, record_obj.location, ss.str().c_str());
+        adjustment_warnings += ss.str();
+        adjustment_warnings += '\n';
         vk12_props->maxUpdateAfterBindDescriptorsInAllPools = glsl::kDebugInputBindlessMaxDescriptors;
     }
 
@@ -223,10 +234,11 @@ void Instance::PostCallRecordGetPhysicalDeviceProperties2(VkPhysicalDevice physi
         if (desc_buffer_props->maxResourceDescriptorBufferBindings > 1) {
             desc_buffer_props->maxResourceDescriptorBufferBindings -= 1;
 
-            std::stringstream ss;
-            ss << "Setting VkPhysicalDeviceDescriptorBufferPropertiesEXT::maxResourceDescriptorBufferBindings to "
+            std::ostringstream ss;
+            ss << "\tSetting VkPhysicalDeviceDescriptorBufferPropertiesEXT::maxResourceDescriptorBufferBindings to "
                << desc_buffer_props->maxResourceDescriptorBufferBindings;
-            AdjustmentWarning(physicalDevice, record_obj.location, ss.str().c_str());
+            adjustment_warnings += ss.str();
+            adjustment_warnings += '\n';
         }
 
         // Currently set regardless if we fallback on maxResourceDescriptorBufferBindings only being 1
@@ -240,12 +252,31 @@ void Instance::PostCallRecordGetPhysicalDeviceProperties2(VkPhysicalDevice physi
             desc_buffer_props->resourceDescriptorBufferAddressSpaceSize -= bytes_to_reserve;
             desc_buffer_props->descriptorBufferAddressSpaceSize -= bytes_to_reserve;
 
-            std::stringstream ss;
-            ss << "Setting VkPhysicalDeviceDescriptorBufferPropertiesEXT::descriptorBufferAddressSpaceSize to "
+            std::ostringstream ss;
+            ss << "\tSetting VkPhysicalDeviceDescriptorBufferPropertiesEXT::descriptorBufferAddressSpaceSize to "
                << desc_buffer_props->resourceDescriptorBufferAddressSpaceSize << "and resourceDescriptorBufferAddressSpaceSize to "
                << desc_buffer_props->descriptorBufferAddressSpaceSize << " (reserving " << bytes_to_reserve << " bytes)";
-            AdjustmentWarning(physicalDevice, record_obj.location, ss.str().c_str());
+            adjustment_warnings += ss.str();
+            adjustment_warnings += '\n';
         }
+    }
+    if (!adjustment_warnings.empty()) {
+        AdjustmentWarning(physicalDevice, record_obj.location, adjustment_warnings.c_str());
+    }
+
+    if (auto *desc_heap_props = vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorHeapPropertiesEXT>(device_props2->pNext)) {
+        VkDeviceSize bytes_to_reserve =
+            Align(desc_heap_props->bufferDescriptorSize * glsl::kTotalBindings, desc_heap_props->bufferDescriptorAlignment);
+        bytes_to_reserve = Align(bytes_to_reserve, desc_heap_props->resourceHeapAlignment);
+
+        VkDeviceSize new_limit = desc_heap_props->minResourceHeapReservedRange + bytes_to_reserve;
+
+        std::stringstream ss;
+        ss << "Setting VkPhysicalDeviceDescriptorHeapPropertiesEXT::minResourceHeapReservedRange to " << new_limit << " (reserving "
+           << bytes_to_reserve << " bytes)";
+        InternalWarning(physicalDevice, record_obj.location, ss.str().c_str());
+
+        desc_heap_props->minResourceHeapReservedRange = new_limit;
     }
 
     ReserveBindingSlot(physicalDevice, device_props2->properties.limits, record_obj.location);
@@ -254,13 +285,14 @@ void Instance::PostCallRecordGetPhysicalDeviceProperties2(VkPhysicalDevice physi
 // Clean up device-related resources
 void Validator::PreCallRecordDestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator,
                                            const RecordObject &record_obj) {
-    // Need to destroy substate before memory backed in things like shared_resources_manager are cleared
+    // Need to destroy substate before memory backed in things like shared_resources_cache are cleared
     DestroySubstate();
 
-    shared_resources_manager.Clear();
+    shared_resources_cache.Clear();
 
     global_indices_buffer_.Destroy();
     global_resource_descriptor_buffer_.Destroy();
+    global_resource_descriptor_heap_.Destroy();
 
     BaseClass::PreCallRecordDestroyDevice(device, pAllocator, record_obj);
 
@@ -348,7 +380,7 @@ void Validator::PreCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBu
 
     const LastBound &last_bound = cb_state->GetLastBoundGraphics();
     valcmd::FirstInstance<VkDrawIndirectCommand>(*this, sub_state, record_obj.location, last_bound, buffer, offset, count,
-                                                 VK_NULL_HANDLE, 0, "VUID-VkDrawIndirectCommand-firstInstance-00501");
+                                                 VK_NULL_HANDLE, 0);
     PreCallActionCommand(*this, sub_state, last_bound, record_obj.location);
 }
 
@@ -366,7 +398,7 @@ void Validator::PreCallRecordCmdDrawIndexedIndirect(VkCommandBuffer commandBuffe
                                            VK_NULL_HANDLE, 0, "VUID-VkDrawIndexedIndirectCommand-robustBufferAccess2-08798");
 
     valcmd::FirstInstance<VkDrawIndexedIndirectCommand>(*this, sub_state, record_obj.location, last_bound, buffer, offset, count,
-                                                        VK_NULL_HANDLE, 0, "VUID-VkDrawIndexedIndirectCommand-firstInstance-00554");
+                                                        VK_NULL_HANDLE, 0);
     PreCallActionCommand(*this, sub_state, last_bound, record_obj.location);
 }
 
@@ -397,7 +429,7 @@ void Validator::PreCallRecordCmdDrawIndirectCount(VkCommandBuffer commandBuffer,
                         vvl::Struct::VkDrawIndirectCommand, stride, countBuffer, countBufferOffset,
                         "VUID-vkCmdDrawIndirectCount-countBuffer-02717");
     valcmd::FirstInstance<VkDrawIndirectCommand>(*this, sub_state, record_obj.location, last_bound, buffer, offset, maxDrawCount,
-                                                 countBuffer, countBufferOffset, "VUID-VkDrawIndirectCommand-firstInstance-00501");
+                                                 countBuffer, countBufferOffset);
     PreCallActionCommand(*this, sub_state, last_bound, record_obj.location);
 }
 
@@ -437,8 +469,7 @@ void Validator::PreCallRecordCmdDrawIndexedIndirectCount(VkCommandBuffer command
                         vvl::Struct::VkDrawIndexedIndirectCommand, stride, countBuffer, countBufferOffset,
                         "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-02717");
     valcmd::FirstInstance<VkDrawIndexedIndirectCommand>(*this, sub_state, record_obj.location, last_bound, buffer, offset,
-                                                        maxDrawCount, countBuffer, countBufferOffset,
-                                                        "VUID-VkDrawIndexedIndirectCommand-firstInstance-00554");
+                                                        maxDrawCount, countBuffer, countBufferOffset);
 
     valcmd::DrawIndexedIndirectIndexBuffer(*this, sub_state, record_obj.location, last_bound, buffer, offset, stride, maxDrawCount,
                                            countBuffer, countBufferOffset,
@@ -558,6 +589,7 @@ void Validator::PreCallRecordCmdDispatch(VkCommandBuffer commandBuffer, uint32_t
     const LastBound &last_bound = cb_state->GetLastBoundCompute();
     PreCallActionCommand(*this, sub_state, last_bound, record_obj.location);
 }
+
 void Validator::PreCallRecordCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                  const RecordObject &record_obj) {
     auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
@@ -589,6 +621,20 @@ void Validator::PreCallRecordCmdDispatchBaseKHR(VkCommandBuffer commandBuffer, u
                                                 uint32_t groupCountZ, const RecordObject &record_obj) {
     PreCallRecordCmdDispatchBase(commandBuffer, baseGroupX, baseGroupY, baseGroupZ, groupCountX, groupCountY, groupCountZ,
                                  record_obj);
+}
+
+void Validator::PreCallRecordCmdBuildAccelerationStructuresKHR(
+    VkCommandBuffer commandBuffer, uint32_t infoCount, const VkAccelerationStructureBuildGeometryInfoKHR *pInfos,
+    const VkAccelerationStructureBuildRangeInfoKHR *const *ppBuildRangeInfos, const RecordObject &record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+    if (!cb_state) {
+        InternalError(commandBuffer, record_obj.location, "Unrecognized command buffer.");
+        return;
+    }
+    auto &cb_sub_state = SubState(*cb_state);
+    const LastBound &last_bound = cb_state->GetLastBoundRayTracing();
+    valcmd::TLAS(*this, record_obj.location, cb_sub_state, last_bound, infoCount, pInfos, ppBuildRangeInfos);
+    valcmd::BLAS(*this, record_obj.location, cb_sub_state, last_bound, infoCount, pInfos, ppBuildRangeInfos);
 }
 
 void Validator::PreCallRecordCmdTraceRaysNV(VkCommandBuffer commandBuffer, VkBuffer raygenShaderBindingTableBuffer,
@@ -705,6 +751,38 @@ void Validator::PreCallRecordCmdCopyBufferToImage2(VkCommandBuffer commandBuffer
                                                    const RecordObject &record_obj) {
     auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
     valcmd::CopyBufferToImage(*this, record_obj.location, SubState(*cb_state), pCopyBufferToImageInfo);
+}
+
+void Validator::PreCallRecordCmdCopyMemoryIndirectKHR(VkCommandBuffer commandBuffer,
+                                                      const VkCopyMemoryIndirectInfoKHR *pCopyMemoryIndirectInfo,
+                                                      const RecordObject &record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+    const valcmd::CopyMemoryIndirectCommon copy_info = {pCopyMemoryIndirectInfo->copyCount,
+                                                        pCopyMemoryIndirectInfo->copyAddressRange};
+    valcmd::CopyMemoryIndirect(*this, record_obj.location, SubState(*cb_state), copy_info);
+}
+
+void Validator::PreCallRecordCmdCopyMemoryToImageIndirectKHR(
+    VkCommandBuffer commandBuffer, const VkCopyMemoryToImageIndirectInfoKHR *pCopyMemoryToImageIndirectInfo,
+    const RecordObject &record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+    const valcmd::CopyMemoryIndirectCommon copy_info = {pCopyMemoryToImageIndirectInfo->copyCount,
+                                                        pCopyMemoryToImageIndirectInfo->copyAddressRange};
+    valcmd::CopyMemoryIndirect(*this, record_obj.location, SubState(*cb_state), copy_info);
+}
+
+bool Validator::PreCallValidateCmdPushDataEXT(VkCommandBuffer commandBuffer, const VkPushDataInfoEXT *pPushDataInfo,
+                                              const ErrorObject &error_obj) const {
+    bool skip = false;
+    if (pPushDataInfo->offset + pPushDataInfo->data.size > push_data_offset_) {
+        skip |=
+            LogError("UNASSIGNED-GPU-Assisted-Validation", commandBuffer, error_obj.location,
+                     "VkPhysicalDeviceDescriptorHeapPropertiesEXT::maxPushDataSize is %" PRIu32
+                     ", however GPU-AV reserved 8 bytes at the end of the push data range for internal use. Therefore only %" PRIu32
+                     " bytes are available to the application.",
+                     static_cast<uint32_t>(push_data_offset_ + sizeof(VkDeviceAddress)), push_data_offset_);
+    }
+    return skip;
 }
 
 // Validates the buffer is allowed to be protected

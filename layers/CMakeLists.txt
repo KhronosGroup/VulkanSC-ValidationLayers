@@ -1,8 +1,8 @@
 # ~~~
-# Copyright (c) 2014-2025 Valve Corporation
-# Copyright (c) 2014-2025 LunarG, Inc.
-# Copyright (c) 2023-2025 RasterGrid Kft.
-# Copyright (C) 2025 Arm Limited.
+# Copyright (c) 2014-2026 Valve Corporation
+# Copyright (c) 2014-2026 LunarG, Inc.
+# Copyright (c) 2023-2026 RasterGrid Kft.
+# Copyright (C) 2026 Arm Limited.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -213,8 +213,6 @@ target_sources(vvl PRIVATE
     chassis/dispatch_object_manual.cpp
     containers/range.h
     containers/range_map.h
-    containers/subresource_adapter.cpp
-    containers/subresource_adapter.h
     core_checks/cc_android.cpp
     core_checks/cc_buffer.cpp
     core_checks/cc_buffer_address.h
@@ -238,6 +236,8 @@ target_sources(vvl PRIVATE
     core_checks/cc_query.cpp
     core_checks/cc_queue.cpp
     core_checks/cc_ray_tracing.cpp
+    core_checks/cc_ray_tracing_micromap.cpp
+    core_checks/cc_ray_tracing_nv.cpp
     core_checks/cc_render_pass.cpp
     core_checks/cc_spirv.cpp
     core_checks/cc_shader_interface.cpp
@@ -257,9 +257,12 @@ target_sources(vvl PRIVATE
     core_checks/cc_wsi.cpp
     core_checks/cc_ycbcr.cpp
     drawdispatch/descriptor_validator.cpp
+    drawdispatch/descriptor_validator.h
     drawdispatch/drawdispatch_vuids.cpp
+    drawdispatch/drawdispatch_vuids.h
     error_message/spirv_logging.h
     error_message/spirv_logging.cpp
+    error_message/unimplementable_validation.h
     external/vma/vma.h
     external/vma/vma.cpp
     ${API_TYPE}/generated/best_practices.cpp
@@ -271,8 +274,8 @@ target_sources(vvl PRIVATE
     ${API_TYPE}/generated/valid_flag_values.cpp
     ${API_TYPE}/generated/command_validation.cpp
     ${API_TYPE}/generated/command_validation.h
-    ${API_TYPE}/generated/deprecation.cpp
-    ${API_TYPE}/generated/deprecation.h
+    ${API_TYPE}/generated/legacy.cpp
+    ${API_TYPE}/generated/legacy.h
     ${API_TYPE}/generated/device_features.cpp
     ${API_TYPE}/generated/device_features.h
     ${API_TYPE}/generated/dynamic_state_helper.cpp
@@ -314,10 +317,12 @@ target_sources(vvl PRIVATE
     gpuav/validation_cmd/gpuav_draw.cpp
     gpuav/validation_cmd/gpuav_dispatch.h
     gpuav/validation_cmd/gpuav_dispatch.cpp
-    gpuav/validation_cmd/gpuav_trace_rays.h
-    gpuav/validation_cmd/gpuav_trace_rays.cpp
+    gpuav/validation_cmd/gpuav_ray_tracing.h
+    gpuav/validation_cmd/gpuav_ray_tracing.cpp
     gpuav/validation_cmd/gpuav_copy_buffer_to_image.h
     gpuav/validation_cmd/gpuav_copy_buffer_to_image.cpp
+    gpuav/validation_cmd/gpuav_copy_memory_indirect.h
+    gpuav/validation_cmd/gpuav_copy_memory_indirect.cpp
     gpuav/descriptor_validation/gpuav_descriptor_validation.h
     gpuav/descriptor_validation/gpuav_descriptor_validation.cpp
     gpuav/descriptor_validation/gpuav_descriptor_set.cpp
@@ -330,12 +335,16 @@ target_sources(vvl PRIVATE
     gpuav/instrumentation/gpuav_shader_instrumentor.h
     gpuav/instrumentation/gpuav_instrumentation.h
     gpuav/instrumentation/gpuav_instrumentation.cpp
-    gpuav/instrumentation/buffer_device_address.h
     gpuav/instrumentation/buffer_device_address.cpp
     gpuav/instrumentation/descriptor_checks.h
     gpuav/instrumentation/descriptor_checks.cpp
-    gpuav/instrumentation/post_process_descriptor_indexing.h
+    gpuav/instrumentation/mesh_shading.cpp
     gpuav/instrumentation/post_process_descriptor_indexing.cpp
+    gpuav/instrumentation/ray_query.cpp
+    gpuav/instrumentation/ray_hit_object.cpp
+    gpuav/instrumentation/register_validation.h
+    gpuav/instrumentation/sanitizer.cpp
+    gpuav/instrumentation/vertex_attribute_fetch_oob.cpp
     gpuav/resources/gpuav_state_trackers.cpp
     gpuav/resources/gpuav_state_trackers.h
     gpuav/resources/gpuav_shader_resources.h
@@ -345,8 +354,9 @@ target_sources(vvl PRIVATE
     gpuav/shaders/gpuav_error_header.h
     gpuav/shaders/gpuav_shaders_constants.h
     gpuav/shaders/validation_cmd/push_data.h
+    legacy/legacy_manual.cpp
+    object_tracker/object_lifetime_validation.cpp
     object_tracker/object_lifetime_validation.h
-    object_tracker/object_tracker_utils.cpp
     state_tracker/bind_point.h
     state_tracker/buffer_state.cpp
     state_tracker/buffer_state.h
@@ -355,6 +365,8 @@ target_sources(vvl PRIVATE
     state_tracker/data_graph_pipeline_session_state.cpp
     state_tracker/data_graph_pipeline_session_state.h
     state_tracker/descriptor_mode.h
+    state_tracker/descriptor_set_layouts.cpp
+    state_tracker/descriptor_set_layouts.h
     state_tracker/descriptor_sets.cpp
     state_tracker/descriptor_sets.h
     state_tracker/device_generated_commands_state.cpp
@@ -393,6 +405,7 @@ target_sources(vvl PRIVATE
     state_tracker/ray_tracing_state.h
     state_tracker/render_pass_state.cpp
     state_tracker/render_pass_state.h
+    state_tracker/sampler_state.cpp
     state_tracker/sampler_state.h
     state_tracker/shader_instruction.cpp
     state_tracker/shader_instruction.h
@@ -405,6 +418,9 @@ target_sources(vvl PRIVATE
     state_tracker/state_tracker.cpp
     state_tracker/state_tracker.h
     state_tracker/submission_reference.h
+    state_tracker/subresource_adapter.cpp
+    state_tracker/subresource_adapter.h
+    state_tracker/vertex_index_buffer_state.cpp
     state_tracker/vertex_index_buffer_state.h
     state_tracker/video_session_state.cpp
     state_tracker/video_session_state.h
@@ -413,6 +429,7 @@ target_sources(vvl PRIVATE
     stateless/sl_buffer.cpp
     stateless/sl_cmd_buffer_dynamic.cpp
     stateless/sl_cmd_buffer.cpp
+    stateless/sl_data_graph.cpp
     stateless/sl_descriptor.cpp
     stateless/sl_device_generated_commands.cpp
     stateless/sl_device_memory.cpp
@@ -422,6 +439,8 @@ target_sources(vvl PRIVATE
     stateless/sl_instance_device.cpp
     stateless/sl_pipeline.cpp
     stateless/sl_ray_tracing.cpp
+    stateless/sl_ray_tracing_micromap.cpp
+    stateless/sl_ray_tracing_nv.cpp
     stateless/sl_render_pass.cpp
     stateless/sl_shader_object.cpp
     stateless/sl_spirv.cpp
@@ -436,6 +455,8 @@ target_sources(vvl PRIVATE
     sync/sync_access_context.cpp
     sync/sync_access_context.h
     sync/sync_access_flags.h
+    sync/sync_access_map.cpp
+    sync/sync_access_map.h
     sync/sync_access_state.cpp
     sync/sync_access_state.h
     sync/sync_barrier.cpp
@@ -446,6 +467,7 @@ target_sources(vvl PRIVATE
     sync/sync_common.h
     sync/sync_error_messages.cpp
     sync/sync_error_messages.h
+    sync/sync_hazard_detection.cpp
     sync/sync_image.cpp
     sync/sync_image.h
     sync/sync_op.cpp
@@ -465,6 +487,8 @@ target_sources(vvl PRIVATE
     thread_tracker/thread_safety_validation.h
     utils/shader_utils.cpp
     utils/shader_utils.h
+    utils/spirv_tools_utils.cpp
+    utils/spirv_tools_utils.h
     layer_options.cpp
     layer_options.h
     layer_options_validation.h
@@ -504,14 +528,16 @@ if(VULKANSC)
     )
 endif()
 
-set(GPUAV_SHADERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/gpuav/shaders")
-file(GLOB_RECURSE GPUAV_SHADERS
-    "${GPUAV_SHADERS_DIR}/*.vert"
-    "${GPUAV_SHADERS_DIR}/*.comp"
-    "${GPUAV_SHADERS_DIR}/*.h"
-)
-add_custom_target(Shaders ALL SOURCES ${GPUAV_SHADERS})
-source_group(TREE ${GPUAV_SHADERS_DIR} PREFIX "GPU-AV Shaders" FILES ${GPUAV_SHADERS})
+if(MSVC)
+    set(GPUAV_SHADERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/gpuav/shaders")
+    file(GLOB_RECURSE GPUAV_SHADERS
+        "${GPUAV_SHADERS_DIR}/*.vert"
+        "${GPUAV_SHADERS_DIR}/*.comp"
+        "${GPUAV_SHADERS_DIR}/*.h"
+    )
+    add_custom_target(Shaders SOURCES ${GPUAV_SHADERS})
+    source_group(TREE ${GPUAV_SHADERS_DIR} PREFIX "GPU-AV Shaders" FILES ${GPUAV_SHADERS})
+endif()
 
 option(BUILD_SELF_VVL "Setup a VVL build that will be used for self validation" FALSE)
 if (BUILD_SELF_VVL)
@@ -652,6 +678,19 @@ configure_file(${INPUT_FILE} ${INTERMEDIATE_FILE} @ONLY)
 add_custom_command(TARGET vvl POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${INTERMEDIATE_FILE} $<TARGET_FILE_DIR:vvl>/${OUTPUT_FILE_FINAL_NAME}
 )
+
+# Auto generate vk_layer_settings.txt upon setting changes
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_custom_command(
+    OUTPUT "${VVL_SOURCE_DIR}/layers/vk_layer_settings.txt" "${VVL_SOURCE_DIR}/layers/layer_options_validation.h"
+    COMMAND Python3::Interpreter "scripts/generate_settings.py"
+    DEPENDS "${VVL_SOURCE_DIR}/layers/VkLayer_khronos_validation.json.in"
+    WORKING_DIRECTORY ${VVL_SOURCE_DIR}
+)
+add_custom_target(vvl_generated_setting_files
+    DEPENDS "${VVL_SOURCE_DIR}/layers/vk_layer_settings.txt" "${VVL_SOURCE_DIR}/layers/layer_options_validation.h"
+)
+add_dependencies(vvl vvl_generated_setting_files)
 
 # For UNIX-based systems, `library_path` should not contain a relative path (indicated by "./") before installing to system directories
 # This json isn't used for regular local development, it's used for installation

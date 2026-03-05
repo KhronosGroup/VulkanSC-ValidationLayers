@@ -9,8 +9,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/data_graph_objects.h"
+#include "layer_validation_tests.h"
+#include "data_graph_objects.h"
 
 class PositiveDataGraph : public DataGraphTest {};
 
@@ -20,18 +20,18 @@ void DataGraphTest::InitBasicDataGraph() {
     AddRequiredExtensions(VK_ARM_DATA_GRAPH_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::tensors);
     AddRequiredFeature(vkt::Feature::dataGraph);
+    AddRequiredFeature(vkt::Feature::dataGraphShaderModule);
     AddRequiredFeature(vkt::Feature::shaderTensorAccess);
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     AddRequiredFeature(vkt::Feature::shaderInt8);
-    AddRequiredFeature(vkt::Feature::shaderInt16);
-    AddRequiredFeature(vkt::Feature::shaderInt64);
 }
 
-const std::string DataGraphTest::IncorrectSpirvMessage{"test incorrect. Possible causes: incorrect spirv, or inconsistency between spirv and tensor/constant declarations\n"} ;
+const std::string DataGraphTest::IncorrectSpirvMessage{"test incorrect. Possible causes: incorrect spirv, or inconsistency between spirv and tensor/constant declarations\n"};
+const VkTensorDescriptionARM DataGraphTest::defaultConstantTensorDesc{DefaultConstantTensorDesc()};
 
 void DataGraphTest::CheckSessionMemory(const vkt::DataGraphPipelineSession& session) {
     const auto &mem_reqs = session.MemReqs();
-    if (mem_reqs.size() == 0) {
+    if (mem_reqs.empty()) {
         GTEST_FAIL() << "No bind points, " << IncorrectSpirvMessage;
     }
     for (uint32_t i = 0; i < mem_reqs.size(); i++) {
@@ -52,8 +52,8 @@ std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> DataGraphTest::InitSess
 
         for (uint32_t j = 0; j < bind_point_reqs[i].numObjects; j++) {
             session_bind_infos[req_i] = vku::InitStructHelper();
-            session_bind_infos[req_i].session = session.handle();
-            session_bind_infos[req_i].memory = device_mem[req_i].handle();
+            session_bind_infos[req_i].session = session;
+            session_bind_infos[req_i].memory = device_mem[req_i];
             session_bind_infos[req_i].bindPoint = bind_point_reqs[req_i].bindPoint;
             session_bind_infos[req_i].objectIndex = j;
             req_i++;
@@ -62,6 +62,41 @@ std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> DataGraphTest::InitSess
     return session_bind_infos;
 }
 
+// Trivial rank 1 tensor
+VkTensorDescriptionARM DataGraphTest::DefaultDesc() {
+    VkTensorDescriptionARM desc = vku::InitStructHelper();
+    static const std::vector<int64_t> dimensions{2};
+    desc.tiling = VK_TENSOR_TILING_LINEAR_ARM;
+    desc.format = VK_FORMAT_R8_SINT;
+    desc.dimensionCount = dimensions.size();
+    desc.pDimensions = dimensions.data();
+    desc.pStrides = nullptr;
+    desc.usage = VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM;
+    return desc;
+}
+
+// Tensor description for constant in GetSpirvModifyableDataGraph and GetSpirvMultiEntryTwoDataGraph
+VkTensorDescriptionARM DataGraphTest::DefaultConstantTensorDesc() {
+    VkTensorDescriptionARM desc = vku::InitStructHelper();
+    static std::vector<int64_t> dimensions{1, 2, 4, 4};
+    desc.tiling = VK_TENSOR_TILING_LINEAR_ARM;
+    desc.format = VK_FORMAT_R8_UINT;
+    desc.dimensionCount = dimensions.size();
+    desc.pDimensions = dimensions.data();
+    desc.usage = VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM;
+    return desc;
+}
+
+// Constant for GetSpirvModifyableDataGraph and GetSpirvMultiEntryTwoDataGraph
+VkDataGraphPipelineConstantARM DataGraphTest::GetConstant(const VkTensorDescriptionARM& desc) {
+    VkDataGraphPipelineConstantARM constant = vku::InitStructHelper();
+    constant.id = 0;
+    // buffer size correct for DefaultConstantTensorDesc
+    static std::array<uint8_t, 32> constant_data;
+    constant.pConstantData = constant_data.data();
+    constant.pNext = &desc;
+    return constant;
+}
 
 TEST_F(PositiveDataGraph, ExecuteDataGraph) {
     TEST_DESCRIPTION("Create and execute a datagraph");
@@ -72,7 +107,7 @@ TEST_F(PositiveDataGraph, ExecuteDataGraph) {
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
-    session_ci.dataGraphPipeline = pipeline.Handle();
+    session_ci.dataGraphPipeline = pipeline;
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
     session.GetMemoryReqs();
     CheckSessionMemory(session);
@@ -83,15 +118,15 @@ TEST_F(PositiveDataGraph, ExecuteDataGraph) {
     auto session_bind_infos = InitSessionBindInfo(session, device_mem);
     vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
 
-    pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.in_tensor_view_.handle(), 0);
-    pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.out_tensor_view_.handle(), 0);
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.tensor_views_[0]->handle(), 0);
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.tensor_views_[1]->handle(), 0);
     pipeline.descriptor_set_->UpdateDescriptorSets();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.Handle());
-    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_.handle(), 0, 1,
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
                               &pipeline.descriptor_set_.get()->set_, 0, nullptr);
-    vk::CmdDispatchDataGraphARM(m_command_buffer, session.handle(), nullptr);
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
     m_command_buffer.End();
 
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -113,7 +148,7 @@ TEST_F(PositiveDataGraph, DISABLED_ProtectedMemoryDataGraph) {
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
-    session_ci.dataGraphPipeline = pipeline.Handle();
+    session_ci.dataGraphPipeline = pipeline;
     session_ci.flags = VK_DATA_GRAPH_PIPELINE_SESSION_CREATE_PROTECTED_BIT_ARM;
 
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
@@ -122,19 +157,18 @@ TEST_F(PositiveDataGraph, DISABLED_ProtectedMemoryDataGraph) {
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem, true);
-
     auto session_bind_infos = InitSessionBindInfo(session, device_mem);
     vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
 
-    pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.in_tensor_view_.handle(), 0);
-    pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.out_tensor_view_.handle(), 0);
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.tensor_views_[0]->handle(), 0);
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.tensor_views_[1]->handle(), 0);
     pipeline.descriptor_set_->UpdateDescriptorSets();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.Handle());
-    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_.handle(), 0, 1,
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
                               &pipeline.descriptor_set_.get()->set_, 0, nullptr);
-    vk::CmdDispatchDataGraphARM(m_command_buffer, session.handle(), nullptr);
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
     m_command_buffer.End();
 
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -149,7 +183,7 @@ TEST_F(PositiveDataGraph, ShaderModuleInPNext) {
 
     // create a ShaderModule to add in the pNext chain
     spvtools::SpirvTools tools{SPV_ENV_UNIVERSAL_1_6};
-    const std::string& spirv_source = vkt::dg::DataGraphPipelineHelper::GetSpirvSourceGraph();
+    const std::string& spirv_source = vkt::dg::DataGraphPipelineHelper::GetSpirvBasicDataGraph();
     std::vector<uint32_t> spirv_binary;
     if (!tools.Assemble(spirv_source, &spirv_binary)) {
         Monitor().SetError("Failed to compile SPIRV shader module");
@@ -184,26 +218,6 @@ TEST_F(PositiveDataGraph, ShaderModuleInPNext) {
     }
 }
 
-TEST_F(PositiveDataGraph, DataGraphAndComputeEntrypoints) {
-    TEST_DESCRIPTION("Create datagraph from spirv including Compute entrypoint.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
-
-    // get spirv with 1 DataGraph and 1 Compute entrypoints
-    // NOTE: both OpEntrypoint and OpGraphEntryPointARM are named 'main'
-    const std::string mixed_entrypoints_spirv = vkt::dg::DataGraphPipelineHelper::GetSpirvMultiEntryComputeAndDataGraph();
-
-    // create graph at datagraph entrypoint
-    {
-        vkt::dg::HelperParameters params;
-        params.spirv_source = mixed_entrypoints_spirv.c_str();
-        params.entrypoint = "main";
-        vkt::dg::DataGraphPipelineHelper pipeline(*this, params);
-
-        pipeline.CreateDataGraphPipeline();
-    }
-}
-
 TEST_F(PositiveDataGraph, DataGraphMultipleEntrypoints) {
     TEST_DESCRIPTION("Execute 2 different entrypoints in the datagraph's spirv.");
     InitBasicDataGraph();
@@ -214,6 +228,8 @@ TEST_F(PositiveDataGraph, DataGraphMultipleEntrypoints) {
 
     // create graph at entrypoint 1
     {
+        // NOTE: even though there is an OpGraphConstantARM in the spirv, we don't need to initialize any
+        // resource, as it is NOT used in this entrypoint
         vkt::dg::HelperParameters params;
         params.spirv_source = two_entrypoint_spirv.c_str();
         params.entrypoint = "entrypoint_1";
@@ -223,10 +239,76 @@ TEST_F(PositiveDataGraph, DataGraphMultipleEntrypoints) {
 
     // create graph at entrypoint 2
     {
+        // NOTE: this entrypoint uses the OpGraphConstantARM in the spirv, so we have to provide a matching object
         vkt::dg::HelperParameters params;
         params.spirv_source = two_entrypoint_spirv.c_str();
         params.entrypoint = "entrypoint_2";
         vkt::dg::DataGraphPipelineHelper pipeline(*this, params);
+
+        VkDataGraphPipelineConstantARM constant = GetConstant();
+        pipeline.shader_module_ci_.constantCount = 1;
+        pipeline.shader_module_ci_.pConstants = &constant;
+
         pipeline.CreateDataGraphPipeline();
     }
+}
+
+TEST_F(PositiveDataGraph, CmdDispatchDescriptorBuffer) {
+    TEST_DESCRIPTION("Dispatch a datagraph using descriptor buffers.");
+    InitBasicDataGraph();
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::dataGraphDescriptorBuffer);
+    RETURN_IF_SKIP(Init());
+
+    vkt::dg::DataGraphPipelineHelper pipeline(*this);
+
+    // create a pipeline layout with the required flags
+    VkDescriptorSetLayoutCreateInfo dsl_ci = vku::InitStructHelper();
+    dsl_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    dsl_ci.bindingCount = pipeline.descriptor_set_layout_bindings_.size();
+    dsl_ci.pBindings = pipeline.descriptor_set_layout_bindings_.data();
+
+    vkt::DescriptorSetLayout dsl(*m_device, dsl_ci);
+    vkt::PipelineLayout pipeline_layout(*m_device, {&dsl});
+    ASSERT_TRUE(pipeline_layout.initialized());
+
+    // set layout and flags for descriptor buffer
+    pipeline.pipeline_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    pipeline.pipeline_ci_.layout = pipeline_layout;
+    pipeline.CreateDataGraphPipeline();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = pipeline.Handle();
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    session.GetMemoryReqs();
+    CheckSessionMemory(session);
+
+    auto &bind_point_reqs = session.BindPointReqs();
+    std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
+    session.AllocSessionMem(device_mem);
+    auto session_bind_infos = InitSessionBindInfo(session, device_mem);
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
+
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.tensor_views_[0]->handle(), 0);
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.tensor_views_[1]->handle(), 0);
+    pipeline.descriptor_set_->UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.Handle());
+
+    vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
+    VkDescriptorBufferBindingInfoEXT dbbi = vku::InitStructHelper();
+    dbbi.address = buffer.Address();
+    dbbi.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &dbbi);
+    uint32_t index = 0;
+    VkDeviceSize offset = 0;
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline_layout, 0, 1, &index, &offset);
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
 }

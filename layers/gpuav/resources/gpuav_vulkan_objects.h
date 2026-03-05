@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2025 The Khronos Group Inc.
- * Copyright (c) 2018-2025 Valve Corporation
- * Copyright (c) 2018-2025 LunarG, Inc.
+/* Copyright (c) 2018-2026 The Khronos Group Inc.
+ * Copyright (c) 2018-2026 Valve Corporation
+ * Copyright (c) 2018-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,7 +62,8 @@ class Buffer {
     void FlushAllocation(VkDeviceSize offset = 0, VkDeviceSize size = VK_WHOLE_SIZE) const;
     void InvalidateAllocation(VkDeviceSize offset = 0, VkDeviceSize size = VK_WHOLE_SIZE) const;
 
-    [[nodiscard]] bool Create(const VkBufferCreateInfo *buffer_create_info, const VmaAllocationCreateInfo *allocation_create_info);
+    [[nodiscard]] VkResult Create(const VkBufferCreateInfo* buffer_create_info,
+                                  const VmaAllocationCreateInfo* allocation_create_info);
     void Destroy();
 
     bool IsDestroyed() const { return buffer == VK_NULL_HANDLE; }
@@ -90,8 +91,11 @@ struct BufferRange {
     VkDeviceAddress offset_address = 0;
     VmaAllocation vma_alloc = VK_NULL_HANDLE;  // Todo: get rid of this once host cached allocation are removed
 
+    VkDescriptorBufferInfo GetDescriptorBufferInfo() const { return {buffer, offset, size}; }
     void Clear() const;
 };
+
+void CmdSynchronizedCopyBufferRange(VkCommandBuffer cb, const vko::BufferRange &dst, const vko::BufferRange &src);
 
 // Register/Create and register GPU resources, all to be destroyed upon a call to DestroyResources
 class GpuResourcesManager {
@@ -142,8 +146,8 @@ class GpuResourcesManager {
 
         struct CachedBufferBlock {
             vko::Buffer buffer;
-            vvl::range<VkDeviceSize> total_range;
-            vvl::range<VkDeviceSize> used_range;
+            vvl::range<VkDeviceAddress> total_range;
+            vvl::range<VkDeviceAddress> used_range;
         };
 
         std::vector<CachedBufferBlock> cached_buffers_blocks_{};
@@ -219,11 +223,18 @@ class CommandPool {
 };
 
 // Cache a single object of type T. Key is *only* based on typeid(T)
+// Set "thread_safe" to true if the caches needs to be.
+template <bool thread_safe>
 class SharedResourcesCache {
   public:
     // Try get an object, returns null if not found
     template <typename T>
     T *TryGet() {
+        std::unique_lock<std::mutex> lock(mtx, std::defer_lock);
+        if (thread_safe) {
+            lock.lock();
+        }
+
         auto entry = shared_validation_resources_map_.find(typeid(T));
         if (entry == shared_validation_resources_map_.cend()) {
             return nullptr;
@@ -233,6 +244,11 @@ class SharedResourcesCache {
     }
     template <typename T>
     const T *TryGet() const {
+        std::unique_lock<std::mutex> lock(mtx, std::defer_lock);
+        if (thread_safe) {
+            lock.lock();
+        }
+
         auto entry = shared_validation_resources_map_.find(typeid(T));
         if (entry == shared_validation_resources_map_.cend()) {
             return nullptr;
@@ -262,8 +278,13 @@ class SharedResourcesCache {
     template <typename T, class... ConstructorTypes>
     T &GetOrCreate(ConstructorTypes &&...args) {
         T *t = TryGet<T>();
-        if (t) return *t;
-
+        if (t) {
+            return *t;
+        }
+        std::unique_lock<std::mutex> lock(mtx, std::defer_lock);
+        if (thread_safe) {
+            lock.lock();
+        }
         auto entry =
             shared_validation_resources_map_.insert({typeid(T), {new T(std::forward<ConstructorTypes>(args)...), [](void *ptr) {
                                                                      auto obj = static_cast<T *>(ptr);
@@ -272,7 +293,13 @@ class SharedResourcesCache {
         return *static_cast<T *>(entry.first->second.first);
     }
 
-    void Clear();
+    void Clear() {
+        for (auto &[key, value] : shared_validation_resources_map_) {
+            auto &[object, destructor] = value;
+            destructor(object);
+        }
+        shared_validation_resources_map_.clear();
+    }
 
   private:
     using TypeInfoRef = std::reference_wrapper<const std::type_info>;
@@ -282,7 +309,7 @@ class SharedResourcesCache {
     struct EqualTo {
         bool operator()(TypeInfoRef lhs, TypeInfoRef rhs) const { return lhs.get() == rhs.get(); }
     };
-
+    mutable std::mutex mtx;
     vvl::unordered_map<TypeInfoRef, std::pair<void * /*object*/, void (*)(void *) /*object destructor*/>, Hasher, EqualTo>
         shared_validation_resources_map_;
 };

@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,7 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/shader_object_helper.h"
 #include "../framework/render_pass_helper.h"
+#include "shader_helper.h"
 
 class NegativeShaderInterface : public VkLayerTest {};
 
@@ -93,11 +94,11 @@ TEST_F(NegativeShaderInterface, MaxVertexComponentsWithBuiltins) {
         "}\n";
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
-    VkShaderObj vs(this, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
     m_errorMonitor->VerifyFound();
     // maxFragmentInputComponents is not reached because GLSL should not be including any input fragment stage built-ins by default
     // only maxVertexOutputComponents is reached
-    VkShaderObj fs(this, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
 TEST_F(NegativeShaderInterface, MaxFragmentComponentsWithBuiltins) {
@@ -159,10 +160,10 @@ TEST_F(NegativeShaderInterface, MaxFragmentComponentsWithBuiltins) {
 
     // maxVertexOutputComponents is not reached because GLSL should not be including any output vertex stage built-ins
     // only maxFragmentInputComponents is reached
-    VkShaderObj vs(this, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
-    VkShaderObj fs(this, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
     m_errorMonitor->VerifyFound();
 }
 
@@ -207,20 +208,20 @@ TEST_F(NegativeShaderInterface, MaxVertexOutputComponents) {
 
         switch (overflow) {
             case 0: {
-                VkShaderObj vs(this, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
+                VkShaderObj vs(*m_device, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
                 break;
             }
             case 1: {
                 // component and location limit (maxVertexOutputComponents)
                 m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
-                VkShaderObj vs(this, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
+                VkShaderObj vs(*m_device, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
                 m_errorMonitor->VerifyFound();
                 break;
             }
             case 2: {
                 // just component limit (maxVertexOutputComponents)
                 m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
-                VkShaderObj vs(this, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
+                VkShaderObj vs(*m_device, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
                 m_errorMonitor->VerifyFound();
                 break;
             }
@@ -281,12 +282,12 @@ TEST_F(NegativeShaderInterface, MaxComponentsBlocks) {
 
     // maxVertexOutputComponents
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
-    VkShaderObj vs(this, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSourceStr.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
     m_errorMonitor->VerifyFound();
 
     // maxFragmentInputComponents
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
-    VkShaderObj fs(this, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
     m_errorMonitor->VerifyFound();
 }
 
@@ -334,20 +335,20 @@ TEST_F(NegativeShaderInterface, MaxFragmentInputComponents) {
 
         switch (overflow) {
             case 0: {
-                VkShaderObj fs(this, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
+                VkShaderObj fs(*m_device, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
                 break;
             }
             case 1: {
                 // (maxFragmentInputComponents)
                 m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
-                VkShaderObj fs(this, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
+                VkShaderObj fs(*m_device, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
                 m_errorMonitor->VerifyFound();
                 break;
             }
             case 2: {
                 // (maxFragmentInputComponents)
                 m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
-                VkShaderObj fs(this, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
+                VkShaderObj fs(*m_device, fsSourceStr.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
                 m_errorMonitor->VerifyFound();
                 break;
             }
@@ -375,7 +376,7 @@ TEST_F(NegativeShaderInterface, FragmentInputNotProvided) {
            color = vec4(x);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -402,7 +403,7 @@ TEST_F(NegativeShaderInterface, FragmentInputNotProvidedInBlock) {
         }
     )glsl";
 
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -435,8 +436,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatch) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -469,8 +470,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatch2) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         // Flipped here
@@ -506,8 +507,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchInBlock) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -540,8 +541,59 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSize) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    const auto set_info = [&](CreatePipelineHelper &helper) {
+        helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    };
+    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-maintenance4-06817");
+}
+
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchLongVectorSize) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    TEST_DESCRIPTION("OpTypeVector has larger output than input");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::longVector);
+    AddRequiredExtensions(VK_EXT_SHADER_LONG_VECTOR_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const char *vsSource = R"glsl(
+        #version 450
+        layout(location=0) out vec4 x;
+        void main(){
+           gl_Position = vec4(1.0);
+        }
+    )glsl";
+    // fs declares a vec3 input
+    const char *fsSource = R"(
+               OpCapability Shader
+               OpCapability LongVectorEXT
+               OpExtension "SPV_EXT_long_vector"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %v
+               OpExecutionMode %main OriginUpperLeft
+               OpDecorate %v Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+         %u3 = OpConstant %uint 3
+    %vfloat  = OpTypeVectorIdEXT %float %u3
+     %ptr_in = OpTypePointer Input %vfloat
+          %v = OpVariable %ptr_in Input
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -597,8 +649,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -651,8 +703,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct64bit) {
         void main(){}
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -708,8 +760,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockArrayOfStruct) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -768,8 +820,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructInnerArraySize) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -830,8 +882,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuterArraySize) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -891,8 +943,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructArraySizeVertex) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -946,8 +998,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuter2DArraySize) {
         void main(){}
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1011,8 +1063,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructType64bit) {
         void main(){}
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1075,8 +1127,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructArray) {
         void main(){}
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1111,8 +1163,8 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByLocation) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1147,8 +1199,8 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByComponent) {
         }
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1263,8 +1315,8 @@ TEST_F(NegativeShaderInterface, InputOutputMismatch) {
            color = vec4(v);
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1292,7 +1344,7 @@ TEST_F(NegativeShaderInterface, VertexOutputNotConsumed) {
            x = 0;
         }
     )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
@@ -1322,7 +1374,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                     b = 0.75f;
                 }
             )glsl";
-        VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
         const char *fsSource = R"glsl(
                 #version 450
@@ -1335,7 +1387,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                     color = vec4(rgb, 1.0f);
                 }
             )glsl";
-        VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+        VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1352,7 +1404,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                 void main() {
                 }
             )glsl";
-        VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
         const char *fsSource = R"glsl(
                 #version 450
@@ -1366,7 +1418,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                     color = vec4(1.0f);
                 }
             )glsl";
-        VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+        VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1384,7 +1436,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                     v = vec3(1.0);
                 }
             )glsl";
-        VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
         const char *fsSource = R"glsl(
                 #version 450
@@ -1397,7 +1449,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                     color = v;
                 }
             )glsl";
-        VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+        VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1415,7 +1467,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                     v = vec3(1.0);
                 }
             )glsl";
-        VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
         const char *fsSource = R"glsl(
                 #version 450
@@ -1426,7 +1478,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                     color = vec4(1.0);
                 }
             )glsl";
-        VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+        VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1448,7 +1500,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                     v3 = vec3(3.0);
                 }
             )glsl";
-        VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
         const char *fsSource = R"glsl(
                 #version 450
@@ -1462,7 +1514,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
                     color = vec4(v1 * v3, 1.0);
                 }
             )glsl";
-        VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+        VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1479,7 +1531,7 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageOutputLocation0) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget(0u);
 
-    VkShaderObj fs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineMultisampleStateCreateInfo ms_state_ci = vku::InitStructHelper();
     ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -1507,7 +1559,7 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageOutputIndex1) {
             c0 = vec4(0.0f);
         }
     )glsl";
-    VkShaderObj fs(this, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineMultisampleStateCreateInfo ms_state_ci = vku::InitStructHelper();
     ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -1536,7 +1588,7 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageOutputNoAlpha) {
            x = vec3(1);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineMultisampleStateCreateInfo ms_state_ci = vku::InitStructHelper();
     ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -1564,7 +1616,7 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageArrayIndex) {
             fragData[0] = vec4(1.0);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineMultisampleStateCreateInfo ms_state_ci = vku::InitStructHelper();
     ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -1592,7 +1644,7 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageArrayVec3) {
             fragData[0] = vec3(1.0);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineMultisampleStateCreateInfo ms_state_ci = vku::InitStructHelper();
     ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -1629,8 +1681,8 @@ TEST_F(NegativeShaderInterface, MultidimensionalArray) {
         void main(){}
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1662,8 +1714,8 @@ TEST_F(NegativeShaderInterface, MultidimensionalArrayDim) {
         void main(){}
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1700,8 +1752,8 @@ TEST_F(NegativeShaderInterface, MultidimensionalArray64bit) {
         void main(){}
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1731,8 +1783,8 @@ TEST_F(NegativeShaderInterface, PackingInsideArray) {
         void main(){}
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1740,8 +1792,7 @@ TEST_F(NegativeShaderInterface, PackingInsideArray) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
-TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWritten) {
+TEST_F(NegativeShaderInterface, FragmentOutputNotWritten) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
@@ -1751,19 +1802,22 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWritten) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    // Nothing is written
-    VkShaderObj fs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    const char *fs_source = R"glsl(
+        #version 450
+        layout(location = 0) out vec4 uFragColor; // not written to
+        void main() {}
+    )glsl";
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced");
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-OutputNotWritten");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
 
-// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
-TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenDynamicRendering) {
+TEST_F(NegativeShaderInterface, FragmentOutputNotWrittenDynamicRendering) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -1771,8 +1825,12 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenDynamicRenderin
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    // Nothing is written
-    VkShaderObj fs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    const char *fs_source = R"glsl(
+        #version 450
+        layout(location = 0) out vec4 uFragColor; // not written to
+        void main() {}
+    )glsl";
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
     VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
@@ -1787,15 +1845,14 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenDynamicRenderin
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced-DynamicRendering");
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-OutputNotWritten-DynamicRendering");
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRendering();
     m_command_buffer.End();
 }
 
-// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
-TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenDynamicRenderingShaderObject) {
+TEST_F(NegativeShaderInterface, FragmentOutputNotWrittenDynamicRenderingShaderObject) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -1805,9 +1862,14 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenDynamicRenderin
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
+    const char *fs_source = R"glsl(
+        #version 450
+        layout(location = 0) out vec4 uFragColor; // not written to
+        void main() {}
+    )glsl";
+
     const vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl));
-    const vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT,
-                                  GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kMinimalShaderGlsl));
+    const vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fs_source));
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
@@ -1815,7 +1877,7 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenDynamicRenderin
     m_command_buffer.BindShaders(vert_shader, frag_shader);
     VkColorComponentFlags color_write_mask = 0xf;  // all
     vk::CmdSetColorWriteMaskEXT(m_command_buffer, 0, 1, &color_write_mask);
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced-DynamicRendering");
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-OutputNotWritten-DynamicRendering");
     vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRendering();
@@ -1823,6 +1885,7 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenDynamicRenderin
 }
 
 // TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923
+// also https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
 TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArray) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
@@ -1836,17 +1899,15 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArray) {
             uFragColor[0] = vec4(0);
         }
     )glsl";
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddColorAttachment(0);
-    rp.AddColorAttachment(1);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddColorAttachment(1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.CreateRenderPass();
 
     VkPipelineColorBlendAttachmentState color_blends[2];
@@ -1860,12 +1921,13 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArray) {
     pipe.cb_ci_.attachmentCount = 2;
     pipe.cb_ci_.pAttachments = color_blends;
     pipe.gp_ci_.renderPass = rp;
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced");
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-OutputNotWritten");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
 
 // TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923
+// also https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
 TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArrayDynamicRendering) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
@@ -1881,7 +1943,7 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArrayDynamicRen
             uFragColor[0] = vec4(0);
         }
     )glsl";
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkFormat color_formats[2] = {VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM};
     VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
@@ -1915,7 +1977,7 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArrayDynamicRen
     m_command_buffer.Begin();
     m_command_buffer.BeginRendering(rendering_info);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced-DynamicRendering");
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-OutputNotWritten-DynamicRendering");
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRendering();
@@ -1940,7 +2002,7 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputTypeMismatch) {
         }
     )glsl";
 
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1964,7 +2026,7 @@ TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRendering) {
         }
     )glsl";
 
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
     VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
@@ -2005,7 +2067,7 @@ TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRenderingLocalR
         }
     )glsl";
 
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     static constexpr uint32_t locations[] = {VK_ATTACHMENT_UNUSED, 0};
     VkRenderingAttachmentLocationInfo locations_info = vku::InitStructHelper();
@@ -2120,7 +2182,7 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotConsumed) {
            y = vec4(1);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -2146,7 +2208,7 @@ TEST_F(NegativeShaderInterface, FragmentOutputNotConsumedDynamicRendering) {
            y = vec4(1);
         }
     )glsl";
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
     VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
@@ -2338,12 +2400,11 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBuffer) {
     )";
 
     m_errorMonitor->SetDesiredWarning("VUID-StandaloneSpirv-Input-09557");
-    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
 
-// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
-TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachment) {
+TEST_F(NegativeShaderInterface, MultipleFragmentAttachment) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923");
@@ -2353,12 +2414,13 @@ TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachment) {
         #version 450
         layout(location=0) out vec4 color0;
         layout(location=1) out vec4 color1;
+        layout(location=2) out vec4 color2;
         void main() {
            color0 = vec4(1.0);
            color1 = vec4(1.0);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -2367,12 +2429,9 @@ TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachment) {
                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddAttachmentReference({2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddColorAttachment(0);
-    rp.AddColorAttachment(1);
-    rp.AddColorAttachment(2);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddColorAttachment(1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddColorAttachment(2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.CreateRenderPass();
 
     VkPipelineColorBlendAttachmentState color_blends[3];
@@ -2388,13 +2447,12 @@ TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachment) {
     pipe.cb_ci_.attachmentCount = 3;
     pipe.cb_ci_.pAttachments = color_blends;
     pipe.gp_ci_.renderPass = rp;
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced");
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-OutputNotWritten");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
 
-// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
-TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachmentDynamicRendering) {
+TEST_F(NegativeShaderInterface, MultipleFragmentAttachmentDynamicRendering) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -2406,12 +2464,13 @@ TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachmentDynamicRender
         #version 450
         layout(location=0) out vec4 color0;
         layout(location=1) out vec4 color1;
+        layout(location=2) out vec4 color2;
         void main() {
            color0 = vec4(1.0);
            color1 = vec4(1.0);
         }
     )glsl";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkFormat color_formats[3] = {VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM};
     VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
@@ -2448,7 +2507,7 @@ TEST_F(NegativeShaderInterface, DISABLED_MultipleFragmentAttachmentDynamicRender
     m_command_buffer.Begin();
     m_command_buffer.BeginRendering(rendering_info);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-    m_errorMonitor->SetDesiredWarning("Undefined-Value-ShaderOutputNotProduced-DynamicRendering");
+    m_errorMonitor->SetDesiredWarning("Undefined-Value-OutputNotWritten-DynamicRendering");
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRendering();
@@ -2498,13 +2557,12 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndex) {
                OpReturn
                OpFunctionEnd
     )";
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddInputAttachment(0);
-    rp.AddColorAttachment(0);
+    rp.AddInputAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     CreatePipelineHelper pipe(*this);
@@ -2570,7 +2628,7 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndexArray) {
                OpFunctionEnd
     )";
 
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -2685,7 +2743,7 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferArray) {
     )";
 
     m_errorMonitor->SetDesiredWarning("VUID-StandaloneSpirv-Input-09557");
-    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2737,7 +2795,7 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferLinkedList) {
     )";
 
     m_errorMonitor->SetDesiredWarning("VUID-StandaloneSpirv-Input-09557");
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2809,6 +2867,279 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferNested) {
     )";
 
     m_errorMonitor->SetDesiredWarning("VUID-StandaloneSpirv-PhysicalStorageBuffer64-06314");
-    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+// More interface checks that require deeping spirv matching
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11267
+TEST_F(NegativeShaderInterface, DISABLED_NestedStructInBlock) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    ASSERT_NO_FATAL_FAILURE(Init());
+    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+
+    const char vsSource[] = R"glsl(
+        #version 450
+        struct Foo {
+            vec2 a;
+        };
+        layout(location = 0) out block {
+            Foo foo;
+        } testBlock;
+        void main(void) {
+            testBlock.foo.a = vec2(0);
+        }
+    )glsl";
+
+    const char fsSource[] = R"glsl(
+        #version 450
+        layout(location = 0) out vec4 color;
+        struct Foo {
+            int a[8];
+            vec4 b;
+        };
+        layout(location = 0) in block {
+            Foo foo;
+        } testBlock;
+        void main(void) {
+            color = testBlock.foo.b;
+        }
+    )glsl";
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    auto set_info = [&](CreatePipelineHelper &info) { info.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()}; };
+    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-07754");
+}
+
+TEST_F(NegativeShaderInterface, MeshFragmentPerPrimitive) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const char *ms_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : require
+        layout(max_vertices = 12) out;
+        layout(max_primitives = 4) out;
+        layout(triangles) out;
+
+        layout(location = 0) out uint out_0[12];
+        layout(location = 1) perprimitiveEXT out uint out_1[4];
+        layout(location = 2) out float out_2[12];
+        layout(location = 3) perprimitiveEXT out float out_3[4];
+
+        void main() {
+            SetMeshOutputsEXT(12,4);
+            out_0[0] = 0;
+            out_1[0] = 0;
+            out_2[0] = 0.0;
+            out_3[0] = 0.0;
+            gl_PrimitiveTriangleIndicesEXT[1] = uvec3(0,1,2);
+        }
+    )glsl";
+
+    const char *fs_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : require
+
+        layout(location = 0) in flat uint in_0;
+        layout(location = 1) flat in uint in_1; // missing perprimitiveEXT
+        layout(location = 2) in float in_2;
+        layout(location = 3) perprimitiveEXT in float in_3;
+        layout(location = 0) out vec4 c;
+        void main(){
+            c = vec4(1);
+            if (in_0 == 0 && in_1 == 0 && in_2 == 1.0 && in_3 == 1.0) {
+                c = vec4(0);
+            }
+        }
+    )glsl";
+
+    VkShaderObj ms(*m_device, ms_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    m_errorMonitor->SetDesiredWarning("VUID-RuntimeSpirv-OpVariable-08746");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderInterface, MeshFragmentPerPrimitive2) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const char *ms_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : require
+        layout(max_vertices = 12) out;
+        layout(max_primitives = 4) out;
+        layout(triangles) out;
+
+        layout(location = 0) out float out_0[12];
+        layout(location = 1) out float out_1[12]; // missing perprimitiveEXT
+
+        void main() {
+            SetMeshOutputsEXT(12,4);
+            out_0[0] = 0.0;
+            out_1[0] = 0.0;
+            gl_PrimitiveTriangleIndicesEXT[1] = uvec3(0,1,2);
+        }
+    )glsl";
+
+    const char *fs_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : require
+
+        layout(location = 0) in float in_0;
+        layout(location = 1) in perprimitiveEXT float in_1;
+        layout(location = 0) out vec4 c;
+        void main(){
+            c = vec4(1);
+            if (in_0 == 1.0 && in_1 == 1.0) {
+                c = vec4(0);
+            }
+        }
+    )glsl";
+
+    VkShaderObj ms(*m_device, ms_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    m_errorMonitor->SetDesiredWarning("VUID-RuntimeSpirv-OpVariable-08746");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderInterface, MeshFragmentPerPrimitiveSlang) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    // https://godbolt.org/z/ov4G4K19a
+    // Known issue in slang https://github.com/shader-slang/slang/issues/7019
+    const char *spirv_source = R"(
+               OpCapability MeshShadingEXT
+               OpCapability Shader
+               OpExtension "SPV_KHR_non_semantic_info"
+               OpExtension "SPV_EXT_mesh_shader"
+          %2 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint MeshEXT %main "main" %38 %gl_Position %verts_normal %prims_color %75
+               OpEntryPoint Fragment %main_0 "main" %entryPointParam_main %gl_FragCoord %input_normal %prim_color
+               OpExecutionMode %main OutputPrimitivesEXT 3
+               OpExecutionMode %main OutputVertices 9
+               OpExecutionMode %main LocalSize 1 1 1
+               OpExecutionMode %main OutputTrianglesEXT
+               OpExecutionMode %main_0 OriginUpperLeft
+               OpSource Slang 1
+               OpDecorate %38 BuiltIn PrimitiveTriangleIndicesEXT
+               OpDecorate %gl_Position BuiltIn Position
+               OpDecorate %verts_normal Location 0
+               OpDecorate %prims_color Location 1
+               OpDecorate %prims_color PerPrimitiveEXT
+               OpDecorate %75 BuiltIn CullPrimitiveEXT
+               OpDecorate %75 PerPrimitiveEXT
+               OpDecorate %gl_FragCoord BuiltIn FragCoord
+               OpDecorate %input_normal Location 0
+               OpDecorate %prim_color Location 1
+               OpDecorate %prim_color Flat
+               OpDecorate %entryPointParam_main Location 0
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+     %uint_5 = OpConstant %uint 5
+         %12 = OpTypeFunction %void
+     %uint_0 = OpConstant %uint 0
+     %uint_6 = OpConstant %uint 6
+     %uint_2 = OpConstant %uint 2
+     %v3uint = OpTypeVector %uint 3
+        %int = OpTypeInt 32 1
+      %int_3 = OpConstant %int 3
+%_arr_v3uint_int_3 = OpTypeArray %v3uint %int_3
+%_ptr_Output__arr_v3uint_int_3 = OpTypePointer Output %_arr_v3uint_int_3
+%_ptr_Output_v3uint = OpTypePointer Output %v3uint
+         %41 = OpConstantComposite %v3uint %uint_0 %uint_0 %uint_0
+    %uint_18 = OpConstant %uint 18
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+      %int_9 = OpConstant %int 9
+%_arr_v4float_int_9 = OpTypeArray %v4float %int_9
+%_ptr_Output__arr_v4float_int_9 = OpTypePointer Output %_arr_v4float_int_9
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+    %uint_19 = OpConstant %uint 19
+    %uint_20 = OpConstant %uint 20
+%_arr_v4float_int_3 = OpTypeArray %v4float %int_3
+%_ptr_Output__arr_v4float_int_3 = OpTypePointer Output %_arr_v4float_int_3
+    %uint_21 = OpConstant %uint 21
+       %bool = OpTypeBool
+%_arr_bool_int_3 = OpTypeArray %bool %int_3
+%_ptr_Output__arr_bool_int_3 = OpTypePointer Output %_arr_bool_int_3
+%_ptr_Output_bool = OpTypePointer Output %bool
+       %true = OpConstantTrue %bool
+    %uint_25 = OpConstant %uint 25
+     %uint_8 = OpConstant %uint 8
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+    %uint_27 = OpConstant %uint 27
+         %38 = OpVariable %_ptr_Output__arr_v3uint_int_3 Output
+%gl_Position = OpVariable %_ptr_Output__arr_v4float_int_9 Output
+%verts_normal = OpVariable %_ptr_Output__arr_v4float_int_9 Output
+%prims_color = OpVariable %_ptr_Output__arr_v4float_int_3 Output
+         %75 = OpVariable %_ptr_Output__arr_bool_int_3 Output
+%gl_FragCoord = OpVariable %_ptr_Input_v4float Input
+%input_normal = OpVariable %_ptr_Input_v4float Input
+ %prim_color = OpVariable %_ptr_Input_v4float Input
+%entryPointParam_main = OpVariable %_ptr_Output_v4float Output
+    %float_0 = OpConstant %float 0
+        %123 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+       %main = OpFunction %void None %12
+         %13 = OpLabel
+               OpSetMeshOutputsEXT %uint_6 %uint_2
+         %40 = OpAccessChain %_ptr_Output_v3uint %38 %uint_0
+               OpStore %40 %41
+         %52 = OpAccessChain %_ptr_Output_v4float %gl_Position %uint_0
+               OpStore %52 %123
+         %61 = OpAccessChain %_ptr_Output_v4float %verts_normal %uint_0
+               OpStore %61 %123
+         %68 = OpAccessChain %_ptr_Output_v4float %prims_color %uint_0
+               OpStore %68 %123
+         %77 = OpAccessChain %_ptr_Output_bool %75 %uint_0
+               OpStore %77 %true
+               OpReturn
+               OpFunctionEnd
+     %main_0 = OpFunction %void None %12
+         %82 = OpLabel
+         %90 = OpLoad %v4float %gl_FragCoord
+         %93 = OpLoad %v4float %input_normal
+         %95 = OpLoad %v4float %prim_color
+        %100 = OpFAdd %v4float %95 %90
+        %101 = OpFAdd %v4float %100 %93
+               OpStore %entryPointParam_main %101
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    VkShaderObj ms(*m_device, spirv_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, spirv_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    m_errorMonitor->SetDesiredWarning("VUID-RuntimeSpirv-OpVariable-08746");
+    pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }

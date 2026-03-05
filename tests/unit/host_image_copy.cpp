@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
- * Copyright (c) 2023-2025 Google, Inc.
+ * Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
+ * Copyright (c) 2023-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -152,6 +152,35 @@ TEST_F(NegativeHostImageCopy, ImageOffset) {
     m_errorMonitor->SetDesiredError("VUID-VkCopyImageToMemoryInfo-imageOffset-09114");
     m_errorMonitor->SetDesiredError("VUID-VkCopyImageToMemoryInfo-srcImage-09115");
     vk::CopyImageToMemoryEXT(*m_device, &copy_from_image);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeHostImageCopy, ImageOffsetArrayLayer) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11627");
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    image_ci.arrayLayers = 2;
+    vkt::Image image(*m_device, image_ci);
+    image.SetLayout(layout);
+
+    uint8_t garbage = 0;  // should never be dereferenced
+
+    VkMemoryToImageCopy region_to_image = vku::InitStructHelper();
+    region_to_image.pHostPointer = &garbage;
+    region_to_image.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region_to_image.imageOffset = {0, 0, 0};
+    region_to_image.imageExtent = {width, height, 1};
+
+    VkCopyMemoryToImageInfo copy_to_image = vku::InitStructHelper();
+    copy_to_image.dstImage = image;
+    copy_to_image.dstImageLayout = layout;
+    copy_to_image.regionCount = 1;
+    copy_to_image.pRegions = &region_to_image;
+
+    copy_to_image.flags = VK_HOST_IMAGE_COPY_MEMCPY;
+    m_errorMonitor->SetDesiredError("VUID-VkCopyMemoryToImageInfo-dstImage-09115");
+    vk::CopyMemoryToImageEXT(*m_device, &copy_to_image);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1907,7 +1936,7 @@ TEST_F(NegativeHostImageCopy, TransitionImageLayoutNoMemory) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeHostImageCopy, TransitionImageLayoutUsage) {
+TEST_F(NegativeHostImageCopy, TransitionImageLayoutMissingUsage) {
     RETURN_IF_SKIP(InitHostImageCopyTest());
 
     VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
@@ -1922,6 +1951,128 @@ TEST_F(NegativeHostImageCopy, TransitionImageLayoutUsage) {
     image_no_transfer.SetLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     transition_info.image = image_no_transfer;
     m_errorMonitor->SetDesiredError("VUID-VkHostImageLayoutTransitionInfo-image-09055");
+    vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeHostImageCopy, TransitionImageLayoutUsageMismatch) {
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    if (!CopyLayoutSupported(copy_src_layouts, copy_dst_layouts, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)) {
+        GTEST_SKIP() << "VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL layout not supported";
+    }
+
+    image_ci.usage = VK_IMAGE_USAGE_HOST_TRANSFER_BIT;
+    vkt::Image image(*m_device, image_ci);
+
+    VkHostImageLayoutTransitionInfo transition_info = vku::InitStructHelper();
+    transition_info.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition_info.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    transition_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    transition_info.image = image;
+    m_errorMonitor->SetDesiredError("VUID-VkHostImageLayoutTransitionInfo-oldLayout-01208");
+    vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeHostImageCopy, TransitionImageLayoutUsageMismatch2) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    if (!CopyLayoutSupported(copy_src_layouts, copy_dst_layouts, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL)) {
+        GTEST_SKIP() << "VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL layout not supported";
+    }
+
+    image_ci.usage = VK_IMAGE_USAGE_HOST_TRANSFER_BIT;
+    vkt::Image image(*m_device, image_ci);
+
+    VkHostImageLayoutTransitionInfo transition_info = vku::InitStructHelper();
+    transition_info.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition_info.newLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+    transition_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    transition_info.image = image;
+    m_errorMonitor->SetDesiredError("VUID-VkHostImageLayoutTransitionInfo-srcQueueFamilyIndex-03938");
+    vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeHostImageCopy, TransitionImageLayoutSync2Feature) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    if (!CopyLayoutSupported(copy_src_layouts, copy_dst_layouts, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL)) {
+        GTEST_SKIP() << "VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL layout not supported";
+    }
+
+    vkt::Image image(*m_device, image_ci);
+
+    VkHostImageLayoutTransitionInfo transition_info = vku::InitStructHelper();
+    transition_info.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition_info.newLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+    transition_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    transition_info.image = image;
+    m_errorMonitor->SetDesiredError("VUID-VkHostImageLayoutTransitionInfo-synchronization2-07794");
+    vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeHostImageCopy, TransitionImageLayoutLocalReadFeature) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    if (!CopyLayoutSupported(copy_src_layouts, copy_dst_layouts, VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ)) {
+        GTEST_SKIP() << "VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ layout not supported";
+    }
+
+    image_ci.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT;
+    vkt::Image image(*m_device, image_ci);
+
+    VkHostImageLayoutTransitionInfo transition_info = vku::InitStructHelper();
+    transition_info.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition_info.newLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ;
+    transition_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    transition_info.image = image;
+    m_errorMonitor->SetDesiredError("VUID-VkHostImageLayoutTransitionInfo-dynamicRenderingLocalRead-09552");
+    vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeHostImageCopy, TransitionImageLayoutZeroInitialized) {
+    AddRequiredExtensions(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    // Silent message that image needs zero initialize feature in order
+    // to be created with zero initilized initial layout
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-initialLayout-10765");
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT;
+    vkt::Image image(*m_device, image_ci);
+
+    VkHostImageLayoutTransitionInfo transition_info = vku::InitStructHelper();
+    transition_info.oldLayout = VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT;
+    transition_info.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    transition_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    transition_info.image = image;
+    m_errorMonitor->SetDesiredError("VUID-VkHostImageLayoutTransitionInfo-oldLayout-10767");
+    vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeHostImageCopy, TransitionImageLayoutZeroInitializedAllResources) {
+    AddRequiredExtensions(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::zeroInitializeDeviceMemory);
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT;
+    image_ci.mipLevels = 2;
+    vkt::Image image(*m_device, image_ci);
+
+    VkHostImageLayoutTransitionInfo transition_info = vku::InitStructHelper();
+    transition_info.oldLayout = VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT;
+    transition_info.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    transition_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    transition_info.image = image;
+    m_errorMonitor->SetDesiredError("VUID-VkHostImageLayoutTransitionInfo-oldLayout-10768");
     vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
     m_errorMonitor->VerifyFound();
 }

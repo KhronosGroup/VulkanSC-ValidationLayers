@@ -53,11 +53,7 @@ TEST_F(PositiveSyncValWsi, PresentAfterSubmit2AutomaticVisibility) {
     layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     layout_transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     layout_transition.image = swapchain_images[image_index];
-    layout_transition.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    layout_transition.subresourceRange.baseMipLevel = 0;
-    layout_transition.subresourceRange.levelCount = 1;
-    layout_transition.subresourceRange.baseArrayLayer = 0;
-    layout_transition.subresourceRange.layerCount = 1;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     m_command_buffer.Begin();
     m_command_buffer.Barrier(layout_transition);
@@ -92,11 +88,7 @@ TEST_F(PositiveSyncValWsi, PresentAfterSubmitAutomaticVisibility) {
     layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     layout_transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     layout_transition.image = swapchain_images[image_index];
-    layout_transition.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    layout_transition.subresourceRange.baseMipLevel = 0;
-    layout_transition.subresourceRange.levelCount = 1;
-    layout_transition.subresourceRange.baseArrayLayer = 0;
-    layout_transition.subresourceRange.layerCount = 1;
+    layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     m_command_buffer.Begin();
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -166,11 +158,7 @@ TEST_F(PositiveSyncValWsi, ThreadedSubmitAndFenceWaitAndPresent) {
             transition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             transition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             transition.image = image;
-            transition.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            transition.subresourceRange.baseMipLevel = 0;
-            transition.subresourceRange.levelCount = 1;
-            transition.subresourceRange.baseArrayLayer = 0;
-            transition.subresourceRange.layerCount = 1;
+            transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
             vk::CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0,
                                    nullptr, 1, &transition);
         }
@@ -465,7 +453,7 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain) {
     transition_swapchain_image0.image = swapchain_image0;
     transition_swapchain_image0.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    const SurfaceInformation info = GetSwapchainInfo(m_surface.Handle());
+    const SurfaceInformation info = GetSwapchainInfo(m_surface);
     const uint32_t width = info.surface_capabilities.minImageExtent.width;
     const uint32_t height = info.surface_capabilities.minImageExtent.height;
     const uint32_t format_size = vkuFormatTexelBlockSize(info.surface_formats[0].format);
@@ -578,7 +566,7 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain2) {
     transition_swapchain_image0.image = swapchain_image0;
     transition_swapchain_image0.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    const SurfaceInformation info = GetSwapchainInfo(m_surface.Handle());
+    const SurfaceInformation info = GetSwapchainInfo(m_surface);
     const uint32_t width = info.surface_capabilities.minImageExtent.width;
     const uint32_t height = info.surface_capabilities.minImageExtent.height;
     const uint32_t format_size = vkuFormatTexelBlockSize(info.surface_formats[0].format);
@@ -666,7 +654,7 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain3) {
     transition_swapchain_image0.image = swapchain_image0;
     transition_swapchain_image0.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    const SurfaceInformation info = GetSwapchainInfo(m_surface.Handle());
+    const SurfaceInformation info = GetSwapchainInfo(m_surface);
     const uint32_t width = info.surface_capabilities.minImageExtent.width;
     const uint32_t height = info.surface_capabilities.minImageExtent.height;
     const uint32_t format_size = vkuFormatTexelBlockSize(info.surface_formats[0].format);
@@ -728,13 +716,13 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain4) {
     RETURN_IF_SKIP(InitSyncVal());
     RETURN_IF_SKIP(InitSurface());
 
-    const SurfaceInformation surface_info = GetSwapchainInfo(m_surface.Handle());
+    const SurfaceInformation surface_info = GetSwapchainInfo(m_surface);
     if (surface_info.surface_capabilities.minImageCount > 3 || surface_info.surface_capabilities.maxImageCount < 3) {
         GTEST_SKIP() << "Surface must support swapchains with 3 images";
     }
 
     VkSwapchainCreateInfoKHR swapchain_ci = GetDefaultSwapchainCreateInfo(
-        m_surface.Handle(), surface_info, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+        m_surface, surface_info, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     swapchain_ci.minImageCount = 3;
     vkt::Swapchain swapchain(*m_device, swapchain_ci);
 

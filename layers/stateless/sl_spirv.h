@@ -84,12 +84,15 @@ class SpirvValidator : public Logger {
                                             VkShaderStageFlagBits stage, const Location& loc) const;
     bool ValidateShaderStageInputOutputLimits(const spirv::Module& module_state, const spirv::EntryPoint& entrypoint,
                                               const spirv::StatelessData& stateless_data, const Location& loc) const;
+    bool ValidateShaderStageInterfaceVariables(const spirv::Module& module_state, const spirv::EntryPoint& entrypoint,
+                                               const spirv::StatelessData& stateless_data, const Location& loc) const;
     bool ValidateShaderFloatControl(const spirv::Module& module_state, const spirv::EntryPoint& entrypoint,
                                     const spirv::StatelessData& stateless_data, const Location& loc) const;
     bool ValidateExecutionModes(const spirv::Module& module_state, const spirv::EntryPoint& entrypoint,
                                 const spirv::StatelessData& stateless_data, const Location& loc) const;
     bool ValidateConservativeRasterization(const spirv::Module& module_state, const spirv::EntryPoint& entrypoint,
                                            const spirv::StatelessData& stateless_data, const Location& loc) const;
+    bool ValidateShaderTensor(const spirv::Module &module_state, const spirv::EntryPoint &entrypoint, const spirv::StatelessData &stateless_data, const Location& loc) const;
 
     // Auto-generated helper functions
     bool ValidateShaderCapabilitiesAndExtensions(const spirv::Module& module_state, const spirv::Instruction& insn,

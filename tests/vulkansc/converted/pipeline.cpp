@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,7 +71,7 @@ TEST_F(NegativePipeline, BasicCompute) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, cs, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.CreateComputePipeline();
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -116,10 +116,8 @@ TEST_F(NegativePipeline, DisabledIndependentBlend) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_GENERAL);
     rp.AddAttachmentDescription(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_GENERAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
-    rp.AddColorAttachment(1);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+    rp.AddColorAttachment(1, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     VkPipelineColorBlendAttachmentState cb_attachments[2];
@@ -163,8 +161,7 @@ TEST_F(NegativePipeline, BlendingOnFormatWithoutBlendingSupport) {
 
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(non_blending_format, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_GENERAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     CreatePipelineHelper pipe(*this);
@@ -184,8 +181,7 @@ TEST_F(NegativePipeline, ColorWriteMaskE5B9G9R9) {
 
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_E5B9G9R9_UFLOAT_PACK32, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     CreatePipelineHelper pipe(*this);
@@ -231,7 +227,7 @@ TEST_F(NegativePipeline, CmdBufferPipelineDestroyed) {
 
         // Bind helper pipeline to command buffer
         m_command_buffer.Begin();
-        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, helper.Handle());
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, helper);
         m_command_buffer.End();
 
         // pipeline will be destroyed when helper goes out of scope
@@ -356,8 +352,8 @@ TEST_F(NegativePipeline, ShaderStageName) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Attempt to Create Gfx Pipeline w/o a VS
     VkPipelineShaderStageCreateInfo shaderStage = fs.GetStageCreateInfo();  // should be: vs.GetStageCreateInfo();
@@ -395,7 +391,7 @@ TEST_F(NegativePipeline, ShaderStageBit) {
     )glsl";
 
     CreateComputePipelineHelper cs_pipeline(*this);
-    cs_pipeline.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    cs_pipeline.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     cs_pipeline.pipeline_layout_ = vkt::PipelineLayout(*m_device, {});
     cs_pipeline.LateBindPipelineInfo();
     cs_pipeline.cp_ci_.stage.stage = VK_SHADER_STAGE_VERTEX_BIT;  // override with wrong value
@@ -522,39 +518,39 @@ TEST_F(NegativePipeline, DISABLED_SubpassRasterizationSamples) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(renderpass, framebuffer, fb_width, fb_height);
 
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_1.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_1);
 
     // VkPhysicalDeviceFeatures::variableMultisampleRate is false,
     // the two pipelines refer to the same subpass, one that does not use any attachment,
     // BUT the secondly created pipeline has a different sample samples count than the 1st, this is illegal
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipeline-00781");
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_2.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_2);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
 
-TEST_F(NegativePipeline, RenderPassShaderResolveQCOM) {
-    TEST_DESCRIPTION("Test pipeline creation VUIDs added with VK_QCOM_render_pass_shader_resolve extension.");
-    AddRequiredExtensions(VK_QCOM_RENDER_PASS_SHADER_RESOLVE_EXTENSION_NAME);
+TEST_F(NegativePipeline, RenderPassCustomeResolve) {
+    AddRequiredExtensions(VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::customResolve);
     AddRequiredFeature(vkt::Feature::sampleRateShading);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Create a renderPass with two attachments (0=Color, 1=Input)
-    VkAttachmentReference attachmentRefs[2] = {};
-    attachmentRefs[0].layout = VK_IMAGE_LAYOUT_GENERAL;
-    attachmentRefs[0].attachment = 0;
-    attachmentRefs[1].layout = VK_IMAGE_LAYOUT_GENERAL;
-    attachmentRefs[1].attachment = 1;
+    VkAttachmentReference attachment_refs[2] = {};
+    attachment_refs[0].layout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment_refs[0].attachment = 0;
+    attachment_refs[1].layout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment_refs[1].attachment = 1;
 
     VkSubpassDescription subpass = {};
-    subpass.flags = VK_SUBPASS_DESCRIPTION_FRAGMENT_REGION_BIT_QCOM;
+    subpass.flags = VK_SUBPASS_DESCRIPTION_FRAGMENT_REGION_BIT_EXT;
     subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &attachmentRefs[0];
+    subpass.pColorAttachments = &attachment_refs[0];
     subpass.inputAttachmentCount = 1;
-    subpass.pInputAttachments = &attachmentRefs[1];
+    subpass.pInputAttachments = &attachment_refs[1];
 
     VkRenderPassCreateInfo rpci = vku::InitStructHelper();
     rpci.subpassCount = 1;
@@ -585,7 +581,7 @@ TEST_F(NegativePipeline, RenderPassShaderResolveQCOM) {
     ASSERT_TRUE(renderpass2.initialized());
 
     // shader uses gl_SamplePosition which causes the SPIR-V to include SampleRateShading capability
-    const char *sampleRateFragShaderText = R"glsl(
+    static const char *shader_source = R"glsl(
         #version 450
         layout(location = 0) out vec4 uFragColor;
         void main() {
@@ -593,7 +589,7 @@ TEST_F(NegativePipeline, RenderPassShaderResolveQCOM) {
         }
     )glsl";
 
-    VkShaderObj fs_sampleRate(this, sampleRateFragShaderText, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs_sample_rate(*m_device, shader_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineMultisampleStateCreateInfo ms_state = vku::InitStructHelper();
     ms_state.flags = 0;
@@ -610,8 +606,6 @@ TEST_F(NegativePipeline, RenderPassShaderResolveQCOM) {
     pipe.cb_attachments_.blendEnable = VK_TRUE;
     pipe.gp_ci_.pMultisampleState = &ms_state;
 
-    // Create a pipeline with a subpass using VK_SUBPASS_DESCRIPTION_FRAGMENT_REGION_BIT_QCOM,
-    // but where sample count of input attachment doesnt match rasterizationSamples
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-rasterizationSamples-04899");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
@@ -620,20 +614,114 @@ TEST_F(NegativePipeline, RenderPassShaderResolveQCOM) {
     ms_state.sampleShadingEnable = VK_TRUE;
     pipe.gp_ci_.renderPass = renderpass2;
 
-    // Create a pipeline with a subpass using VK_SUBPASS_DESCRIPTION_FRAGMENT_REGION_BIT_QCOM,
-    // and with sampleShadingEnable enabled in the pipeline
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-sampleShadingEnable-04900");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 
     ms_state.sampleShadingEnable = VK_FALSE;
-    pipe.shader_stages_[1] = fs_sampleRate.GetStageCreateInfo();
+    pipe.shader_stages_[1] = fs_sample_rate.GetStageCreateInfo();
 
-    // Create a pipeline with a subpass using VK_SUBPASS_DESCRIPTION_FRAGMENT_REGION_BIT_QCOM,
-    // and with SampleRateShading capability enabled in the SPIR-V fragment shader
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-SampleRateShading-06378");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativePipeline, CustomResolvePipelineFormat) {
+    AddRequiredExtensions(VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::customResolve);
+    RETURN_IF_SKIP(Init());
+
+    VkFormat color_formats[2] = {VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+    VkCustomResolveCreateInfoEXT custom_resolve_info = vku::InitStructHelper();
+    custom_resolve_info.customResolve = VK_TRUE;
+    custom_resolve_info.colorAttachmentCount = 2;
+    custom_resolve_info.pColorAttachmentFormats = &color_formats[0];
+
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper(&custom_resolve_info);
+    pipeline_rendering_info.colorAttachmentCount = 1;
+    pipeline_rendering_info.pColorAttachmentFormats = &color_formats[1];
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-renderPass-11504");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativePipeline, CustomResolveSampleShadingImplicit) {
+    AddRequiredExtensions(VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::customResolve);
+    AddRequiredFeature(vkt::Feature::sampleRateShading);
+    RETURN_IF_SKIP(Init());
+
+    char const *vs_source = R"glsl(
+        #version 460
+        layout(location = 0) out vec4 samp;
+        void main(){
+           gl_Position = vec4(1.0);
+        }
+    )glsl";
+
+    char const *fs_source = R"glsl(
+        #version 460
+        layout(location = 0) in sample vec4 samp; // implicitly sets with Sample Decoration
+        layout(location = 0) out vec4 color;
+        void main() {
+            color = samp;
+        }
+    )glsl";
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkFormat color_format = VK_FORMAT_B8G8R8A8_UNORM;
+    VkCustomResolveCreateInfoEXT custom_resolve_info = vku::InitStructHelper();
+    custom_resolve_info.customResolve = VK_TRUE;
+    custom_resolve_info.colorAttachmentCount = 1;
+    custom_resolve_info.pColorAttachmentFormats = &color_format;
+
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper(&custom_resolve_info);
+    pipeline_rendering_info.colorAttachmentCount = 1;
+    pipeline_rendering_info.pColorAttachmentFormats = &color_format;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    VkImageCreateInfo image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    vkt::Image color_image(*m_device, image_ci);
+    vkt::ImageView color_image_view = color_image.CreateView();
+
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    vkt::Image resolve_image(*m_device, image_ci);
+    vkt::ImageView resolve_image_view = resolve_image.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.imageView = color_image_view;
+    color_attachment.resolveMode = VK_RESOLVE_MODE_CUSTOM_BIT_EXT;
+    color_attachment.resolveImageView = resolve_image_view;
+    color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.flags = VK_RENDERING_CUSTOM_RESOLVE_BIT_EXT | VK_RENDERING_FRAGMENT_REGION_BIT_EXT;
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment;
+    begin_rendering_info.layerCount = 1;
+    begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    VkBeginCustomResolveInfoEXT begin_resolve_info = vku::InitStructHelper();
+    vk::CmdBeginCustomResolveEXT(m_command_buffer, &begin_resolve_info);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-flags-11521");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativePipeline, RasterizerDiscardWithFragmentShader) {
@@ -645,8 +733,8 @@ TEST_F(NegativePipeline, RasterizerDiscardWithFragmentShader) {
     vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     InitRenderTarget(&depth_image_view.handle());
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
     const VkPipelineShaderStageCreateInfo stages[] = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
 
     const VkPipelineVertexInputStateCreateInfo pipeline_vertex_input_state_create_info{
@@ -715,7 +803,7 @@ TEST_F(NegativePipeline, DISABLED_CreateGraphicsPipelineWithBadBasePointer) {
     vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     InitRenderTarget(&depth_image_view.handle());
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 
     const VkPipelineVertexInputStateCreateInfo pipeline_vertex_input_state_create_info{
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, nullptr, 0, 0, nullptr, 0, nullptr};
@@ -801,7 +889,7 @@ TEST_F(NegativePipeline, PipelineCreationCacheControl) {
         helper.cp_ci_.flags = VK_PIPELINE_CREATE_EARLY_RETURN_ON_FAILURE_BIT;
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_compute_flags, kErrorBit,
-                                             "VUID-VkComputePipelineCreateInfo-pipelineCreationCacheControl-02875");
+                                             "VUID-VkComputePipelineCreateInfo-pipelineCreationCacheControl-02878");
 
     VkPipelineCache pipeline_cache;
     VkPipelineCacheCreateInfo cache_create_info = vku::InitStructHelper();
@@ -1041,7 +1129,7 @@ TEST_F(NegativePipeline, DISABLED_MissingEntrypoint) {
 
     // Graphics
     {
-        VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr,
+        VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr,
                        "foo");
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -1052,8 +1140,8 @@ TEST_F(NegativePipeline, DISABLED_MissingEntrypoint) {
     // Compute
     {
         const auto set_info = [&](CreateComputePipelineHelper &helper) {
-            helper.cs_ = VkShaderObj(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                                     nullptr, "foo");
+            helper.cs_ = VkShaderObj(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
+                                     SPV_SOURCE_GLSL, nullptr, "foo");
         };
         CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-pName-00707");
     }
@@ -1063,8 +1151,8 @@ TEST_F(NegativePipeline, DISABLED_MissingEntrypoint) {
         CreateComputePipelineHelper pipe_0(*this);  // valid
         pipe_0.LateBindPipelineInfo();
         CreateComputePipelineHelper pipe_1(*this);  // invalid
-        pipe_1.cs_ =
-            VkShaderObj(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "foo");
+        pipe_1.cs_ = VkShaderObj(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
+                                 nullptr, "foo");
         pipe_1.LateBindPipelineInfo();
 
         VkComputePipelineCreateInfo create_infos[3] = {pipe_0.cp_ci_, pipe_1.cp_ci_, pipe_0.cp_ci_};
@@ -1105,7 +1193,8 @@ TEST_F(NegativePipeline, DISABLED_MissingEntrypoint2) {
 )";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr, "main");
+    pipe.cs_ =
+        VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr, "main");
     m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-pName-00707");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
@@ -1172,10 +1261,8 @@ TEST_F(NegativePipeline, DepthStencilRequired) {
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.AddAttachmentDescription(VK_FORMAT_D16_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
-    rp.AddColorAttachment(0);
-    rp.AddDepthStencilAttachment(1);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddDepthStencilAttachment(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     rp.CreateRenderPass();
 
     CreatePipelineHelper pipe(*this);
@@ -1191,7 +1278,7 @@ TEST_F(NegativePipeline, DISABLED_NullStagepName) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo()};
@@ -1206,7 +1293,7 @@ TEST_F(NegativePipeline, DISABLED_NullStagepName) {
 TEST_F(NegativePipeline, DISABLED_NullStagepNameCompute) {
     TEST_DESCRIPTION("Test that an error is produced for a stage with a null pName pointer");
     RETURN_IF_SKIP(Init());
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     vkt::PipelineLayout layout(*m_device, {});
 
@@ -1336,10 +1423,8 @@ TEST_F(NegativePipeline, FramebufferMixedSamplesNV) {
                                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         rp.AddAttachmentDescription(VK_FORMAT_D24_UNORM_S8_UINT, test_case.depth_samples, VK_IMAGE_LAYOUT_PREINITIALIZED,
                                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-        rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-        rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
-        rp.AddColorAttachment(0);
-        rp.AddDepthStencilAttachment(1);
+        rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        rp.AddDepthStencilAttachment(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
         rp.CreateRenderPass();
 
         VkPipelineDepthStencilStateCreateInfo ds = vku::InitStructHelper();
@@ -1403,10 +1488,8 @@ TEST_F(NegativePipeline, FramebufferMixedSamples) {
                                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         rp.AddAttachmentDescription(ds_format, test_case.depth_samples, VK_IMAGE_LAYOUT_PREINITIALIZED,
                                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-        rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-        rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
-        rp.AddColorAttachment(0);
-        rp.AddDepthStencilAttachment(1);
+        rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        rp.AddDepthStencilAttachment(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
         if (test_case.color_samples != test_case.depth_samples) {
             m_errorMonitor->SetDesiredError("VUID-VkSubpassDescription-pDepthStencilAttachment-01418");
@@ -1517,13 +1600,11 @@ TEST_F(NegativePipeline, FramebufferMixedSamplesCoverageReduction) {
         RenderPassSingleSubpass rp(*this);
         rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, test_case.color_samples, VK_IMAGE_LAYOUT_UNDEFINED,
                                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-        rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-        rp.AddColorAttachment(0);
+        rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         if (test_case.depth_samples) {
             rp.AddAttachmentDescription(VK_FORMAT_D24_UNORM_S8_UINT, test_case.depth_samples, VK_IMAGE_LAYOUT_UNDEFINED,
                                         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-            rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
-            rp.AddDepthStencilAttachment(1);
+            rp.AddDepthStencilAttachment(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
         }
         rp.CreateRenderPass();
 
@@ -1864,7 +1945,7 @@ TEST_F(NegativePipeline, NotCompatibleForSet) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
@@ -1901,7 +1982,7 @@ TEST_F(NegativePipeline, NotCompatibleForSetIndependent) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout_1;
     pipe.CreateComputePipeline();
 
@@ -1932,7 +2013,7 @@ TEST_F(NegativePipeline, DescriptorSetNotBound) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
 
@@ -2106,7 +2187,7 @@ TEST_F(NegativePipeline, SampledInvalidImageViews) {
            color += texture(samplerColor, gl_FragCoord.wz);
         }
     )glsl";
-    VkShaderObj fs_combined(this, fs_source_combined, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs_combined(*m_device, fs_source_combined, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // maps to VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE and VK_DESCRIPTOR_TYPE_SAMPLER
     const char *fs_source_seperate = R"glsl(
@@ -2122,7 +2203,7 @@ TEST_F(NegativePipeline, SampledInvalidImageViews) {
            color = foo(textureColor, samplers);
         }
     )glsl";
-    VkShaderObj fs_seperate(this, fs_source_seperate, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs_seperate(*m_device, fs_source_seperate, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // maps to an unused image sampler that should not trigger validation as it is never sampled
     const char *fs_source_unused = R"glsl(
@@ -2133,7 +2214,7 @@ TEST_F(NegativePipeline, SampledInvalidImageViews) {
            color = vec4(gl_FragCoord.xyz, 1.0);
         }
     )glsl";
-    VkShaderObj fs_unused(this, fs_source_unused, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs_unused(*m_device, fs_source_unused, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // maps to VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER but makes sure it walks function tree to find sampling
     const char *fs_source_function = R"glsl(
@@ -2146,7 +2227,7 @@ TEST_F(NegativePipeline, SampledInvalidImageViews) {
            color = bar(gl_FragCoord.x);
         }
     )glsl";
-    VkShaderObj fs_function(this, fs_source_function, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs_function(*m_device, fs_source_function, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipeline_combined(*this);
     CreatePipelineHelper pipeline_seperate(*this);
@@ -2287,7 +2368,7 @@ TEST_F(NegativePipeline, DISABLED_ShaderDrawParametersNotEnabled10) {
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2308,7 +2389,7 @@ TEST_F(NegativePipeline, ShaderDrawParametersNotEnabled11) {
     )glsl";
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2352,8 +2433,9 @@ TEST_F(NegativePipeline, DISABLED_CreateFlags) {
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-None-09497");
     flags = VK_PIPELINE_CREATE_RAY_TRACING_DISPLACEMENT_MICROMAP_BIT_NV;
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-flags-07997");
-    flags = 0x80000000;
-    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-None-09497");
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-None-09497");
+    flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
+    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-vkCreateGraphicsPipelines-pNext-09617");
 }
 
 // Not supported in Vulkan SC: miscellaneous Vulkan-only extensions
@@ -2394,9 +2476,11 @@ TEST_F(NegativePipeline, DISABLED_CreateFlagsCompute) {
     flags = VK_PIPELINE_CREATE_RAY_TRACING_DISPLACEMENT_MICROMAP_BIT_NV;
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkComputePipelineCreateInfo-flags-07996");
     flags = VK_PIPELINE_CREATE_INDIRECT_BINDABLE_BIT_NV;
-    CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkComputePipelineCreateInfo-None-09497");
-    flags = 0x80000000;
-    CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkComputePipelineCreateInfo-None-09497");
+    m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-None-09497");
+    CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkComputePipelineCreateInfo-flags-09007");
+    flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
+    m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-None-09497");
+    CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-vkCreateComputePipelines-pNext-09617");
 }
 
 // Not supported in Vulkan SC: vkMergePipelineCaches
@@ -2433,7 +2517,7 @@ TEST_F(NegativePipeline, DISABLED_CreateComputePipelineWithBadBasePointer) {
         }
     )glsl";
 
-    VkShaderObj cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
     const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
@@ -2467,7 +2551,7 @@ TEST_F(NegativePipeline, DISABLED_CreateComputePipelineWithDerivatives) {
         }
     )glsl";
 
-    VkShaderObj cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
     const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
@@ -2755,10 +2839,8 @@ TEST_F(NegativePipeline, VariableSampleLocations) {
     VkRenderPassBeginInfo begin_info = vku::InitStructHelper(&render_pass_sample_locations);
     begin_info.renderPass = render_pass;
     begin_info.framebuffer = framebuffer;
-    begin_info.renderArea.extent.width = 32;
-    begin_info.renderArea.extent.height = 32;
-    begin_info.renderArea.offset.x = 0;
-    begin_info.renderArea.offset.y = 0;
+    begin_info.renderArea.extent = {32, 32};
+    begin_info.renderArea.offset = {0, 0};
     begin_info.clearValueCount = 1;
     begin_info.pClearValues = &clear_value;
 
@@ -2995,7 +3077,7 @@ TEST_F(NegativePipeline, RasterizationOrderAttachmentAccessNoSubpassFlags) {
 
     vkt::RenderPass render_pass_no_flags;
     create_render_pass(0, render_pass_no_flags);
-    render_pass_handle = render_pass_no_flags.handle();
+    render_pass_handle = render_pass_no_flags;
 
     // Color attachment
     if (rasterization_order_features.rasterizationOrderColorAttachmentAccess) {
@@ -3034,7 +3116,7 @@ TEST_F(NegativePipeline, RasterizationOrderAttachmentAccessNoSubpassFlags) {
             }
         )glsl";
 
-        VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+        VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         auto set_stages_pipeline_createinfo = [&](CreatePipelineHelper &helper) {
             helper.gp_ci_.pDepthStencilState = &ds_ci;
@@ -3075,8 +3157,8 @@ TEST_F(NegativePipeline, MismatchedRenderPassAndPipelineAttachments) {
                 }
             )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const vkt::DescriptorSetLayout descriptor_set_layout(
         *m_device, {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr});
@@ -3188,8 +3270,7 @@ TEST_F(NegativePipeline, ShaderTileImage) {
 
         RenderPassSingleSubpass rp(*this);
         rp.AddAttachmentDescription(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED);
-        rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-        rp.AddColorAttachment(0);
+        rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
         rp.CreateRenderPass();
 
         // Check if the colorAttachmentRead capability enable, renderpass should be null
@@ -3350,6 +3431,8 @@ TEST_F(NegativePipeline, MismatchedRasterizationSamples) {
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageView = image_view;
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+    color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkMultisampledRenderToSingleSampledInfoEXT rtss = vku::InitStructHelper();
     rtss.multisampledRenderToSingleSampledEnable = VK_TRUE;
@@ -3389,8 +3472,7 @@ TEST_F(NegativePipeline, PipelineMissingFeatures) {
     const VkFormat ds_format = FindSupportedDepthStencilFormat(m_device->Physical());
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(ds_format, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
-    rp.AddDepthStencilAttachment(0);
+    rp.AddDepthStencilAttachment(0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     rp.CreateRenderPass();
 
     CreatePipelineHelper pipe(*this);
@@ -3624,7 +3706,7 @@ TEST_F(NegativePipeline, GeometryShaderConservativeRasterization) {
         }
     )glsl";
 
-    VkShaderObj gs(this, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
+    VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     VkPhysicalDeviceConservativeRasterizationPropertiesEXT conservative_rasterization_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(conservative_rasterization_props);
@@ -3693,7 +3775,7 @@ TEST_F(NegativePipeline, PipelineCreationFlags2CacheControl) {
         flags2.flags = VK_PIPELINE_CREATE_2_EARLY_RETURN_ON_FAILURE_BIT;
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_compute_flags, kErrorBit,
-                                             "VUID-VkComputePipelineCreateInfo-pipelineCreationCacheControl-02875");
+                                             "VUID-VkComputePipelineCreateInfo-pipelineCreationCacheControl-02878");
 }
 
 TEST_F(NegativePipeline, PipelineCreationFlags2Library) {

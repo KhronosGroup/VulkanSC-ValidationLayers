@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +16,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include <algorithm>
+#include <cstdint>
 
 class NegativeQuery : public QueryTest {};
 
@@ -639,7 +640,7 @@ TEST_F(NegativeQuery, PerformanceIncompletePasses) {
                                 sizeof(VkPerformanceCounterResultKHR) * results.size(), VK_QUERY_RESULT_64_BIT);
         m_errorMonitor->VerifyFound();
         if (IsExtensionsEnabled(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME)) {
-            m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-queryType-09440");
+            m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-queryType-11874");
             vk::GetQueryPoolResults(device(), query_pool, 0, 1, sizeof(VkPerformanceCounterResultKHR) * results.size(), &results[0],
                                     sizeof(VkPerformanceCounterResultKHR) * results.size(), VK_QUERY_RESULT_WITH_STATUS_BIT_KHR);
             m_errorMonitor->VerifyFound();
@@ -1255,7 +1256,7 @@ TEST_F(NegativeQuery, PerformanceQueryIntel) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeQuery, PoolInUseDestroyedSignaled) {
+TEST_F(NegativeQuery, PoolInUseDestroyed) {
     TEST_DESCRIPTION("Delete in-use query pool.");
 
     RETURN_IF_SKIP(Init());
@@ -1444,6 +1445,29 @@ TEST_F(NegativeQuery, ResultStatusOnly) {
     AddRequiredExtensions(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
+    uint32_t qf_count;
+    vk::GetPhysicalDeviceQueueFamilyProperties2(Gpu(), &qf_count, nullptr);
+
+    std::vector<VkQueueFamilyProperties2> queueFamilyProps2(qf_count, vku::InitStruct<VkQueueFamilyProperties2>());
+    std::vector<VkQueueFamilyQueryResultStatusPropertiesKHR> queueFamilyQueryResultStatusProps(
+        qf_count, vku::InitStruct<VkQueueFamilyQueryResultStatusPropertiesKHR>());
+    for (uint32_t i = 0; i < qf_count; ++i) {
+        queueFamilyProps2[i].pNext = &queueFamilyQueryResultStatusProps[i];
+    }
+    vk::GetPhysicalDeviceQueueFamilyProperties2(Gpu(), &qf_count, queueFamilyProps2.data());
+
+    bool has_queue_with_result_status_only_support = false;
+    for (uint32_t qfi = 0; qfi < qf_count; ++qfi) {
+        if (queueFamilyQueryResultStatusProps[qfi].queryResultStatusSupport) {
+            has_queue_with_result_status_only_support = true;
+            break;
+        }
+    }
+
+    if (!has_queue_with_result_status_only_support) {
+        GTEST_SKIP() << "Test requires queue to support result status queries";
+    }
+
     vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR, 1);
     if (!query_pool.initialized()) {
         GTEST_SKIP() << "Required query not supported";
@@ -1500,7 +1524,6 @@ TEST_F(NegativeQuery, DestroyActiveQueryPool) {
 
 TEST_F(NegativeQuery, MultiviewBeginQuery) {
     TEST_DESCRIPTION("Test CmdBeginQuery in subpass with multiview");
-
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::multiview);
     RETURN_IF_SKIP(Init());
@@ -1521,13 +1544,13 @@ TEST_F(NegativeQuery, MultiviewBeginQuery) {
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &color_att;
 
-    uint32_t viewMasks[] = {0x3u};
-    uint32_t correlationMasks[] = {0x1u};
+    uint32_t view_masks[] = {0x3u};
+    uint32_t correlation_masks[] = {0x1u};
     VkRenderPassMultiviewCreateInfo rpmv_ci = vku::InitStructHelper();
     rpmv_ci.subpassCount = 1;
-    rpmv_ci.pViewMasks = viewMasks;
+    rpmv_ci.pViewMasks = view_masks;
     rpmv_ci.correlationMaskCount = 1;
-    rpmv_ci.pCorrelationMasks = correlationMasks;
+    rpmv_ci.pCorrelationMasks = correlation_masks;
 
     VkRenderPassCreateInfo rp_ci = vku::InitStructHelper(&rpmv_ci);
     rp_ci.attachmentCount = 1;
@@ -1540,9 +1563,7 @@ TEST_F(NegativeQuery, MultiviewBeginQuery) {
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_ci.extent.width = 64;
-    image_ci.extent.height = 64;
-    image_ci.extent.depth = 1;
+    image_ci.extent = {64, 64, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 4;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1613,18 +1634,22 @@ TEST_F(NegativeQuery, PipelineStatisticsQuery) {
     }
 }
 
-TEST_F(NegativeQuery, TestGetQueryPoolResultsDataAndStride) {
+TEST_F(NegativeQuery, GetQueryPoolResultsDataAndStride) {
     TEST_DESCRIPTION("Test pData and stride multiple in GetQueryPoolResults");
 
     AddRequiredExtensions(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_TIMESTAMP, 1);
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_TIMESTAMP, 2);
 
-    m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-flags-02828");
     const size_t out_data_size = 16;
     uint8_t data[out_data_size];
-    vk::GetQueryPoolResults(device(), query_pool, 0, 1, out_data_size, &data, 3, 0);
+    m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-queryCount-12251");
+    vk::GetQueryPoolResults(device(), query_pool, 0, 2, out_data_size, &data, 3, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-flags-02828");
+    vk::GetQueryPoolResults(device(), query_pool, 0, 1, out_data_size, &data[1], 4, 0);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2285,6 +2310,10 @@ TEST_F(NegativeQuery, WriteTimestampInsideRenderPass) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
+    if (!(m_device->Physical().limits_.timestampComputeAndGraphics & VK_QUEUE_GRAPHICS_BIT)) {
+        GTEST_SKIP() << "Timestamps not supported in the graphics queue";
+    }
+
     VkQueryPoolCreateInfo query_pool_create_info = vku::InitStructHelper();
     query_pool_create_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
     query_pool_create_info.queryCount = 2;
@@ -2356,20 +2385,20 @@ TEST_F(NegativeQuery, Stride) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    char data_space;
+    uint8_t data_space[16];
     m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-flags-02828");
-    vk::GetQueryPoolResults(*m_device, query_pool, 0, 1, sizeof(data_space), &data_space, 1, VK_QUERY_RESULT_WAIT_BIT);
+    vk::GetQueryPoolResults(*m_device, query_pool, 0, 1, 4, &data_space[1], 1, VK_QUERY_RESULT_WAIT_BIT);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-flags-00815");
-    vk::GetQueryPoolResults(*m_device, query_pool, 0, 1, sizeof(data_space), &data_space, 1,
-                            (VK_QUERY_RESULT_WAIT_BIT | VK_QUERY_RESULT_64_BIT));
+    vk::GetQueryPoolResults(*m_device, query_pool, 0, 1, 8, &data_space[1], 1, (VK_QUERY_RESULT_WAIT_BIT | VK_QUERY_RESULT_64_BIT));
     m_errorMonitor->VerifyFound();
 
     char data_space4[4] = "";
     vk::GetQueryPoolResults(*m_device, query_pool, 0, 1, sizeof(data_space4), &data_space4, 4, VK_QUERY_RESULT_WAIT_BIT);
 
-    char data_space8[8] = "";
+    // alignas() for 32-bit machines
+    alignas(8) char data_space8[8] = "";
     vk::GetQueryPoolResults(*m_device, query_pool, 0, 1, sizeof(data_space8), &data_space8, 8,
                             (VK_QUERY_RESULT_WAIT_BIT | VK_QUERY_RESULT_64_BIT));
 
@@ -2492,6 +2521,10 @@ TEST_F(NegativeQuery, CopyUnavailableQueries) {
 TEST_F(NegativeQuery, QueryResultCopyBufferInvalidFlags) {
     TEST_DESCRIPTION("Copy query results to a buffer without transfer dst flag");
     RETURN_IF_SKIP(Init());
+
+    if (!m_device->Physical().limits_.timestampComputeAndGraphics) {
+        GTEST_SKIP() << "Timestamps not supported";
+    }
 
     vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_TIMESTAMP, 1u);
     vkt::Buffer buffer(*m_device, 16u, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);

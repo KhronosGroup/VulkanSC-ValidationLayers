@@ -3,9 +3,9 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2534,6 +2534,12 @@ static inline VkResult DispatchGetImageViewAddressNVX(VkDevice device, VkImageVi
     return dispatch->GetImageViewAddressNVX(device, imageView, pProperties);
 }
 
+static inline uint64_t DispatchGetDeviceCombinedImageSamplerIndexNVX(VkDevice device, uint64_t imageViewIndex,
+                                                                     uint64_t samplerIndex) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->GetDeviceCombinedImageSamplerIndexNVX(device, imageViewIndex, samplerIndex);
+}
+
 static inline void DispatchCmdDrawIndirectCountAMD(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                    VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                                    uint32_t stride) {
@@ -2830,6 +2836,65 @@ static inline void DispatchCmdDispatchGraphIndirectCountAMDX(VkCommandBuffer com
 }
 #endif  // VK_ENABLE_BETA_EXTENSIONS
 
+static inline VkResult DispatchWriteSamplerDescriptorsEXT(VkDevice device, uint32_t samplerCount,
+                                                          const VkSamplerCreateInfo* pSamplers,
+                                                          const VkHostAddressRangeEXT* pDescriptors) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->WriteSamplerDescriptorsEXT(device, samplerCount, pSamplers, pDescriptors);
+}
+
+static inline VkResult DispatchWriteResourceDescriptorsEXT(VkDevice device, uint32_t resourceCount,
+                                                           const VkResourceDescriptorInfoEXT* pResources,
+                                                           const VkHostAddressRangeEXT* pDescriptors) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->WriteResourceDescriptorsEXT(device, resourceCount, pResources, pDescriptors);
+}
+
+static inline void DispatchCmdBindSamplerHeapEXT(VkCommandBuffer commandBuffer, const VkBindHeapInfoEXT* pBindInfo) {
+    auto dispatch = vvl::dispatch::GetData(commandBuffer);
+    dispatch->CmdBindSamplerHeapEXT(commandBuffer, pBindInfo);
+}
+
+static inline void DispatchCmdBindResourceHeapEXT(VkCommandBuffer commandBuffer, const VkBindHeapInfoEXT* pBindInfo) {
+    auto dispatch = vvl::dispatch::GetData(commandBuffer);
+    dispatch->CmdBindResourceHeapEXT(commandBuffer, pBindInfo);
+}
+
+static inline void DispatchCmdPushDataEXT(VkCommandBuffer commandBuffer, const VkPushDataInfoEXT* pPushDataInfo) {
+    auto dispatch = vvl::dispatch::GetData(commandBuffer);
+    dispatch->CmdPushDataEXT(commandBuffer, pPushDataInfo);
+}
+
+static inline VkResult DispatchGetImageOpaqueCaptureDataEXT(VkDevice device, uint32_t imageCount, const VkImage* pImages,
+                                                            VkHostAddressRangeEXT* pDatas) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->GetImageOpaqueCaptureDataEXT(device, imageCount, pImages, pDatas);
+}
+
+static inline VkDeviceSize DispatchGetPhysicalDeviceDescriptorSizeEXT(VkPhysicalDevice physicalDevice,
+                                                                      VkDescriptorType descriptorType) {
+    auto dispatch = vvl::dispatch::GetData(physicalDevice);
+    return dispatch->GetPhysicalDeviceDescriptorSizeEXT(physicalDevice, descriptorType);
+}
+
+static inline VkResult DispatchRegisterCustomBorderColorEXT(VkDevice device,
+                                                            const VkSamplerCustomBorderColorCreateInfoEXT* pBorderColor,
+                                                            VkBool32 requestIndex, uint32_t* pIndex) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->RegisterCustomBorderColorEXT(device, pBorderColor, requestIndex, pIndex);
+}
+
+static inline void DispatchUnregisterCustomBorderColorEXT(VkDevice device, uint32_t index) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    dispatch->UnregisterCustomBorderColorEXT(device, index);
+}
+
+static inline VkResult DispatchGetTensorOpaqueCaptureDataARM(VkDevice device, uint32_t tensorCount, const VkTensorARM* pTensors,
+                                                             VkHostAddressRangeEXT* pDatas) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->GetTensorOpaqueCaptureDataARM(device, tensorCount, pTensors, pDatas);
+}
+
 static inline void DispatchCmdSetSampleLocationsEXT(VkCommandBuffer commandBuffer,
                                                     const VkSampleLocationsInfoEXT* pSampleLocationsInfo) {
     auto dispatch = vvl::dispatch::GetData(commandBuffer);
@@ -3068,6 +3133,33 @@ static inline void DispatchGetQueueCheckpointData2NV(VkQueue queue, uint32_t* pC
                                                      VkCheckpointData2NV* pCheckpointData) {
     auto dispatch = vvl::dispatch::GetData(queue);
     dispatch->GetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData);
+}
+
+static inline VkResult DispatchSetSwapchainPresentTimingQueueSizeEXT(VkDevice device, VkSwapchainKHR swapchain, uint32_t size) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->SetSwapchainPresentTimingQueueSizeEXT(device, swapchain, size);
+}
+
+static inline VkResult DispatchGetSwapchainTimingPropertiesEXT(VkDevice device, VkSwapchainKHR swapchain,
+                                                               VkSwapchainTimingPropertiesEXT* pSwapchainTimingProperties,
+                                                               uint64_t* pSwapchainTimingPropertiesCounter) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->GetSwapchainTimingPropertiesEXT(device, swapchain, pSwapchainTimingProperties,
+                                                     pSwapchainTimingPropertiesCounter);
+}
+
+static inline VkResult DispatchGetSwapchainTimeDomainPropertiesEXT(
+    VkDevice device, VkSwapchainKHR swapchain, VkSwapchainTimeDomainPropertiesEXT* pSwapchainTimeDomainProperties,
+    uint64_t* pTimeDomainsCounter) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->GetSwapchainTimeDomainPropertiesEXT(device, swapchain, pSwapchainTimeDomainProperties, pTimeDomainsCounter);
+}
+
+static inline VkResult DispatchGetPastPresentationTimingEXT(
+    VkDevice device, const VkPastPresentationTimingInfoEXT* pPastPresentationTimingInfo,
+    VkPastPresentationTimingPropertiesEXT* pPastPresentationTimingProperties) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->GetPastPresentationTimingEXT(device, pPastPresentationTimingInfo, pPastPresentationTimingProperties);
 }
 
 static inline VkResult DispatchInitializePerformanceApiINTEL(VkDevice device,
@@ -3875,6 +3967,20 @@ static inline VkDeviceAddress DispatchGetPipelineIndirectDeviceAddressNV(VkDevic
     auto dispatch = vvl::dispatch::GetData(device);
     return dispatch->GetPipelineIndirectDeviceAddressNV(device, pInfo);
 }
+#ifdef VK_USE_PLATFORM_OHOS
+
+static inline VkResult DispatchGetNativeBufferPropertiesOHOS(VkDevice device, const struct OH_NativeBuffer* buffer,
+                                                             VkNativeBufferPropertiesOHOS* pProperties) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->GetNativeBufferPropertiesOHOS(device, buffer, pProperties);
+}
+
+static inline VkResult DispatchGetMemoryNativeBufferOHOS(VkDevice device, const VkMemoryGetNativeBufferInfoOHOS* pInfo,
+                                                         struct OH_NativeBuffer** pBuffer) {
+    auto dispatch = vvl::dispatch::GetData(device);
+    return dispatch->GetMemoryNativeBufferOHOS(device, pInfo, pBuffer);
+}
+#endif  // VK_USE_PLATFORM_OHOS
 
 static inline void DispatchCmdSetDepthClampEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthClampEnable) {
     auto dispatch = vvl::dispatch::GetData(commandBuffer);
@@ -4485,25 +4591,6 @@ static inline VkResult DispatchCreateSurfaceOHOS(VkInstance instance, const VkSu
     auto dispatch = vvl::dispatch::GetData(instance);
     return dispatch->CreateSurfaceOHOS(instance, pCreateInfo, pAllocator, pSurface);
 }
-
-static inline VkResult DispatchGetSwapchainGrallocUsageOHOS(VkDevice device, VkFormat format, VkImageUsageFlags imageUsage,
-                                                            uint64_t* grallocUsage) {
-    auto dispatch = vvl::dispatch::GetData(device);
-    return dispatch->GetSwapchainGrallocUsageOHOS(device, format, imageUsage, grallocUsage);
-}
-
-static inline VkResult DispatchAcquireImageOHOS(VkDevice device, VkImage image, int32_t nativeFenceFd, VkSemaphore semaphore,
-                                                VkFence fence) {
-    auto dispatch = vvl::dispatch::GetData(device);
-    return dispatch->AcquireImageOHOS(device, image, nativeFenceFd, semaphore, fence);
-}
-
-static inline VkResult DispatchQueueSignalReleaseImageOHOS(VkQueue queue, uint32_t waitSemaphoreCount,
-                                                           const VkSemaphore* pWaitSemaphores, VkImage image,
-                                                           int32_t* pNativeFenceFd) {
-    auto dispatch = vvl::dispatch::GetData(queue);
-    return dispatch->QueueSignalReleaseImageOHOS(queue, waitSemaphoreCount, pWaitSemaphores, image, pNativeFenceFd);
-}
 #endif  // VK_USE_PLATFORM_OHOS
 
 static inline VkResult DispatchGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(
@@ -4527,10 +4614,44 @@ static inline VkResult DispatchGetMemoryMetalHandlePropertiesEXT(VkDevice device
 }
 #endif  // VK_USE_PLATFORM_METAL_EXT
 
+static inline VkResult DispatchEnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM(
+    VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, uint32_t* pCounterCount, VkPerformanceCounterARM* pCounters,
+    VkPerformanceCounterDescriptionARM* pCounterDescriptions) {
+    auto dispatch = vvl::dispatch::GetData(physicalDevice);
+    return dispatch->EnumeratePhysicalDeviceQueueFamilyPerformanceCountersByRegionARM(
+        physicalDevice, queueFamilyIndex, pCounterCount, pCounters, pCounterDescriptions);
+}
+
 static inline void DispatchCmdEndRendering2EXT(VkCommandBuffer commandBuffer, const VkRenderingEndInfoKHR* pRenderingEndInfo) {
     auto dispatch = vvl::dispatch::GetData(commandBuffer);
     dispatch->CmdEndRendering2EXT(commandBuffer, pRenderingEndInfo);
 }
+
+static inline void DispatchCmdBeginCustomResolveEXT(VkCommandBuffer commandBuffer,
+                                                    const VkBeginCustomResolveInfoEXT* pBeginCustomResolveInfo) {
+    auto dispatch = vvl::dispatch::GetData(commandBuffer);
+    dispatch->CmdBeginCustomResolveEXT(commandBuffer, pBeginCustomResolveInfo);
+}
+
+static inline void DispatchCmdSetComputeOccupancyPriorityNV(VkCommandBuffer commandBuffer,
+                                                            const VkComputeOccupancyPriorityParametersNV* pParameters) {
+    auto dispatch = vvl::dispatch::GetData(commandBuffer);
+    dispatch->CmdSetComputeOccupancyPriorityNV(commandBuffer, pParameters);
+}
+#ifdef VK_USE_PLATFORM_UBM_SEC
+
+static inline VkResult DispatchCreateUbmSurfaceSEC(VkInstance instance, const VkUbmSurfaceCreateInfoSEC* pCreateInfo,
+                                                   const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
+    auto dispatch = vvl::dispatch::GetData(instance);
+    return dispatch->CreateUbmSurfaceSEC(instance, pCreateInfo, pAllocator, pSurface);
+}
+
+static inline VkBool32 DispatchGetPhysicalDeviceUbmPresentationSupportSEC(VkPhysicalDevice physicalDevice,
+                                                                          uint32_t queueFamilyIndex, struct ubm_device* device) {
+    auto dispatch = vvl::dispatch::GetData(physicalDevice);
+    return dispatch->GetPhysicalDeviceUbmPresentationSupportSEC(physicalDevice, queueFamilyIndex, device);
+}
+#endif  // VK_USE_PLATFORM_UBM_SEC
 
 static inline VkResult DispatchCreateAccelerationStructureKHR(VkDevice device,
                                                               const VkAccelerationStructureCreateInfoKHR* pCreateInfo,

@@ -459,19 +459,6 @@ bool Device::ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchainCreat
     return skip;
 }
 
-bool Device::ValidatePipelineShaderStage(const vvl::Pipeline& pipeline, const vku::safe_VkPipelineShaderStageCreateInfo& stage_ci,
-                                         const void* pipeline_ci_pnext, const Location& loc) const {
-    bool skip = false;
-
-    if (stage_ci.module != VK_NULL_HANDLE) {
-        skip |= LogError("VUID-VkPipelineShaderStageCreateInfo-module-05026", device, loc,
-                         "module in VkPipelineShaderStageCreateInfo (stage %s) is not VK_NULL_HANDLE.",
-                         string_VkShaderStageFlagBits(stage_ci.stage));
-    }
-
-    return skip;
-}
-
 bool Instance::PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
                                              VkInstance* pInstance, const ErrorObject& error_obj) const {
     bool skip = BaseClass::PreCallValidateCreateInstance(pCreateInfo, pAllocator, pInstance, error_obj);

@@ -3,9 +3,9 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -841,6 +841,8 @@ bool PreCallValidateGetImageViewHandle64NVX(VkDevice device, const VkImageViewHa
                                             const ErrorObject& error_obj) const override;
 bool PreCallValidateGetImageViewAddressNVX(VkDevice device, VkImageView imageView, VkImageViewAddressPropertiesNVX* pProperties,
                                            const ErrorObject& error_obj) const override;
+bool PreCallValidateGetDeviceCombinedImageSamplerIndexNVX(VkDevice device, uint64_t imageViewIndex, uint64_t samplerIndex,
+                                                          const ErrorObject& error_obj) const override;
 bool PreCallValidateCmdDrawIndirectCountAMD(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                             VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                             uint32_t stride, const ErrorObject& error_obj) const override;
@@ -932,6 +934,27 @@ bool PreCallValidateCmdDispatchGraphIndirectCountAMDX(VkCommandBuffer commandBuf
                                                       VkDeviceSize scratchSize, VkDeviceAddress countInfo,
                                                       const ErrorObject& error_obj) const override;
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+bool PreCallValidateWriteSamplerDescriptorsEXT(VkDevice device, uint32_t samplerCount, const VkSamplerCreateInfo* pSamplers,
+                                               const VkHostAddressRangeEXT* pDescriptors,
+                                               const ErrorObject& error_obj) const override;
+bool PreCallValidateWriteResourceDescriptorsEXT(VkDevice device, uint32_t resourceCount,
+                                                const VkResourceDescriptorInfoEXT* pResources,
+                                                const VkHostAddressRangeEXT* pDescriptors,
+                                                const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdBindSamplerHeapEXT(VkCommandBuffer commandBuffer, const VkBindHeapInfoEXT* pBindInfo,
+                                          const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdBindResourceHeapEXT(VkCommandBuffer commandBuffer, const VkBindHeapInfoEXT* pBindInfo,
+                                           const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdPushDataEXT(VkCommandBuffer commandBuffer, const VkPushDataInfoEXT* pPushDataInfo,
+                                   const ErrorObject& error_obj) const override;
+bool PreCallValidateGetImageOpaqueCaptureDataEXT(VkDevice device, uint32_t imageCount, const VkImage* pImages,
+                                                 VkHostAddressRangeEXT* pDatas, const ErrorObject& error_obj) const override;
+bool PreCallValidateRegisterCustomBorderColorEXT(VkDevice device, const VkSamplerCustomBorderColorCreateInfoEXT* pBorderColor,
+                                                 VkBool32 requestIndex, uint32_t* pIndex,
+                                                 const ErrorObject& error_obj) const override;
+bool PreCallValidateUnregisterCustomBorderColorEXT(VkDevice device, uint32_t index, const ErrorObject& error_obj) const override;
+bool PreCallValidateGetTensorOpaqueCaptureDataARM(VkDevice device, uint32_t tensorCount, const VkTensorARM* pTensors,
+                                                  VkHostAddressRangeEXT* pDatas, const ErrorObject& error_obj) const override;
 bool PreCallValidateCmdSetSampleLocationsEXT(VkCommandBuffer commandBuffer, const VkSampleLocationsInfoEXT* pSampleLocationsInfo,
                                              const ErrorObject& error_obj) const override;
 bool PreCallValidateGetImageDrmFormatModifierPropertiesEXT(VkDevice device, VkImage image,
@@ -1032,6 +1055,19 @@ bool PreCallValidateGetQueueCheckpointDataNV(VkQueue queue, uint32_t* pCheckpoin
                                              const ErrorObject& error_obj) const override;
 bool PreCallValidateGetQueueCheckpointData2NV(VkQueue queue, uint32_t* pCheckpointDataCount, VkCheckpointData2NV* pCheckpointData,
                                               const ErrorObject& error_obj) const override;
+bool PreCallValidateSetSwapchainPresentTimingQueueSizeEXT(VkDevice device, VkSwapchainKHR swapchain, uint32_t size,
+                                                          const ErrorObject& error_obj) const override;
+bool PreCallValidateGetSwapchainTimingPropertiesEXT(VkDevice device, VkSwapchainKHR swapchain,
+                                                    VkSwapchainTimingPropertiesEXT* pSwapchainTimingProperties,
+                                                    uint64_t* pSwapchainTimingPropertiesCounter,
+                                                    const ErrorObject& error_obj) const override;
+bool PreCallValidateGetSwapchainTimeDomainPropertiesEXT(VkDevice device, VkSwapchainKHR swapchain,
+                                                        VkSwapchainTimeDomainPropertiesEXT* pSwapchainTimeDomainProperties,
+                                                        uint64_t* pTimeDomainsCounter, const ErrorObject& error_obj) const override;
+bool PreCallValidateGetPastPresentationTimingEXT(VkDevice device,
+                                                 const VkPastPresentationTimingInfoEXT* pPastPresentationTimingInfo,
+                                                 VkPastPresentationTimingPropertiesEXT* pPastPresentationTimingProperties,
+                                                 const ErrorObject& error_obj) const override;
 bool PreCallValidateInitializePerformanceApiINTEL(VkDevice device, const VkInitializePerformanceApiInfoINTEL* pInitializeInfo,
                                                   const ErrorObject& error_obj) const override;
 bool PreCallValidateUninitializePerformanceApiINTEL(VkDevice device, const ErrorObject& error_obj) const override;
@@ -1326,6 +1362,13 @@ bool PreCallValidateCmdUpdatePipelineIndirectBufferNV(VkCommandBuffer commandBuf
                                                       VkPipeline pipeline, const ErrorObject& error_obj) const override;
 bool PreCallValidateGetPipelineIndirectDeviceAddressNV(VkDevice device, const VkPipelineIndirectDeviceAddressInfoNV* pInfo,
                                                        const ErrorObject& error_obj) const override;
+#ifdef VK_USE_PLATFORM_OHOS
+bool PreCallValidateGetNativeBufferPropertiesOHOS(VkDevice device, const struct OH_NativeBuffer* buffer,
+                                                  VkNativeBufferPropertiesOHOS* pProperties,
+                                                  const ErrorObject& error_obj) const override;
+bool PreCallValidateGetMemoryNativeBufferOHOS(VkDevice device, const VkMemoryGetNativeBufferInfoOHOS* pInfo,
+                                              struct OH_NativeBuffer** pBuffer, const ErrorObject& error_obj) const override;
+#endif  // VK_USE_PLATFORM_OHOS
 bool PreCallValidateCmdSetDepthClampEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthClampEnable,
                                               const ErrorObject& error_obj) const override;
 bool PreCallValidateCmdSetPolygonModeEXT(VkCommandBuffer commandBuffer, VkPolygonMode polygonMode,
@@ -1577,15 +1620,6 @@ bool PreCallValidateUpdateIndirectExecutionSetShaderEXT(VkDevice device, VkIndir
                                                         uint32_t executionSetWriteCount,
                                                         const VkWriteIndirectExecutionSetShaderEXT* pExecutionSetWrites,
                                                         const ErrorObject& error_obj) const override;
-#ifdef VK_USE_PLATFORM_OHOS
-bool PreCallValidateGetSwapchainGrallocUsageOHOS(VkDevice device, VkFormat format, VkImageUsageFlags imageUsage,
-                                                 uint64_t* grallocUsage, const ErrorObject& error_obj) const override;
-bool PreCallValidateAcquireImageOHOS(VkDevice device, VkImage image, int32_t nativeFenceFd, VkSemaphore semaphore, VkFence fence,
-                                     const ErrorObject& error_obj) const override;
-bool PreCallValidateQueueSignalReleaseImageOHOS(VkQueue queue, uint32_t waitSemaphoreCount, const VkSemaphore* pWaitSemaphores,
-                                                VkImage image, int32_t* pNativeFenceFd,
-                                                const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_OHOS
 #ifdef VK_USE_PLATFORM_METAL_EXT
 bool PreCallValidateGetMemoryMetalHandleEXT(VkDevice device, const VkMemoryGetMetalHandleInfoEXT* pGetMetalHandleInfo,
                                             void** pHandle, const ErrorObject& error_obj) const override;
@@ -1596,6 +1630,12 @@ bool PreCallValidateGetMemoryMetalHandlePropertiesEXT(VkDevice device, VkExterna
 #endif  // VK_USE_PLATFORM_METAL_EXT
 bool PreCallValidateCmdEndRendering2EXT(VkCommandBuffer commandBuffer, const VkRenderingEndInfoKHR* pRenderingEndInfo,
                                         const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdBeginCustomResolveEXT(VkCommandBuffer commandBuffer,
+                                             const VkBeginCustomResolveInfoEXT* pBeginCustomResolveInfo,
+                                             const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdSetComputeOccupancyPriorityNV(VkCommandBuffer commandBuffer,
+                                                     const VkComputeOccupancyPriorityParametersNV* pParameters,
+                                                     const ErrorObject& error_obj) const override;
 bool PreCallValidateCreateAccelerationStructureKHR(VkDevice device, const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
                                                    const VkAllocationCallbacks* pAllocator,
                                                    VkAccelerationStructureKHR* pAccelerationStructure,

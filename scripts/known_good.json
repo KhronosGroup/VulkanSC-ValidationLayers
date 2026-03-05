@@ -7,7 +7,7 @@
             "sub_dir": "Vulkan-Headers",
             "build_dir": "Vulkan-Headers/build",
             "install_dir": "Vulkan-Headers/build/install",
-            "commit": "v1.4.330"
+            "commit": "v1.4.344"
         },
         {
             "name": "Vulkan-Headers",
@@ -19,7 +19,7 @@
             "cmake_options": [
                 "-DGEN_VULKANSC_COMBINED=ON"
             ],
-            "commit": "vksc1.0.20"
+            "commit": "ba3b55609702243722fea9db42941a4ebc9a50c0"
         },
         {
             "name": "Vulkan-Utility-Libraries",
@@ -28,7 +28,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "v1.4.330",
+            "commit": "v1.4.344",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -43,7 +43,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "vksc1.0.20",
+            "commit": "50a3c053901e12559b5c1942da8d6c5f3c34eb98",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -57,7 +57,7 @@
             "sub_dir": "SPIRV-Headers",
             "build_dir": "SPIRV-Headers/build",
             "install_dir": "SPIRV-Headers/build/install",
-            "commit": "9268f3057354a2cb65991ba5f38b16d81e803692"
+            "commit": "04f10f650d514df88b76d25e83db360142c7b174"
         },
         {
             "name": "SPIRV-Tools",
@@ -71,7 +71,7 @@
                 "-DSPIRV_SKIP_TESTS=ON",
                 "-DSPIRV_SKIP_EXECUTABLES=OFF"
             ],
-            "commit": "6d43afe9a0ef71712d8cec5b0ce0cd3570d1fd41"
+            "commit": "a66a95eecf5102f2b19d6208385538c7c29aa7a1"
         },
         {
             "name": "mimalloc",
@@ -112,7 +112,7 @@
             "sub_dir": "glslang",
             "build_dir": "glslang/build",
             "install_dir": "glslang/build/install",
-            "commit": "8e1494f9d742a27b54193ecd9475dcb2ef23b8b7",
+            "commit": "f0bd0257c308b9a26562c1a30c4748a0219cc951",
             "cmake_options": [
                 "-DENABLE_OPT=OFF"
             ],
@@ -127,7 +127,7 @@
             "sub_dir": "Vulkan-Loader",
             "build_dir": "Vulkan-Loader/build",
             "install_dir": "Vulkan-Loader/build/install",
-            "commit": "v1.4.330",
+            "commit": "v1.4.344",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -153,7 +153,7 @@
             "sub_dir": "Vulkan-Profiles",
             "build_dir": "Vulkan-Profiles/build",
             "install_dir": "Vulkan-Profiles/build/install",
-            "commit": "v1.4.329",
+            "commit": "v1.4.341",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -166,7 +166,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "vksc1.0.20",
+            "commit": "9859d70e5c031271ee9a959883337cf10bfc5b93",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -191,9 +191,32 @@
         },
         {
             "name": "slang",
-            "repo_binaries_url": "https://github.com/shader-slang/slang/releases/tag/v2025.12.1",
+            "url": "https://github.com/shader-slang/slang/releases/download/v{release}/slang-{release}-{system}-{arch}.zip",
+            "sub_dir": "slang",
             "build_dir": "slang/download",
-            "install_dir": "slang/install"
+            "install_dir": "slang/install",
+            "release": "2025.19.1",
+            "url_format_map": {
+                "64": "x86_64",
+                "x64": "x86_64",
+                "win64": "x86_64",
+                "arm64": "aarch64",
+                "Darwin": "macos"
+            },
+            "optional": [
+                "tests"
+            ],
+            "build_platforms": [
+                "linux",
+                "macos",
+                "windows"
+            ],
+            "build_architectures": [
+                "64",
+                "x64",
+                "win64",
+                "arm64"
+            ]
         }
     ],
     "install_names": {

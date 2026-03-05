@@ -32,10 +32,31 @@
 namespace vkt {
 namespace dg {
 
+enum GraphVariant {
+    BasicSpirv,                  // double TOSA MAX_POOL2D
+    AddTensorArraySpirv,         // TOSA ADD, using tensor OpTypeArray
+    AddRuntimeTensorArraySpirv,  // TOSA ADD, using tensor OpTypeRuntimeArray
+};
+
+enum TensorType {
+    BASIC_SPIRV_IN,
+    BASIC_SPIRV_OUT,
+    ARRAY_SPIRV,
+};
+
 struct HelperParameters {
     bool protected_tensors = false;
+    VkDescriptorType desc_type = VK_DESCRIPTOR_TYPE_TENSOR_ARM;
+    VkTensorUsageFlagsARM usage_bit = VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM;
     const char *spirv_source = nullptr;
     const char *entrypoint = "main";
+    GraphVariant graph_variant = BasicSpirv;
+};
+
+struct ModifiableShaderParameters {
+    const char *capabilities = "";
+    const char *types = "";
+    const char *instructions = "";
 };
 
 class DataGraphPipelineHelper {
@@ -48,10 +69,8 @@ class DataGraphPipelineHelper {
     vkt::ShaderModule shader_;
     VkDataGraphPipelineShaderModuleCreateInfoARM shader_module_ci_;
     std::vector<VkDataGraphPipelineResourceInfoARM> resources_;
-    vkt::Tensor in_tensor_;
-    vkt::Tensor out_tensor_;
-    vkt::TensorView in_tensor_view_;
-    vkt::TensorView out_tensor_view_;
+    std::vector<std::shared_ptr<vkt::Tensor>> tensors_;
+    std::vector<std::shared_ptr<vkt::TensorView>> tensor_views_;
 
     VkLayerTest &layer_test_;
     vkt::Device *device_;
@@ -60,15 +79,22 @@ class DataGraphPipelineHelper {
     virtual ~DataGraphPipelineHelper();
     void Destroy();
 
-    static std::string GetSpirvSourceGraph(const char *inserted_line = "");
-    static std::string GetSpirvMultiEntryComputeAndDataGraph();
+    static inline std::string GetSpirvBasicDataGraph() { return GetSpirvModifyableDataGraph(); };
+    static std::string GetSpirvModifyableDataGraph(const ModifiableShaderParameters& params = ModifiableShaderParameters());
+    static std::string GetSpirvConstantDataGraph();
     static std::string GetSpirvMultiEntryTwoDataGraph();
-    void InitPipelineResources(const std::vector<vkt::Tensor *> &tensors = {},
-                               VkDescriptorType desc_type = VK_DESCRIPTOR_TYPE_TENSOR_ARM,
-                               VkDescriptorSetLayoutCreateFlags layout_flags = 0);
+    static inline std::string GetSpirvBasicShader() { return GetSpirvModifiableShader(); };
+    static std::string GetSpirvModifiableShader(const ModifiableShaderParameters &params = ModifiableShaderParameters());
+    static std::string GetSpirvTensorArrayDataGraph(bool is_runtime = false);
+
+    VkTensorDescriptionARM GetTensorDesc(TensorType type);
+    void InitPipelineResources();
+    void InitTensor(vkt::Tensor &tensor, vkt::TensorView &tensor_view, const VkTensorDescriptionARM &tensor_desc,
+                    bool is_protected = false);
     void CreatePipelineLayout(const std::vector<VkPushConstantRange> &push_constant_ranges = {});
-    VkResult CreateDataGraphPipeline();
+    VkResult CreateDataGraphPipeline(VkPipelineCache pipeline_cache = VK_NULL_HANDLE);
     const VkPipeline &Handle() const { return pipeline_; }
+    operator VkPipeline() const { return pipeline_; }
 
     // Helper function to create a simple test case
     // info_override can be any callable that takes a DataGraphPipelineHelper, error can be any args accepted by
@@ -100,10 +126,9 @@ class DataGraphPipelineHelper {
 
   private:
     void CreateShaderModule(const char *spirv_source, const char *entrypoint = "main");
-    void InitTensor(vkt::Tensor &tensor, vkt::TensorView &tensor_view, const std::vector<int64_t> &tensor_dims, bool is_protected);
 
     VkPipeline pipeline_ = VK_NULL_HANDLE;
+    HelperParameters params_ = HelperParameters();
 };
-
 }  // namespace dg
 }  // namespace vkt

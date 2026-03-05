@@ -146,7 +146,7 @@ TEST_F(NegativeParent, BindPipeline) {
     pipeline_layout_ci.setLayoutCount = 0;
     vkt::PipelineLayout pipeline_layout(*m_second_device, pipeline_layout_ci);
 
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
+    VkShaderObj cs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
     cs.InitFromGLSLTry(m_second_device);
 
     VkComputePipelineCreateInfo pipeline_ci = vku::InitStructHelper();
@@ -171,7 +171,7 @@ TEST_F(NegativeParent, DISABLED_PipelineShaderStageCreateInfo) {
     pipeline_layout_ci.setLayoutCount = 0;
     vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci);
 
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
+    VkShaderObj cs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
     cs.InitFromGLSLTry(m_second_device);
 
     VkComputePipelineCreateInfo pipeline_ci = vku::InitStructHelper();
@@ -302,7 +302,7 @@ TEST_F(NegativeParent, Instance_PhysicalDeviceAndSurface) {
 
     VkBool32 supported = VK_FALSE;
     m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceSurfaceSupportKHR-commonparent");
-    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, instance2_surface.Handle(), &supported);
+    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, instance2_surface, &supported);
     m_errorMonitor->VerifyFound();
 }
 
@@ -320,7 +320,7 @@ TEST_F(NegativeParent, Instance_DeviceAndSurface) {
 
     VkDeviceGroupPresentModeFlagsKHR flags = 0;
     m_errorMonitor->SetDesiredError("VUID-vkGetDeviceGroupSurfacePresentModesKHR-commonparent");
-    vk::GetDeviceGroupSurfacePresentModesKHR(*m_device, instance2_surface.Handle(), &flags);
+    vk::GetDeviceGroupSurfacePresentModesKHR(*m_device, instance2_surface, &flags);
     m_errorMonitor->VerifyFound();
 }
 
@@ -340,7 +340,7 @@ TEST_F(NegativeParent, Instance_Surface) {
     }
 
     auto swapchain_ci = vku::InitStruct<VkSwapchainCreateInfoKHR>();
-    swapchain_ci.surface = instance2_surface.Handle();
+    swapchain_ci.surface = instance2_surface;
     swapchain_ci.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_ci.imageFormat = m_surface_formats[0].format;
     swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
@@ -387,7 +387,7 @@ TEST_F(NegativeParent, Device_OldSwapchain) {
     vkt::Device instance2_device(instance2_physical_device, m_device_extension_names);
 
     auto swapchain_ci = vku::InitStruct<VkSwapchainCreateInfoKHR>();
-    swapchain_ci.surface = instance2_surface.Handle();
+    swapchain_ci.surface = instance2_surface;
     swapchain_ci.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_ci.imageFormat = m_surface_formats[0].format;
     swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
@@ -404,7 +404,7 @@ TEST_F(NegativeParent, Device_OldSwapchain) {
     vkt::Swapchain other_device_swapchain(instance2_device, swapchain_ci);
 
     // oldSwapchain from a different device
-    swapchain_ci.surface = m_surface.Handle();
+    swapchain_ci.surface = m_surface;
     swapchain_ci.oldSwapchain = other_device_swapchain;
     m_errorMonitor->SetDesiredError("VUID-VkSwapchainCreateInfoKHR-commonparent");
     vkt::Swapchain swapchain(*m_device, swapchain_ci);
@@ -425,7 +425,7 @@ TEST_F(NegativeParent, Instance_Surface_2) {
 
     // surface from a different instance
     m_errorMonitor->SetDesiredError("VUID-vkDestroySurfaceKHR-surface-parent");
-    vk::DestroySurfaceKHR(instance(), instance2_surface.Handle(), nullptr);
+    vk::DestroySurfaceKHR(instance(), instance2_surface, nullptr);
     m_errorMonitor->VerifyFound();
 }
 
@@ -753,6 +753,34 @@ TEST_F(NegativeParent, UpdateDescriptorSetsCombinedImageSampler) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeParent, UpdateDescriptorSetsTensor) {
+    TEST_DESCRIPTION("Try to update tensor descriptors on the wrong device.");
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tensors);
+    RETURN_IF_SKIP(Init());
+
+    // tensor and view allocated on the main device (m_device)
+    vkt::Tensor tensor(*m_device);
+    tensor.BindToMem();
+    VkTensorViewCreateInfoARM tensor_view_create_info = vku::InitStructHelper();
+    tensor_view_create_info.tensor = tensor;
+    tensor_view_create_info.format = tensor.Format();
+    vkt::TensorView view(*m_device, tensor_view_create_info);
+
+    // allocate the descriptor set on a different device (m_second_device)
+    auto features = m_device->Physical().Features();
+    m_second_device = new vkt::Device(gpu_, m_device_extension_names, &features, nullptr);
+    OneOffDescriptorSet descriptor_set(m_second_device, {
+                                                            {0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                        });
+    descriptor_set.WriteDescriptorTensorInfo(0, &view.handle(), 0);
+
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateDescriptorSets-pDescriptorWrites-12324");
+    descriptor_set.UpdateDescriptorSets();
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeParent, DescriptorSetLayout) {
     TEST_DESCRIPTION("Create pipeline layout from a descriptor set layout that was created on a different device");
     RETURN_IF_SKIP(Init());
@@ -925,18 +953,15 @@ TEST_F(NegativeParent, MapMemory2) {
 
 TEST_F(NegativeParent, DataGraphPipeline) {
     TEST_DESCRIPTION("Test VUID-*-commonparent checks not sharing the same Device");
-
-    SetTargetApiVersion(VK_API_VERSION_1_3);
+    SetTargetApiVersion(VK_API_VERSION_1_4);
     AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
     AddRequiredExtensions(VK_ARM_DATA_GRAPH_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tensors);
+    AddRequiredFeature(vkt::Feature::dataGraph);
+    AddRequiredFeature(vkt::Feature::dataGraphShaderModule);
     AddRequiredFeature(vkt::Feature::shaderTensorAccess);
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
-    AddRequiredFeature(vkt::Feature::dataGraph);
     AddRequiredFeature(vkt::Feature::shaderInt8);
-    AddRequiredFeature(vkt::Feature::shaderInt16);
-    AddRequiredFeature(vkt::Feature::shaderInt64);
-    AddRequiredFeature(vkt::Feature::shaderFloat16);
-    AddRequiredFeature(vkt::Feature::tensors);
     RETURN_IF_SKIP(Init());
 
     auto features = m_device->Physical().Features();
@@ -947,7 +972,7 @@ TEST_F(NegativeParent, DataGraphPipeline) {
     VkDataGraphPipelineInfoARM pipeline_info = vku::InitStructHelper();
     pipeline_info.dataGraphPipeline = pipeline.Handle();
 
-    /* query with pData null, to get back the required dataSize. Enough to trigger the VUID */
+    // query with pData null, to get back the required dataSize. Enough to trigger the VUID
     VkDataGraphPipelinePropertyQueryResultARM query_result = vku::InitStructHelper();
     query_result.property = VK_DATA_GRAPH_PIPELINE_PROPERTY_CREATION_LOG_ARM;
     query_result.pData = nullptr;
@@ -962,17 +987,15 @@ TEST_F(NegativeParent, DataGraphPipelineSessionBindPointRequirements) {
     TEST_DESCRIPTION(
         "Try to get the bind point requirements for DataGraphPipelineSession using a different device than the device used to "
         "create the session");
-    SetTargetApiVersion(VK_API_VERSION_1_3);
+    SetTargetApiVersion(VK_API_VERSION_1_4);
     AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
     AddRequiredExtensions(VK_ARM_DATA_GRAPH_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tensors);
     AddRequiredFeature(vkt::Feature::dataGraph);
+    AddRequiredFeature(vkt::Feature::dataGraphShaderModule);
     AddRequiredFeature(vkt::Feature::shaderTensorAccess);
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     AddRequiredFeature(vkt::Feature::shaderInt8);
-    AddRequiredFeature(vkt::Feature::shaderInt16);
-    AddRequiredFeature(vkt::Feature::shaderInt64);
-    AddRequiredFeature(vkt::Feature::shaderFloat16);
-    AddRequiredFeature(vkt::Feature::tensors);
     RETURN_IF_SKIP(Init());
 
     auto features = m_device->Physical().Features();
@@ -992,5 +1015,70 @@ TEST_F(NegativeParent, DataGraphPipelineSessionBindPointRequirements) {
 
     m_errorMonitor->SetDesiredError("VUID-vkGetDataGraphPipelineSessionBindPointRequirementsARM-session-09783");
     vk::GetDataGraphPipelineSessionBindPointRequirementsARM(m_second_device->handle(), &req_info, &count, nullptr);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeParent, DataGraphPipelineSessionMemoryRequirements) {
+    TEST_DESCRIPTION(
+        "Try to get the memory requirements for DataGraphPipelineSession using a different device than the device used to create "
+        "the session");
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_ARM_DATA_GRAPH_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tensors);
+    AddRequiredFeature(vkt::Feature::dataGraph);
+    AddRequiredFeature(vkt::Feature::dataGraphShaderModule);
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    RETURN_IF_SKIP(Init());
+
+    auto features = m_device->Physical().Features();
+    m_second_device = new vkt::Device(gpu_, m_device_extension_names, &features, nullptr);
+
+    vkt::dg::DataGraphPipelineHelper pipeline(*this);
+    pipeline.CreateDataGraphPipeline();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = pipeline.Handle();
+
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+
+    VkDataGraphPipelineSessionMemoryRequirementsInfoARM req_info = vku::InitStructHelper();
+    req_info.session = session.handle();
+    VkMemoryRequirements2 mem_req = vku::InitStructHelper();
+
+    m_errorMonitor->SetDesiredError("VUID-vkGetDataGraphPipelineSessionMemoryRequirementsARM-session-09950");
+    vk::GetDataGraphPipelineSessionMemoryRequirementsARM(m_second_device->handle(), &req_info, &mem_req);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeParent, DataGraphPipelineSessionAvailableProperties) {
+    TEST_DESCRIPTION(
+        "Try to get the available properties for DataGraphPipeline using a different device than the device used to create the "
+        "session");
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_ARM_DATA_GRAPH_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tensors);
+    AddRequiredFeature(vkt::Feature::dataGraph);
+    AddRequiredFeature(vkt::Feature::dataGraphShaderModule);
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    RETURN_IF_SKIP(Init());
+
+    auto features = m_device->Physical().Features();
+    m_second_device = new vkt::Device(gpu_, m_device_extension_names, &features, nullptr);
+
+    vkt::dg::DataGraphPipelineHelper pipeline(*this);
+    pipeline.CreateDataGraphPipeline();
+    VkDataGraphPipelineInfoARM pipeline_info = vku::InitStructHelper();
+    pipeline_info.dataGraphPipeline = pipeline.Handle();
+
+    // query with VkDataGraphPipelinePropertyARM null, to get back the required prop_count. Enough to trigger the VUID
+    uint32_t prop_count;
+    m_errorMonitor->SetDesiredError("VUID-vkGetDataGraphPipelineAvailablePropertiesARM-dataGraphPipeline-09888");
+    vk::GetDataGraphPipelineAvailablePropertiesARM(m_second_device->handle(), &pipeline_info, &prop_count, nullptr);
     m_errorMonitor->VerifyFound();
 }

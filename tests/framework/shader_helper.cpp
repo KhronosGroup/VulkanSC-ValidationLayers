@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -347,8 +347,10 @@ void CheckSlangSupport() {
 #endif
 }
 
-bool SlangToSPV(const char *slang_shader, const char *entry_point_name, std::vector<uint8_t> &out_bytes) {
+bool SlangToSPV(const spv_target_env target_env, const char* slang_shader, const char* entry_point_name,
+                std::vector<uint8_t>& out_bytes) {
 #ifndef VVL_USE_SLANG
+    (void)target_env;
     (void)slang_shader;
     (void)entry_point_name;
     (void)out_bytes;
@@ -372,7 +374,14 @@ bool SlangToSPV(const char *slang_shader, const char *entry_point_name, std::vec
     // Next we create a compilation session to generate SPIRV code from Slang source.
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
-    targetDesc.profile = slang_session->findProfile("glsl_460");  // todo what spirv profile ?
+    // Default currently is spirv_1_3 (vulkan 1.1) as that is what Slang does by default
+    std::string profile = "spirv_1_3";
+    if (target_env == SPV_ENV_VULKAN_1_2) {
+        profile = "spirv_1_5";
+    } else if (target_env == SPV_ENV_VULKAN_1_3 || target_env == SPV_ENV_VULKAN_1_4) {
+        profile = "spirv_1_6";
+    }
+    targetDesc.profile = slang_session->findProfile(profile.c_str());
     targetDesc.flags = 0;
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targets = &targetDesc;
@@ -478,9 +487,9 @@ bool SlangToSPV(const char *slang_shader, const char *entry_point_name, std::vec
 
 VkPipelineShaderStageCreateInfo const &VkShaderObj::GetStageCreateInfo() const { return m_stage_info; }
 
-VkShaderObj::VkShaderObj(vkt::Device &device, const char *source, VkShaderStageFlagBits stage, const spv_target_env env,
-                         SpvSourceType source_type, const VkSpecializationInfo *spec_info, const char *entry_point,
-                         const void *pNext)
+VkShaderObj::VkShaderObj(vkt::Device& device, const char* source, VkShaderStageFlagBits stage, const spv_target_env env,
+                         SpvSourceType source_type, const VkSpecializationInfo* spec_info, const char* entry_point,
+                         const void* shader_module_ci_pNext, const void* pipeline_shader_stage_ci_pNext)
     : m_device(&device), m_source(source), m_spv_env(env) {
     m_stage_info = vku::InitStructHelper();
     m_stage_info.flags = 0;
@@ -488,8 +497,9 @@ VkShaderObj::VkShaderObj(vkt::Device &device, const char *source, VkShaderStageF
     m_stage_info.module = VK_NULL_HANDLE;
     m_stage_info.pName = entry_point;
     m_stage_info.pSpecializationInfo = spec_info;
+    m_stage_info.pNext = pipeline_shader_stage_ci_pNext;
     if (source_type == SPV_SOURCE_GLSL) {
-        InitFromGLSL(pNext);
+        InitFromGLSL(shader_module_ci_pNext);
     } else if (source_type == SPV_SOURCE_ASM) {
         InitFromASM();
     } else if (source_type == SPV_SOURCE_SLANG) {
@@ -497,21 +507,16 @@ VkShaderObj::VkShaderObj(vkt::Device &device, const char *source, VkShaderStageF
     }
 }
 
-VkShaderObj::VkShaderObj(VkRenderFramework *framework, const char *source, VkShaderStageFlagBits stage, const spv_target_env env,
-                         SpvSourceType source_type, const VkSpecializationInfo *spec_info, const char *entry_point,
-                         const void *pNext)
-    : VkShaderObj(*framework->DeviceObj(), source, stage, env, source_type, spec_info, entry_point, pNext) {}
-
-bool VkShaderObj::InitFromGLSL(const void *pNext) {
+bool VkShaderObj::InitFromGLSL(const void* shader_module_ci_pNext) {
     std::vector<uint32_t> spv;
     GLSLtoSPV(m_device->Physical().limits_, m_stage_info.stage, m_source, spv, m_spv_env);
 
-    VkShaderModuleCreateInfo moduleCreateInfo = vku::InitStructHelper();
-    moduleCreateInfo.pNext = pNext;
-    moduleCreateInfo.codeSize = spv.size() * sizeof(uint32_t);
-    moduleCreateInfo.pCode = spv.data();
+    VkShaderModuleCreateInfo module_ci = vku::InitStructHelper();
+    module_ci.pNext = shader_module_ci_pNext;
+    module_ci.codeSize = spv.size() * sizeof(uint32_t);
+    module_ci.pCode = spv.data();
 
-    Init(*m_device, moduleCreateInfo);
+    Init(*m_device, module_ci);
     m_stage_info.module = handle();
     return VK_NULL_HANDLE != handle();
 }
@@ -566,7 +571,7 @@ bool VkShaderObj::InitFromSlang() {
     return false;
 #else
     std::vector<uint8_t> bytes;
-    if (!SlangToSPV(m_source, m_stage_info.pName, bytes)) {
+    if (!SlangToSPV(m_spv_env, m_source, m_stage_info.pName, bytes)) {
         return false;
     }
     VkShaderModuleCreateInfo module_ci = vku::InitStructHelper();
@@ -583,7 +588,7 @@ bool VkShaderObj::InitFromSlang() {
 VkShaderObj VkShaderObj::CreateFromGLSL(VkRenderFramework *framework, const char *source, VkShaderStageFlagBits stage,
                                         const spv_target_env spv_env, const VkSpecializationInfo *spec_info,
                                         const char *entry_point) {
-    auto shader = VkShaderObj(framework, source, stage, spv_env, SPV_SOURCE_GLSL_TRY, spec_info, entry_point);
+    auto shader = VkShaderObj(*framework->DeviceObj(), source, stage, spv_env, SPV_SOURCE_GLSL_TRY, spec_info, entry_point);
     if (VK_SUCCESS == shader.InitFromGLSLTry()) {
         return shader;
     }
@@ -594,9 +599,19 @@ VkShaderObj VkShaderObj::CreateFromGLSL(VkRenderFramework *framework, const char
 VkShaderObj VkShaderObj::CreateFromASM(VkRenderFramework *framework, const char *source, VkShaderStageFlagBits stage,
                                        const spv_target_env spv_env, const VkSpecializationInfo *spec_info,
                                        const char *entry_point) {
-    auto shader = VkShaderObj(framework, source, stage, spv_env, SPV_SOURCE_ASM_TRY, spec_info, entry_point);
+    auto shader = VkShaderObj(*framework->DeviceObj(), source, stage, spv_env, SPV_SOURCE_ASM_TRY, spec_info, entry_point);
     if (VK_SUCCESS == shader.InitFromASMTry()) {
         return shader;
     }
     return {};
+}
+
+VkDescriptorSetAndBindingMappingEXT MakeSetAndBindingMapping(uint32_t set, uint32_t binding, uint32_t count,
+                                                             VkSpirvResourceTypeFlagsEXT mask) {
+    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
+    mapping.descriptorSet = set;
+    mapping.firstBinding = binding;
+    mapping.bindingCount = count;
+    mapping.resourceMask = mask;
+    return mapping;
 }

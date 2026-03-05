@@ -278,8 +278,10 @@ class VideoConfig {
         picture_format_props_.clear();
         dpb_format_props_.clear();
 
-        picture_format_props_ = picture_format_props;
-        dpb_format_props_ = dpb_format_props;
+        std::copy_if(picture_format_props.begin(), picture_format_props.end(), std::back_inserter(picture_format_props_),
+                     IsTestableVideoFormat);
+        std::copy_if(dpb_format_props.begin(), dpb_format_props.end(), std::back_inserter(dpb_format_props_),
+                     IsTestableVideoFormat);
 
         session_create_info_.pictureFormat = picture_format_props[0].format;
         session_create_info_.referencePictureFormat = dpb_format_props[0].format;
@@ -291,10 +293,14 @@ class VideoConfig {
         emphasis_map_format_props_.clear();
 
         for (const auto& delta_map_format_prop : delta_map_format_props) {
-            quant_delta_map_format_props_.emplace_back(&delta_map_format_prop);
+            if (IsTestableVideoFormat(delta_map_format_prop)) {
+                quant_delta_map_format_props_.emplace_back(&delta_map_format_prop);
+            }
         }
         for (const auto& emphasis_map_format_prop : emphasis_map_format_props) {
-            emphasis_map_format_props_.emplace_back(&emphasis_map_format_prop);
+            if (IsTestableVideoFormat(emphasis_map_format_prop)) {
+                emphasis_map_format_props_.emplace_back(&emphasis_map_format_prop);
+            }
         }
     }
 
@@ -499,6 +505,10 @@ class VideoConfig {
     std::vector<vku::safe_VkVideoFormatPropertiesKHR> quant_delta_map_format_props_{};
     std::vector<vku::safe_VkVideoFormatPropertiesKHR> emphasis_map_format_props_{};
     VkVideoEncodeIntraRefreshModeFlagBitsKHR intra_refresh_mode_{VK_VIDEO_ENCODE_INTRA_REFRESH_MODE_NONE_KHR};
+
+    static bool IsTestableVideoFormat(const VkVideoFormatPropertiesKHR& format) {
+        return format.imageTiling == VK_IMAGE_TILING_LINEAR || format.imageTiling == VK_IMAGE_TILING_OPTIMAL;
+    }
 };
 
 class BitstreamBuffer {
@@ -2926,9 +2936,9 @@ class VideoContext {
     }
 
     void Init(bool protected_content) {
-        ASSERT_TRUE(queue_.handle() != VK_NULL_HANDLE);
-        ASSERT_TRUE(cmd_pool_.handle() != VK_NULL_HANDLE);
-        ASSERT_TRUE(cmd_buffer_.handle() != VK_NULL_HANDLE);
+        ASSERT_TRUE(queue_ != VK_NULL_HANDLE);
+        ASSERT_TRUE(cmd_pool_ != VK_NULL_HANDLE);
+        ASSERT_TRUE(cmd_buffer_ != VK_NULL_HANDLE);
 
         {
             VkVideoSessionCreateInfoKHR create_info = *config_.SessionCreateInfo();
@@ -3140,6 +3150,7 @@ class VkVideoLayerTest : public VkLayerTest {
         // NOTE: this appears to be required for the format that is chosen in
         // VkVideoLayerTest.BeginCodingIncompatRefPicProfile
         AddOptionalExtensions(VK_EXT_YCBCR_2PLANE_444_FORMATS_EXTENSION_NAME);
+        AddOptionalFeature(vkt::Feature::ycbcr2plane444Formats);
 
         AddOptionalExtensions(VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME);
         AddOptionalExtensions(VK_KHR_VIDEO_DECODE_H265_EXTENSION_NAME);
@@ -3353,6 +3364,15 @@ class VkVideoLayerTest : public VkLayerTest {
 
     bool QueueFamilySupportsResultStatusOnlyQueries(uint32_t qfi) const {
         return queue_family_query_result_status_props_[qfi].queryResultStatusSupport;
+    }
+
+    bool HasQueueFamilySupportsResultStatusOnlyQueries() const {
+        for (size_t qfi = 0; qfi < queue_family_video_props_.size(); qfi++) {
+            if (queue_family_query_result_status_props_[qfi].queryResultStatusSupport) {
+                return true;
+            }
+        }
+        return false;
     }
 
     bool IsProtectedNoFaultSupported() const { return protected_no_fault_supported_; }

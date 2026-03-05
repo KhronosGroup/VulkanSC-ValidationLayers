@@ -1,6 +1,6 @@
-/* Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
+/* Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
  * Copyright (c) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,6 +37,7 @@
 #include "state_tracker/tensor_state.h"
 #include "drawdispatch/drawdispatch_vuids.h"
 #include "utils/action_command_utils.h"
+#include "utils/image_utils.h"
 
 namespace vvl {
 
@@ -53,7 +54,7 @@ static const char *GetActionType(Func command) {
 
 std::string DescriptorValidator::DescribeDescriptor(const spirv::ResourceInterfaceVariable &resource_variable, uint32_t index,
                                                     VkDescriptorType type) const {
-    std::stringstream ss;
+    std::ostringstream ss;
     switch (type) {
         case VK_DESCRIPTOR_TYPE_SAMPLER:
             ss << "sampler ";
@@ -62,7 +63,11 @@ std::string DescriptorValidator::DescribeDescriptor(const spirv::ResourceInterfa
             ss << "combined image sampler ";
             break;
         case VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM:
+            ss << "sampled weight image ";
+            break;
         case VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM:
+            ss << "block match image ";
+            break;
         case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
             ss << "sampled image ";
             break;
@@ -91,8 +96,10 @@ std::string DescriptorValidator::DescribeDescriptor(const spirv::ResourceInterfa
             break;
         case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
         case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV:
-        case VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV:
             ss << "acceleration structure ";
+            break;
+        case VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV:
+            ss << "partitioned acceleration structure ";
             break;
         case VK_DESCRIPTOR_TYPE_TENSOR_ARM:
             ss << "tensor ";
@@ -156,7 +163,7 @@ bool DescriptorValidator::ValidateDescriptorsStatic(const spirv::ResourceInterfa
     // the pipeline layout more info https://gitlab.khronos.org/vulkan/vulkan/-/issues/4383
     uint32_t count = binding.count;
     // if using VARIABLE_DESCRIPTOR_COUNT, we will still use binding.count as that will be the adjusted value
-    if (resource_variable.array_length != 0 && descriptor_set.GetVariableDescriptorCount() == 0) {
+    if (resource_variable.IsArray() && descriptor_set.GetVariableDescriptorCount() == 0) {
         count = resource_variable.array_length;
     }
 
@@ -309,6 +316,9 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
                              DescribeDescriptor(resource_variable, index, descriptor_type).c_str(), FormatHandle(buffer).c_str(),
                              FormatHandle(binding->Handle()).c_str(), DescribeInstruction().c_str());
         }
+        if (dev_proxy.enabled_features.tileMemoryHeap && resource_variable.IsAccessed()) {
+            skip |= dev_proxy.ValidateBoundTileMemory(*descriptor.GetBufferState(), cb_state, *vuids);
+        }
     }
     if (dev_proxy.enabled_features.protectedMemory == VK_TRUE) {
         skip |= dev_proxy.ValidateProtectedBuffer(cb_state, *buffer_node, loc.Get(), vuids->unprotected_command_buffer_02707,
@@ -439,15 +449,15 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
                 DescribeDescriptor(resource_variable, index, descriptor_type).c_str(),
                 string_VkImageViewType(image_view_ci.viewType), string_SpvDim(dim), is_image_array,
                 SuggestImageViewType(dim, is_image_array),
-                (is_gpu_av && resource_variable.array_length > 1)
-                    ? "\nAdvice: The dimension is tied to descriptor variable, so for descriptor indexing, you might need to "
+                (is_gpu_av && resource_variable.IsArray())
+                    ? "\nAdvice: The dimension is tied to the descriptor variable, so for descriptor indexing, you might need to "
                       "express two different arrays of different types that share the same descriptor binding."
                     : "",
                 DescribeInstruction().c_str());
         }
 
         const uint32_t view_numeric_type = spirv::GetFormatType(image_view_ci.format);
-        const uint32_t variable_numeric_type = resource_variable.info.image_sampled_type_numeric;
+        const uint32_t variable_numeric_type = resource_variable.info.numeric_type;
         // When the image has a external format the views format must be VK_FORMAT_UNDEFINED and it is required to use a sampler
         // Ycbcr conversion. Thus we can't extract any meaningful information from the format parameter.
         if (image_view_ci.format != VK_FORMAT_UNDEFINED && ((variable_numeric_type & view_numeric_type) == 0)) {
@@ -464,24 +474,24 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
         }
 
         // Check for only_report_errors last (to save a nesting), this string building is expensive if being spammed constantly
-        if (image_view_ci.format != VK_FORMAT_UNDEFINED && resource_variable.info.image_format != VK_FORMAT_UNDEFINED &&
-            image_view_ci.format != resource_variable.info.image_format && !dev_proxy.global_settings.only_report_errors) {
+        if (image_view_ci.format != VK_FORMAT_UNDEFINED && resource_variable.info.vk_format != VK_FORMAT_UNDEFINED &&
+            image_view_ci.format != resource_variable.info.vk_format && !dev_proxy.global_settings.only_report_errors) {
             // This warning was added after being discussed in https://gitlab.khronos.org/vulkan/vulkan/-/issues/4128
             auto set = descriptor_set.Handle();
             const LogObjectList objlist(this->objlist, set, image_view);
-            std::stringstream msg;
+            std::ostringstream msg;
             msg << "the " << DescribeDescriptor(resource_variable, index, descriptor_type)
                 << " is accessed by a OpTypeImage that has a Format operand "
-                << string_SpirvImageFormat(resource_variable.info.image_format) << " (equivalent to "
-                << string_VkFormat(resource_variable.info.image_format) << ") which doesn't match the " << FormatHandle(image_view)
+                << string_SpirvImageFormat(resource_variable.info.vk_format) << " (equivalent to "
+                << string_VkFormat(resource_variable.info.vk_format) << ") which doesn't match the " << FormatHandle(image_view)
                 << " format (" << string_VkFormat(image_view_ci.format)
                 << "). Any loads or stores with the variable will produce undefined values to the whole image (not just the texel "
                    "being accessed).";
             if (vkuFormatCompatibilityClass(image_view_ci.format) ==
-                vkuFormatCompatibilityClass(resource_variable.info.image_format)) {
+                vkuFormatCompatibilityClass(resource_variable.info.vk_format)) {
                 msg << " While the formats are compatible, Storage Images must exactly match. Few ways to resolve this are\n";
-                if (vkuFormatComponentCount(image_view_ci.format) == vkuFormatComponentCount(resource_variable.info.image_format)) {
-                    msg << "1. Set your ImageView to " << string_VkFormat(resource_variable.info.image_format)
+                if (vkuFormatComponentCount(image_view_ci.format) == vkuFormatComponentCount(resource_variable.info.vk_format)) {
+                    msg << "1. Set your ImageView to " << string_VkFormat(resource_variable.info.vk_format)
                         << " and swizzle the values in the shader to match the desired results.\n";
                 } else {
                     const char *suggested_format = string_SpirvImageFormat(image_view_ci.format);
@@ -504,13 +514,13 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
 
         const bool image_format_width_64 = vkuFormatHasComponentSize(image_view_ci.format, 64);
         if (image_format_width_64) {
-            if (resource_variable.info.image_sampled_type_width != 64) {
+            if (resource_variable.info.bit_width != 64) {
                 const LogObjectList objlist(this->objlist, descriptor_set.Handle(), image_view);
                 skip |= LogError(vuids->image_view_access_64_04470, objlist, loc.Get(),
                                  "the %s has a 64-bit component ImageView format (%s) but the OpTypeImage's "
                                  "Sampled Type has a width of %" PRIu32 ".%s",
                                  DescribeDescriptor(resource_variable, index, descriptor_type).c_str(),
-                                 string_VkFormat(image_view_ci.format), resource_variable.info.image_sampled_type_width,
+                                 string_VkFormat(image_view_ci.format), resource_variable.info.bit_width,
                                  DescribeInstruction().c_str());
             } else if (!dev_proxy.enabled_features.sparseImageInt64Atomics && image_state->sparse_residency) {
                 const LogObjectList objlist(this->objlist, descriptor_set.Handle(), image_view, image_state->Handle());
@@ -520,21 +530,21 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
                              "sparseImageInt64Atomics is not enabled.%s",
                              DescribeDescriptor(resource_variable, index, descriptor_type).c_str(), DescribeInstruction().c_str());
             }
-        } else if (!image_format_width_64 && resource_variable.info.image_sampled_type_width != 32) {
+        } else if (!image_format_width_64 && resource_variable.info.bit_width != 32) {
             const LogObjectList objlist(this->objlist, descriptor_set.Handle(), image_view);
-            skip |= LogError(vuids->image_view_access_32_04471, objlist, loc.Get(),
-                             "the %s has a 32-bit component ImageView format (%s) but the OpTypeImage's "
-                             "Sampled Type has a width of %" PRIu32 ".%s",
-                             DescribeDescriptor(resource_variable, index, descriptor_type).c_str(),
-                             string_VkFormat(image_view_ci.format), resource_variable.info.image_sampled_type_width,
-                             DescribeInstruction().c_str());
+            skip |=
+                LogError(vuids->image_view_access_32_04471, objlist, loc.Get(),
+                         "the %s has a 32-bit component ImageView format (%s) but the OpTypeImage's "
+                         "Sampled Type has a width of %" PRIu32 ".%s",
+                         DescribeDescriptor(resource_variable, index, descriptor_type).c_str(),
+                         string_VkFormat(image_view_ci.format), resource_variable.info.bit_width, DescribeInstruction().c_str());
         }
     }
 
     if (!dev_proxy.disabled[image_layout_validation]) {
         if (const auto image_layout_map = cb_state.GetImageLayoutMap(image_state->VkHandle())) {
             auto describe_descriptor_callback = [this, &resource_variable, index, descriptor_type]() {
-                std::stringstream ss;
+                std::ostringstream ss;
                 ss << DescribeDescriptor(resource_variable, index, descriptor_type);
                 if (descriptor_set.IsPushDescriptor()) {
                     ss << " updated by vkCmdPushDescriptorSet";
@@ -657,17 +667,19 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
             const bool layout_read_only = IsImageLayoutReadOnly(attachment_info.layout);
             const bool read_attachment = (subpass.usage & (VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)) != 0;
             if (read_attachment && descriptor_written_to) {
+                const char* vuid = attachment_info.IsDepth()     ? vuids->image_subresources_subpass_depth_12339
+                                   : attachment_info.IsStencil() ? vuids->image_subresources_subpass_stencil_12340
+                                                                 : vuids->image_subresources_subpass_color_12338;
                 if (same_view) {
                     const LogObjectList objlist(this->objlist, descriptor_set.Handle(), image_view, framebuffer);
-                    skip |= LogError(vuids->image_subresources_subpass_write_06539, objlist, loc.Get(),
-                                     "the %s has %s which will be read from as %s attachment %" PRIu32 ".%s",
-                                     DescribeDescriptor(resource_variable, index, descriptor_type).c_str(),
-                                     FormatHandle(image_view).c_str(), FormatHandle(framebuffer).c_str(), att_index,
-                                     DescribeInstruction().c_str());
+                    skip |= LogError(
+                        vuid, objlist, loc.Get(), "the %s has %s which will be read from as %s attachment %" PRIu32 ".%s",
+                        DescribeDescriptor(resource_variable, index, descriptor_type).c_str(), FormatHandle(image_view).c_str(),
+                        FormatHandle(framebuffer).c_str(), att_index, DescribeInstruction().c_str());
                 } else if (overlapping_view) {
                     const LogObjectList objlist(this->objlist, descriptor_set.Handle(), image_view, framebuffer,
                                                 view_state->Handle());
-                    skip |= LogError(vuids->image_subresources_subpass_write_06539, objlist, loc.Get(),
+                    skip |= LogError(vuid, objlist, loc.Get(),
                                      "the %s has %s which will be overlap read from as %s in %s attachment %" PRIu32 " overlap.%s",
                                      DescribeDescriptor(resource_variable, index, descriptor_type).c_str(),
                                      FormatHandle(image_view).c_str(), FormatHandle(view_state->Handle()).c_str(),
@@ -703,6 +715,10 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
             skip |= dev_proxy.ValidateUnprotectedImage(cb_state, *image_state, loc.Get(), vuids->protected_command_buffer_02712,
                                                        " (Image is in a descriptorSet)");
         }
+    }
+
+    if (dev_proxy.enabled_features.tileMemoryHeap) {
+        skip |= dev_proxy.ValidateBoundTileMemory(*image_view_state->image_state, cb_state, *vuids);
     }
 
     // If the Image View is invalid, the combined sampler mayb have the same issue
@@ -1004,7 +1020,7 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
 
     const VkFormat buffer_view_format = buffer_view_state->create_info.format;
     const uint32_t view_numeric_type = spirv::GetFormatType(buffer_view_format);
-    const uint32_t variable_numeric_type = resource_variable.info.image_sampled_type_numeric;
+    const uint32_t variable_numeric_type = resource_variable.info.numeric_type;
     if ((variable_numeric_type & view_numeric_type) == 0) {
         spirv::ImageInstruction image_insn = (is_gpu_av && original_spirv)
                                                  ? spirv::ImageInstruction(&(*original_spirv)[instruction_position_offset])
@@ -1023,23 +1039,23 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
     }
 
     // Check for only_report_errors last (to save a nesting), this string building is expensive if being spammed constantly
-    if (buffer_view_format != VK_FORMAT_UNDEFINED && resource_variable.info.image_format != VK_FORMAT_UNDEFINED &&
-        buffer_view_format != resource_variable.info.image_format && !dev_proxy.global_settings.only_report_errors) {
+    if (buffer_view_format != VK_FORMAT_UNDEFINED && resource_variable.info.vk_format != VK_FORMAT_UNDEFINED &&
+        buffer_view_format != resource_variable.info.vk_format && !dev_proxy.global_settings.only_report_errors) {
         // This warning was added after being discussed in https://gitlab.khronos.org/vulkan/vulkan/-/issues/4128
         auto set = descriptor_set.Handle();
         const LogObjectList objlist(this->objlist, set, buffer_view);
-        std::stringstream msg;
+        std::ostringstream msg;
         msg << "the " << DescribeDescriptor(resource_variable, index, descriptor_type)
             << " is accessed by a OpTypeImage that has a Format operand "
-            << string_SpirvImageFormat(resource_variable.info.image_format) << " (equivalent to "
-            << string_VkFormat(resource_variable.info.image_format) << ") which doesn't match the " << FormatHandle(buffer_view)
+            << string_SpirvImageFormat(resource_variable.info.vk_format) << " (equivalent to "
+            << string_VkFormat(resource_variable.info.vk_format) << ") which doesn't match the " << FormatHandle(buffer_view)
             << " format (" << string_VkFormat(buffer_view_format)
             << "). Any loads or stores with the variable will produce undefined values to the whole image (not just the texel "
                "being accessed).";
-        if (vkuFormatCompatibilityClass(buffer_view_format) == vkuFormatCompatibilityClass(resource_variable.info.image_format)) {
+        if (vkuFormatCompatibilityClass(buffer_view_format) == vkuFormatCompatibilityClass(resource_variable.info.vk_format)) {
             msg << " While the formats are compatible, Texel Buffers must exactly match. Few ways to resolve this are\n";
-            if (vkuFormatComponentCount(buffer_view_format) == vkuFormatComponentCount(resource_variable.info.image_format)) {
-                msg << "1. Set your BuffereView to " << string_VkFormat(resource_variable.info.image_format)
+            if (vkuFormatComponentCount(buffer_view_format) == vkuFormatComponentCount(resource_variable.info.vk_format)) {
+                msg << "1. Set your BuffereView to " << string_VkFormat(resource_variable.info.vk_format)
                     << " and swizzle the values in the shader to match the desired results.\n";
             } else {
                 const char *suggested_format = string_SpirvImageFormat(buffer_view_format);
@@ -1060,20 +1076,20 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
     }
 
     const bool buffer_format_width_64 = vkuFormatHasComponentSize(buffer_view_format, 64);
-    if (buffer_format_width_64 && resource_variable.info.image_sampled_type_width != 64) {
+    if (buffer_format_width_64 && resource_variable.info.bit_width != 64) {
         const LogObjectList objlist(this->objlist, descriptor_set.Handle(), buffer_view);
         skip |= LogError(vuids->buffer_view_access_64_04472, objlist, loc.Get(),
                          "the %s has a 64-bit component BufferView format (%s) but the OpTypeImage's Sampled "
                          "Type has a width of %" PRIu32 ".%s",
                          DescribeDescriptor(resource_variable, index, descriptor_type).c_str(), string_VkFormat(buffer_view_format),
-                         resource_variable.info.image_sampled_type_width, DescribeInstruction().c_str());
-    } else if (!buffer_format_width_64 && resource_variable.info.image_sampled_type_width != 32) {
+                         resource_variable.info.bit_width, DescribeInstruction().c_str());
+    } else if (!buffer_format_width_64 && resource_variable.info.bit_width != 32) {
         const LogObjectList objlist(this->objlist, descriptor_set.Handle(), buffer_view);
         skip |= LogError(vuids->buffer_view_access_32_04473, objlist, loc.Get(),
                          "the %s has a 32-bit component BufferView format (%s) but the OpTypeImage's Sampled "
                          "Type has a width of %" PRIu32 ".%s",
                          DescribeDescriptor(resource_variable, index, descriptor_type).c_str(), string_VkFormat(buffer_view_format),
-                         resource_variable.info.image_sampled_type_width, DescribeInstruction().c_str());
+                         resource_variable.info.bit_width, DescribeInstruction().c_str());
     }
 
     const VkFormatFeatureFlags2 buffer_format_features = buffer_view_state->buffer_format_features;
@@ -1139,6 +1155,10 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
                              FormatHandle(buffer_view).c_str(), string_VkFormat(buffer_view_format), format_component_count,
                              texel_component_count, DescribeInstruction().c_str());
         }
+    }
+
+    if (dev_proxy.enabled_features.tileMemoryHeap) {
+        skip |= dev_proxy.ValidateBoundTileMemory(*buffer_view_state->buffer_state, cb_state, *vuids);
     }
 
     return skip;
@@ -1213,13 +1233,13 @@ bool DescriptorValidator::ValidateSamplerDescriptor(const spirv::ResourceInterfa
                          "the %s is using sampler %s that is invalid or has been destroyed.%s",
                          DescribeDescriptor(resource_variable, index, VK_DESCRIPTOR_TYPE_SAMPLER).c_str(),
                          FormatHandle(sampler).c_str(), DescribeInstruction().c_str());
-    } else if (sampler_state->samplerConversion && !is_immutable) {
+    } else if (sampler_state->sampler_conversion && !is_immutable) {
         const LogObjectList objlist(this->objlist, descriptor_set.Handle());
         skip |= LogError(vuids->descriptor_buffer_bit_set_08114, objlist, loc.Get(),
                          "the %s sampler (%s) contains a YCBCR conversion (%s), but the sampler is not an "
                          "immutable sampler.%s",
                          DescribeDescriptor(resource_variable, index, VK_DESCRIPTOR_TYPE_SAMPLER).c_str(),
-                         FormatHandle(sampler).c_str(), FormatHandle(sampler_state->samplerConversion).c_str(),
+                         FormatHandle(sampler).c_str(), FormatHandle(sampler_state->sampler_conversion).c_str(),
                          DescribeInstruction().c_str());
     }
     return skip;
@@ -1233,15 +1253,73 @@ bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVaria
 
 bool DescriptorValidator::ValidateDescriptor(const spirv::ResourceInterfaceVariable &resource_variable, uint32_t index,
                                              VkDescriptorType descriptor_type, const vvl::TensorDescriptor &descriptor) const {
-    const auto tensor_state = descriptor.GetTensorViewState()->tensor_state;
-    {
-        if (tensor_state->unprotected) {
-            return dev_proxy.ValidateUnprotectedTensor(cb_state, *tensor_state, loc.Get(), vuids->protected_command_buffer_02712);
-        } else {
-            return dev_proxy.ValidateProtectedTensor(cb_state, *tensor_state, loc.Get(), vuids->unprotected_command_buffer_02707);
+    bool skip = false;
+
+    const vvl::TensorView *tensor_view_state = descriptor.GetTensorViewState();
+    ASSERT_AND_RETURN_SKIP(tensor_view_state);
+    if (tensor_view_state->Destroyed()) {
+        const LogObjectList objlist(this->objlist, descriptor_set.Handle());
+        skip |= LogError(vuids->descriptor_buffer_bit_set_08114, objlist, loc.Get(),
+                         "the %s is using tensor view %s that is invalid or has been destroyed.%s",
+                         DescribeDescriptor(resource_variable, index, VK_DESCRIPTOR_TYPE_TENSOR_ARM).c_str(),
+                         FormatHandle(tensor_view_state->Handle()).c_str(), DescribeInstruction().c_str());
+        return skip;
+    }
+    const vvl::Tensor *tensor_state = descriptor.GetTensorState();
+    ASSERT_AND_RETURN_SKIP(tensor_state);
+    if (tensor_state->Destroyed()) {
+        const LogObjectList objlist(this->objlist, descriptor_set.Handle());
+        skip |= LogError(vuids->descriptor_buffer_bit_set_08114, objlist, loc.Get(),
+                         "the %s is using tensor %s that is invalid or has been destroyed.%s",
+                         DescribeDescriptor(resource_variable, index, VK_DESCRIPTOR_TYPE_TENSOR_ARM).c_str(),
+                         FormatHandle(tensor_state->Handle()).c_str(), DescribeInstruction().c_str());
+        return skip;
+    }
+
+    if (tensor_state->unprotected) {
+        skip |= dev_proxy.ValidateUnprotectedTensor(cb_state, *tensor_state, loc.Get(), vuids->protected_command_buffer_02712);
+    } else {
+        skip |= dev_proxy.ValidateProtectedTensor(cb_state, *tensor_state, loc.Get(), vuids->unprotected_command_buffer_02707);
+    }
+
+    // These VUs are only for tensors used in _shaders_. For use in _datagraphs_, VU 9923 applies.
+    // https://gitlab.khronos.org/vulkan/vulkan/-/issues/4482#note_564658
+    if (loc.Get().function != Func::vkCmdDispatchDataGraphARM) {
+        if (resource_variable.info.tensor_rank != tensor_state->create_info.pDescription->dimensionCount) {
+            const LogObjectList objlist(cb_state.Handle(), this->objlist, descriptor_set.Handle(), tensor_state->Handle());
+            skip |= LogError(
+                vuids->tensorARM_dimensionCount_09905, objlist, loc.Get(),
+                "the %s is using tensor %s created with dimensionCount %" PRIu32 ", but the corresponding OpTypeTensorARM has rank %" PRIu32 ".%s",
+                DescribeDescriptor(resource_variable, index, descriptor_type).c_str(), FormatHandle(tensor_state->Handle()).c_str(),
+                tensor_state->create_info.pDescription->dimensionCount, resource_variable.info.tensor_rank, DescribeInstruction().c_str());
+        }
+        if (resource_variable.info.vk_format != tensor_view_state->create_info.format) {
+            const LogObjectList objlist(cb_state.Handle(), this->objlist, descriptor_set.Handle(), tensor_view_state->Handle());
+            skip |= LogError(
+                vuids->spirv_OpTypeTensorARM_09906, objlist, loc.Get(),
+                "the %s is using tensor %s that was created with %s but doesn't match the OpTypeTensorARM of type %s and width %" PRIu32
+                " (equivalent to %s).%s",
+                DescribeDescriptor(resource_variable, index, descriptor_type).c_str(),
+                FormatHandle(tensor_view_state->Handle()).c_str(), string_VkFormat(tensor_view_state->create_info.format),
+                spirv::string_NumericType(resource_variable.info.numeric_type), resource_variable.info.bit_width,
+                string_VkFormat(resource_variable.info.vk_format), DescribeInstruction().c_str());
         }
     }
-    return false;
+
+    VkTensorUsageFlagBitsARM usage_flag = (loc.Get().function == Func::vkCmdDispatchDataGraphARM)
+                                              ? VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM
+                                              : VK_TENSOR_USAGE_SHADER_BIT_ARM;
+    if ((tensor_state->create_info.pDescription->usage & usage_flag) == 0) {
+        const LogObjectList objlist(cb_state.Handle(), this->objlist, descriptor_set.Handle(), tensor_state->Handle());
+        skip |= LogError(vuids->tensorARM_pDescription_09900, objlist, loc.Get(),
+                         "the %s is using tensor %s created with usage %s, which doesn't include %s.%s",
+                         DescribeDescriptor(resource_variable, index, descriptor_type).c_str(),
+                         FormatHandle(tensor_state->Handle()).c_str(),
+                         string_VkTensorUsageFlagBitsARM(tensor_state->create_info.pDescription->usage),
+                         string_VkTensorUsageFlagBitsARM(usage_flag), DescribeInstruction().c_str());
+    }
+
+    return skip;
 }
 
 }  // namespace vvl

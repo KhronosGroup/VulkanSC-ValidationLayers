@@ -3,10 +3,10 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google Inc.
  * Copyright (c) 2015-2025 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -694,6 +694,9 @@ bool PreCallValidateReleaseCapturedPipelineDataKHR(VkDevice device, const VkRele
                                                    const ErrorObject& error_obj) const override;
 bool PreCallValidateReleaseSwapchainImagesKHR(VkDevice device, const VkReleaseSwapchainImagesInfoKHR* pReleaseInfo,
                                               const ErrorObject& error_obj) const override;
+bool PreCallValidateGetCalibratedTimestampsKHR(VkDevice device, uint32_t timestampCount,
+                                               const VkCalibratedTimestampInfoKHR* pTimestampInfos, uint64_t* pTimestamps,
+                                               uint64_t* pMaxDeviation, const ErrorObject& error_obj) const override;
 bool PreCallValidateCmdBindDescriptorSets2KHR(VkCommandBuffer commandBuffer,
                                               const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo,
                                               const ErrorObject& error_obj) const override;
@@ -796,6 +799,17 @@ void PostCallRecordCreateExecutionGraphPipelinesAMDX(VkDevice device, VkPipeline
                                                      const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
                                                      const RecordObject& record_obj) override;
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+bool PreCallValidateWriteSamplerDescriptorsEXT(VkDevice device, uint32_t samplerCount, const VkSamplerCreateInfo* pSamplers,
+                                               const VkHostAddressRangeEXT* pDescriptors,
+                                               const ErrorObject& error_obj) const override;
+bool PreCallValidateWriteResourceDescriptorsEXT(VkDevice device, uint32_t resourceCount,
+                                                const VkResourceDescriptorInfoEXT* pResources,
+                                                const VkHostAddressRangeEXT* pDescriptors,
+                                                const ErrorObject& error_obj) const override;
+bool PreCallValidateGetImageOpaqueCaptureDataEXT(VkDevice device, uint32_t imageCount, const VkImage* pImages,
+                                                 VkHostAddressRangeEXT* pDatas, const ErrorObject& error_obj) const override;
+bool PreCallValidateGetTensorOpaqueCaptureDataARM(VkDevice device, uint32_t tensorCount, const VkTensorARM* pTensors,
+                                                  VkHostAddressRangeEXT* pDatas, const ErrorObject& error_obj) const override;
 bool PreCallValidateGetImageDrmFormatModifierPropertiesEXT(VkDevice device, VkImage image,
                                                            VkImageDrmFormatModifierPropertiesEXT* pProperties,
                                                            const ErrorObject& error_obj) const override;
@@ -844,6 +858,13 @@ bool PreCallValidateCmdWriteAccelerationStructuresPropertiesNV(VkCommandBuffer c
                                                                const VkAccelerationStructureNV* pAccelerationStructures,
                                                                VkQueryType queryType, VkQueryPool queryPool, uint32_t firstQuery,
                                                                const ErrorObject& error_obj) const override;
+bool PreCallValidateGetCalibratedTimestampsEXT(VkDevice device, uint32_t timestampCount,
+                                               const VkCalibratedTimestampInfoKHR* pTimestampInfos, uint64_t* pTimestamps,
+                                               uint64_t* pMaxDeviation, const ErrorObject& error_obj) const override;
+bool PreCallValidateGetPastPresentationTimingEXT(VkDevice device,
+                                                 const VkPastPresentationTimingInfoEXT* pPastPresentationTimingInfo,
+                                                 VkPastPresentationTimingPropertiesEXT* pPastPresentationTimingProperties,
+                                                 const ErrorObject& error_obj) const override;
 void PostCallRecordAcquirePerformanceConfigurationINTEL(VkDevice device,
                                                         const VkPerformanceConfigurationAcquireInfoINTEL* pAcquireInfo,
                                                         VkPerformanceConfigurationINTEL* pConfiguration,
@@ -1033,6 +1054,10 @@ bool PreCallValidateGetPipelineIndirectMemoryRequirementsNV(VkDevice device, con
                                                             const ErrorObject& error_obj) const override;
 bool PreCallValidateGetPipelineIndirectDeviceAddressNV(VkDevice device, const VkPipelineIndirectDeviceAddressInfoNV* pInfo,
                                                        const ErrorObject& error_obj) const override;
+#ifdef VK_USE_PLATFORM_OHOS
+bool PreCallValidateGetMemoryNativeBufferOHOS(VkDevice device, const VkMemoryGetNativeBufferInfoOHOS* pInfo,
+                                              struct OH_NativeBuffer** pBuffer, const ErrorObject& error_obj) const override;
+#endif  // VK_USE_PLATFORM_OHOS
 void PostCallRecordCreateTensorARM(VkDevice device, const VkTensorCreateInfoARM* pCreateInfo,
                                    const VkAllocationCallbacks* pAllocator, VkTensorARM* pTensor,
                                    const RecordObject& record_obj) override;
@@ -1202,11 +1227,6 @@ bool PreCallValidateUpdateIndirectExecutionSetShaderEXT(VkDevice device, VkIndir
                                                         uint32_t executionSetWriteCount,
                                                         const VkWriteIndirectExecutionSetShaderEXT* pExecutionSetWrites,
                                                         const ErrorObject& error_obj) const override;
-#ifdef VK_USE_PLATFORM_OHOS
-bool PreCallValidateQueueSignalReleaseImageOHOS(VkQueue queue, uint32_t waitSemaphoreCount, const VkSemaphore* pWaitSemaphores,
-                                                VkImage image, int32_t* pNativeFenceFd,
-                                                const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_OHOS
 #ifdef VK_USE_PLATFORM_METAL_EXT
 bool PreCallValidateGetMemoryMetalHandleEXT(VkDevice device, const VkMemoryGetMetalHandleInfoEXT* pGetMetalHandleInfo,
                                             void** pHandle, const ErrorObject& error_obj) const override;

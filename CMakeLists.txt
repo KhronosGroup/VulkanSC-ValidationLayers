@@ -1,7 +1,7 @@
 # ~~~
-# Copyright (c) 2014-2025 Valve Corporation
-# Copyright (c) 2014-2025 LunarG, Inc.
-# Copyright (c) 2023-2025 RasterGrid Kft.
+# Copyright (c) 2014-2026 Valve Corporation
+# Copyright (c) 2014-2026 LunarG, Inc.
+# Copyright (c) 2023-2026 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ option(VULKANSC "Build Vulkan SC validation layers" ON)
 if(VULKANSC)
     project(VVL VERSION 1.0.20 LANGUAGES CXX) # vulkansc
 else()
-    project(VVL VERSION 1.4.330 LANGUAGES CXX) # vulkan
+    project(VVL VERSION 1.4.344 LANGUAGES CXX) # vulkan
 endif()
 
 option(BUILD_WSI_SCREEN_QNX_SUPPORT "Build QNX screen support" OFF)
@@ -165,6 +165,9 @@ if (ANNOTATED_SPEC_LINK)
     add_compile_definitions(ANNOTATED_SPEC_LINK=${ANNOTATED_SPEC_LINK})
 endif()
 
+# The idiom for open source projects is to NOT enable warnings as errors.
+# System/language package managers have to build on multiple different platforms and compilers.
+# By defaulting to `ON` we cause issues for package managers since there is no standard way to disable warnings until CMake 3.24
 option(BUILD_WERROR "Treat compiler warnings as errors")
 if (BUILD_WERROR)
     add_compile_options("$<IF:$<CXX_COMPILER_ID:MSVC>,/WX,-Werror>")
@@ -230,6 +233,34 @@ elseif(MSVC)
 endif()
 
 add_subdirectory(layers)
+
+if(MSVC AND UPDATE_DEPS)
+    set(SCRIPTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
+    file(GLOB_RECURSE SCRIPTS
+        "${SCRIPTS_DIR}/*.py"
+        "${SCRIPTS_DIR}/*.json"
+    )
+    add_custom_target(Scripts SOURCES ${SCRIPTS})
+    source_group(TREE ${SCRIPTS_DIR} PREFIX "Scripts" FILES ${SCRIPTS})
+
+    set(EXTERNAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external")
+    file(GLOB_RECURSE EXTERNAL_HEADER_FILES
+            "${GLSLANG_INSTALL_DIR}/*.h"
+            "${GLSLANG_INSTALL_DIR}/*.hpp"
+            "${VULKAN_HEADERS_INSTALL_DIR}/*.h"
+            "${VULKAN_HEADERS_INSTALL_DIR}/*.hpp"
+            "${VULKAN_UTILITY_LIBRARIES_INSTALL_DIR}/*.h"
+            "${VULKAN_UTILITY_LIBRARIES_INSTALL_DIR}/*.hpp"
+            "${SPIRV_HEADERS_INSTALL_DIR}/*.h"
+            "${SPIRV_HEADERS_INSTALL_DIR}/*.hpp"
+            "${SPIRV_TOOLS_INSTALL_DIR}/*.h"
+            "${SPIRV_TOOLS_INSTALL_DIR}/*.hpp"
+            "${GOOGLETEST_INSTALL_DIR}/*.h"
+            "${MIMALLOC_INSTALL_DIR}/*.h"
+    )
+    add_custom_target(External SOURCES ${EXTERNAL_HEADER_FILES})
+    source_group(TREE ${EXTERNAL_DIR} PREFIX "External" FILES ${EXTERNAL_HEADER_FILES})
+endif()
 
 option(BUILD_TESTS "Build the tests")
 if(BUILD_TESTS)

@@ -1,6 +1,7 @@
-/* Copyright (c) 2024-2025 The Khronos Group Inc.
- * Copyright (c) 2024-2025 Valve Corporation
- * Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 The Khronos Group Inc.
+ * Copyright (c) 2024-2026 Valve Corporation
+ * Copyright (c) 2024-2026 LunarG, Inc.
+ * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +20,9 @@
 #include "shader_stage_state.h"
 
 #include "state_tracker/shader_module.h"
+#include "utils/shader_utils.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
+#include "containers/container_utils.h"
 
 // Common for both Pipeline and Shader Object
 void GetActiveSlots(ActiveSlotMap &active_slots, const std::shared_ptr<const spirv::EntryPoint> &entrypoint) {
@@ -76,62 +79,83 @@ const void *ShaderStageState::GetPNext() const {
     return (pipeline_create_info) ? pipeline_create_info->pNext : shader_object_create_info->pNext;
 }
 
-bool ShaderStageState::GetInt32ConstantValue(const spirv::Instruction &insn, uint32_t *value) const {
-    const spirv::Instruction *type_id = spirv_state->FindDef(insn.Word(1));
-    if (type_id->Opcode() != spv::OpTypeInt || type_id->Word(2) != 32) {
+bool ShaderStageState::ResourceHeapIsUsed() {
+    if (!entrypoint || !spirv_state) {
         return false;
     }
-
-    if (insn.Opcode() == spv::OpConstant) {
-        *value = insn.Word(3);
-        return true;
-    } else if (insn.Opcode() == spv::OpSpecConstant) {
-        *value = insn.Word(3);  // default value
-        const auto *spec_info = GetSpecializationInfo();
-        const uint32_t spec_id = spirv_state->static_data_.id_to_spec_id.at(insn.Word(2));
-        if (spec_info && spec_id < spec_info->mapEntryCount) {
-            memcpy(value, (uint8_t *)spec_info->pData + spec_info->pMapEntries[spec_id].offset,
-                   spec_info->pMapEntries[spec_id].size);
-        }
-        return true;
+    const auto mapping_info = vku::FindStructInPNextChain<VkShaderDescriptorSetAndBindingMappingInfoEXT>(GetPNext());
+    if (!mapping_info && !spirv_state->static_data_.has_descriptor_heap) {
+        return false;  // if not using heaps at all
     }
 
-    // This means the value is not known until runtime and will need to be checked in GPU-AV
+    for (const spirv::ResourceInterfaceVariable& resource_variable : entrypoint->resource_interface_variables) {
+        if (resource_variable.decorations.IsDescriptorSet() && !resource_variable.is_sampler && mapping_info) {
+            for (uint32_t i = 0; i < mapping_info->mappingCount; i++) {
+                const auto& mapping = mapping_info->pMappings[i];
+                if (mapping.descriptorSet == resource_variable.decorations.set &&
+                    mapping.firstBinding <= resource_variable.decorations.binding &&
+                    ResourceTypeMatchesBinding(mapping.resourceMask, resource_variable) &&
+                    IsValueIn(mapping.source, {VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_RESOURCE_HEAP_DATA_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT})) {
+                    return true;
+                }
+            }
+        } else if (resource_variable.is_resource_heap) {
+            return true;
+        }
+    }
     return false;
 }
 
-bool ShaderStageState::GetBooleanConstantValue(const spirv::Instruction &insn, bool *value) const {
-    const spirv::Instruction *type_id = spirv_state->FindDef(insn.Word(1));
-    if (type_id->Opcode() != spv::OpTypeBool) {
+bool ShaderStageState::SamplerHeapIsUsed() {
+    if (!entrypoint || !spirv_state) {
         return false;
     }
-
-    if (insn.Opcode() == spv::OpConstantFalse) {
-        *value = false;
-        return true;
-    } else if (insn.Opcode() == spv::OpConstantTrue) {
-        *value = true;
-        return true;
-    } else if (insn.Opcode() == spv::OpSpecConstantTrue || insn.Opcode() == spv::OpSpecConstantFalse) {
-        *value = insn.Opcode() == spv::OpSpecConstantTrue;  // default value
-        const auto *spec_info = GetSpecializationInfo();
-        const uint32_t spec_id = spirv_state->static_data_.id_to_spec_id.at(insn.Word(2));
-        if (spec_info && spec_id < spec_info->mapEntryCount) {
-            memcpy(value, (uint8_t *)spec_info->pData + spec_info->pMapEntries[spec_id].offset, 1);
-        }
-        return true;
+    const auto mapping_info = vku::FindStructInPNextChain<VkShaderDescriptorSetAndBindingMappingInfoEXT>(GetPNext());
+    if (!mapping_info && !spirv_state->static_data_.has_descriptor_heap) {
+        return false;  // if not using heaps at all
     }
 
-    // This means the value is not known until runtime and will need to be checked in GPU-AV
+    for (const spirv::ResourceInterfaceVariable& resource_variable : entrypoint->resource_interface_variables) {
+        if (resource_variable.is_sampler && mapping_info) {
+            for (uint32_t i = 0; i < mapping_info->mappingCount; i++) {
+                const auto& mapping = mapping_info->pMappings[i];
+                if (mapping.descriptorSet == resource_variable.decorations.set &&
+                    mapping.firstBinding <= resource_variable.decorations.binding &&
+                    ResourceTypeMatchesBinding(mapping.resourceMask, resource_variable) &&
+                    IsValueIn(mapping.source, {VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_RESOURCE_HEAP_DATA_EXT,
+                                               VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT})) {
+                    return true;
+                }
+            }
+        } else if (resource_variable.is_sampler_heap) {
+            return true;
+        }
+    }
     return false;
 }
 
-ShaderStageState::ShaderStageState(const vku::safe_VkPipelineShaderStageCreateInfo *pipeline_create_info,
-                                   const vku::safe_VkShaderCreateInfoEXT *shader_object_create_info,
+ShaderStageState::ShaderStageState(const vku::safe_VkPipelineShaderStageCreateInfo* pipeline_create_info,
+                                   const vku::safe_VkShaderCreateInfoEXT* shader_object_create_info,
+                                   const vvl::DescriptorSetLayoutList* descriptor_set_layouts,
                                    std::shared_ptr<const vvl::ShaderModule> module_state,
-                                   std::shared_ptr<const spirv::Module> spirv_state)
+                                   std::shared_ptr<const spirv::Module> spirv_state, const VkPipelineLayout pipeline_layout,
+                                   bool descriptor_heap_mode)
     : module_state(module_state),
       spirv_state(spirv_state),
       pipeline_create_info(pipeline_create_info),
       shader_object_create_info(shader_object_create_info),
-      entrypoint(spirv_state ? spirv_state->FindEntrypoint(GetPName(), GetStage()) : nullptr) {}
+      descriptor_set_layouts(descriptor_set_layouts),
+      pipeline_layout(pipeline_layout),
+      entrypoint(spirv_state ? spirv_state->FindEntrypoint(GetPName(), GetStage()) : nullptr),
+      descriptor_heap_mode(descriptor_heap_mode),
+      uses_resource_heap(ResourceHeapIsUsed()),
+      uses_sampler_heap(SamplerHeapIsUsed()) {}

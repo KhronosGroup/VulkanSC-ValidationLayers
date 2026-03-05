@@ -1,4 +1,4 @@
-/* Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,13 @@
 #include <cassert>
 #include <spirv/unified1/spirv.hpp>
 #include "containers/custom_containers.h"
+#include "function_basic_block.h"
 #include "generated/spirv_grammar_helper.h"
 #include "gpuav/shaders/gpuav_shaders_constants.h"
 #include "error_message/logging.h"
 #include "error_message/log_message_type.h"
+#include "error_message/error_location.h"
+#include "utils/shader_utils.h"
 
 #include <iostream>
 
@@ -31,22 +34,22 @@ namespace spirv {
 
 static constexpr uint32_t kLinkedInstruction = vvl::kNoIndex32;
 
-Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const Settings& settings,
-               const DeviceFeatures& enabled_features,
-               const std::vector<std::vector<BindingLayout>>& set_index_to_bindings_layout_lut)
+// This constructor is really our "parse incoming SPIR-V" logic for GPU-AV
+// It will build up the Module object which will be modified, and when done, dumpped back out to SPIR-V
+Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const DeviceSettings& settings,
+               const InstrumentationInterface& interface, const DeviceFeatures& enabled_features)
     : type_manager_(*this),
       settings_(settings),
+      interface_(interface),
       enabled_features_(enabled_features),
-      has_bindless_descriptors_(settings.has_bindless_descriptors),
-      debug_report_(debug_report),
-      set_index_to_bindings_layout_lut_(set_index_to_bindings_layout_lut) {
+      has_bindless_descriptors_(interface.instrumentation_dsl.has_bindless_descriptors),
+      debug_report_(debug_report) {
     spirv_iterator it = words.begin();
     header_.magic_number = *it++;
     header_.version = *it++;
     header_.generator = *it++;
     header_.bound = *it++;
     header_.schema = *it++;
-    vvl::unordered_set<uint32_t> entry_point_functions;
     // Parse everything up until the first function and sort into seperate lists
     while (it != words.end()) {
         const uint32_t opcode = *it & 0x0ffffu;
@@ -72,7 +75,11 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
                 memory_model_.emplace_back(std::move(new_inst));
                 break;
             case spv::OpEntryPoint:
-                entry_point_functions.insert(new_inst->Word(2));
+                if (interface.entry_point_stage == ExecutionModelToShaderStageFlagBits(new_inst->Word(1))) {
+                    if (strcmp(interface.entry_point_name, new_inst->GetAsString(3)) == 0) {
+                        target_entry_point_id_ = new_inst->Word(2);
+                    }
+                }
                 entry_points_.emplace_back(std::move(new_inst));
                 break;
             case spv::OpExecutionMode:
@@ -165,6 +172,21 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
         it += length;
     }
 
+    // From a dump of 400k production shaders found
+    //   - the most OpFunction created was 135, the mean was 2.4
+    //   - the most Instruction count was 125k, the mean was 1500
+    //
+    // The Function struct is only ~160 bytes so it should be better to just expand it (if needed) and loop through the function
+    // list if we need to find a certain function
+    //
+    // Function is empty here, we want to reserve 3 for incoming functions and 5 (to make a power of two) for future functions
+    // GPU-AV will insert at linking time
+    functions_.reserve(8);
+
+    // < function id, [ OpFunctionCall ids ]
+    // (we use a set because Function A might call Function B multiple times)
+    vvl::unordered_map<uint32_t, vvl::unordered_set<uint32_t>> function_call_map;
+
     // each function is broken up to 3 stage, pre/during/post basic_blocks
     BasicBlock* current_block = nullptr;
     Function* current_function = nullptr;
@@ -176,20 +198,22 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
         const uint32_t position_offset = static_cast<uint32_t>(it - words.begin());
         auto new_inst = std::make_unique<Instruction>(it, position_offset);
 
+        const uint32_t result_id = new_inst->ResultId();
         if (opcode == spv::OpFunction) {
-            const bool is_entry_point = entry_point_functions.find(new_inst->ResultId()) != entry_point_functions.end();
-            auto new_function = std::make_unique<Function>(*this, std::move(new_inst), is_entry_point);
-            auto& added_function = functions_.emplace_back(std::move(new_function));
-            current_function = &(*added_function);
+            Function& new_function = functions_.emplace_back(*this, std::move(new_inst));
+            current_function = &new_function;
             block_found = false;
             function_end_found = false;
             it += length;
             continue;
         }
 
-        const uint32_t result_id = new_inst->ResultId();
         if (result_id != 0) {
             current_function->inst_map_[result_id] = new_inst.get();
+        }
+
+        if (opcode == spv::OpFunctionCall) {
+            function_call_map[current_function->id_].insert(new_inst->Word(3));
         }
 
         if (opcode == spv::OpFunctionEnd) {
@@ -218,7 +242,7 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
 
         if (opcode == spv::OpLabel) {
             block_found = true;
-            auto new_block = std::make_unique<BasicBlock>(std::move(new_inst), *current_function);
+            auto new_block = std::make_unique<BasicBlock>(std::move(new_inst));
             auto& added_block = current_function->blocks_.emplace_back(std::move(new_block));
             current_block = &(*added_block);
         } else if (function_end_found) {
@@ -230,6 +254,50 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
         }
 
         it += length;
+    }
+
+    // Quick lookup map to avoid the nested loop
+    // (Can only be done after we know the |functions_| is done growing
+    vvl::unordered_map<uint32_t, Function*> id_to_func;
+    for (Function& func : functions_) {
+        id_to_func[func.id_] = &func;
+    }
+
+    // Go through all the function calls and mark which are seen (statically) from the target entry point
+    // (Note - recursion isn't allowed, but still watch out for it)
+    std::vector<uint32_t> worklist;
+    worklist.push_back(target_entry_point_id_);
+    assert(target_entry_point_id_ != 0);
+
+    vvl::unordered_set<uint32_t> seen_functions;
+
+    while (!worklist.empty()) {
+        const uint32_t current_id = worklist.back();
+        worklist.pop_back();
+
+        if (!seen_functions.insert(current_id).second) {
+            continue;
+        }
+        Function* next_function = id_to_func[current_id];
+        next_function->called_from_target_ = true;
+
+        auto func_it = function_call_map.find(current_id);
+        if (func_it != function_call_map.end()) {
+            for (uint32_t callee_id : func_it->second) {
+                if (seen_functions.find(callee_id) == seen_functions.end()) {
+                    worklist.push_back(callee_id);
+                }
+            }
+        }
+    }
+
+    // This is all in effort to have |functions_| not be a vector<std::unique_ptr<Function>>
+    // (Because it shouldn't need to be!!)
+    // From here, the |functions_| vector is not going to change until we link (when it is safe too)
+    for (Function& function : functions_) {
+        for (auto& block : function.blocks_) {
+            block->function_ = &function;
+        }
     }
 }
 
@@ -269,6 +337,16 @@ void Module::AddCapability(spv::Capability capability) {
     }
 }
 
+void Module::RemoveCapability(spv::Capability capability) {
+    for (auto it = capabilities_.begin(); it != capabilities_.end();) {
+        if (it->get()->Word(1) == capability) {
+            it = capabilities_.erase(it);
+            return;
+        } else {
+            ++it;
+        }
+    }
+}
 void Module::AddExtension(const char* extension) {
     std::vector<uint32_t> words;
     StringToSpirv(extension, words);
@@ -304,6 +382,18 @@ void Module::AddMemberDecoration(uint32_t target_id, uint32_t index, spv::Decora
     annotations_.emplace_back(std::move(new_inst));
 }
 
+// Found in extreme cases production shaders have maybe 5 entrypoints
+// From 400k shaders dumped, the average was 1.01 entry points per shader
+Instruction* Module::GetTargetEntryPoint() const {
+    for (const auto& entry_point : entry_points_) {
+        if (entry_point->Word(2) == target_entry_point_id_) {
+            return entry_point.get();
+        }
+    }
+    assert(false);
+    return nullptr;
+}
+
 uint32_t Module::TakeNextId() {
     // SPIR-V limit.
     assert(header_.bound < 0x3FFFFF);
@@ -311,7 +401,7 @@ uint32_t Module::TakeNextId() {
 }
 
 // walk through each list and append the buffer
-void Module::ToBinary(std::vector<uint32_t>& out) {
+void Module::ToBinary(std::vector<uint32_t>& out) const {
     out.clear();
     out.push_back(header_.magic_number);
     out.push_back(header_.version);
@@ -352,8 +442,8 @@ void Module::ToBinary(std::vector<uint32_t>& out) {
     for (const auto& inst : types_values_constants_) {
         inst->ToBinary(out);
     }
-    for (const auto& function : functions_) {
-        function->ToBinary(out);
+    for (const Function& function : functions_) {
+        function.ToBinary(out);
     }
 }
 
@@ -368,11 +458,7 @@ void Module::AddInterfaceVariables(uint32_t id, spv::StorageClass storage_class)
             return;
         }
 
-        // Currently just apply to all Entrypoint as it should be ok to have a global variable in there even if it can't dynamically
-        // touch the new function
-        for (auto& entry_point : entry_points_) {
-            entry_point->AppendWord(id);
-        }
+        GetTargetEntryPoint()->AppendWord(id);
     }
 }
 
@@ -382,7 +468,8 @@ void Module::LinkFunctions(const LinkInfo& info) {
     // track the incoming SSA IDs with what they are in the module
     // < old_id, new_id >
     vvl::unordered_map<uint32_t, uint32_t> id_swap_map;
-    uint32_t function_type_id = 0;
+    // If we have 2 functions in our GLSL, we need to map the OpTypeFunction later
+    vvl::unordered_map<uint32_t, uint32_t> function_type_id_map;
 
     // Track all decorations and add after when have full id_swap_map
     InstructionList decorations;
@@ -501,12 +588,13 @@ void Module::LinkFunctions(const LinkInfo& info) {
                     new_inst->ReplaceLinkedId(id_swap_map);
                     // First swap out IDs so comparison will be the same
                     const Type* function_type = type_manager_.FindFunctionType(*new_inst.get());
+                    const uint32_t old_function_type_id = new_inst->ResultId();
                     if (function_type) {
                         // Just reuse non-unique OpTypeFunction
-                        function_type_id = function_type->Id();
+                        function_type_id_map[old_function_type_id] = function_type->Id();
                     } else {
-                        function_type_id = TakeNextId();
-                        type_id = function_type_id;
+                        type_id = TakeNextId();
+                        function_type_id_map[old_function_type_id] = type_id;
                         new_inst->ReplaceResultId(type_id);
                         type_manager_.AddType(std::move(new_inst), spv_type).Id();
                     }
@@ -525,8 +613,11 @@ void Module::LinkFunctions(const LinkInfo& info) {
                 new_op_constant[0] = (4 << 16) | spv::OpConstant;
                 new_op_constant[1] = new_inst->Word(1);
                 new_op_constant[2] = new_inst->Word(2);
-                if (new_inst->Word(3) == glsl::kLinkShaderId) {
-                    new_op_constant[3] = settings_.shader_id;
+                const uint32_t value = new_inst->Word(3);
+                if (value == glsl::kLinkShaderId) {
+                    new_op_constant[3] = interface_.unique_shader_id;
+                } else if (value == glsl::kInstErrorBufferLengthId) {
+                    new_op_constant[3] = settings_.error_buffer_data_length;
                 }
                 new_inst.reset(new Instruction(new_op_constant, kLinkedInstruction));
             } else if (opcode == spv::OpSpecConstantOp) {
@@ -648,7 +739,7 @@ void Module::LinkFunctions(const LinkInfo& info) {
         AddDebugName(link_function.offline.opname, link_function.id);
 
         // Add function and copy all instructions to it, while adjusting any IDs
-        auto& new_function = functions_.emplace_back(std::make_unique<Function>(*this));
+        Function& new_function = functions_.emplace_back(*this);
         // We make things simpler by just putting everything in the first BasicBlock
         // (We need it in a block incase we want to alter this function later with something like DebugPrintf)
         BasicBlock* link_basic_block = nullptr;
@@ -668,15 +759,15 @@ void Module::LinkFunctions(const LinkInfo& info) {
                 // - There is zero way to truely check if it supported or not
                 // - We reworked our functions to be smaller because we have to assume it will be inlined
                 new_inst->UpdateWord(3, spv::FunctionControlMaskNone);
-                new_inst->UpdateWord(4, function_type_id);
+                new_inst->UpdateWord(4, function_type_id_map[new_inst->Word(4)]);
             } else if (opcode == spv::OpLabel) {
                 uint32_t new_result_id = id_swap_map[new_inst->ResultId()];
                 new_inst->ReplaceResultId(new_result_id);
 
                 // Only do on first label at top of function
                 if (!link_basic_block) {
-                    auto new_block = std::make_unique<BasicBlock>(std::move(new_inst), *new_function);
-                    auto& added_block = new_function->blocks_.emplace_back(std::move(new_block));
+                    auto new_block = std::make_unique<BasicBlock>(std::move(new_inst));
+                    auto& added_block = new_function.blocks_.emplace_back(std::move(new_block));
                     link_basic_block = &(*added_block);
                     offset += length;
                     continue;  // prevent adding a null new_inst below
@@ -694,14 +785,14 @@ void Module::LinkFunctions(const LinkInfo& info) {
             // For a future FindInstruction() make sure everything is added to the inst_map
             const uint32_t result_id = new_inst->ResultId();
             if (result_id != 0) {
-                new_function->inst_map_[result_id] = new_inst.get();
+                new_function.inst_map_[result_id] = new_inst.get();
             }
 
             if (link_basic_block) {
                 // Need for a possible FindInstruction() lookup
                 link_basic_block->instructions_.emplace_back(std::move(new_inst));
             } else {
-                new_function->pre_block_inst_.emplace_back(std::move(new_inst));
+                new_function.pre_block_inst_.emplace_back(std::move(new_inst));
             }
 
             if (opcode == spv::OpFunctionEnd) {
@@ -771,12 +862,16 @@ void Module::PostProcess() {
     if (header_.version == spirv_version_1_0) {
         // SPV_KHR_storage_buffer_storage_class is needed, but glslang removes it from linking functions
         AddExtension("SPV_KHR_storage_buffer_storage_class");
+
+        // Subgroups where added in Vulkan 1.1, so SPIR-V 1.0 can't use them
+        // This is a bad hack around for someone using a SPIR-V 1.0
+        RemoveCapability(spv::CapabilityGroupNonUniform);
     }
 }
 
 void Module::InternalWarning(const char* tag, const std::string& message) {
     if (debug_report_) {
-        debug_report_->LogMessage(kWarningBit, tag, {}, settings_.loc, message);
+        debug_report_->LogMessage(kWarningBit, tag, {}, interface_.loc, message);
     } else {
         std::cout << "[" << tag << "] " << message << '\n';
     }
@@ -784,7 +879,7 @@ void Module::InternalWarning(const char* tag, const std::string& message) {
 
 void Module::InternalError(const char* tag, const std::string& message) {
     if (debug_report_) {
-        debug_report_->LogMessage(kErrorBit, tag, {}, settings_.loc, message);
+        debug_report_->LogMessage(kErrorBit, tag, {}, interface_.loc, message);
     } else {
         std::cerr << "[" << tag << "] " << message << '\n';
     }

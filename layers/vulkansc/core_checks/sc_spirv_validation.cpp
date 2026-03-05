@@ -44,6 +44,7 @@
 #include "generated/spirv_grammar_helper.h"
 #include "state_tracker/shader_instruction.h"
 #include "utils/math_utils.h"
+#include "utils/spirv_tools_utils.h"
 
 namespace core::sc {
 
@@ -64,7 +65,7 @@ bool Instance::ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device,
         return false;
     }
 
-    if (SafeModulo(stage_info->codeSize, 4) != 0) {
+    if (!IsIntegerMultipleOf(stage_info->codeSize, 4)) {
         skip |= LogError(kVUID_SC_PipelineCacheData_CodeSizeNotMultipleOfFour, physical_device, loc.dot(Field::pInitialData),
                          "contains pipeline identifier {%s} with invalid SPIR-V module data for stage "
                          "index entry #%u that cannot be validated as its codeSize (%" PRIu64 ") is not a multiple of 4.",

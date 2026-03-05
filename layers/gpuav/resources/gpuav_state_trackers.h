@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2025 The Khronos Group Inc.
- * Copyright (c) 2018-2025 Valve Corporation
- * Copyright (c) 2018-2025 LunarG, Inc.
+/* Copyright (c) 2018-2026 The Khronos Group Inc.
+ * Copyright (c) 2018-2026 Valve Corporation
+ * Copyright (c) 2018-2026 LunarG, Inc.
  * Copyright (c) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,14 +50,21 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
         const std::vector<std::string> &initial_label_stack;
     };
 
-    using OnInstrumentionDescSetUpdate =
-        stdext::inplace_function<void(CommandBufferSubState &cb, VkPipelineBindPoint bind_point,
+    using InstrumentationErrorLogger =
+        stdext::inplace_function<bool(Validator &gpuav, const Location &loc, const uint32_t *error_record,
+                                      std::string &out_error_msg, std::string &out_vuid_msg)>;
+    using OnInstrumentationErrorLoggerRegister = stdext::inplace_function<InstrumentationErrorLogger(
+        Validator &gpuav, CommandBufferSubState &cb, const LastBound &last_bound)>;
+    using OnInstrumentationDescSetUpdate =
+        stdext::inplace_function<void(CommandBufferSubState &cb, VkPipelineBindPoint bind_point, const Location &loc,
                                       VkDescriptorBufferInfo &out_buffer_info, uint32_t &out_dst_binding),
                                  48>;
-    using OnInstrumentionDescBufferUpdate =
+    using OnInstrumentationDescBufferUpdate =
         stdext::inplace_function<void(CommandBufferSubState &cb, VkPipelineBindPoint bind_point,
                                       VkDescriptorAddressInfoEXT &out_address_info, uint32_t &out_dst_binding),
                                  48>;
+    using OnInstrumentationDescHeapUpdate =
+        stdext::inplace_function<void(CommandBufferSubState &cb, VkPipelineBindPoint bind_point, VkDeviceAddress &out_address), 48>;
     using OnCommandBufferSubmission =
         stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, VkCommandBuffer per_submission_cb)>;
     using OnCommandBufferCompletion =
@@ -65,16 +72,18 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
                                       const CommandBufferSubState::LabelLogging &label_logging, const Location &submission_loc),
                                  64>;
     using OnPreCommandBufferSubmission =
-        stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, VkCommandBuffer per_pre_submission_cb)>;
+        stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, VkCommandBuffer per_pre_submission_cb), 48>;
     using OnPostCommandBufferSubmission =
         stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, VkCommandBuffer per_post_submission_cb)>;
-    std::vector<OnInstrumentionDescSetUpdate> on_instrumentation_desc_set_update_functions;
-    std::vector<OnInstrumentionDescBufferUpdate> on_instrumentation_desc_buffer_update_functions;
+    std::vector<OnInstrumentationErrorLoggerRegister> on_instrumentation_error_logger_register_functions;
+    std::vector<OnInstrumentationDescSetUpdate> on_instrumentation_desc_set_update_functions;
+    std::vector<OnInstrumentationDescBufferUpdate> on_instrumentation_desc_buffer_update_functions;
+    std::vector<OnInstrumentationDescHeapUpdate> on_instrumentation_desc_heap_update_functions;
     std::vector<OnPreCommandBufferSubmission> on_pre_cb_submission_functions;
     std::vector<OnPostCommandBufferSubmission> on_post_cb_submission_functions;
     std::vector<OnCommandBufferCompletion> on_cb_completion_functions;
 
-    vko::SharedResourcesCache shared_resources_cache;
+    vko::SharedResourcesCache<false> shared_resources_cache;
 
     // Used to track which spot in the command buffer the error came from
     uint32_t draw_index = 0;
@@ -129,9 +138,9 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
 
     // Using stdext::inplace_function over std::function to allocate memory in place
     using ErrorLoggerFunc =
-        stdext::inplace_function<bool(const uint32_t *error_record, const Location &loc_with_debug_region,
-                                      const LogObjectList &objlist),
-                                 248 /*lambda storage size (bytes), large enough to store biggest error lambda*/>;
+        stdext::inplace_function<bool(const uint32_t* error_record, const Location& loc_with_debug_region,
+                                      const LogObjectList& objlist),
+                                 88 /*lambda storage size (bytes), large enough to store biggest error lambda*/>;
     struct CommandErrorLogger {
         vvl::LocationCapture loc;
         LogObjectList objlist;
@@ -195,7 +204,7 @@ class QueueSubState : public vvl::QueueSubState {
     void PostSubmit(std::deque<vvl::QueueSubmission> &submissions) override;
     void Retire(vvl::QueueSubmission &) override;
 
-    vko::SharedResourcesCache shared_resources_cache;
+    vko::SharedResourcesCache<false> shared_resources_cache;
 
   protected:
     void SubmitBarrier(const Location &loc, uint64_t seq);

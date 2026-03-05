@@ -23,7 +23,7 @@
 #include "../framework/ray_tracing_objects.h"
 
 // Tests for NVIDIA-specific best practices
-const char *kEnableNVIDIAValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_NVIDIA";
+const char *kEnableNVIDIAValidation = "validate_best_practices_nvidia";
 
 static constexpr float defaultQueuePriority = 0.0f;
 
@@ -599,8 +599,8 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipelineSwitchTessGeometryMe
         void main() {}
     )glsl";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj gs(this, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
 

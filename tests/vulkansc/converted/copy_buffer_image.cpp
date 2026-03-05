@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (c) 2015-2025 Google, Inc.
  * Modifications Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -584,7 +584,7 @@ TEST_F(NegativeCopyBufferImage, ImageLayerCountMismatch) {
     copy_region.dstOffset = {0, 0, 0};
     copy_region.extent = {1, 1, 1};
 
-    const char *vuid = (maintenance1 == true) ? "VUID-vkCmdCopyImage-srcImage-08793" : "VUID-VkImageCopy-apiVersion-07941";
+    const char* vuid = (maintenance1 == true) ? "VUID-vkCmdCopyImage-srcImage-08793" : "VUID-VkImageCopy-apiVersion-07941";
     m_errorMonitor->SetDesiredError(vuid);
     vk::CmdCopyImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_GENERAL, dst_image, VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
     m_errorMonitor->VerifyFound();
@@ -2251,6 +2251,7 @@ TEST_F(NegativeCopyBufferImage, DepthStencilImageCopyNoGraphicsQueueFlags) {
         "Allocate a command buffer on a queue that does not support graphics and try to issue a depth/stencil image copy to "
         "buffer");
 
+    SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
 
     const std::optional<uint32_t> no_gfx = m_device->NonGraphicsQueueFamily();
@@ -2260,6 +2261,8 @@ TEST_F(NegativeCopyBufferImage, DepthStencilImageCopyNoGraphicsQueueFlags) {
 
     // Create Depth image
     const VkFormat ds_format = FindSupportedDepthOnlyFormat(Gpu());
+    const bool ds_supports_copy_on_compute_queue = FormatFeatures2AreSupported(
+        Gpu(), ds_format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_2_DEPTH_COPY_ON_COMPUTE_QUEUE_BIT_KHR);
     vkt::Image ds_image(*m_device, 64, 64, ds_format,
                         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
@@ -2282,6 +2285,9 @@ TEST_F(NegativeCopyBufferImage, DepthStencilImageCopyNoGraphicsQueueFlags) {
     command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyBufferToImage-commandBuffer-07739");
+    if (!ds_supports_copy_on_compute_queue) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImageToBuffer-commandBuffer-11790");
+    }
     vk::CmdCopyBufferToImage(command_buffer, buffer, ds_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
     m_errorMonitor->VerifyFound();
 }
@@ -2705,7 +2711,9 @@ TEST_F(NegativeCopyBufferImage, BufferToCompressedImage) {
 }
 
 TEST_F(NegativeCopyBufferImage, SameImage) {
-    TEST_DESCRIPTION("use wrong layout copying to the same image.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
 
     auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_B8G8R8A8_UNORM, kSrcDstUsage);
@@ -2719,6 +2727,13 @@ TEST_F(NegativeCopyBufferImage, SameImage) {
     copy_region.dstOffset = {2, 2, 0};
     copy_region.extent = {1, 1, 1};
 
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-srcImage-09460");
+    vk::CmdCopyImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, src_image,
+                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
+    m_errorMonitor->VerifyFound();
+
+    copy_region.srcSubresource.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    copy_region.dstSubresource.layerCount = VK_REMAINING_ARRAY_LAYERS;
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-srcImage-09460");
     vk::CmdCopyImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, src_image,
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
@@ -3288,6 +3303,35 @@ TEST_F(NegativeCopyBufferImage, CopyColorToDepthMaintenanc8DepthStencil) {
     m_command_buffer.End();
 }
 
+TEST_F(NegativeCopyBufferImage, CopyDepthToDepthStencilMaintenanc8Depth) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::maintenance8);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_8_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
+
+    if (!FormatFeaturesAreSupported(Gpu(), ds_format, VK_IMAGE_TILING_OPTIMAL, kSrcDstFeature)) {
+        GTEST_SKIP() << "Required Depth/Stencil features not supported";
+    }
+
+    vkt::Image depth_stencil_image_1(*m_device, 128, 128, ds_format, kSrcDstUsage);
+    vkt::Image depth_stencil_image_2(*m_device, 128, 128, ds_format, kSrcDstUsage);
+
+    VkImageCopy copy_region;
+    copy_region.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    copy_region.srcOffset = {0, 0, 0};
+    copy_region.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1};
+    copy_region.dstOffset = {0, 0, 0};
+    copy_region.extent = {64, 64, 1};
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-pRegions-12201");
+    vk::CmdCopyImage(m_command_buffer, depth_stencil_image_1, VK_IMAGE_LAYOUT_GENERAL, depth_stencil_image_2,
+                     VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeCopyBufferImage, CopyColorToDepthMaintenanc8Compatible) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::maintenance8);
@@ -3374,10 +3418,14 @@ TEST_F(NegativeCopyBufferImage, MissingQueueGraphicsSupport) {
     RETURN_IF_SKIP(Init());
 
     const std::optional<uint32_t> non_graphics_queue_family_index = m_device->QueueFamilyWithoutCapabilities(VK_QUEUE_GRAPHICS_BIT);
-
+    const bool is_compute_queue =
+        m_device->Physical().queue_properties_[*non_graphics_queue_family_index].queueFlags & VK_QUEUE_COMPUTE_BIT;
     if (!non_graphics_queue_family_index) {
         GTEST_SKIP() << "No suitable queue found.";
     }
+
+    VkFormatProperties2 depth_format_properties2 = vku::InitStructHelper();
+    vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_D16_UNORM, &depth_format_properties2);
 
     vkt::CommandPool command_pool(*m_device, non_graphics_queue_family_index.value());
     vkt::CommandBuffer command_buffer(*m_device, command_pool);
@@ -3389,6 +3437,11 @@ TEST_F(NegativeCopyBufferImage, MissingQueueGraphicsSupport) {
                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     vkt::Image dst_ds_image(*m_device, 32u, 32u, VK_FORMAT_D16_UNORM,
                             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+    const bool ds_supports_copy_on_compute_queue = FormatFeatures2AreSupported(
+        Gpu(), VK_FORMAT_D16_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_2_DEPTH_COPY_ON_COMPUTE_QUEUE_BIT_KHR);
+    const bool ds_supports_copy_on_transfer_queue = FormatFeatures2AreSupported(
+        Gpu(), VK_FORMAT_D16_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_2_DEPTH_COPY_ON_TRANSFER_QUEUE_BIT_KHR);
 
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
     buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -3408,6 +3461,12 @@ TEST_F(NegativeCopyBufferImage, MissingQueueGraphicsSupport) {
     buffer_image_copy.imageExtent = extent;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImageToBuffer-commandBuffer-10216");
+    if (!ds_supports_copy_on_transfer_queue && !is_compute_queue) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdCopyBufferToImage-commandBuffer-11779");
+    }
+    if (!ds_supports_copy_on_compute_queue && is_compute_queue) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdCopyBufferToImage-commandBuffer-11778");
+    }
     vk::CmdCopyImageToBuffer(command_buffer, src_ds_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1u, &buffer_image_copy);
     m_errorMonitor->VerifyFound();
 
@@ -3419,6 +3478,12 @@ TEST_F(NegativeCopyBufferImage, MissingQueueGraphicsSupport) {
     image_copy.extent = extent;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-commandBuffer-10218");
+    if (!ds_supports_copy_on_transfer_queue && !is_compute_queue) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-commandBuffer-11787");
+    }
+    if (!ds_supports_copy_on_compute_queue && is_compute_queue) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-commandBuffer-11786");
+    }
     vk::CmdCopyImage(command_buffer, src_ds_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_color_image,
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &image_copy);
     m_errorMonitor->VerifyFound();
@@ -3427,6 +3492,12 @@ TEST_F(NegativeCopyBufferImage, MissingQueueGraphicsSupport) {
     image_copy.dstSubresource = ds_image_subresource;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-commandBuffer-10217");
+    if (!ds_supports_copy_on_compute_queue && !is_compute_queue) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-commandBuffer-11783");
+    }
+    if (!ds_supports_copy_on_compute_queue && is_compute_queue) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-commandBuffer-11782");
+    }
     vk::CmdCopyImage(command_buffer, src_color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_ds_image,
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &image_copy);
     m_errorMonitor->VerifyFound();
@@ -3531,6 +3602,7 @@ TEST_F(NegativeCopyBufferImage, BlitDepthRemainingArrayLayers) {
     region.dstOffsets[0] = {0, 0, 0};
     region.dstOffsets[1] = {32, 32, 2};
 
+    m_errorMonitor->SetDesiredError("VUID-VkImageBlit-layerCount-08801");
     m_errorMonitor->SetDesiredError("VUID-vkCmdBlitImage-maintenance8-10208");
     vk::CmdBlitImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_image_3d,
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &region, VK_FILTER_NEAREST);
@@ -4284,11 +4356,7 @@ TEST_F(NegativeCopyBufferImage, Transition3dImageSlices) {
     image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     image_memory_barrier.image = image;
-    image_memory_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    image_memory_barrier.subresourceRange.baseMipLevel = 0;
-    image_memory_barrier.subresourceRange.levelCount = 1;
-    image_memory_barrier.subresourceRange.baseArrayLayer = 0;
-    image_memory_barrier.subresourceRange.layerCount = 4;
+    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 4};
     m_command_buffer.Barrier(image_memory_barrier);
 
     image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -4402,7 +4470,7 @@ TEST_F(NegativeCopyBufferImage, MemoryIndirectFeature) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
 
     VkStridedDeviceAddressRangeKHR copy_address_range = {};
     copy_address_range.address = indirect_buffer.Address();
@@ -4429,7 +4497,7 @@ TEST_F(NegativeCopyBufferImage, MemoryIndirect) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size * 2, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size * 2, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
 
     m_command_buffer.Begin();
 
@@ -4483,7 +4551,7 @@ TEST_F(NegativeCopyBufferImage, MemoryIndirectProtect) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
 
     VkStridedDeviceAddressRangeKHR address_range = {};
     address_range.address = indirect_buffer.Address();
@@ -4511,7 +4579,7 @@ TEST_F(NegativeCopyBufferImage, MemoryIndirectBufferOverflow) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
 
     VkStridedDeviceAddressRangeKHR address_range = {};
     address_range.address = indirect_buffer.Address();
@@ -4551,7 +4619,7 @@ TEST_F(NegativeCopyBufferImage, MemoryToImageIndirectFeature) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryToImageIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
     vkt::Image dst_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     VkStridedDeviceAddressRangeKHR copy_address_range = {};
@@ -4583,7 +4651,7 @@ TEST_F(NegativeCopyBufferImage, MemoryToImageIndirect) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryToImageIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size * 3, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size * 3, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
     vkt::Image dst_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     m_command_buffer.Begin();
@@ -4641,7 +4709,7 @@ TEST_F(NegativeCopyBufferImage, MemoryToImageIndirectAspectMask) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryToImageIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
     vkt::Image dst_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     VkStridedDeviceAddressRangeKHR copy_address_range = {};
@@ -4672,7 +4740,7 @@ TEST_F(NegativeCopyBufferImage, MemoryToImageIndirectDstImageAndLayout) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryToImageIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size * 2, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size * 2, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
     vkt::Image dst_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     m_command_buffer.Begin();
@@ -4721,7 +4789,7 @@ TEST_F(NegativeCopyBufferImage, MemoryToImageIndirectSubresource) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryToImageIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
     vkt::Image dst_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     m_command_buffer.Begin();
@@ -4741,7 +4809,7 @@ TEST_F(NegativeCopyBufferImage, MemoryToImageIndirectSubresource) {
     {
         VkImageSubresourceLayers res_layer = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 2};
         indirect_info.pImageSubresources = &res_layer;
-        m_errorMonitor->SetDesiredError("VUID-VkCopyMemoryToImageIndirectInfoKHR-layerCount-08764");
+        m_errorMonitor->SetDesiredError("VUID-VkCopyMemoryToImageIndirectInfoKHR-dstImage-12288");
         vk::CmdCopyMemoryToImageIndirectKHR(m_command_buffer, &indirect_info);
         m_errorMonitor->VerifyFound();
     }
@@ -4763,7 +4831,7 @@ TEST_F(NegativeCopyBufferImage, MemoryToImageIndirectLayout) {
     RETURN_IF_SKIP(Init());
 
     const size_t copy_size = sizeof(VkCopyMemoryToImageIndirectCommandKHR);
-    vkt::Buffer indirect_buffer(*m_device, copy_size * 2, 0, vkt::device_address);
+    vkt::Buffer indirect_buffer(*m_device, copy_size * 2, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
 
     m_command_buffer.Begin();
 
@@ -4818,6 +4886,49 @@ TEST_F(NegativeCopyBufferImage, MemoryToImageIndirectLayout) {
     m_command_buffer.End();
 }
 
+TEST_F(NegativeCopyBufferImage, MemoryToImageIndirectUsage) {
+    AddRequiredExtensions(VK_KHR_COPY_MEMORY_INDIRECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::indirectMemoryCopy);
+    AddRequiredFeature(vkt::Feature::indirectMemoryToImageCopy);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Buffer indirect_buffer(*m_device, 256, 0, vkt::device_address);
+
+    VkStridedDeviceAddressRangeKHR address_range = {};
+    address_range.address = indirect_buffer.Address();
+    address_range.size = 256;
+    address_range.stride = 64;
+
+    m_command_buffer.Begin();
+    {
+        VkCopyMemoryIndirectInfoKHR copy_info = vku::InitStructHelper();
+        copy_info.copyCount = 1;
+        copy_info.copyAddressRange = address_range;
+        copy_info.srcCopyFlags = VK_ADDRESS_COPY_DEVICE_LOCAL_BIT_KHR;
+        copy_info.dstCopyFlags = VK_ADDRESS_COPY_DEVICE_LOCAL_BIT_KHR;
+        m_errorMonitor->SetDesiredError("VUID-VkCopyMemoryIndirectInfoKHR-copyAddressRange-12210");
+        vk::CmdCopyMemoryIndirectKHR(m_command_buffer, &copy_info);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        vkt::Image dst_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+        VkImageSubresourceLayers res_layer = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        VkCopyMemoryToImageIndirectInfoKHR copy_info = vku::InitStructHelper();
+        copy_info.copyCount = 1;
+        copy_info.copyAddressRange = address_range;
+        copy_info.srcCopyFlags = VK_ADDRESS_COPY_DEVICE_LOCAL_BIT_KHR;
+        copy_info.dstImage = dst_image;
+        copy_info.dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        copy_info.pImageSubresources = &res_layer;
+        m_errorMonitor->SetDesiredError("VUID-VkCopyMemoryToImageIndirectInfoKHR-copyAddressRange-12213");
+        vk::CmdCopyMemoryToImageIndirectKHR(m_command_buffer, &copy_info);
+        m_errorMonitor->VerifyFound();
+    }
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeCopyBufferImage, SinglePlaneYCbCr) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
@@ -4859,6 +4970,319 @@ TEST_F(NegativeCopyBufferImage, SinglePlaneYCbCr) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-dstOffset-00151");
     vk::CmdCopyImage(m_command_buffer, image_422, VK_IMAGE_LAYOUT_GENERAL, image_ucmp32, VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeCopyBufferImage, CopyDepthOnComputeQueue) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_8_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_10_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance8);
+    AddRequiredFeature(vkt::Feature::maintenance10);
+    RETURN_IF_SKIP(Init());
+
+    auto compute_without_graphics_queue_i = m_device->QueueFamily(VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT);
+    if (!compute_without_graphics_queue_i.has_value()) {
+        GTEST_SKIP() << "Need a queue that supports compute but not graphics";
+    }
+    std::vector<VkFormat> depth_formats = {VK_FORMAT_D16_UNORM,         VK_FORMAT_X8_D24_UNORM_PACK32,
+                                           VK_FORMAT_D32_SFLOAT,        VK_FORMAT_D16_UNORM_S8_UINT,
+                                           VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT};
+    VkFormat depth_format = VK_FORMAT_UNDEFINED;
+    for (const auto& format : depth_formats) {
+        if (!FormatFeatures2AreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL,
+                                         VK_FORMAT_FEATURE_2_DEPTH_COPY_ON_COMPUTE_QUEUE_BIT_KHR) &&
+            FormatIsSupported(gpu_, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
+            depth_format = format;
+            break;
+        }
+    }
+    if (depth_format == VK_FORMAT_UNDEFINED) {
+        GTEST_SKIP() << "Suitable format not found";
+    }
+    vkt::CommandPool pool(*m_device, *compute_without_graphics_queue_i);
+    vkt::CommandBuffer cb(*m_device, pool);
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = depth_format;
+    image_create_info.extent = {32, 32, 1};
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 4;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.flags = 0;
+
+    vkt::Image depth_image(*m_device, image_create_info, vkt::set_layout);
+
+    vkt::Buffer buffer_256k(*m_device, 262144, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    VkBufferImageCopy2 ds_region = vku::InitStructHelper();
+    ds_region.bufferOffset = 0;
+    ds_region.bufferRowLength = 0;
+    ds_region.bufferImageHeight = 0;
+    ds_region.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    ds_region.imageOffset = {0, 0, 0};
+    ds_region.imageExtent = {16, 16, 1};
+
+    VkCopyImageToBufferInfo2 image_buffer_info = vku::InitStructHelper();
+    image_buffer_info.dstBuffer = buffer_256k;
+    image_buffer_info.srcImage = depth_image;
+    image_buffer_info.srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_buffer_info.regionCount = 1;
+    image_buffer_info.pRegions = &ds_region;
+
+    cb.Begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyBufferToImage2-commandBuffer-11778");
+    vk::CmdCopyImageToBuffer2(cb, &image_buffer_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeCopyBufferImage, CopyDepthToBufferOnTransferQueue) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_8_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_10_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance8);
+    AddRequiredFeature(vkt::Feature::maintenance10);
+    RETURN_IF_SKIP(Init());
+
+    auto compute_without_graphics_queue_i =
+        m_device->QueueFamily(VK_QUEUE_TRANSFER_BIT, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+    if (!compute_without_graphics_queue_i.has_value()) {
+        GTEST_SKIP() << "Need a queue that supports compute but not graphics";
+    }
+    vkt::CommandPool pool(*m_device, *compute_without_graphics_queue_i);
+    vkt::CommandBuffer cb(*m_device, pool);
+
+    std::vector<VkFormat> depth_formats = {VK_FORMAT_D16_UNORM,         VK_FORMAT_X8_D24_UNORM_PACK32,
+                                           VK_FORMAT_D32_SFLOAT,        VK_FORMAT_D16_UNORM_S8_UINT,
+                                           VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT};
+    VkFormat depth_format = VK_FORMAT_UNDEFINED;
+    for (const auto& format : depth_formats) {
+        if (!FormatFeatures2AreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL,
+                                         VK_FORMAT_FEATURE_2_DEPTH_COPY_ON_TRANSFER_QUEUE_BIT_KHR) &&
+            FormatIsSupported(gpu_, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
+            depth_format = format;
+            break;
+        }
+    }
+    if (depth_format == VK_FORMAT_UNDEFINED) {
+        GTEST_SKIP() << "Suitable format not found";
+    }
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = depth_format;
+    image_create_info.extent = {32, 32, 1};
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 4;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.flags = 0;
+
+    vkt::Image depth_image(*m_device, image_create_info, vkt::set_layout);
+
+    vkt::Buffer buffer_256k(*m_device, 262144, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    VkBufferImageCopy2 ds_region = vku::InitStructHelper();
+    ds_region.bufferOffset = 0;
+    ds_region.bufferRowLength = 0;
+    ds_region.bufferImageHeight = 0;
+    ds_region.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    ds_region.imageOffset = {0, 0, 0};
+    ds_region.imageExtent = {16, 16, 1};
+
+    VkCopyImageToBufferInfo2 image_buffer_info = vku::InitStructHelper();
+    image_buffer_info.dstBuffer = buffer_256k;
+    image_buffer_info.srcImage = depth_image;
+    image_buffer_info.srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_buffer_info.regionCount = 1;
+    image_buffer_info.pRegions = &ds_region;
+
+    cb.Begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyBufferToImage2-commandBuffer-11779");
+    vk::CmdCopyImageToBuffer2(cb, &image_buffer_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeCopyBufferImage, CopyBufferToDepthOnComputeQueue) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_8_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_10_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance8);
+    AddRequiredFeature(vkt::Feature::maintenance10);
+    RETURN_IF_SKIP(Init());
+
+    auto compute_without_graphics_queue_i = m_device->QueueFamily(VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT);
+    if (!compute_without_graphics_queue_i.has_value()) {
+        GTEST_SKIP() << "Need a queue that supports compute but not graphics";
+    }
+    std::vector<VkFormat> depth_formats = {VK_FORMAT_D16_UNORM,         VK_FORMAT_X8_D24_UNORM_PACK32,
+                                           VK_FORMAT_D32_SFLOAT,        VK_FORMAT_D16_UNORM_S8_UINT,
+                                           VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT};
+    VkFormat depth_format = VK_FORMAT_UNDEFINED;
+    for (const auto& format : depth_formats) {
+        if (!FormatFeatures2AreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL,
+                                         VK_FORMAT_FEATURE_2_DEPTH_COPY_ON_COMPUTE_QUEUE_BIT_KHR) &&
+            FormatIsSupported(gpu_, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
+            depth_format = format;
+            break;
+        }
+    }
+    if (depth_format == VK_FORMAT_UNDEFINED) {
+        GTEST_SKIP() << "Suitable format not found";
+    }
+    vkt::CommandPool pool(*m_device, *compute_without_graphics_queue_i);
+    vkt::CommandBuffer cb(*m_device, pool);
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = depth_format;
+    image_create_info.extent = {32, 32, 1};
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 4;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.flags = 0;
+
+    vkt::Image depth_image(*m_device, image_create_info, vkt::set_layout);
+
+    vkt::Buffer buffer_256k(*m_device, 262144, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    VkBufferImageCopy2 ds_region = vku::InitStructHelper();
+    ds_region.bufferOffset = 0;
+    ds_region.bufferRowLength = 0;
+    ds_region.bufferImageHeight = 0;
+    ds_region.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    ds_region.imageOffset = {0, 0, 0};
+    ds_region.imageExtent = {16, 16, 1};
+
+    const VkBufferImageCopy2 region2 = {VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+                                        nullptr,
+                                        ds_region.bufferOffset,
+                                        ds_region.bufferRowLength,
+                                        ds_region.bufferImageHeight,
+                                        ds_region.imageSubresource,
+                                        ds_region.imageOffset,
+                                        ds_region.imageExtent};
+    const VkCopyBufferToImageInfo2 copy_buffer_to_image_info2 = {
+        VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2, nullptr, buffer_256k, depth_image, VK_IMAGE_LAYOUT_GENERAL, 1, &region2};
+
+    cb.Begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImageToBuffer2-commandBuffer-11790");
+    vk::CmdCopyBufferToImage2(cb, &copy_buffer_to_image_info2);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeCopyBufferImage, CopyBufferToDepthOnTransferQueue) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_8_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_10_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance8);
+    AddRequiredFeature(vkt::Feature::maintenance10);
+    RETURN_IF_SKIP(Init());
+
+    auto transfer_queue = m_device->QueueFamily(VK_QUEUE_TRANSFER_BIT, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+    if (!transfer_queue.has_value()) {
+        GTEST_SKIP() << "Need a queue that supports transfer but not graphics or compute";
+    }
+    std::vector<VkFormat> depth_formats = {VK_FORMAT_D16_UNORM,         VK_FORMAT_X8_D24_UNORM_PACK32,
+                                           VK_FORMAT_D32_SFLOAT,        VK_FORMAT_D16_UNORM_S8_UINT,
+                                           VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT};
+    VkFormat depth_format = VK_FORMAT_UNDEFINED;
+    for (const auto& format : depth_formats) {
+        if (!FormatFeatures2AreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL,
+                                         VK_FORMAT_FEATURE_2_DEPTH_COPY_ON_TRANSFER_QUEUE_BIT_KHR) &&
+            FormatIsSupported(gpu_, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
+            depth_format = format;
+            break;
+        }
+    }
+    if (depth_format == VK_FORMAT_UNDEFINED) {
+        GTEST_SKIP() << "Suitable format not found";
+    }
+    vkt::CommandPool pool(*m_device, *transfer_queue);
+    vkt::CommandBuffer cb(*m_device, pool);
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = depth_format;
+    image_create_info.extent = {32, 32, 1};
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 4;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.flags = 0;
+
+    vkt::Image depth_image(*m_device, image_create_info, vkt::set_layout);
+
+    vkt::Buffer buffer_256k(*m_device, 262144, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    VkBufferImageCopy2 ds_region = vku::InitStructHelper();
+    ds_region.bufferOffset = 0;
+    ds_region.bufferRowLength = 0;
+    ds_region.bufferImageHeight = 0;
+    ds_region.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    ds_region.imageOffset = {0, 0, 0};
+    ds_region.imageExtent = {16, 16, 1};
+
+    const VkBufferImageCopy2 region2 = {VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+                                        nullptr,
+                                        ds_region.bufferOffset,
+                                        ds_region.bufferRowLength,
+                                        ds_region.bufferImageHeight,
+                                        ds_region.imageSubresource,
+                                        ds_region.imageOffset,
+                                        ds_region.imageExtent};
+    const VkCopyBufferToImageInfo2 copy_buffer_to_image_info2 = {
+        VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2, nullptr, buffer_256k, depth_image, VK_IMAGE_LAYOUT_GENERAL, 1, &region2};
+
+    cb.Begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImageToBuffer2-commandBuffer-11791");
+    vk::CmdCopyBufferToImage2(cb, &copy_buffer_to_image_info2);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeCopyBufferImage, BufferToLayeredImageCopy) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(Init());
+
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_BC7_UNORM_BLOCK, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)) {
+        GTEST_SKIP() << "Required formats/features not supported";
+    }
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 4, VK_FORMAT_BC7_UNORM_BLOCK, VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                                                  VK_IMAGE_TILING_OPTIMAL);
+    vkt::Image image(*m_device, image_ci);
+
+    VkDeviceSize buff_size = 32 * 32;
+    vkt::Buffer buffer(*m_device, vkt::Buffer::CreateInfo(buff_size, kSrcDstUsage));
+
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 4};
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {32, 32, 1};
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImageToBuffer-pRegions-00183");
+    vk::CmdCopyImageToBuffer(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, buffer, 1, &region);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }

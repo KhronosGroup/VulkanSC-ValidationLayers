@@ -40,7 +40,7 @@ TEST_F(NegativePipelineBinary, GetPipelineKey) {
     }
 
     {
-        VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+        VkShaderObj cs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
         std::vector<VkDescriptorSetLayoutBinding> bindings(0);
         const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
@@ -85,7 +85,7 @@ TEST_F(NegativePipelineBinary, ReleaseCapturedDataAllocator) {
     };
     const VkAllocationCallbacks allocator = {nullptr, Alloc::alloc, Alloc::reallocFunc, Alloc::freeFunc, nullptr, nullptr};
 
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
     const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
@@ -151,7 +151,7 @@ TEST_F(NegativePipelineBinary, ReleaseCapturedData) {
 
     {
         VkReleaseCapturedPipelineDataInfoKHR data_info = vku::InitStructHelper();
-        data_info.pipeline = pipe2.Handle();
+        data_info.pipeline = pipe2;
 
         vk::ReleaseCapturedPipelineDataKHR(device(), &data_info, nullptr);
 
@@ -221,6 +221,7 @@ TEST_F(NegativePipelineBinary, ComputePipeline) {
     AddRequiredFeature(vkt::Feature::maintenance5);
     AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::pipelineBinaries);
+    AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
     RETURN_IF_SKIP(Init());
 
     VkPipelineCache pipeline_cache;
@@ -327,6 +328,7 @@ TEST_F(NegativePipelineBinary, GraphicsPipeline) {
     AddRequiredFeature(vkt::Feature::maintenance5);
     AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::pipelineBinaries);
+    AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
     RETURN_IF_SKIP(Init());
 
     VkPipelineCache pipeline_cache;
@@ -341,7 +343,7 @@ TEST_F(NegativePipelineBinary, GraphicsPipeline) {
     vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     InitRenderTarget(&depth_image_view.handle());
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 
     const VkPipelineVertexInputStateCreateInfo pipeline_vertex_input_state_create_info{
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, nullptr, 0, 0, nullptr, 0, nullptr};
@@ -573,7 +575,7 @@ TEST_F(NegativePipelineBinary, Creation3) {
         GTEST_SKIP() << "pipelineBinaryInternalCache is VK_TRUE";
     }
 
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
     const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
@@ -721,7 +723,7 @@ TEST_F(NegativePipelineBinary, CreateCacheControl) {
     cache_control.disableInternalCache = VK_TRUE;
     RETURN_IF_SKIP(InitState(nullptr, &cache_control));
 
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
     const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
@@ -756,7 +758,7 @@ TEST_F(NegativePipelineBinary, InvalidPNext) {
     AddRequiredFeature(vkt::Feature::pipelineBinaries);
     RETURN_IF_SKIP(Init());
 
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkShaderObj cs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
     const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);

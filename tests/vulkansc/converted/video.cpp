@@ -427,6 +427,40 @@ TEST_F(NegativeVideo, CreateSessionInvalidStdHeaderVersion) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeVideo, CreateSessionUnsupportedCodecOp) {
+    TEST_DESCRIPTION("vkCreateVideoSessionKHR - unsupported video codec operation");
+
+    RETURN_IF_SKIP(Init());
+
+    VideoConfig config = GetConfig();
+    if (!config) {
+        GTEST_SKIP() << "Test requires video support";
+    }
+
+    uint32_t queue_family_index = VK_QUEUE_FAMILY_IGNORED;
+    for (uint32_t qfi = 0; qfi < QueueFamilyCount(); ++qfi) {
+        if ((QueueFamilyFlags(qfi) & (VK_QUEUE_VIDEO_DECODE_BIT_KHR | VK_QUEUE_VIDEO_ENCODE_BIT_KHR)) &&
+            ((QueueFamilyVideoCodecOps(qfi) & config.Profile()->videoCodecOperation) == 0)) {
+            queue_family_index = qfi;
+            break;
+        }
+    }
+
+    if (queue_family_index == VK_QUEUE_FAMILY_IGNORED) {
+        GTEST_SKIP() << "Test requires a queue family that supports video but not the specific codec op";
+    }
+
+    VkVideoSessionKHR session;
+    VkVideoSessionCreateInfoKHR create_info = *config.SessionCreateInfo();
+    create_info.pVideoProfile = config.Profile();
+    create_info.pStdHeaderVersion = config.StdVersion();
+    create_info.queueFamilyIndex = queue_family_index;
+
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-pVideoProfile-11759");
+    vk::CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeVideo, BindVideoSessionMemory) {
     TEST_DESCRIPTION("vkBindVideoSessionMemoryKHR - memory binding related invalid usages");
 
@@ -694,7 +728,7 @@ TEST_F(NegativeVideo, BeginCodingUnsupportedCodecOp) {
 
     cb.Begin();
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07231");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-11760");
     cb.BeginVideoCoding(context.Begin());
     m_errorMonitor->VerifyFound();
 
@@ -1651,9 +1685,7 @@ TEST_F(NegativeVideo, CreateImageViewInvalidViewType) {
         image_view_ci.image = image;
         image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
         image_view_ci.format = image_ci.format;
-        image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        image_view_ci.subresourceRange.levelCount = 1;
-        image_view_ci.subresourceRange.layerCount = 6;
+        image_view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 6};
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageViewCreateInfo-image-01003");
         if (config.IsDecode()) {
@@ -1731,9 +1763,7 @@ TEST_F(NegativeVideo, CreateImageViewInvalidUsage) {
         image_view_ci.image = image;
         image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
         image_view_ci.format = format;
-        image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        image_view_ci.subresourceRange.levelCount = 1;
-        image_view_ci.subresourceRange.layerCount = 1;
+        image_view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
         VkImageView image_view = VK_NULL_HANDLE;
 
@@ -1748,6 +1778,10 @@ TEST_F(NegativeVideo, BeginQueryIncompatibleQueueFamily) {
     TEST_DESCRIPTION("vkCmdBeginQuery - result status only queries require queue family support");
 
     RETURN_IF_SKIP(Init());
+
+    if (!HasQueueFamilySupportsResultStatusOnlyQueries()) {
+        GTEST_SKIP() << "Test requires at least one queue family to support result status queries";
+    }
 
     uint32_t queue_family_index = VK_QUEUE_FAMILY_IGNORED;
     for (uint32_t qfi = 0; qfi < QueueFamilyCount(); ++qfi) {
@@ -1981,6 +2015,10 @@ TEST_F(NegativeVideo, GetQueryPoolResultsStatusBit) {
 
     RETURN_IF_SKIP(Init());
 
+    if (!HasQueueFamilySupportsResultStatusOnlyQueries()) {
+        GTEST_SKIP() << "Test requires at least one queue family to support result status queries";
+    }
+
     if (!GetConfig()) {
         GTEST_SKIP() << "Test requires video support";
     }
@@ -2001,10 +2039,34 @@ TEST_F(NegativeVideo, GetQueryPoolResultsStatusBit) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeVideo, GetQueryPoolResultsStatusBitInvalidQueryType) {
+    TEST_DESCRIPTION("vkGetQueryPoolResults - test invalid combination of QueryResultFlags and QueryType");
+
+    RETURN_IF_SKIP(Init());
+
+    if (!GetConfig()) {
+        GTEST_SKIP() << "Test requires video support";
+    }
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 1);
+
+    uint32_t status;
+    VkQueryResultFlags flags;
+
+    m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-queryType-11874");
+    flags = VK_QUERY_RESULT_WITH_STATUS_BIT_KHR;
+    vk::GetQueryPoolResults(device(), query_pool, 0, 1, sizeof(status), &status, sizeof(status), flags);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeVideo, CopyQueryPoolResultsStatusBit) {
     TEST_DESCRIPTION("vkCmdCopyQueryPoolResults - test invalid use of VK_QUERY_RESULT_WITH_STATUS_BIT_KHR");
 
     RETURN_IF_SKIP(Init());
+
+    if (!HasQueueFamilySupportsResultStatusOnlyQueries()) {
+        GTEST_SKIP() << "Test requires at least one queue family to support result status queries";
+    }
 
     if (!GetConfig()) {
         GTEST_SKIP() << "Test requires video support";
@@ -2025,6 +2087,31 @@ TEST_F(NegativeVideo, CopyQueryPoolResultsStatusBit) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResults-flags-09443");
     flags = VK_QUERY_RESULT_WITH_STATUS_BIT_KHR | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
+    vk::CmdCopyQueryPoolResults(m_command_buffer, query_pool, 0, 1, buffer, 0, sizeof(uint32_t), flags);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeVideo, CopyQueryPoolResultsStatusBitInvalidQueryType) {
+    TEST_DESCRIPTION("vkCmdCopyQueryPoolResults - test invalid combination of QueryResultFlags and QueryType");
+
+    RETURN_IF_SKIP(Init());
+
+    if (!GetConfig()) {
+        GTEST_SKIP() << "Test requires video support";
+    }
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 1);
+
+    VkQueryResultFlags flags;
+
+    vkt::Buffer buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    m_command_buffer.Begin();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResults-queryType-11874");
+    flags = VK_QUERY_RESULT_WITH_STATUS_BIT_KHR;
     vk::CmdCopyQueryPoolResults(m_command_buffer, query_pool, 0, 1, buffer, 0, sizeof(uint32_t), flags);
     m_errorMonitor->VerifyFound();
 
@@ -2106,4 +2193,36 @@ TEST_F(NegativeVideoBestPractices, BindVideoSessionMemory) {
             m_errorMonitor->VerifyFound();
         }
     }
+}
+
+TEST_F(NegativeVideo, NoQueueSupportForResultStatusOnly) {
+    TEST_DESCRIPTION("vkCreateQueryPool - test querypool creation when result status only query is not supported");
+
+    RETURN_IF_SKIP(Init());
+
+    VideoConfig config = GetConfig();
+    if (!config) {
+        GTEST_SKIP() << "Test requires video support";
+    }
+
+    bool has_queue_with_result_status_only_support = false;
+    for (uint32_t qfi = 0; qfi < QueueFamilyCount(); ++qfi) {
+        if (QueueFamilySupportsResultStatusOnlyQueries(qfi)) {
+            has_queue_with_result_status_only_support = true;
+            break;
+        }
+    }
+
+    if (has_queue_with_result_status_only_support) {
+        GTEST_SKIP() << "Test requires there is not queue family that supports result status only";
+    }
+
+    VkQueryPoolCreateInfo query_pool_create_info = vku::InitStructHelper();
+    query_pool_create_info.queryType = VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR;
+    query_pool_create_info.queryCount = 1;
+
+    m_errorMonitor->SetDesiredError("VUID-VkQueryPoolCreateInfo-queryType-11839");
+    VkQueryPool query_pool;
+    vk::CreateQueryPool(device(), &query_pool_create_info, nullptr, &query_pool);
+    m_errorMonitor->VerifyFound();
 }

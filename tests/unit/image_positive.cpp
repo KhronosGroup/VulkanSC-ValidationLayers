@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,7 +80,6 @@ TEST_F(PositiveImage, OwnershipTranfers) {
 TEST_F(PositiveImage, AliasedMemoryTracking) {
     TEST_DESCRIPTION(
         "Create a buffer, allocate memory, bind memory, destroy the buffer, create an image, and bind the same memory to it");
-
     RETURN_IF_SKIP(Init());
 
     VkDeviceSize buff_size = 256;
@@ -90,9 +89,7 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_R8G8B8A8_UNORM;  // mandatory format
-    image_create_info.extent.width = 64;                  // at least 4096x4096 is supported
-    image_create_info.extent.height = 64;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {64, 64, 1};               // at least 4096x4096 is supported
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -126,7 +123,6 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
     buffer.reset(nullptr);
     m_device->Wait();
 
-    // VALIDATION FAILURE:
     image.BindMemory(mem, 0);
 }
 
@@ -227,11 +223,7 @@ TEST_F(PositiveImage, FramebufferFrom3DImage) {
     dsvci.image = image;
     dsvci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
     dsvci.format = VK_FORMAT_B8G8R8A8_UNORM;
-    dsvci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    dsvci.subresourceRange.baseMipLevel = 0;
-    dsvci.subresourceRange.layerCount = 4;
-    dsvci.subresourceRange.baseArrayLayer = 0;
-    dsvci.subresourceRange.levelCount = 1;
+    dsvci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 4};
     vkt::ImageView view(*m_device, dsvci);
 
     VkFramebufferCreateInfo fci = vku::InitStructHelper();
@@ -274,19 +266,16 @@ TEST_F(PositiveImage, ExtendedUsageWithDifferentFormatViews) {
     }
 
     vkt::Image image(*m_device, image_ci);
-    ASSERT_TRUE(image.handle() != VK_NULL_HANDLE);
+    ASSERT_TRUE(image != VK_NULL_HANDLE);
 
     // Since the format is compatible with all image's usage, there's no need to restrict usage
     VkImageViewCreateInfo iv_ci = vku::InitStructHelper();
     iv_ci.image = image;
     iv_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     iv_ci.format = VK_FORMAT_R32G32B32A32_UINT;
-    iv_ci.subresourceRange.layerCount = 1;
-    iv_ci.subresourceRange.baseMipLevel = 0;
-    iv_ci.subresourceRange.levelCount = 1;
-    iv_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    iv_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vkt::ImageView view(*m_device, iv_ci);
-    ASSERT_TRUE(view.handle() != VK_NULL_HANDLE);
+    ASSERT_TRUE(view != VK_NULL_HANDLE);
 
     // Since usage is inherited from the image, we need to restrict the usage to a subset
     // Compressed images do not support storage, but we want to sample from the compressed
@@ -294,7 +283,7 @@ TEST_F(PositiveImage, ExtendedUsageWithDifferentFormatViews) {
     ivu_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     iv_ci.pNext = &ivu_ci;
     vkt::ImageView view2(*m_device, iv_ci);
-    ASSERT_TRUE(view2.handle() != VK_NULL_HANDLE);
+    ASSERT_TRUE(view2 != VK_NULL_HANDLE);
 }
 
 TEST_F(PositiveImage, ImageCompressionControl) {
@@ -502,47 +491,6 @@ TEST_F(PositiveImage, SlicedCreateInfo) {
     }
 }
 
-TEST_F(PositiveImage, BlitRemainingArrayLayers) {
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    RETURN_IF_SKIP(Init());
-
-    VkFormat f_color = VK_FORMAT_R32_SFLOAT;  // Need features ..BLIT_SRC_BIT & ..BLIT_DST_BIT
-    if (!FormatFeaturesAreSupported(Gpu(), f_color, VK_IMAGE_TILING_OPTIMAL,
-                                    VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT)) {
-        GTEST_SKIP() << "No blit feature format support";
-    }
-
-    VkImageCreateInfo ci = vku::InitStructHelper();
-    ci.imageType = VK_IMAGE_TYPE_2D;
-    ci.format = f_color;
-    ci.extent = {64, 64, 1};
-    ci.mipLevels = 1;
-    ci.arrayLayers = 4;
-    ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.tiling = VK_IMAGE_TILING_OPTIMAL;
-    ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    vkt::Image image(*m_device, ci);
-
-    VkImageBlit blitRegion = {};
-    blitRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 2, VK_REMAINING_ARRAY_LAYERS};
-    blitRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, VK_REMAINING_ARRAY_LAYERS};
-    blitRegion.srcOffsets[0] = {0, 0, 0};
-    blitRegion.srcOffsets[1] = {16, 16, 1};
-    blitRegion.dstOffsets[0] = {32, 32, 0};
-    blitRegion.dstOffsets[1] = {64, 64, 1};
-
-    m_command_buffer.Begin();
-
-    vk::CmdBlitImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, image, VK_IMAGE_LAYOUT_GENERAL, 1, &blitRegion,
-                     VK_FILTER_NEAREST);
-    m_command_buffer.FullMemoryBarrier();
-    blitRegion.dstSubresource.layerCount = 2;  // same as VK_REMAINING_ARRAY_LAYERS
-    vk::CmdBlitImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, image, VK_IMAGE_LAYOUT_GENERAL, 1, &blitRegion,
-                     VK_FILTER_NEAREST);
-}
-
 TEST_F(PositiveImage, BlockTexelViewCompatibleMultipleLayers) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
@@ -578,11 +526,7 @@ TEST_F(PositiveImage, BlockTexelViewCompatibleMultipleLayers) {
     ivci.image = image;
     ivci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
     ivci.format = VK_FORMAT_R16G16B16A16_UNORM;
-    ivci.subresourceRange.baseMipLevel = 0;
-    ivci.subresourceRange.baseArrayLayer = 0;
-    ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    ivci.subresourceRange.levelCount = 1;
-    ivci.subresourceRange.layerCount = 2;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 2};
     vkt::ImageView view(*m_device, ivci);
 }
 
@@ -605,6 +549,10 @@ TEST_F(PositiveImage, ImageFormatListSizeCompatibleUncompressed) {
     image_ci.pNext = &format_list;
     image_ci.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT;
 
+    if (!IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        GTEST_SKIP() << "Image create info not supported on device";
+    }
+
     vkt::Image image(*m_device, image_ci);
 }
 
@@ -626,6 +574,10 @@ TEST_F(PositiveImage, ImageFormatListSizeCompatibleCompressed) {
     auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, VK_FORMAT_BC3_UNORM_BLOCK, VK_IMAGE_USAGE_SAMPLED_BIT);
     image_ci.pNext = &format_list;
     image_ci.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT;
+
+    if (!IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        GTEST_SKIP() << "Image create info not supported on device";
+    }
 
     vkt::Image image(*m_device, image_ci);
 }
@@ -697,10 +649,8 @@ TEST_F(PositiveImage, RemainingMipLevelsBlockTexelView) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
-    VkFormatProperties image_fmt;
-    vk::GetPhysicalDeviceFormatProperties(m_device->Physical(), image_create_info.format, &image_fmt);
-    if (!vkt::Image::IsCompatible(*m_device, image_create_info.usage, image_fmt.optimalTilingFeatures)) {
-        GTEST_SKIP() << "Image usage and format not compatible on device";
+    if (!IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        GTEST_SKIP() << "Image create info not compatible on device";
     }
     vkt::Image image(*m_device, image_create_info, vkt::set_layout);
 
@@ -768,10 +718,7 @@ TEST_F(PositiveImage, ImageViewIncompatibleFormat) {
 
     VkImageViewCreateInfo imgViewInfo = vku::InitStructHelper();
     imgViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imgViewInfo.subresourceRange.layerCount = 1;
-    imgViewInfo.subresourceRange.baseMipLevel = 0;
-    imgViewInfo.subresourceRange.levelCount = 1;
-    imgViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imgViewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     imgViewInfo.image = mutImage;
 
     // With a identical format, there should be no error
@@ -803,10 +750,8 @@ TEST_F(PositiveImage, BlockTexelViewType) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
-    VkFormatProperties image_fmt;
-    vk::GetPhysicalDeviceFormatProperties(m_device->Physical(), image_create_info.format, &image_fmt);
-    if (!vkt::Image::IsCompatible(*m_device, image_create_info.usage, image_fmt.optimalTilingFeatures)) {
-        GTEST_SKIP() << "Image usage and format not compatible on device";
+    if (!IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        GTEST_SKIP() << "Image create info not compatible on device";
     }
     vkt::Image image(*m_device, image_create_info, vkt::set_layout);
 
@@ -814,11 +759,7 @@ TEST_F(PositiveImage, BlockTexelViewType) {
     ivci.image = image;
     ivci.viewType = VK_IMAGE_VIEW_TYPE_3D;
     ivci.format = VK_FORMAT_R16G16B16A16_UNORM;
-    ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    ivci.subresourceRange.baseMipLevel = 0;
-    ivci.subresourceRange.layerCount = 1;
-    ivci.subresourceRange.baseArrayLayer = 0;
-    ivci.subresourceRange.levelCount = 1;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     vkt::ImageView image_view(*m_device, ivci);
 }
@@ -832,9 +773,7 @@ TEST_F(PositiveImage, CornerSampledImageNV) {
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
-    image_create_info.extent.width = 2;
-    image_create_info.extent.height = 1;
-    image_create_info.extent.depth = 1;
+    image_create_info.extent = {2, 1, 1};
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -912,12 +851,7 @@ TEST_F(PositiveImage, Image3DWith2DArrayCompatIssue) {
     image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     image_memory_barrier.image = image;
-    image_memory_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    image_memory_barrier.subresourceRange.baseMipLevel = 0;
-    image_memory_barrier.subresourceRange.levelCount = 1;
-    image_memory_barrier.subresourceRange.baseArrayLayer = 0;
-    // Prevent warning by using VK_REMAINING_ARRAY_LAYERS
-    image_memory_barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, VK_REMAINING_ARRAY_LAYERS};
 
     m_command_buffer.Begin();
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
@@ -992,10 +926,8 @@ TEST_F(PositiveImage, BlockTexelViewLayerCount) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
-    VkFormatProperties image_fmt;
-    vk::GetPhysicalDeviceFormatProperties(m_device->Physical(), image_create_info.format, &image_fmt);
-    if (!vkt::Image::IsCompatible(*m_device, image_create_info.usage, image_fmt.optimalTilingFeatures)) {
-        GTEST_SKIP() << "Image usage and format not compatible on device";
+    if (!IsImageFormatSupported(Gpu(), image_create_info, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        GTEST_SKIP() << "Image create info not compatible on device";
     }
     vkt::Image image(*m_device, image_create_info);
 

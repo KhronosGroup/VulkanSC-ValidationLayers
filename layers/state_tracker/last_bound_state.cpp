@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (C) 2015-2025 Google Inc.
+/* Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (C) 2015-2026 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,7 @@
 #include "last_bound_state.h"
 #include <vulkan/vulkan_core.h>
 #include <cassert>
+#include <string>
 #include "containers/container_utils.h"
 #include "state_tracker/descriptor_mode.h"
 #include "state_tracker/pipeline_state.h"
@@ -255,7 +256,7 @@ bool LastBound::IsColorBlendEnabled(uint32_t i) const {
 }
 
 std::string LastBound::DescribeColorBlendEnabled(uint32_t i) const {
-    std::stringstream ss;
+    std::ostringstream ss;
     if (IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT)) {
         if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT)) {
             ss << "vkCmdSetColorBlendEnableEXT::pColorBlendEnables[" << i << "] is ";
@@ -324,7 +325,7 @@ bool LastBound::IsDualBlending(uint32_t i) const {
 }
 
 std::string LastBound::DescribeBlendFactorEquation(uint32_t i) const {
-    std::stringstream ss;
+    std::ostringstream ss;
     if (IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT)) {
         if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT)) {
             const VkColorBlendEquationEXT &eq = cb_state.dynamic_state_value.color_blend_equations[i];
@@ -656,30 +657,30 @@ VkPrimitiveTopology LastBound::ClipSpaceTopology() const {
         }
     } else {  // shader object
         if (mesh_shader_bound) {
-            vvl::ShaderObject *mesh_shader = GetShaderState(ShaderObjectStage::MESH);
-            if (mesh_shader && mesh_shader->entrypoint) {
-                return mesh_shader->entrypoint->execution_mode.GetGeometryMeshOutputTopology();
+            vvl::ShaderObject *mesh_shader = GetShaderObjectState(ShaderObjectStage::MESH);
+            if (mesh_shader && mesh_shader->stage.entrypoint) {
+                return mesh_shader->stage.entrypoint->execution_mode.GetGeometryMeshOutputTopology();
             }
         } else if (geom_shader_bound) {
-            vvl::ShaderObject *geom_shader = GetShaderState(ShaderObjectStage::GEOMETRY);
-            if (geom_shader && geom_shader->entrypoint) {
-                return geom_shader->entrypoint->execution_mode.GetGeometryMeshOutputTopology();
+            vvl::ShaderObject *geom_shader = GetShaderObjectState(ShaderObjectStage::GEOMETRY);
+            if (geom_shader && geom_shader->stage.entrypoint) {
+                return geom_shader->stage.entrypoint->execution_mode.GetGeometryMeshOutputTopology();
             }
         } else if (tesc_shader_bound || tese_shader_bound) {
             VkPrimitiveTopology tess_output_topology = VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
-            vvl::ShaderObject *tesc_shader = GetShaderState(ShaderObjectStage::TESSELLATION_CONTROL);
-            if (tesc_shader && tesc_shader->entrypoint) {
-                if (tesc_shader->entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
+            vvl::ShaderObject *tesc_shader = GetShaderObjectState(ShaderObjectStage::TESSELLATION_CONTROL);
+            if (tesc_shader && tesc_shader->stage.entrypoint) {
+                if (tesc_shader->stage.entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
                     return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
                 }
             }
 
-            vvl::ShaderObject *tese_shader = GetShaderState(ShaderObjectStage::TESSELLATION_EVALUATION);
-            if (tese_shader && tese_shader->entrypoint) {
-                if (tese_shader->entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
+            vvl::ShaderObject *tese_shader = GetShaderObjectState(ShaderObjectStage::TESSELLATION_EVALUATION);
+            if (tese_shader && tese_shader->stage.entrypoint) {
+                if (tese_shader->stage.entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
                     return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
                 } else {
-                    tess_output_topology = tese_shader->entrypoint->execution_mode.GetTessellationEvalOutputTopology();
+                    tess_output_topology = tese_shader->stage.entrypoint->execution_mode.GetTessellationEvalOutputTopology();
                 }
             }
 
@@ -708,16 +709,97 @@ VkPrimitiveTopology LastBound::GetRasterizationInputTopology() const {
     return topology;
 }
 
-VkShaderEXT LastBound::GetShader(ShaderObjectStage stage) const {
-    if (!IsValidShaderBound(stage) || GetShaderState(stage) == nullptr) return VK_NULL_HANDLE;
+bool LastBound::IsSampleShadingEnabled() const {
+    // There is no dynamic state for sampleShadingEnable (or minSampleShading) and instead it can be implicitly set in one of 3 ways
+    // as described in https://godbolt.org/z/7KdqafWrj
+    auto fragment_entry_point = GetFragmentEntryPoint();
+    if (!fragment_entry_point) {
+        return false;  // if no fragment shader, no sample shading
+    }
+
+    for (const auto &variable : fragment_entry_point->stage_interface_variables) {
+        if (variable.storage_class != spv::StorageClassInput) {
+            continue;
+        }
+        if (variable.decorations.Has(spirv::DecorationSet::sample_bit) || variable.decorations.built_in == spv::BuiltInSampleId ||
+            variable.decorations.built_in == spv::BuiltInSamplePosition) {
+            return true;
+        }
+    }
+
+    // Need to check implicit first as it override the explicit values
+    if (pipeline_state) {
+        if (auto ms_state = pipeline_state->MultisampleState()) {
+            return ms_state->sampleShadingEnable;  // explicitly enabled
+        }
+    }
+
+    return false;
+}
+
+float LastBound::GetMinSampleShading() const {
+    // assumes sample shading is enabled, the minSampleShading can have 2 values
+    // 1. If explicitly enabled, read minSampleShading from pipeline state
+    // 2. If implicitly enabled, it is always going to be 1.0
+    if (pipeline_state) {
+        if (auto ms_state = pipeline_state->MultisampleState()) {
+            return ms_state->minSampleShading;
+        }
+    }
+    return 1.0;
+}
+
+std::string LastBound::DescribeSampleShading() const {
+    std::ostringstream ss;
+    ss << "Sample Shading was enbled ";
+
+    bool is_implicit = false;
+    if (auto fragment_entry_point = GetFragmentEntryPoint()) {
+        for (const auto &variable : fragment_entry_point->stage_interface_variables) {
+            if (variable.storage_class != spv::StorageClassInput) {
+                continue;
+            }
+            if (variable.decorations.Has(spirv::DecorationSet::sample_bit)) {
+                ss << "implicitly in the fragment shader because there is a Sample decorated input variable.";
+                is_implicit = true;
+                break;
+            } else if (variable.decorations.built_in == spv::BuiltInSampleId) {
+                ss << "implicitly in the fragment shader because there is a SampleId BuiltIn decorated input variable. "
+                      "(gl_SampleID)";
+                is_implicit = true;
+                break;
+            } else if (variable.decorations.built_in == spv::BuiltInSamplePosition) {
+                ss << "implicitly in the fragment shader because there is a SamplePosition BuiltIn decorated input variable. "
+                      "(gl_SamplePosition)";
+                is_implicit = true;
+                break;
+            }
+        }
+    }
+    if (is_implicit) {
+        ss << "\nminSampleShading is always 1.0 when sample shading is implicitly enabled";
+    } else if (pipeline_state && pipeline_state->MultisampleState()) {
+        ss << "explicitly from VkPipelineMultisampleStateCreateInfo::sampleShadingEnable set to "
+              "VK_TRUE.\nVkPipelineMultisampleStateCreateInfo::minSampleShading = "
+           << pipeline_state->MultisampleState()->minSampleShading;
+    } else {
+        assert(false);
+    }
+    return ss.str();
+}
+
+VkShaderEXT LastBound::GetShaderObject(ShaderObjectStage stage) const {
+    if (!IsValidShaderObjectBound(stage) || GetShaderObjectState(stage) == nullptr) {
+        return VK_NULL_HANDLE;
+    }
     return shader_object_states[static_cast<uint32_t>(stage)]->VkHandle();
 }
 
-vvl::ShaderObject *LastBound::GetShaderState(ShaderObjectStage stage) const {
+vvl::ShaderObject *LastBound::GetShaderObjectState(ShaderObjectStage stage) const {
     return shader_object_states[static_cast<uint32_t>(stage)];
 }
 
-const vvl::ShaderObject *LastBound::GetShaderStateIfValid(ShaderObjectStage stage) const {
+const vvl::ShaderObject *LastBound::GetShaderObjectStateIfValid(ShaderObjectStage stage) const {
     if (!shader_object_bound[static_cast<uint32_t>(stage)]) {
         return nullptr;
     }
@@ -726,13 +808,13 @@ const vvl::ShaderObject *LastBound::GetShaderStateIfValid(ShaderObjectStage stag
 
 const vvl::ShaderObject *LastBound::GetFirstShader() const {
     if (bind_point == VK_PIPELINE_BIND_POINT_COMPUTE) {
-        return GetShaderStateIfValid(ShaderObjectStage::COMPUTE);
+        return GetShaderObjectStateIfValid(ShaderObjectStage::COMPUTE);
     } else if (bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS) {
-        if (const vvl::ShaderObject *vs = GetShaderStateIfValid(ShaderObjectStage::VERTEX)) {
+        if (const vvl::ShaderObject *vs = GetShaderObjectStateIfValid(ShaderObjectStage::VERTEX)) {
             return vs;
         }
 
-        if (const vvl::ShaderObject *ms = GetShaderStateIfValid(ShaderObjectStage::MESH)) {
+        if (const vvl::ShaderObject *ms = GetShaderObjectStateIfValid(ShaderObjectStage::MESH)) {
             return ms;
         }
     }
@@ -742,63 +824,65 @@ const vvl::ShaderObject *LastBound::GetFirstShader() const {
 
 bool LastBound::HasShaderObjects() const {
     for (uint32_t i = 0; i < kShaderObjectStageCount; ++i) {
-        if (GetShader(static_cast<ShaderObjectStage>(i)) != VK_NULL_HANDLE) {
+        if (GetShaderObject(static_cast<ShaderObjectStage>(i)) != VK_NULL_HANDLE) {
             return true;
         }
     }
     return false;
 }
 
-bool LastBound::IsValidShaderBound(ShaderObjectStage stage) const { return GetShaderStateIfValid(stage) != nullptr; }
+bool LastBound::IsValidShaderObjectBound(ShaderObjectStage stage) const { return GetShaderObjectStateIfValid(stage) != nullptr; }
 
-bool LastBound::IsValidShaderOrNullBound(ShaderObjectStage stage) const {
+bool LastBound::IsValidShaderObjectOrNullBound(ShaderObjectStage stage) const {
     return shader_object_bound[static_cast<uint32_t>(stage)];
 }
 
-std::vector<vvl::ShaderObject *> LastBound::GetAllBoundGraphicsShaders() {
+std::vector<vvl::ShaderObject *> LastBound::GetAllBoundGraphicsShaderObjects() {
     std::vector<vvl::ShaderObject *> shaders;
 
-    if (IsValidShaderBound(ShaderObjectStage::VERTEX)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::VERTEX)) {
         shaders.emplace_back(shader_object_states[static_cast<uint32_t>(ShaderObjectStage::VERTEX)]);
     }
-    if (IsValidShaderBound(ShaderObjectStage::TESSELLATION_CONTROL)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::TESSELLATION_CONTROL)) {
         shaders.emplace_back(shader_object_states[static_cast<uint32_t>(ShaderObjectStage::TESSELLATION_CONTROL)]);
     }
-    if (IsValidShaderBound(ShaderObjectStage::TESSELLATION_EVALUATION)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::TESSELLATION_EVALUATION)) {
         shaders.emplace_back(shader_object_states[static_cast<uint32_t>(ShaderObjectStage::TESSELLATION_EVALUATION)]);
     }
-    if (IsValidShaderBound(ShaderObjectStage::GEOMETRY)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::GEOMETRY)) {
         shaders.emplace_back(shader_object_states[static_cast<uint32_t>(ShaderObjectStage::GEOMETRY)]);
     }
-    if (IsValidShaderBound(ShaderObjectStage::FRAGMENT)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::FRAGMENT)) {
         shaders.emplace_back(shader_object_states[static_cast<uint32_t>(ShaderObjectStage::FRAGMENT)]);
     }
-    if (IsValidShaderBound(ShaderObjectStage::TASK)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::TASK)) {
         shaders.emplace_back(shader_object_states[static_cast<uint32_t>(ShaderObjectStage::TASK)]);
     }
-    if (IsValidShaderBound(ShaderObjectStage::MESH)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::MESH)) {
         shaders.emplace_back(shader_object_states[static_cast<uint32_t>(ShaderObjectStage::MESH)]);
     }
 
     return shaders;
 }
 
-bool LastBound::IsAnyGraphicsShaderBound() const {
+bool LastBound::IsStageBound(VkShaderStageFlagBits stage) const {
     if (pipeline_state) {
-        return (pipeline_state->active_shaders & kShaderStageAllGraphics) != 0;
+        return (pipeline_state->active_shaders & stage) != 0;
     } else {
-        return IsValidShaderBound(ShaderObjectStage::VERTEX) || IsValidShaderBound(ShaderObjectStage::TESSELLATION_CONTROL) ||
-               IsValidShaderBound(ShaderObjectStage::TESSELLATION_EVALUATION) || IsValidShaderBound(ShaderObjectStage::GEOMETRY) ||
-               IsValidShaderBound(ShaderObjectStage::FRAGMENT) || IsValidShaderBound(ShaderObjectStage::TASK) ||
-               IsValidShaderBound(ShaderObjectStage::MESH);
+        const ShaderObjectStage shader_object_stage = VkShaderStageToShaderObjectStage(stage);
+        return GetShaderObjectStateIfValid(shader_object_stage) != nullptr;
     }
 }
 
-bool LastBound::IsFragmentBound() const {
+bool LastBound::IsAnyGraphicsStageBound() const {
     if (pipeline_state) {
-        return (pipeline_state->active_shaders & VK_SHADER_STAGE_FRAGMENT_BIT) != 0;
+        return (pipeline_state->active_shaders & kShaderStageAllGraphics) != 0;
     } else {
-        return IsValidShaderBound(ShaderObjectStage::FRAGMENT);
+        return IsValidShaderObjectBound(ShaderObjectStage::VERTEX) ||
+               IsValidShaderObjectBound(ShaderObjectStage::TESSELLATION_CONTROL) ||
+               IsValidShaderObjectBound(ShaderObjectStage::TESSELLATION_EVALUATION) ||
+               IsValidShaderObjectBound(ShaderObjectStage::GEOMETRY) || IsValidShaderObjectBound(ShaderObjectStage::FRAGMENT) ||
+               IsValidShaderObjectBound(ShaderObjectStage::TASK) || IsValidShaderObjectBound(ShaderObjectStage::MESH);
     }
 }
 
@@ -808,28 +892,28 @@ VkShaderStageFlags LastBound::GetAllActiveBoundStages() const {
     }
     // else shader object
     VkShaderStageFlags stages = 0;
-    if (IsValidShaderBound(ShaderObjectStage::VERTEX)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::VERTEX)) {
         stages |= VK_SHADER_STAGE_VERTEX_BIT;
     }
-    if (IsValidShaderBound(ShaderObjectStage::TESSELLATION_CONTROL)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::TESSELLATION_CONTROL)) {
         stages |= VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
     }
-    if (IsValidShaderBound(ShaderObjectStage::TESSELLATION_EVALUATION)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::TESSELLATION_EVALUATION)) {
         stages |= VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
     }
-    if (IsValidShaderBound(ShaderObjectStage::GEOMETRY)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::GEOMETRY)) {
         stages |= VK_SHADER_STAGE_GEOMETRY_BIT;
     }
-    if (IsValidShaderBound(ShaderObjectStage::FRAGMENT)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::FRAGMENT)) {
         stages |= VK_SHADER_STAGE_FRAGMENT_BIT;
     }
-    if (IsValidShaderBound(ShaderObjectStage::COMPUTE)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::COMPUTE)) {
         stages |= VK_SHADER_STAGE_COMPUTE_BIT;
     }
-    if (IsValidShaderBound(ShaderObjectStage::TASK)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::TASK)) {
         stages |= VK_SHADER_STAGE_TASK_BIT_EXT;
     }
-    if (IsValidShaderBound(ShaderObjectStage::MESH)) {
+    if (IsValidShaderObjectBound(ShaderObjectStage::MESH)) {
         stages |= VK_SHADER_STAGE_MESH_BIT_EXT;
     }
     return stages;
@@ -888,8 +972,8 @@ const spirv::EntryPoint *LastBound::GetVertexEntryPoint() const {
             return shader_stage_state.entrypoint.get();
         }
         return nullptr;
-    } else if (const auto *shader_object = GetShaderState(ShaderObjectStage::VERTEX)) {
-        return shader_object->entrypoint.get();
+    } else if (const auto *shader_object = GetShaderObjectState(ShaderObjectStage::VERTEX)) {
+        return shader_object->stage.entrypoint.get();
     }
     return nullptr;
 }
@@ -897,8 +981,8 @@ const spirv::EntryPoint *LastBound::GetVertexEntryPoint() const {
 const spirv::EntryPoint *LastBound::GetFragmentEntryPoint() const {
     if (pipeline_state && pipeline_state->fragment_shader_state) {
         return pipeline_state->fragment_shader_state->fragment_entry_point.get();
-    } else if (const auto *shader_object = GetShaderState(ShaderObjectStage::FRAGMENT)) {
-        return shader_object->entrypoint.get();
+    } else if (const auto *shader_object = GetShaderObjectState(ShaderObjectStage::FRAGMENT)) {
+        return shader_object->stage.entrypoint.get();
     }
     return nullptr;
 }
@@ -908,28 +992,58 @@ vvl::DescriptorMode LastBound::GetActionDescriptorMode() const {
         return descriptor_mode;  // Most common case
     }
 
-    // This is only needed  at draw/dispatch time when there is a chance there is not bound descriptor, but can still find from a
+    // This is only needed at draw/dispatch time when there is a chance there is not bound descriptor, but can still find from a
     // pipeline/layout
     if (pipeline_state) {
-        if (pipeline_state->create_flags & VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT) {
+        if (pipeline_state->descriptor_buffer_mode) {
             return vvl::DescriptorModeBuffer;
+        } else if (pipeline_state->descriptor_heap_mode) {
+            return vvl::DescriptorModeHeap;
         } else {
             return vvl::DescriptorModeClassic;
         }
     } else {
         // Shader Object
+        if (GetFirstShader() && GetFirstShader()->descriptor_heap_mode) {
+            return vvl::DescriptorModeHeap;
+        }
         if (desc_set_pipeline_layout) {
-            for (uint32_t i = 0; i < desc_set_pipeline_layout->set_layouts.size(); i++) {
-                if (const auto set_layout_state = desc_set_pipeline_layout->set_layouts[i]) {
-                    if (set_layout_state->GetCreateFlags() & VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT) {
-                        return vvl::DescriptorModeBuffer;
-                    } else {
-                        return vvl::DescriptorModeClassic;
-                    }
-                }
+            if (desc_set_pipeline_layout->has_descriptor_buffer) {
+                return vvl::DescriptorModeBuffer;
+            } else {
+                return vvl::DescriptorModeClassic;
             }
         }
     }
     // Not sure how to find it if in this situation, so resort to a safe choice
     return vvl::DescriptorModeClassic;
+}
+
+std::string LastBound::DescribeInvalidDescriptorMode() const {
+    std::stringstream ss;
+
+    // If it is unknown, the user has just never set any descriptors
+    if (previous_descriptor_mode != vvl::DescriptorModeUnknown) {
+        ss << "\nThe command buffer is currently in ";
+
+        if (descriptor_mode == vvl::DescriptorModeClassic) {
+            ss << "'Classic Descriptor'";
+        } else if (descriptor_mode == vvl::DescriptorModeBuffer) {
+            ss << "'Descriptor Buffer'";
+        } else if (descriptor_mode == vvl::DescriptorModeHeap) {
+            ss << "'Descriptor Heap'";
+        }
+        ss << " mode from previous call to " << String(set_descriptor_mode) << " which invalidated the previous ";
+
+        if (previous_descriptor_mode == vvl::DescriptorModeClassic) {
+            ss << "'Classic Descriptor'";
+        } else if (previous_descriptor_mode == vvl::DescriptorModeBuffer) {
+            ss << "'Descriptor Buffer'";
+        } else if (previous_descriptor_mode == vvl::DescriptorModeHeap) {
+            ss << "'Descriptor Heap'";
+        }
+        ss << " mode that was set with " << String(previous_set_descriptor_mode);
+    }
+
+    return ss.str();
 }

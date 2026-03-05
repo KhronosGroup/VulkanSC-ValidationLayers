@@ -1,6 +1,6 @@
 /*
-** Copyright (c) 2015-2018, 2023-2025 The Khronos Group Inc.
-** Modifications Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
+** Copyright (c) 2015-2018, 2023-2026 The Khronos Group Inc.
+** Modifications Copyright (C) 2024-2026 Advanced Micro Devices, Inc. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -485,7 +485,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceQueueFamilyProperties(VkPhysi
 
 static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceMemoryProperties(VkPhysicalDevice physicalDevice,
                                                                     VkPhysicalDeviceMemoryProperties* pMemoryProperties) {
-    pMemoryProperties->memoryTypeCount = 6;
+    pMemoryProperties->memoryTypeCount = 7;
     // Host visible Coherent
     pMemoryProperties->memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     pMemoryProperties->memoryTypes[0].heapIndex = 0;
@@ -505,11 +505,17 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceMemoryProperties(VkPhysicalDe
     // Device local only
     pMemoryProperties->memoryTypes[5].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     pMemoryProperties->memoryTypes[5].heapIndex = 1;
-    pMemoryProperties->memoryHeapCount = 2;
+    // Device local for Tile Memory
+    pMemoryProperties->memoryTypes[6].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    pMemoryProperties->memoryTypes[6].heapIndex = 2;
+
+    pMemoryProperties->memoryHeapCount = 3;
     pMemoryProperties->memoryHeaps[0].flags = VK_MEMORY_HEAP_MULTI_INSTANCE_BIT;
     pMemoryProperties->memoryHeaps[0].size = 8000000000;
     pMemoryProperties->memoryHeaps[1].flags = VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
     pMemoryProperties->memoryHeaps[1].size = 8000000000;
+    pMemoryProperties->memoryHeaps[2].flags = VK_MEMORY_HEAP_TILE_MEMORY_BIT_QCOM;
+    pMemoryProperties->memoryHeaps[2].size = 1000000000;
 }
 
 static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetInstanceProcAddr(VkInstance instance, const char* pName) {
@@ -898,6 +904,11 @@ static VKAPI_ATTR VkResult VKAPI_CALL EnumerateInstanceVersion(uint32_t* pApiVer
 static VKAPI_ATTR void VKAPI_CALL GetImageMemoryRequirements2(VkDevice device, const VkImageMemoryRequirementsInfo2* pInfo,
                                                               VkMemoryRequirements2* pMemoryRequirements) {
     GetImageMemoryRequirements(device, pInfo->image, &pMemoryRequirements->memoryRequirements);
+
+    if (auto tile_mem_reqs = vku::FindStructInPNextChain<VkTileMemoryRequirementsQCOM>(pMemoryRequirements->pNext)) {
+        tile_mem_reqs->size = 4096;
+        tile_mem_reqs->alignment = 32;
+    }
 }
 
 #ifndef VULKANSC  // Vulkan SC does not support VK_ARM_tensors
@@ -939,6 +950,11 @@ static VKAPI_ATTR void VKAPI_CALL GetDataGraphPipelineSessionMemoryRequirementsA
 static VKAPI_ATTR void VKAPI_CALL GetBufferMemoryRequirements2(VkDevice device, const VkBufferMemoryRequirementsInfo2* pInfo,
                                                                VkMemoryRequirements2* pMemoryRequirements) {
     GetBufferMemoryRequirements(device, pInfo->buffer, &pMemoryRequirements->memoryRequirements);
+
+    if (auto tile_mem_reqs = vku::FindStructInPNextChain<VkTileMemoryRequirementsQCOM>(pMemoryRequirements->pNext)) {
+        tile_mem_reqs->size = 4096;
+        tile_mem_reqs->alignment = 32;
+    }
 }
 
 #ifndef VULKANSC  // Vulkan SC does not support sparse resources
@@ -1221,22 +1237,6 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFeatures2(VkPhysicalDevice ph
 #else
     uint32_t num_bools = 0;  // Count number of VkBool32s in extension structs
     VkBool32* feat_bools = nullptr;
-    auto vk_1_1_features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(pFeatures->pNext);
-    if (vk_1_1_features) {
-        vk_1_1_features->protectedMemory = VK_TRUE;
-    }
-    auto vk_1_3_features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(pFeatures->pNext);
-    if (vk_1_3_features) {
-        vk_1_3_features->synchronization2 = VK_TRUE;
-    }
-    auto prot_features = vku::FindStructInPNextChain<VkPhysicalDeviceProtectedMemoryFeatures>(pFeatures->pNext);
-    if (prot_features) {
-        prot_features->protectedMemory = VK_TRUE;
-    }
-    auto sync2_features = vku::FindStructInPNextChain<VkPhysicalDeviceSynchronization2FeaturesKHR>(pFeatures->pNext);
-    if (sync2_features) {
-        sync2_features->synchronization2 = VK_TRUE;
-    }
     auto video_maintenance1_features = vku::FindStructInPNextChain<VkPhysicalDeviceVideoMaintenance1FeaturesKHR>(pFeatures->pNext);
     if (video_maintenance1_features) {
         video_maintenance1_features->videoMaintenance1 = VK_TRUE;
@@ -1244,12 +1244,6 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFeatures2(VkPhysicalDevice ph
     auto video_maintenance2_features = vku::FindStructInPNextChain<VkPhysicalDeviceVideoMaintenance2FeaturesKHR>(pFeatures->pNext);
     if (video_maintenance2_features) {
         video_maintenance2_features->videoMaintenance2 = VK_TRUE;
-    }
-    auto device_generated_commands_features =
-        vku::FindStructInPNextChain<VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT>(pFeatures->pNext);
-    if (device_generated_commands_features) {
-        device_generated_commands_features->deviceGeneratedCommands = VK_TRUE;
-        device_generated_commands_features->dynamicGeneratedPipelineLayout = VK_TRUE;
     }
     const auto* desc_idx_features = vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>(pFeatures->pNext);
     if (desc_idx_features) {
@@ -1390,6 +1384,29 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceProperties2(VkPhysicalDevice 
         mesh_shader_props->prefersCompactPrimitiveOutput = VK_TRUE;
     }
 
+    auto* descriptor_heap_props = vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorHeapPropertiesEXT>(pProperties->pNext);
+    if (descriptor_heap_props) {
+        descriptor_heap_props->samplerHeapAlignment = 4;
+        descriptor_heap_props->resourceHeapAlignment = 4;
+        descriptor_heap_props->maxSamplerHeapSize = 1044480;
+        descriptor_heap_props->maxResourceHeapSize = 260046848;
+        descriptor_heap_props->minSamplerHeapReservedRange = 20480;
+        descriptor_heap_props->minSamplerHeapReservedRangeWithEmbedded = 520192;
+        descriptor_heap_props->minResourceHeapReservedRange = 0;
+        descriptor_heap_props->samplerDescriptorSize = 256;
+        descriptor_heap_props->imageDescriptorSize = 256;
+        descriptor_heap_props->bufferDescriptorSize = 256;
+        descriptor_heap_props->samplerDescriptorAlignment = 256;
+        descriptor_heap_props->imageDescriptorAlignment = 256;
+        descriptor_heap_props->bufferDescriptorAlignment = 256;
+        descriptor_heap_props->maxPushDataSize = 256;
+        descriptor_heap_props->imageCaptureReplayOpaqueDataSize = 8;
+        descriptor_heap_props->maxDescriptorHeapEmbeddedSamplers = 2032;
+        descriptor_heap_props->samplerYcbcrConversionCount = 3;
+        descriptor_heap_props->sparseDescriptorHeaps = 0;
+        descriptor_heap_props->protectedDescriptorHeaps = 0;
+    }
+
     auto* fragment_density_map2_props =
         vku::FindStructInPNextChain<VkPhysicalDeviceFragmentDensityMap2PropertiesEXT>(pProperties->pNext);
     if (fragment_density_map2_props) {
@@ -1424,6 +1441,16 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceProperties2(VkPhysicalDevice 
     if (coop_vec_nv_props) {
         coop_vec_nv_props->cooperativeVectorTrainingFloat16Accumulation = VK_TRUE;
         coop_vec_nv_props->cooperativeVectorTrainingFloat32Accumulation = VK_TRUE;
+    }
+
+    auto* perf_counters_props =
+        vku::FindStructInPNextChain<VkPhysicalDevicePerformanceCountersByRegionPropertiesARM>(pProperties->pNext);
+    if (perf_counters_props) {
+        perf_counters_props->maxPerRegionPerformanceCounters = 1;
+        perf_counters_props->performanceCounterRegionSize = {64, 64};
+        perf_counters_props->rowStrideAlignment = 1;
+        perf_counters_props->regionAlignment = 1;
+        perf_counters_props->identityTransformOrder = true;
     }
 
     const uint32_t num_copy_layouts = 5;
@@ -1609,11 +1636,25 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceQueueFamilyProperties2(VkPhys
                                                     VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR;
             }
         }
-        if (*pQueueFamilyPropertyCount > 3) {
-            *pQueueFamilyPropertyCount = 3;
+        if (*pQueueFamilyPropertyCount >= 4) {
+            auto props = &pQueueFamilyProperties[3].queueFamilyProperties;
+            props->queueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT;
+            props->queueCount = 1;
+            props->timestampValidBits = 16;
+            props->minImageTransferGranularity = {1, 1, 1};
+        }
+        if (*pQueueFamilyPropertyCount >= 5) {
+            auto props = &pQueueFamilyProperties[4].queueFamilyProperties;
+            props->queueFlags = VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT;
+            props->queueCount = 1;
+            props->timestampValidBits = 16;
+            props->minImageTransferGranularity = {1, 1, 1};
+        }
+        if (*pQueueFamilyPropertyCount > 5) {
+            *pQueueFamilyPropertyCount = 5;
         }
     } else {
-        *pQueueFamilyPropertyCount = 3;
+        *pQueueFamilyPropertyCount = 5;
 #endif  // VULKANSC
     }
 }
@@ -2070,5 +2111,31 @@ static VKAPI_ATTR void VKAPI_CALL GetClusterAccelerationStructureBuildSizesNV(Vk
     pSizeInfo->updateScratchSize = 4;
 }
 #endif  // VULKANSC
+
+static VKAPI_ATTR VkDeviceSize VKAPI_CALL GetPhysicalDeviceDescriptorSizeEXT(VkPhysicalDevice physicalDevice,
+                                                                             VkDescriptorType descriptorType) {
+    // Some of these must match VkPhysicalDeviceDescriptorHeapPropertiesEXT
+    // others are arbitrary
+    switch (descriptorType) {
+        case VK_DESCRIPTOR_TYPE_SAMPLER:
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+        case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+        case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+        case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+        case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+        case VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM:
+        case VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM:
+        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV:
+        case VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV:
+        case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+        case VK_DESCRIPTOR_TYPE_TENSOR_ARM:
+            return 256;
+        default:
+            break;
+    }
+    return 0;
+}
 
 }  // namespace icd

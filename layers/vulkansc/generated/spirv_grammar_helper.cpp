@@ -755,6 +755,16 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpGroupNonUniformQuadAllKHR";
         case spv::OpGroupNonUniformQuadAnyKHR:
             return "OpGroupNonUniformQuadAnyKHR";
+        case spv::OpTypeBufferEXT:
+            return "OpTypeBufferEXT";
+        case spv::OpBufferPointerEXT:
+            return "OpBufferPointerEXT";
+        case spv::OpUntypedImageTexelPointerEXT:
+            return "OpUntypedImageTexelPointerEXT";
+        case spv::OpMemberDecorateIdEXT:
+            return "OpMemberDecorateIdEXT";
+        case spv::OpConstantSizeOfEXT:
+            return "OpConstantSizeOfEXT";
         case spv::OpHitObjectRecordHitMotionNV:
             return "OpHitObjectRecordHitMotionNV";
         case spv::OpHitObjectRecordHitWithIndexMotionNV:
@@ -823,8 +833,8 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpTypeHitObjectNV";
         case spv::OpImageSampleFootprintNV:
             return "OpImageSampleFootprintNV";
-        case spv::OpTypeCooperativeVectorNV:
-            return "OpTypeCooperativeVectorNV";
+        case spv::OpTypeVectorIdEXT:
+            return "OpTypeVectorIdEXT";
         case spv::OpCooperativeVectorMatrixMulNV:
             return "OpCooperativeVectorMatrixMulNV";
         case spv::OpCooperativeVectorOuterProductAccumulateNV:
@@ -839,8 +849,8 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpEmitMeshTasksEXT";
         case spv::OpSetMeshOutputsEXT:
             return "OpSetMeshOutputsEXT";
-        case spv::OpGroupNonUniformPartitionNV:
-            return "OpGroupNonUniformPartitionNV";
+        case spv::OpGroupNonUniformPartitionEXT:
+            return "OpGroupNonUniformPartitionEXT";
         case spv::OpWritePackedPrimitiveIndices4x8NV:
             return "OpWritePackedPrimitiveIndices4x8NV";
         case spv::OpFetchMicroTriangleVertexPositionNV:
@@ -851,6 +861,66 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpCooperativeVectorLoadNV";
         case spv::OpCooperativeVectorStoreNV:
             return "OpCooperativeVectorStoreNV";
+        case spv::OpHitObjectRecordFromQueryEXT:
+            return "OpHitObjectRecordFromQueryEXT";
+        case spv::OpHitObjectRecordMissEXT:
+            return "OpHitObjectRecordMissEXT";
+        case spv::OpHitObjectRecordMissMotionEXT:
+            return "OpHitObjectRecordMissMotionEXT";
+        case spv::OpHitObjectGetIntersectionTriangleVertexPositionsEXT:
+            return "OpHitObjectGetIntersectionTriangleVertexPositionsEXT";
+        case spv::OpHitObjectGetRayFlagsEXT:
+            return "OpHitObjectGetRayFlagsEXT";
+        case spv::OpHitObjectSetShaderBindingTableRecordIndexEXT:
+            return "OpHitObjectSetShaderBindingTableRecordIndexEXT";
+        case spv::OpHitObjectReorderExecuteShaderEXT:
+            return "OpHitObjectReorderExecuteShaderEXT";
+        case spv::OpHitObjectTraceReorderExecuteEXT:
+            return "OpHitObjectTraceReorderExecuteEXT";
+        case spv::OpHitObjectTraceMotionReorderExecuteEXT:
+            return "OpHitObjectTraceMotionReorderExecuteEXT";
+        case spv::OpTypeHitObjectEXT:
+            return "OpTypeHitObjectEXT";
+        case spv::OpReorderThreadWithHintEXT:
+            return "OpReorderThreadWithHintEXT";
+        case spv::OpReorderThreadWithHitObjectEXT:
+            return "OpReorderThreadWithHitObjectEXT";
+        case spv::OpHitObjectTraceRayEXT:
+            return "OpHitObjectTraceRayEXT";
+        case spv::OpHitObjectTraceRayMotionEXT:
+            return "OpHitObjectTraceRayMotionEXT";
+        case spv::OpHitObjectRecordEmptyEXT:
+            return "OpHitObjectRecordEmptyEXT";
+        case spv::OpHitObjectExecuteShaderEXT:
+            return "OpHitObjectExecuteShaderEXT";
+        case spv::OpHitObjectGetCurrentTimeEXT:
+            return "OpHitObjectGetCurrentTimeEXT";
+        case spv::OpHitObjectGetAttributesEXT:
+            return "OpHitObjectGetAttributesEXT";
+        case spv::OpHitObjectGetHitKindEXT:
+            return "OpHitObjectGetHitKindEXT";
+        case spv::OpHitObjectGetPrimitiveIndexEXT:
+            return "OpHitObjectGetPrimitiveIndexEXT";
+        case spv::OpHitObjectGetGeometryIndexEXT:
+            return "OpHitObjectGetGeometryIndexEXT";
+        case spv::OpHitObjectGetInstanceIdEXT:
+            return "OpHitObjectGetInstanceIdEXT";
+        case spv::OpHitObjectGetInstanceCustomIndexEXT:
+            return "OpHitObjectGetInstanceCustomIndexEXT";
+        case spv::OpHitObjectGetObjectRayOriginEXT:
+            return "OpHitObjectGetObjectRayOriginEXT";
+        case spv::OpHitObjectGetObjectRayDirectionEXT:
+            return "OpHitObjectGetObjectRayDirectionEXT";
+        case spv::OpHitObjectGetWorldRayDirectionEXT:
+            return "OpHitObjectGetWorldRayDirectionEXT";
+        case spv::OpHitObjectGetWorldRayOriginEXT:
+            return "OpHitObjectGetWorldRayOriginEXT";
+        case spv::OpHitObjectGetObjectToWorldEXT:
+            return "OpHitObjectGetObjectToWorldEXT";
+        case spv::OpHitObjectGetWorldToObjectEXT:
+            return "OpHitObjectGetWorldToObjectEXT";
+        case spv::OpHitObjectGetRayTMaxEXT:
+            return "OpHitObjectGetRayTMaxEXT";
         case spv::OpReportIntersectionKHR:
             return "OpReportIntersectionKHR";
         case spv::OpIgnoreIntersectionNV:
@@ -873,6 +943,18 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpRayQueryGetIntersectionClusterIdNV";
         case spv::OpHitObjectGetClusterIdNV:
             return "OpHitObjectGetClusterIdNV";
+        case spv::OpHitObjectGetRayTMinEXT:
+            return "OpHitObjectGetRayTMinEXT";
+        case spv::OpHitObjectGetShaderBindingTableRecordIndexEXT:
+            return "OpHitObjectGetShaderBindingTableRecordIndexEXT";
+        case spv::OpHitObjectGetShaderRecordBufferHandleEXT:
+            return "OpHitObjectGetShaderRecordBufferHandleEXT";
+        case spv::OpHitObjectIsEmptyEXT:
+            return "OpHitObjectIsEmptyEXT";
+        case spv::OpHitObjectIsHitEXT:
+            return "OpHitObjectIsHitEXT";
+        case spv::OpHitObjectIsMissEXT:
+            return "OpHitObjectIsMissEXT";
         case spv::OpTypeCooperativeMatrixNV:
             return "OpTypeCooperativeMatrixNV";
         case spv::OpCooperativeMatrixLoadNV:
@@ -1049,16 +1131,6 @@ const char* string_SpvOpcode(uint32_t opcode) {
             return "OpAtomicFAddEXT";
         case spv::OpArithmeticFenceEXT:
             return "OpArithmeticFenceEXT";
-        case spv::OpTaskSequenceCreateINTEL:
-            return "OpTaskSequenceCreateINTEL";
-        case spv::OpTaskSequenceAsyncINTEL:
-            return "OpTaskSequenceAsyncINTEL";
-        case spv::OpTaskSequenceGetINTEL:
-            return "OpTaskSequenceGetINTEL";
-        case spv::OpTaskSequenceReleaseINTEL:
-            return "OpTaskSequenceReleaseINTEL";
-        case spv::OpTypeTaskSequenceINTEL:
-            return "OpTypeTaskSequenceINTEL";
         case spv::OpSubgroupBlockPrefetchINTEL:
             return "OpSubgroupBlockPrefetchINTEL";
         case spv::OpSubgroup2DBlockLoadINTEL:
@@ -1189,12 +1261,14 @@ const char* string_SpvStorageClass(uint32_t storage_class) {
             return "HitObjectAttributeNV";
         case spv::StorageClassTaskPayloadWorkgroupEXT:
             return "TaskPayloadWorkgroupEXT";
+        case spv::StorageClassHitObjectAttributeEXT:
+            return "HitObjectAttributeEXT";
         case spv::StorageClassCodeSectionINTEL:
             return "CodeSectionINTEL";
-        case spv::StorageClassDeviceOnlyINTEL:
-            return "DeviceOnlyINTEL";
-        case spv::StorageClassHostOnlyINTEL:
-            return "HostOnlyINTEL";
+        case spv::StorageClassDeviceOnlyALTERA:
+            return "DeviceOnlyALTERA";
+        case spv::StorageClassHostOnlyALTERA:
+            return "HostOnlyALTERA";
 
 #ifdef VK_ENABLE_BETA_EXTENSIONS
         case spv::StorageClassNodePayloadAMDX:
@@ -1393,6 +1467,8 @@ const char* string_SpvExecutionMode(uint32_t execution_mode) {
             return "ShadingRateInterlockOrderedEXT";
         case spv::ExecutionModeShadingRateInterlockUnorderedEXT:
             return "ShadingRateInterlockUnorderedEXT";
+        case spv::ExecutionModeShader64BitIndexingEXT:
+            return "Shader64BitIndexingEXT";
         case spv::ExecutionModeSharedLocalMemorySizeINTEL:
             return "SharedLocalMemorySizeINTEL";
         case spv::ExecutionModeRoundingModeRTPINTEL:
@@ -1561,6 +1637,10 @@ const char* string_SpvDecoration(uint32_t decoration) {
             return "BlockMatchSamplerQCOM";
         case spv::DecorationExplicitInterpAMD:
             return "ExplicitInterpAMD";
+        case spv::DecorationArrayStrideIdEXT:
+            return "ArrayStrideIdEXT";
+        case spv::DecorationOffsetIdEXT:
+            return "OffsetIdEXT";
         case spv::DecorationOverrideCoverageNV:
             return "OverrideCoverageNV";
         case spv::DecorationPassthroughNV:
@@ -1583,8 +1663,14 @@ const char* string_SpvDecoration(uint32_t decoration) {
             return "RestrictPointer";
         case spv::DecorationAliasedPointer:
             return "AliasedPointer";
+        case spv::DecorationMemberOffsetNV:
+            return "MemberOffsetNV";
         case spv::DecorationHitObjectShaderRecordBufferNV:
             return "HitObjectShaderRecordBufferNV";
+        case spv::DecorationHitObjectShaderRecordBufferEXT:
+            return "HitObjectShaderRecordBufferEXT";
+        case spv::DecorationBankNV:
+            return "BankNV";
         case spv::DecorationBindlessSamplerNV:
             return "BindlessSamplerNV";
         case spv::DecorationBindlessImageNV:
@@ -1621,64 +1707,64 @@ const char* string_SpvDecoration(uint32_t decoration) {
             return "FunctionRoundingModeINTEL";
         case spv::DecorationFunctionDenormModeINTEL:
             return "FunctionDenormModeINTEL";
-        case spv::DecorationRegisterINTEL:
-            return "RegisterINTEL";
-        case spv::DecorationMemoryINTEL:
-            return "MemoryINTEL";
-        case spv::DecorationNumbanksINTEL:
-            return "NumbanksINTEL";
-        case spv::DecorationBankwidthINTEL:
-            return "BankwidthINTEL";
-        case spv::DecorationMaxPrivateCopiesINTEL:
-            return "MaxPrivateCopiesINTEL";
-        case spv::DecorationSinglepumpINTEL:
-            return "SinglepumpINTEL";
-        case spv::DecorationDoublepumpINTEL:
-            return "DoublepumpINTEL";
-        case spv::DecorationMaxReplicatesINTEL:
-            return "MaxReplicatesINTEL";
-        case spv::DecorationSimpleDualPortINTEL:
-            return "SimpleDualPortINTEL";
-        case spv::DecorationMergeINTEL:
-            return "MergeINTEL";
-        case spv::DecorationBankBitsINTEL:
-            return "BankBitsINTEL";
-        case spv::DecorationForcePow2DepthINTEL:
-            return "ForcePow2DepthINTEL";
-        case spv::DecorationStridesizeINTEL:
-            return "StridesizeINTEL";
-        case spv::DecorationWordsizeINTEL:
-            return "WordsizeINTEL";
-        case spv::DecorationTrueDualPortINTEL:
-            return "TrueDualPortINTEL";
-        case spv::DecorationBurstCoalesceINTEL:
-            return "BurstCoalesceINTEL";
-        case spv::DecorationCacheSizeINTEL:
-            return "CacheSizeINTEL";
-        case spv::DecorationDontStaticallyCoalesceINTEL:
-            return "DontStaticallyCoalesceINTEL";
-        case spv::DecorationPrefetchINTEL:
-            return "PrefetchINTEL";
-        case spv::DecorationStallEnableINTEL:
-            return "StallEnableINTEL";
-        case spv::DecorationFuseLoopsInFunctionINTEL:
-            return "FuseLoopsInFunctionINTEL";
-        case spv::DecorationMathOpDSPModeINTEL:
-            return "MathOpDSPModeINTEL";
+        case spv::DecorationRegisterALTERA:
+            return "RegisterALTERA";
+        case spv::DecorationMemoryALTERA:
+            return "MemoryALTERA";
+        case spv::DecorationNumbanksALTERA:
+            return "NumbanksALTERA";
+        case spv::DecorationBankwidthALTERA:
+            return "BankwidthALTERA";
+        case spv::DecorationMaxPrivateCopiesALTERA:
+            return "MaxPrivateCopiesALTERA";
+        case spv::DecorationSinglepumpALTERA:
+            return "SinglepumpALTERA";
+        case spv::DecorationDoublepumpALTERA:
+            return "DoublepumpALTERA";
+        case spv::DecorationMaxReplicatesALTERA:
+            return "MaxReplicatesALTERA";
+        case spv::DecorationSimpleDualPortALTERA:
+            return "SimpleDualPortALTERA";
+        case spv::DecorationMergeALTERA:
+            return "MergeALTERA";
+        case spv::DecorationBankBitsALTERA:
+            return "BankBitsALTERA";
+        case spv::DecorationForcePow2DepthALTERA:
+            return "ForcePow2DepthALTERA";
+        case spv::DecorationStridesizeALTERA:
+            return "StridesizeALTERA";
+        case spv::DecorationWordsizeALTERA:
+            return "WordsizeALTERA";
+        case spv::DecorationTrueDualPortALTERA:
+            return "TrueDualPortALTERA";
+        case spv::DecorationBurstCoalesceALTERA:
+            return "BurstCoalesceALTERA";
+        case spv::DecorationCacheSizeALTERA:
+            return "CacheSizeALTERA";
+        case spv::DecorationDontStaticallyCoalesceALTERA:
+            return "DontStaticallyCoalesceALTERA";
+        case spv::DecorationPrefetchALTERA:
+            return "PrefetchALTERA";
+        case spv::DecorationStallEnableALTERA:
+            return "StallEnableALTERA";
+        case spv::DecorationFuseLoopsInFunctionALTERA:
+            return "FuseLoopsInFunctionALTERA";
+        case spv::DecorationMathOpDSPModeALTERA:
+            return "MathOpDSPModeALTERA";
         case spv::DecorationAliasScopeINTEL:
             return "AliasScopeINTEL";
         case spv::DecorationNoAliasINTEL:
             return "NoAliasINTEL";
-        case spv::DecorationInitiationIntervalINTEL:
-            return "InitiationIntervalINTEL";
-        case spv::DecorationMaxConcurrencyINTEL:
-            return "MaxConcurrencyINTEL";
-        case spv::DecorationPipelineEnableINTEL:
-            return "PipelineEnableINTEL";
-        case spv::DecorationBufferLocationINTEL:
-            return "BufferLocationINTEL";
-        case spv::DecorationIOPipeStorageINTEL:
-            return "IOPipeStorageINTEL";
+        case spv::DecorationInitiationIntervalALTERA:
+            return "InitiationIntervalALTERA";
+        case spv::DecorationMaxConcurrencyALTERA:
+            return "MaxConcurrencyALTERA";
+        case spv::DecorationPipelineEnableALTERA:
+            return "PipelineEnableALTERA";
+        case spv::DecorationBufferLocationALTERA:
+            return "BufferLocationALTERA";
+        case spv::DecorationIOPipeStorageALTERA:
+            return "IOPipeStorageALTERA";
         case spv::DecorationFunctionFloatingPointModeINTEL:
             return "FunctionFloatingPointModeINTEL";
         case spv::DecorationSingleElementVectorINTEL:
@@ -1687,38 +1773,38 @@ const char* string_SpvDecoration(uint32_t decoration) {
             return "VectorComputeCallableFunctionINTEL";
         case spv::DecorationMediaBlockIOINTEL:
             return "MediaBlockIOINTEL";
-        case spv::DecorationStallFreeINTEL:
-            return "StallFreeINTEL";
+        case spv::DecorationStallFreeALTERA:
+            return "StallFreeALTERA";
         case spv::DecorationFPMaxErrorDecorationINTEL:
             return "FPMaxErrorDecorationINTEL";
-        case spv::DecorationLatencyControlLabelINTEL:
-            return "LatencyControlLabelINTEL";
-        case spv::DecorationLatencyControlConstraintINTEL:
-            return "LatencyControlConstraintINTEL";
-        case spv::DecorationConduitKernelArgumentINTEL:
-            return "ConduitKernelArgumentINTEL";
-        case spv::DecorationRegisterMapKernelArgumentINTEL:
-            return "RegisterMapKernelArgumentINTEL";
-        case spv::DecorationMMHostInterfaceAddressWidthINTEL:
-            return "MMHostInterfaceAddressWidthINTEL";
-        case spv::DecorationMMHostInterfaceDataWidthINTEL:
-            return "MMHostInterfaceDataWidthINTEL";
-        case spv::DecorationMMHostInterfaceLatencyINTEL:
-            return "MMHostInterfaceLatencyINTEL";
-        case spv::DecorationMMHostInterfaceReadWriteModeINTEL:
-            return "MMHostInterfaceReadWriteModeINTEL";
-        case spv::DecorationMMHostInterfaceMaxBurstINTEL:
-            return "MMHostInterfaceMaxBurstINTEL";
-        case spv::DecorationMMHostInterfaceWaitRequestINTEL:
-            return "MMHostInterfaceWaitRequestINTEL";
-        case spv::DecorationStableKernelArgumentINTEL:
-            return "StableKernelArgumentINTEL";
+        case spv::DecorationLatencyControlLabelALTERA:
+            return "LatencyControlLabelALTERA";
+        case spv::DecorationLatencyControlConstraintALTERA:
+            return "LatencyControlConstraintALTERA";
+        case spv::DecorationConduitKernelArgumentALTERA:
+            return "ConduitKernelArgumentALTERA";
+        case spv::DecorationRegisterMapKernelArgumentALTERA:
+            return "RegisterMapKernelArgumentALTERA";
+        case spv::DecorationMMHostInterfaceAddressWidthALTERA:
+            return "MMHostInterfaceAddressWidthALTERA";
+        case spv::DecorationMMHostInterfaceDataWidthALTERA:
+            return "MMHostInterfaceDataWidthALTERA";
+        case spv::DecorationMMHostInterfaceLatencyALTERA:
+            return "MMHostInterfaceLatencyALTERA";
+        case spv::DecorationMMHostInterfaceReadWriteModeALTERA:
+            return "MMHostInterfaceReadWriteModeALTERA";
+        case spv::DecorationMMHostInterfaceMaxBurstALTERA:
+            return "MMHostInterfaceMaxBurstALTERA";
+        case spv::DecorationMMHostInterfaceWaitRequestALTERA:
+            return "MMHostInterfaceWaitRequestALTERA";
+        case spv::DecorationStableKernelArgumentALTERA:
+            return "StableKernelArgumentALTERA";
         case spv::DecorationHostAccessINTEL:
             return "HostAccessINTEL";
-        case spv::DecorationInitModeINTEL:
-            return "InitModeINTEL";
-        case spv::DecorationImplementInRegisterMapINTEL:
-            return "ImplementInRegisterMapINTEL";
+        case spv::DecorationInitModeALTERA:
+            return "InitModeALTERA";
+        case spv::DecorationImplementInRegisterMapALTERA:
+            return "ImplementInRegisterMapALTERA";
         case spv::DecorationCacheControlLoadINTEL:
             return "CacheControlLoadINTEL";
         case spv::DecorationCacheControlStoreINTEL:
@@ -1749,7 +1835,7 @@ const char* string_SpvDecoration(uint32_t decoration) {
     }
 }
 
-const char* string_SpvBuiltIn(uint32_t built_in) {
+const char* string_SpvBuiltIn(spv::BuiltIn built_in) {
     switch (built_in) {
         case spv::BuiltInPosition:
             return "Position";
@@ -1889,6 +1975,10 @@ const char* string_SpvBuiltIn(uint32_t built_in) {
             return "BaryCoordPullModelAMD";
         case spv::BuiltInFragStencilRefEXT:
             return "FragStencilRefEXT";
+        case spv::BuiltInSamplerHeapEXT:
+            return "SamplerHeapEXT";
+        case spv::BuiltInResourceHeapEXT:
+            return "ResourceHeapEXT";
         case spv::BuiltInViewportMaskNV:
             return "ViewportMaskNV";
         case spv::BuiltInSecondaryPositionNV:
@@ -2434,6 +2524,11 @@ const OperandInfo& GetOperandInfo(uint32_t opcode) {
         {spv::OpReadClockKHR, {{OperandKind::Id}}},
         {spv::OpGroupNonUniformQuadAllKHR, {{OperandKind::Id}}},
         {spv::OpGroupNonUniformQuadAnyKHR, {{OperandKind::Id}}},
+        {spv::OpTypeBufferEXT, {{OperandKind::ValueEnum}}},
+        {spv::OpBufferPointerEXT, {{OperandKind::Id}}},
+        {spv::OpUntypedImageTexelPointerEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpMemberDecorateIdEXT, {{OperandKind::Id, OperandKind::Literal, OperandKind::ValueEnum}}},
+        {spv::OpConstantSizeOfEXT, {{OperandKind::Id}}},
         {spv::OpHitObjectRecordHitMotionNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpHitObjectRecordHitWithIndexMotionNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpHitObjectRecordMissMotionNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
@@ -2468,7 +2563,7 @@ const OperandInfo& GetOperandInfo(uint32_t opcode) {
         {spv::OpReorderThreadWithHintNV, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpTypeHitObjectNV, {{}}},
         {spv::OpImageSampleFootprintNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
-        {spv::OpTypeCooperativeVectorNV, {{OperandKind::Id, OperandKind::Id}}},
+        {spv::OpTypeVectorIdEXT, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpCooperativeVectorMatrixMulNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
         {spv::OpCooperativeVectorOuterProductAccumulateNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpCooperativeVectorReduceSumAccumulateNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
@@ -2476,12 +2571,42 @@ const OperandInfo& GetOperandInfo(uint32_t opcode) {
         {spv::OpCooperativeMatrixConvertNV, {{OperandKind::Id}}},
         {spv::OpEmitMeshTasksEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpSetMeshOutputsEXT, {{OperandKind::Id, OperandKind::Id}}},
-        {spv::OpGroupNonUniformPartitionNV, {{OperandKind::Id}}},
+        {spv::OpGroupNonUniformPartitionEXT, {{OperandKind::Id}}},
         {spv::OpWritePackedPrimitiveIndices4x8NV, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpFetchMicroTriangleVertexPositionNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpFetchMicroTriangleVertexBarycentricNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpCooperativeVectorLoadNV, {{OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
         {spv::OpCooperativeVectorStoreNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
+        {spv::OpHitObjectRecordFromQueryEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectRecordMissEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectRecordMissMotionEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectGetIntersectionTriangleVertexPositionsEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetRayFlagsEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectSetShaderBindingTableRecordIndexEXT, {{OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectReorderExecuteShaderEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectTraceReorderExecuteEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectTraceMotionReorderExecuteEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpTypeHitObjectEXT, {{}}},
+        {spv::OpReorderThreadWithHintEXT, {{OperandKind::Id, OperandKind::Id}}},
+        {spv::OpReorderThreadWithHitObjectEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectTraceRayEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectTraceRayMotionEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectRecordEmptyEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectExecuteShaderEXT, {{OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectGetCurrentTimeEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetAttributesEXT, {{OperandKind::Id, OperandKind::Id}}},
+        {spv::OpHitObjectGetHitKindEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetPrimitiveIndexEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetGeometryIndexEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetInstanceIdEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetInstanceCustomIndexEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetObjectRayOriginEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetObjectRayDirectionEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetWorldRayDirectionEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetWorldRayOriginEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetObjectToWorldEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetWorldToObjectEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetRayTMaxEXT, {{OperandKind::Id}}},
         {spv::OpReportIntersectionKHR, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpIgnoreIntersectionNV, {{}}},
         {spv::OpTerminateRayNV, {{}}},
@@ -2493,6 +2618,12 @@ const OperandInfo& GetOperandInfo(uint32_t opcode) {
         {spv::OpExecuteCallableNV, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpRayQueryGetIntersectionClusterIdNV, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpHitObjectGetClusterIdNV, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetRayTMinEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetShaderBindingTableRecordIndexEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectGetShaderRecordBufferHandleEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectIsEmptyEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectIsHitEXT, {{OperandKind::Id}}},
+        {spv::OpHitObjectIsMissEXT, {{OperandKind::Id}}},
         {spv::OpTypeCooperativeMatrixNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpCooperativeMatrixLoadNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
         {spv::OpCooperativeMatrixStoreNV, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
@@ -2581,11 +2712,6 @@ const OperandInfo& GetOperandInfo(uint32_t opcode) {
         {spv::OpRayQueryGetIntersectionWorldToObjectKHR, {{OperandKind::Id, OperandKind::Id}}},
         {spv::OpAtomicFAddEXT, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpArithmeticFenceEXT, {{OperandKind::Id}}},
-        {spv::OpTaskSequenceCreateINTEL, {{OperandKind::Id, OperandKind::Literal, OperandKind::Literal, OperandKind::Literal, OperandKind::Literal}}},
-        {spv::OpTaskSequenceAsyncINTEL, {{OperandKind::Id, OperandKind::Id}}},
-        {spv::OpTaskSequenceGetINTEL, {{OperandKind::Id}}},
-        {spv::OpTaskSequenceReleaseINTEL, {{OperandKind::Id}}},
-        {spv::OpTypeTaskSequenceINTEL, {{}}},
         {spv::OpSubgroupBlockPrefetchINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::BitEnum}}},
         {spv::OpSubgroup2DBlockLoadINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},
         {spv::OpSubgroup2DBlockLoadTransformINTEL, {{OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id, OperandKind::Id}}},

@@ -3,9 +3,9 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (c) 2015-2024 Google Inc.
  * Copyright (c) 2023-2024 RasterGrid Kft.
  *
@@ -34,7 +34,7 @@
 #include "chassis/dispatch_object.h"
 #include "thread_tracker/thread_safety_validation.h"
 #include "stateless/stateless_validation.h"
-#include "generated/deprecation.h"
+#include "generated/legacy.h"
 #include "object_tracker/object_lifetime_validation.h"
 #include "state_tracker/state_tracker.h"
 #include "core_checks/core_validation.h"
@@ -48,19 +48,19 @@ namespace dispatch {
 void Device::InitObjectDispatchVectors() {
 #define BUILD_DISPATCH_VECTOR(name)                                                                                       \
     init_object_dispatch_vector(InterceptId##name, typeid(&vvl::base::Device::name), typeid(&threadsafety::Device::name), \
-                                typeid(&stateless::Device::name), typeid(&deprecation::Device::name),                     \
+                                typeid(&stateless::Device::name), typeid(&legacy::Device::name),                          \
                                 typeid(&object_lifetimes::Device::name), typeid(&vvl::DeviceState::name),                 \
                                 typeid(&CoreChecks::name), typeid(&BestPractices::name), typeid(&gpuav::Validator::name), \
                                 typeid(&syncval::SyncValidator::name), false);
 #define BUILD_DESTROY_DISPATCH_VECTOR(name)                                                                               \
     init_object_dispatch_vector(InterceptId##name, typeid(&vvl::base::Device::name), typeid(&threadsafety::Device::name), \
-                                typeid(&stateless::Device::name), typeid(&deprecation::Device::name),                     \
+                                typeid(&stateless::Device::name), typeid(&legacy::Device::name),                          \
                                 typeid(&object_lifetimes::Device::name), typeid(&vvl::DeviceState::name),                 \
                                 typeid(&CoreChecks::name), typeid(&BestPractices::name), typeid(&gpuav::Validator::name), \
                                 typeid(&syncval::SyncValidator::name), true);
 
     auto init_object_dispatch_vector = [this](InterceptId id, const std::type_info& vo_typeid, const std::type_info& t_typeid,
-                                              const std::type_info& pv_typeid, const std::type_info& d_typeid,
+                                              const std::type_info& pv_typeid, const std::type_info& l_typeid,
                                               const std::type_info& ot_typeid, const std::type_info& st_typeid,
                                               const std::type_info& cv_typeid, const std::type_info& bp_typeid,
                                               const std::type_info& ga_typeid, const std::type_info& sv_typeid, bool is_destroy) {
@@ -77,8 +77,8 @@ void Device::InitObjectDispatchVectors() {
                     if (pv_typeid != vo_typeid) intercept_vector->push_back(item);
                     break;
 
-                case LayerObjectTypeDeprecation:
-                    if (d_typeid != vo_typeid) intercept_vector->push_back(item);
+                case LayerObjectTypeLegacy:
+                    if (l_typeid != vo_typeid) intercept_vector->push_back(item);
                     break;
 
                 case LayerObjectTypeObjectTracker:
@@ -1150,6 +1150,9 @@ void Device::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateGetImageViewAddressNVX);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetImageViewAddressNVX);
     BUILD_DISPATCH_VECTOR(PostCallRecordGetImageViewAddressNVX);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetDeviceCombinedImageSamplerIndexNVX);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetDeviceCombinedImageSamplerIndexNVX);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetDeviceCombinedImageSamplerIndexNVX);
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdDrawIndirectCountAMD);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdDrawIndirectCountAMD);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdDrawIndirectCountAMD);
@@ -1258,6 +1261,33 @@ void Device::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdDispatchGraphIndirectCountAMDX);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdDispatchGraphIndirectCountAMDX);
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+    BUILD_DISPATCH_VECTOR(PreCallValidateWriteSamplerDescriptorsEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordWriteSamplerDescriptorsEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordWriteSamplerDescriptorsEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateWriteResourceDescriptorsEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordWriteResourceDescriptorsEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordWriteResourceDescriptorsEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdBindSamplerHeapEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdBindSamplerHeapEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdBindSamplerHeapEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdBindResourceHeapEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdBindResourceHeapEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdBindResourceHeapEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdPushDataEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdPushDataEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdPushDataEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetImageOpaqueCaptureDataEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetImageOpaqueCaptureDataEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetImageOpaqueCaptureDataEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateRegisterCustomBorderColorEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordRegisterCustomBorderColorEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordRegisterCustomBorderColorEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateUnregisterCustomBorderColorEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordUnregisterCustomBorderColorEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordUnregisterCustomBorderColorEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetTensorOpaqueCaptureDataARM);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetTensorOpaqueCaptureDataARM);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetTensorOpaqueCaptureDataARM);
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetSampleLocationsEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetSampleLocationsEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetSampleLocationsEXT);
@@ -1345,6 +1375,18 @@ void Device::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateGetQueueCheckpointData2NV);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetQueueCheckpointData2NV);
     BUILD_DISPATCH_VECTOR(PostCallRecordGetQueueCheckpointData2NV);
+    BUILD_DISPATCH_VECTOR(PreCallValidateSetSwapchainPresentTimingQueueSizeEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordSetSwapchainPresentTimingQueueSizeEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordSetSwapchainPresentTimingQueueSizeEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetSwapchainTimingPropertiesEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetSwapchainTimingPropertiesEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetSwapchainTimingPropertiesEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetSwapchainTimeDomainPropertiesEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetSwapchainTimeDomainPropertiesEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetSwapchainTimeDomainPropertiesEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetPastPresentationTimingEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetPastPresentationTimingEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetPastPresentationTimingEXT);
     BUILD_DISPATCH_VECTOR(PreCallValidateInitializePerformanceApiINTEL);
     BUILD_DISPATCH_VECTOR(PreCallRecordInitializePerformanceApiINTEL);
     BUILD_DISPATCH_VECTOR(PostCallRecordInitializePerformanceApiINTEL);
@@ -1703,6 +1745,14 @@ void Device::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateGetPipelineIndirectDeviceAddressNV);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetPipelineIndirectDeviceAddressNV);
     BUILD_DISPATCH_VECTOR(PostCallRecordGetPipelineIndirectDeviceAddressNV);
+#ifdef VK_USE_PLATFORM_OHOS
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetNativeBufferPropertiesOHOS);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetNativeBufferPropertiesOHOS);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetNativeBufferPropertiesOHOS);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetMemoryNativeBufferOHOS);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetMemoryNativeBufferOHOS);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetMemoryNativeBufferOHOS);
+#endif  // VK_USE_PLATFORM_OHOS
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetDepthClampEnableEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetDepthClampEnableEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetDepthClampEnableEXT);
@@ -1974,17 +2024,6 @@ void Device::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateUpdateIndirectExecutionSetShaderEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordUpdateIndirectExecutionSetShaderEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordUpdateIndirectExecutionSetShaderEXT);
-#ifdef VK_USE_PLATFORM_OHOS
-    BUILD_DISPATCH_VECTOR(PreCallValidateGetSwapchainGrallocUsageOHOS);
-    BUILD_DISPATCH_VECTOR(PreCallRecordGetSwapchainGrallocUsageOHOS);
-    BUILD_DISPATCH_VECTOR(PostCallRecordGetSwapchainGrallocUsageOHOS);
-    BUILD_DISPATCH_VECTOR(PreCallValidateAcquireImageOHOS);
-    BUILD_DISPATCH_VECTOR(PreCallRecordAcquireImageOHOS);
-    BUILD_DISPATCH_VECTOR(PostCallRecordAcquireImageOHOS);
-    BUILD_DISPATCH_VECTOR(PreCallValidateQueueSignalReleaseImageOHOS);
-    BUILD_DISPATCH_VECTOR(PreCallRecordQueueSignalReleaseImageOHOS);
-    BUILD_DISPATCH_VECTOR(PostCallRecordQueueSignalReleaseImageOHOS);
-#endif  // VK_USE_PLATFORM_OHOS
 #ifdef VK_USE_PLATFORM_METAL_EXT
     BUILD_DISPATCH_VECTOR(PreCallValidateGetMemoryMetalHandleEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetMemoryMetalHandleEXT);
@@ -1996,6 +2035,12 @@ void Device::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdEndRendering2EXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdEndRendering2EXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdEndRendering2EXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdBeginCustomResolveEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdBeginCustomResolveEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdBeginCustomResolveEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetComputeOccupancyPriorityNV);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetComputeOccupancyPriorityNV);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetComputeOccupancyPriorityNV);
     BUILD_DISPATCH_VECTOR(PreCallValidateCreateAccelerationStructureKHR);
     BUILD_DISPATCH_VECTOR(PreCallRecordCreateAccelerationStructureKHR);
     BUILD_DISPATCH_VECTOR(PostCallRecordCreateAccelerationStructureKHR);

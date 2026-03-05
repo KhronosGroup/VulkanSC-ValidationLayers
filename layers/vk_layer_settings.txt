@@ -38,7 +38,7 @@ khronos_validation.check_shaders_caching = true
 # Debug Action
 # =====================
 # Specifies what action is to be taken when a layer reports information
-khronos_validation.debug_action = VK_DBG_LAYER_ACTION_LOG_MSG
+khronos_validation.debug_action = VK_DBG_LAYER_ACTION_LOG_MSG,VK_DBG_LAYER_ACTION_DEBUG_OUTPUT
 
 # Max Duplicated Messages
 # =====================
@@ -55,6 +55,11 @@ khronos_validation.enable_message_limit = true
 # Enable fine grained locking for Core Validation, which should improve performance in multithreaded applications. This setting allows the optimization to be disabled for debugging.
 khronos_validation.fine_grained_locking = true
 
+# Acceleration structures builds
+# =====================
+# Validate acceleration structures references in TLAS build commands.
+khronos_validation.gpuav_acceleration_structures_builds = true
+
 # Out of bounds buffer device addresses
 # =====================
 # Check for invalid access using buffer device address
@@ -69,6 +74,11 @@ khronos_validation.gpuav_buffer_copies = true
 # =====================
 # Validate buffers containing parameters used in indirect Vulkan commands, or used in copy commands
 khronos_validation.gpuav_buffers_validation = true
+
+# VK_KHR_copy_memory_indirect
+# =====================
+# Validate VK_KHR_copy_memory_indirect.
+khronos_validation.gpuav_copy_memory_indirect = true
 
 # Descriptors indexing
 # =====================
@@ -105,6 +115,16 @@ khronos_validation.gpuav_indirect_draws_buffers = true
 # Validate buffers containing ray tracing parameters used in indirect ray tracing commands
 khronos_validation.gpuav_indirect_trace_rays_buffers = true
 
+# Maximum Indices
+# =====================
+# Number of indices held in the buffer used to index commands and validation resources (Max number of draws/dispatches in a command buffer that can be tracked). Can be lowered to save memory.
+khronos_validation.gpuav_max_indices_count = 8192
+
+# Mesh Shading SPIR-V instructions
+# =====================
+# Enable shader instrumentation on VK_EXT_mesh_shader
+khronos_validation.gpuav_mesh_shading = true
+
 # Post process descriptor indexing
 # =====================
 # Track which descriptor indexes were used in shader to run normal validation afterwards
@@ -125,6 +145,11 @@ khronos_validation.gpuav_select_instrumented_shaders = false
 # Instrument shaders to validate descriptors, descriptor indexing, buffer device addresses and ray queries. Warning: will considerably slow down shader executions.
 khronos_validation.gpuav_shader_instrumentation = true
 
+# Shader Sanitizer
+# =====================
+# Things invalid to do in SPIR-V but don't have a dedicated check (example: dividing an int by zero, reaching OpUnreachable, invalid casting, overflow/undeflow). When in safe mode, will modify the invalid usage.
+khronos_validation.gpuav_shader_sanitizer = true
+
 # Shader/pipeline name regexes
 # =====================
 # Any shader or pipeline library debug name (set with vkSetDebugUtilsObjectNameEXT) fully matching any listed regular expression will be instrumented when creating pipelines with those shaders or libraries. Regex grammar: Modified ECMAScript. No support for shader objects yet. Warning: instrumentation being performed at final pipeline creation time, if shaders modules have already been destroyed at this step (possible when using pipeline libraries), they won't be found by this regex selection system. In this case, consider naming pipeline libraries instead.
@@ -139,6 +164,11 @@ khronos_validation.gpuav_validate_ray_query = true
 # =====================
 # Validate that no vertex attribute fetching is out of bonds
 khronos_validation.gpuav_vertex_attribute_fetch_oob = true
+
+# Legacy Detection
+# =====================
+# Give warnings when using legacy parts of the API.
+khronos_validation.legacy_detection = false
 
 # Log Filename
 # =====================
@@ -167,7 +197,7 @@ khronos_validation.object_lifetime = true
 
 # Printf buffer size
 # =====================
-# Set the size in bytes of the buffer per draw/dispatch/traceRays to hold the messages
+# Set the size in bytes of the buffer per VkCommandBuffer to hold the messages (Each message is about 50 bytes)
 khronos_validation.printf_buffer_size = 1024
 
 # Debug Printf
@@ -207,7 +237,7 @@ khronos_validation.syncval_message_extra_properties = false
 
 # Shader accesses heuristic
 # =====================
-# Take into account memory accesses performed by the shader based on SPIR-V static analysis. Warning: can produce false-positives, can ignore certain types of accesses.
+# Take into account memory accesses performed by the shader based on SPIR-V static analysis. Warning: can produce false-positives, can ignore certain types of accesses, does not support VK_EXT_descriptor_buffer.
 khronos_validation.syncval_shader_accesses_heuristic = false
 
 # Submit time validation

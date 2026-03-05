@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+/* Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -20,6 +20,8 @@
 #include "state_tracker/queue_state.h"
 #include "state_tracker/state_tracker.h"
 #include "state_tracker/wsi_state.h"
+#include "utils/math_utils.h"
+#include "containers/container_utils.h"
 
 static bool CanSignalBinarySemaphoreAfterOperation(vvl::Semaphore::OpType op_type) {
     return op_type == vvl::Semaphore::kNone || op_type == vvl::Semaphore::kWait;
@@ -39,7 +41,7 @@ void vvl::Semaphore::TimePoint::Notify() const {
     signal_submit->queue->Notify(signal_submit->seq);
 }
 
-vvl::Semaphore::Semaphore(DeviceState &dev, VkSemaphore handle, const VkSemaphoreTypeCreateInfo *type_create_info,
+vvl::Semaphore::Semaphore(DeviceState &device, VkSemaphore handle, const VkSemaphoreTypeCreateInfo *type_create_info,
                           const VkSemaphoreCreateInfo *pCreateInfo)
     : RefcountedStateObject(handle, kVulkanObjectTypeSemaphore),
       type(type_create_info ? type_create_info->semaphoreType : VK_SEMAPHORE_TYPE_BINARY),
@@ -49,10 +51,10 @@ vvl::Semaphore::Semaphore(DeviceState &dev, VkSemaphore handle, const VkSemaphor
 #ifdef VK_USE_PLATFORM_METAL_EXT
       metal_semaphore_export(GetMetalExport(pCreateInfo)),
 #endif  // VK_USE_PLATFORM_METAL_EXT
-      completed_{type == VK_SEMAPHORE_TYPE_TIMELINE ? kSignal : kNone, SubmissionReference{},
-                 type_create_info ? type_create_info->initialValue : 0},
-      next_payload_(completed_.payload + 1),
-      dev_data_(dev) {
+      device_(device),
+      current_payload_(type_create_info ? type_create_info->initialValue : 0),
+      completed_{type == VK_SEMAPHORE_TYPE_TIMELINE ? kSignal : kNone, nullptr, current_payload_},
+      next_payload_(current_payload_ + 1) {
 }
 
 const VulkanTypedHandle *vvl::Semaphore::InUse() const {
@@ -87,8 +89,8 @@ const VulkanTypedHandle *vvl::Semaphore::InUse() const {
     // cannot be derived from timeline_. It's a bit unconventional. Maybe we need better
     // separation between in-use tracking on other type of functionality. Or maybe it's about
     // better definitions.
-    if (completed_.submit.queue) {
-        return &completed_.submit.queue->Handle();
+    if (completed_.queue) {
+        return &completed_.queue->Handle();
     }
     assert(false && "Can't find queue that uses the semaphore");
     static const VulkanTypedHandle empty{};
@@ -104,9 +106,25 @@ void vvl::Semaphore::EnqueueSignal(const SubmissionReference &signal_submit, uin
     auto guard = WriteLock();
     if (type == VK_SEMAPHORE_TYPE_BINARY) {
         payload = next_payload_++;
+    } else {
+        assert(type == VK_SEMAPHORE_TYPE_TIMELINE);
+        // Host signal (vkSignalSemaphore) updates payload immediately.
+        // This also handles vkLatencySleepNV external signal.
+        if (signal_submit.queue == nullptr) {
+            // Non-increasing signal value, do not track it. Validation phase already reported this.
+            if (payload <= current_payload_) {
+                return;
+            }
+            current_payload_ = payload;
+        }
+
+        // Track smallest pending signal
+        if (signal_submit.queue != nullptr) {
+            if (!smallest_pending_signal_value_.has_value() || payload < *smallest_pending_signal_value_) {
+                smallest_pending_signal_value_ = payload;
+            }
+        }
     }
-    // Check there is no existing signal, validation should enforce this
-    assert(timeline_.find(payload) == timeline_.end() || !timeline_.find(payload)->second.signal_submit.has_value());
 
     timeline_[payload].signal_submit.emplace(signal_submit);
 }
@@ -125,7 +143,8 @@ void vvl::Semaphore::EnqueueWait(const SubmissionReference &wait_submit, uint64_
         if (timeline_.empty()) {
             if (scope_ != vvl::Semaphore::kInternal) {
                 // for external semaphore mark wait as completed, no guarantee of signal visibility
-                completed_ = SemOp(kWait, wait_submit, 0);
+                completed_ = SemOp(kWait, wait_submit.queue, 0);
+                current_payload_ = 0;
                 return;
             } else {
                 // generate binary payload value from the last completed signals
@@ -146,7 +165,7 @@ void vvl::Semaphore::EnqueueWait(const SubmissionReference &wait_submit, uint64_
         // The matching waits should be resolved against completed_ in this case.
         assert(!vvl::Contains(timeline_, payload));
         completed_.op_type = kWait;
-        completed_.submit = wait_submit;
+        completed_.queue = wait_submit.queue;
         return;
     }
 
@@ -161,37 +180,74 @@ void vvl::Semaphore::EnqueueAcquire(vvl::Func acquire_command) {
     timeline_[payload].acquire_command.emplace(acquire_command);
 }
 
-std::optional<vvl::Semaphore::SemOp> vvl::Semaphore::LastOp(const std::function<bool(OpType, uint64_t, bool)> &filter) const {
+std::optional<uint64_t> vvl::Semaphore::CheckMaxDiffThreshold(uint64_t value, const char *&payload_type) const {
+    assert(type == VK_SEMAPHORE_TYPE_TIMELINE);
     auto guard = ReadLock();
-    std::optional<SemOp> result;
 
-    for (auto pos = timeline_.rbegin(); pos != timeline_.rend(); ++pos) {
-        uint64_t payload = pos->first;
-        auto &timepoint = pos->second;
-        for (auto &op : timepoint.wait_submits) {
-            if (!filter || filter(kWait, payload, true)) {
-                result.emplace(SemOp(kWait, op, payload));
-                break;
-            }
-        }
-        if (!result && timepoint.signal_submit) {
-            // vkSemaphoreSignal can't be a pending operation, it signals immediately
-            const bool pending = timepoint.signal_submit->queue != nullptr;
+    const uint64_t max_diff = device_.phys_dev_props_core12.maxTimelineSemaphoreValueDifference;
 
-            if (!filter || filter(kSignal, payload, pending)) {
-                result.emplace(SemOp(kSignal, *timepoint.signal_submit, payload));
-                break;
-            }
+    // Check the current payload
+    if (AbsDiff(value, current_payload_) > max_diff) {
+        payload_type = "current";
+        return current_payload_;
+    }
+
+    // It is enough to check only the first (smallest payload) and last (largest payload) entries.
+    // If either exceeds the threshold, it must be a pending operation, since the current payload
+    // has already been checked. One of these entries may equal the current payload (e.g., for
+    // host signals), but in that case it will not exceed the threshold.
+    if (!timeline_.empty()) {
+        const auto &[first_payload, first_timepoint] = *timeline_.begin();
+        if (AbsDiff(value, first_payload) > max_diff) {
+            payload_type = first_timepoint.HasWaiters() ? "pending wait" : "pending signal";
+            return first_payload;
         }
-        if (!result && timepoint.acquire_command && (!filter || filter(kBinaryAcquire, payload, true))) {
-            result.emplace(SemOp(*timepoint.acquire_command, payload));
-            break;
+        const auto &[last_payload, last_timepoint] = *timeline_.rbegin();
+        if (AbsDiff(value, last_payload) > max_diff) {
+            payload_type = last_timepoint.HasWaiters() ? "pending wait" : "pending signal";
+            return last_payload;
         }
     }
-    if (!result && (!filter || filter(completed_.op_type, completed_.payload, false))) {
-        result.emplace(completed_);
+    return {};
+}
+
+bool vvl::Semaphore::HasPendingTimelineSignal(uint64_t signal_value) const {
+    assert(type == VK_SEMAPHORE_TYPE_TIMELINE);
+    auto guard = ReadLock();
+
+    auto it = timeline_.find(signal_value);
+    if (it == timeline_.end()) {
+        return false;
     }
-    return result;
+    const TimePoint &timepoint = it->second;
+    if (!timepoint.signal_submit.has_value()) {
+        return false;
+    }
+    const bool pending = timepoint.signal_submit->queue != nullptr;
+    return pending;
+}
+
+std::optional<uint64_t> vvl::Semaphore::GetSmallestPendingTimelineSignal() const {
+    assert(type == VK_SEMAPHORE_TYPE_TIMELINE);
+    auto guard = ReadLock();
+    return smallest_pending_signal_value_;
+}
+
+std::optional<vvl::SubmissionReference> vvl::Semaphore::GetPendingBinarySignalSubmission() const {
+    assert(type == VK_SEMAPHORE_TYPE_BINARY);
+    auto guard = ReadLock();
+    if (timeline_.empty()) {
+        return {};
+    }
+    const TimePoint &timepoint = timeline_.rbegin()->second;
+    assert(timepoint.HasSignaler());  // semaphore was signaled or acquired
+
+    if (!timepoint.signal_submit.has_value()) {
+        assert(timepoint.acquire_command.has_value());
+        return {};
+    }
+    assert(timepoint.signal_submit->queue != nullptr);  // binary semaphore can't be signaled from the host
+    return timepoint.signal_submit;
 }
 
 std::optional<vvl::SubmissionReference> vvl::Semaphore::GetPendingBinaryWaitSubmission() const {
@@ -235,7 +291,7 @@ std::optional<vvl::SemaphoreInfo> vvl::Semaphore::GetPendingBinarySignalTimeline
 
 uint64_t vvl::Semaphore::CurrentPayload() const {
     auto guard = ReadLock();
-    return completed_.payload;
+    return current_payload_;
 }
 
 bool vvl::Semaphore::CanBinaryBeSignaled() const {
@@ -277,8 +333,8 @@ void vvl::Semaphore::GetLastBinarySignalSource(VkQueue &queue, vvl::Func &acquir
 
     auto guard = ReadLock();
     if (timeline_.empty()) {
-        if (completed_.op_type == kSignal && completed_.submit.queue) {
-            queue = completed_.submit.queue->VkHandle();
+        if (completed_.op_type == kSignal && completed_.queue) {
+            queue = completed_.queue->VkHandle();
         } else if (completed_.op_type == kBinaryAcquire) {
             acquire_command = *completed_.acquire_command;
         }
@@ -423,11 +479,7 @@ void vvl::Semaphore::RetireWait(vvl::Queue *current_queue, uint64_t payload, con
             retire = CanRetireTimelineWait(current_queue, payload);
         }
         if (retire) {
-            // SemOp::submit is used only by the binary semaphores.
-            // Binary semaphores can have at most one wait per timepoint.
-            const auto submit_ref = (type == VK_SEMAPHORE_TYPE_BINARY) ? timepoint.wait_submits[0] : SubmissionReference{};
-
-            RetireTimePoint(payload, kWait, submit_ref);
+            RetireTimePoint(payload, kWait, current_queue);
             return;
         }
 
@@ -441,7 +493,7 @@ void vvl::Semaphore::RetireWait(vvl::Queue *current_queue, uint64_t payload, con
 
     if (retire_external_payload) {
         auto guard = WriteLock();
-        RetireTimePoint(external_payload, kWait, SubmissionReference{});
+        RetireTimePoint(external_payload, kWait, nullptr);
     }
 }
 
@@ -454,7 +506,7 @@ void vvl::Semaphore::RetireSignal(uint64_t payload) {
     assert(timepoint.signal_submit.has_value());
 
     OpType completed_op = kSignal;
-    SubmissionReference completed_submit = *timepoint.signal_submit;
+    const Queue *completed_op_queue = timepoint.signal_submit->queue;
 
     // If there is a wait operation then mark it as the last completed instead.
     // The reason to do this here instead on the waiter side (after it is unblocked)
@@ -462,14 +514,16 @@ void vvl::Semaphore::RetireSignal(uint64_t payload) {
     // In this case it's the signal that defines the last completed value.
     if (!timepoint.wait_submits.empty()) {
         completed_op = kWait;
-        // SemOp::submit is used only for binary semaphores which can have only single wait
-        completed_submit = timepoint.wait_submits[0];
+        // NOTE: for timeline semaphores there can be several waiters. Also for timeline
+        // semaphores the queue of the completed operation is only used by Semaphore::InUse
+        // for reporting purposes. We can choose any valid wait queue if there are multiple.
+        completed_op_queue = timepoint.wait_submits[0].queue;
     }
 
-    RetireTimePoint(payload, completed_op, completed_submit);
+    RetireTimePoint(payload, completed_op, completed_op_queue);
 }
 
-void vvl::Semaphore::RetireTimePoint(uint64_t payload, OpType completed_op, SubmissionReference completed_submit) {
+void vvl::Semaphore::RetireTimePoint(uint64_t payload, OpType completed_op, const Queue *completed_op_queue) {
     auto it = timeline_.begin();
     while (it != timeline_.end() && it->first <= payload) {
         assert(it->first > completed_.payload);
@@ -477,23 +531,51 @@ void vvl::Semaphore::RetireTimePoint(uint64_t payload, OpType completed_op, Subm
         ++it;
     }
     timeline_.erase(timeline_.begin(), it);
-    completed_ = SemOp(completed_op, completed_submit, payload);
+    completed_ = SemOp(completed_op, completed_op_queue, payload);
+
+    // Update the current payload only if the given payload is larger.
+    // vkSignalSemaphore updates the current payload immediately, so it can be
+    // larger than the given payload from the most recently synchronized batch.
+    if (payload > current_payload_) {
+        current_payload_ = payload;
+    }
+
+    // Update smallest pending signal
+    if (type == VK_SEMAPHORE_TYPE_TIMELINE) {
+        if (timeline_.empty()) {
+            smallest_pending_signal_value_.reset();
+        } else if (smallest_pending_signal_value_.has_value() && timeline_.begin()->first > *smallest_pending_signal_value_) {
+            smallest_pending_signal_value_.reset();
+            for (const auto &[payload, timepoint] : timeline_) {
+                if (!timepoint.signal_submit.has_value()) {
+                    continue;
+                }
+
+                // host signals must always go before pending signals and at this point
+                // we iterate over pending operations
+                assert(timepoint.signal_submit->queue != nullptr);
+
+                smallest_pending_signal_value_ = payload;
+                break;
+            }
+        }
+    }
 }
 
 void vvl::Semaphore::WaitTimePoint(std::shared_future<void> &&waiter, uint64_t payload, bool unblock_validation_object,
                                    const Location &loc) {
     if (unblock_validation_object) {
-        dev_data_.BeginBlockingOperation();
+        device_.BeginBlockingOperation();
     }
 
     auto result = waiter.wait_until(GetCondWaitTimeout());
 
     if (unblock_validation_object) {
-        dev_data_.EndBlockingOperation();
+        device_.EndBlockingOperation();
     }
 
     if (result != std::future_status::ready) {
-        dev_data_.LogError(
+        device_.LogError(
             "INTERNAL-ERROR-VkSemaphore-state-timeout", Handle(), loc,
             "The Validation Layers hit a timeout waiting for timeline semaphore state to update. completed_.payload=%" PRIu64
             " wait_payload=%" PRIu64,
@@ -543,14 +625,15 @@ void vvl::Semaphore::Export(VkExternalSemaphoreHandleTypeFlagBits handle_type) {
         scope_ = kExternalPermanent;
     } else {
         assert(type == VK_SEMAPHORE_TYPE_BINARY);  // checked by validation phase
-        // Exporting a semaphore payload to a handle with copy transference has the same side effects on the source semaphore's
-        // payload as executing a semaphore wait operation
-        auto filter = [](const Semaphore::OpType op_type, uint64_t payload, bool is_pending) {
-            return is_pending && CanWaitBinarySemaphoreAfterOperation(op_type);
-        };
-        auto last_op = LastOp(filter);
-        if (last_op) {
-            EnqueueWait(last_op->submit, last_op->payload);
+        // Exporting a semaphore payload to a handle with copy transference has the same side effects
+        // on the source semaphore's payload as executing a semaphore wait operation
+        if (std::optional<SubmissionReference> pending_signal_submit = GetPendingBinarySignalSubmission()) {
+            uint64_t temp_payload;  // don't need output parameter
+            EnqueueWait(*pending_signal_submit, temp_payload);
+        } else {
+            assert(completed_.op_type == kSignal);  // checked by validation phase
+            completed_.op_type = kWait;
+            completed_.queue = nullptr;  // Export's wait is not associated with a queue
         }
     }
 }

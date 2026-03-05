@@ -2,8 +2,8 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,8 +32,7 @@ TEST_F(PositiveImagelessFramebuffer, BasicUsage) {
     // Create a renderPass with a single attachment
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(format);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     VkFramebufferAttachmentImageInfo fb_attachment_image_info = vku::InitStructHelper();
@@ -72,8 +71,7 @@ TEST_F(PositiveImagelessFramebuffer, Image3D) {
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(format);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
-    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     rp.CreateRenderPass();
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
@@ -149,8 +147,7 @@ TEST_F(PositiveImagelessFramebuffer, SecondaryCmdBuffer) {
     // Create a renderPass with a single attachment
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(format);
-    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
-    rp.AddDepthStencilAttachment(0);
+    rp.AddDepthStencilAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
     VkFramebufferAttachmentImageInfo fb_attachment_image_info = vku::InitStructHelper();
@@ -227,16 +224,16 @@ TEST_F(PositiveImagelessFramebuffer, FragmentShadingRateDimensionsMultiview) {
     // Render Pass with view mask (0x4)
     RenderPass2SingleSubpass rp_view_mask(*this);
     rp_view_mask.AddAttachmentDescription(VK_FORMAT_R8_UINT);
-    rp_view_mask.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL);
-    rp_view_mask.AddFragmentShadingRateAttachment(0, fsr_properties.minFragmentShadingRateAttachmentTexelSize);
+    rp_view_mask.AddFragmentShadingRateAttachment(0, VK_IMAGE_LAYOUT_GENERAL,
+                                                  fsr_properties.minFragmentShadingRateAttachmentTexelSize);
     rp_view_mask.SetViewMask(0x4);
     rp_view_mask.CreateRenderPass();
 
     // Render Pass without view mask
     RenderPass2SingleSubpass rp_no_view_mask(*this);
     rp_no_view_mask.AddAttachmentDescription(VK_FORMAT_R8_UINT);
-    rp_no_view_mask.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL);
-    rp_no_view_mask.AddFragmentShadingRateAttachment(0, fsr_properties.minFragmentShadingRateAttachmentTexelSize);
+    rp_no_view_mask.AddFragmentShadingRateAttachment(0, VK_IMAGE_LAYOUT_GENERAL,
+                                                     fsr_properties.minFragmentShadingRateAttachmentTexelSize);
     rp_no_view_mask.SetViewMask(0);
     rp_no_view_mask.CreateRenderPass();
 
@@ -271,7 +268,7 @@ TEST_F(PositiveImagelessFramebuffer, FragmentShadingRateDimensionsMultiview) {
         // Framebuffer with view mask > 0 and attachment layer count == 1
         VkFramebufferCreateInfo fb_info = vku::InitStructHelper(&fba_info_no_layer);
         fb_info.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
-        fb_info.renderPass = rp_view_mask.Handle();
+        fb_info.renderPass = rp_view_mask;
         fb_info.attachmentCount = 1;
         fb_info.pAttachments = NULL;
         fb_info.width = fsr_properties.minFragmentShadingRateAttachmentTexelSize.width;
@@ -285,7 +282,7 @@ TEST_F(PositiveImagelessFramebuffer, FragmentShadingRateDimensionsMultiview) {
         // Framebuffer with view mask == 0 and attachment layer count > 1
         VkFramebufferCreateInfo fb_info = vku::InitStructHelper(&fba_info_layer);
         fb_info.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
-        fb_info.renderPass = rp_no_view_mask.Handle();
+        fb_info.renderPass = rp_no_view_mask;
         fb_info.attachmentCount = 1;
         fb_info.pAttachments = NULL;
         fb_info.width = fsr_properties.minFragmentShadingRateAttachmentTexelSize.width;
@@ -299,7 +296,7 @@ TEST_F(PositiveImagelessFramebuffer, FragmentShadingRateDimensionsMultiview) {
         // Framebuffer with view mask == 0 and attachment layer count == 1
         VkFramebufferCreateInfo fb_info = vku::InitStructHelper(&fba_info_no_layer);
         fb_info.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
-        fb_info.renderPass = rp_no_view_mask.Handle();
+        fb_info.renderPass = rp_no_view_mask;
         fb_info.attachmentCount = 1;
         fb_info.pAttachments = NULL;
         fb_info.width = fsr_properties.minFragmentShadingRateAttachmentTexelSize.width;

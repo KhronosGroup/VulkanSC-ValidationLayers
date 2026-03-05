@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <spirv-tools/libspirv.hpp>
 #include <glslang/Public/ShaderLang.h>
 
@@ -42,7 +43,8 @@ bool GLSLtoSPV(const VkPhysicalDeviceLimits &device_limits, const VkShaderStageF
 bool ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char *p_asm, std::vector<uint32_t> &out_spv);
 // We don't support installation of Slang on some platforms
 void CheckSlangSupport();
-bool SlangToSPV(const char *slang_shader, const char *entry_point_name, std::vector<uint8_t> &out_bytes);
+bool SlangToSPV(const spv_target_env target_env, const char* slang_shader, const char* entry_point_name,
+                std::vector<uint8_t>& out_bytes);
 
 // VkShaderObj is really just the Shader Module, but we named before VK_EXT_shader_object
 // TODO - move all of VkShaderObj to vkt::ShaderModule
@@ -53,18 +55,14 @@ class VkShaderObj : public vkt::ShaderModule {
     VkShaderObj &operator=(VkShaderObj &&rhs) noexcept = default;
 
     // optional arguments listed order of most likely to be changed manually by a test
-    VkShaderObj(vkt::Device &device, const char *source, VkShaderStageFlagBits stage, const spv_target_env env = SPV_ENV_VULKAN_1_0,
-                SpvSourceType source_type = SPV_SOURCE_GLSL, const VkSpecializationInfo *spec_info = nullptr,
-                const char *entry_point = "main", const void *pNext = nullptr);
-
-    // DEPRECATED
-    VkShaderObj(VkRenderFramework *framework, const char *source, VkShaderStageFlagBits stage,
-                const spv_target_env env = SPV_ENV_VULKAN_1_0, SpvSourceType source_type = SPV_SOURCE_GLSL,
-                const VkSpecializationInfo *spec_info = nullptr, const char *entry_point = "main", const void *pNext = nullptr);
+    VkShaderObj(vkt::Device& device, const char* source, VkShaderStageFlagBits stage, const spv_target_env env = SPV_ENV_VULKAN_1_0,
+                SpvSourceType source_type = SPV_SOURCE_GLSL, const VkSpecializationInfo* spec_info = nullptr,
+                const char* entry_point = "main", const void* shader_module_ci_pNext = nullptr,
+                const void* pipeline_shader_stage_ci_pNext = nullptr);
 
     VkPipelineShaderStageCreateInfo const &GetStageCreateInfo() const;
 
-    bool InitFromGLSL(const void *pNext = nullptr);
+    bool InitFromGLSL(const void* shader_module_ci_pNext = nullptr);
     VkResult InitFromGLSLTry(const vkt::Device *custom_device = nullptr);
     bool InitFromASM();
     VkResult InitFromASMTry();
@@ -85,3 +83,6 @@ class VkShaderObj : public vkt::ShaderModule {
     const char *m_source;
     spv_target_env m_spv_env;
 };
+
+VkDescriptorSetAndBindingMappingEXT MakeSetAndBindingMapping(uint32_t set, uint32_t binding, uint32_t count = 1,
+                                                             VkSpirvResourceTypeFlagsEXT mask = VK_SPIRV_RESOURCE_TYPE_ALL_EXT);

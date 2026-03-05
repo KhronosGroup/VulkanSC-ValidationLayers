@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+/* Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -56,19 +56,18 @@ class Semaphore : public RefcountedStateObject {
     struct SwapchainWaitInfo {
         std::shared_ptr<vvl::Swapchain> swapchain;
         uint32_t image_index = vvl::kNoIndex32;  // image being presented
-        uint32_t acquire_counter_value = 0;   // value of vvl::Swapchain::acquire_count when the image was acquired
+        uint32_t acquire_counter_value = 0;      // value of vvl::Swapchain::acquire_request_count when the image was acquired
     };
 
     struct SemOp {
         OpType op_type;
         uint64_t payload;
-        SubmissionReference submit;  // Used only by binary semaphores
+        const Queue *queue;
         std::optional<Func> acquire_command;
 
-        SemOp(OpType op_type, const SubmissionReference &submit, uint64_t payload)
-            : op_type(op_type), payload(payload), submit(submit) {}
+        SemOp(OpType op_type, const Queue *queue, uint64_t payload) : op_type(op_type), payload(payload), queue(queue) {}
         SemOp(Func acquire_command, uint64_t payload)
-            : op_type(kBinaryAcquire), payload(payload), acquire_command(acquire_command) {}
+            : op_type(kBinaryAcquire), payload(payload), queue(nullptr), acquire_command(acquire_command) {}
     };
 
     struct TimePoint {
@@ -111,8 +110,16 @@ class Semaphore : public RefcountedStateObject {
     // Process signal by retiring timeline timepoints up to the specified payload
     void RetireSignal(uint64_t payload);
 
-    // Look for most recent / highest payload operation that matches
-    std::optional<SemOp> LastOp(const std::function<bool(OpType op_type, uint64_t payload, bool is_pending)> &filter) const;
+    // Return the payload (current or pending) for which the given value exceeds the max diff threshold.
+    // Return an empty result if the threshould is not exceeded.
+    std::optional<uint64_t> CheckMaxDiffThreshold(uint64_t value, const char *&payload_type) const;
+
+    // Return true if there is a pending timeline signal with a given value
+    bool HasPendingTimelineSignal(uint64_t signal_value) const;
+
+    std::optional<uint64_t> GetSmallestPendingTimelineSignal() const;
+
+    std::optional<SubmissionReference> GetPendingBinarySignalSubmission() const;
 
     // Returns pending queue submission that waits on this binary semaphore.
     std::optional<SubmissionReference> GetPendingBinaryWaitSubmission() const;
@@ -123,8 +130,8 @@ class Semaphore : public RefcountedStateObject {
     // "and any semaphore signal operations on which it depends must have also been submitted for execution"
     std::optional<SemaphoreInfo> GetPendingBinarySignalTimelineDependency() const;
 
-    // Current payload value.
-    // If a queue submission command is pending execution, then the returned value may immediately be out of date
+    // Return semaphore's current payload.
+    // If a queue submission command is pending execution, then the returned value may immediately be out of date.
     uint64_t CurrentPayload() const;
 
     bool CanBinaryBeSignaled() const;
@@ -167,15 +174,22 @@ class Semaphore : public RefcountedStateObject {
     bool CanRetireTimelineWait(const vvl::Queue *current_queue, uint64_t payload) const;
 
     // Mark timepoints up to and including payload as completed (notify waiters) and remove them from timeline
-    void RetireTimePoint(uint64_t payload, OpType completed_op, SubmissionReference completed_submit);
+    void RetireTimePoint(uint64_t payload, OpType completed_op, const Queue *completed_op_queue);
 
     // Waits for the waiter. Unblock parameter must be true if the caller is a validation object and false otherwise.
     // (validation object has to use {Begin/End}BlockingOperation() when waiting for the timepoint)
     void WaitTimePoint(std::shared_future<void> &&waiter, uint64_t payload, bool unblock_validation_object, const Location &loc);
 
   private:
+    DeviceState &device_;
+
     enum Scope scope_ { kInternal };
     std::optional<VkExternalSemaphoreHandleTypeFlagBits> imported_handle_type_;  // has value when scope is not kInternal
+
+    uint64_t current_payload_ = 0;
+
+    // Empty if there are no pending signals. Used only for timeline semaphores
+    std::optional<uint64_t> smallest_pending_signal_value_;
 
     // the most recently completed operation
     SemOp completed_;
@@ -187,8 +201,8 @@ class Semaphore : public RefcountedStateObject {
     // Timeline operations can be added in any order and multiple wait operations
     // can use the same payload value.
     std::map<uint64_t, TimePoint> timeline_;
+
     mutable std::shared_mutex lock_;
-    DeviceState &dev_data_;
 
     // Reference to the swapchain image if the semaphore was used by the acquire operation.
     // The semaphore wait operation uses this to mark the image as acquired and safe to use.

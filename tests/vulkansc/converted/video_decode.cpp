@@ -652,7 +652,7 @@ TEST_F(NegativeVideoDecode, DecodeBufferMissingDecodeSrcUsage) {
     cb.BeginVideoCoding(context.Begin());
 
     m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeInfoKHR-srcBuffer-07165");
-    cb.DecodeVideo(context.DecodeFrame().SetBitstreamBuffer(buffer.handle(), 0, create_info.size));
+    cb.DecodeVideo(context.DecodeFrame().SetBitstreamBuffer(buffer, 0, create_info.size));
     m_errorMonitor->VerifyFound();
 
     cb.EndVideoCoding(context.End());
@@ -1681,7 +1681,7 @@ TEST_F(NegativeVideoDecode, DecodeInlineQueryType) {
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-queryPool-08368");
     m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-queryType-08367");
-    cb.DecodeVideo(context.DecodeFrame().InlineQuery(query_pool.handle()));
+    cb.DecodeVideo(context.DecodeFrame().InlineQuery(query_pool));
     m_errorMonitor->VerifyFound();
 
     cb.EndVideoCoding(context.End());
@@ -1732,6 +1732,10 @@ TEST_F(NegativeVideoDecode, DecodeInlineQueryIncompatibleQueueFamily) {
     AddRequiredFeature(vkt::Feature::videoMaintenance1);
     RETURN_IF_SKIP(Init());
 
+    if (!HasQueueFamilySupportsResultStatusOnlyQueries()) {
+        GTEST_SKIP() << "Test requires at least one video queue to support result status queries";
+    }
+
     uint32_t queue_family_index = VK_QUEUE_FAMILY_IGNORED;
     for (uint32_t qfi = 0; qfi < QueueFamilyCount(); ++qfi) {
         if (!QueueFamilySupportsResultStatusOnlyQueries(qfi)) {
@@ -1762,7 +1766,7 @@ TEST_F(NegativeVideoDecode, DecodeInlineQueryIncompatibleQueueFamily) {
     cb.Begin();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-cmdpool");
-    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07231");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-11760");
     cb.BeginVideoCoding(context.Begin());
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-commandBuffer-cmdpool");
