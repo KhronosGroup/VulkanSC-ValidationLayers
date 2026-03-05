@@ -2112,6 +2112,7 @@ static VKAPI_ATTR void VKAPI_CALL GetClusterAccelerationStructureBuildSizesNV(Vk
 }
 #endif  // VULKANSC
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_EXT_descriptor_heap
 static VKAPI_ATTR VkDeviceSize VKAPI_CALL GetPhysicalDeviceDescriptorSizeEXT(VkPhysicalDevice physicalDevice,
                                                                              VkDescriptorType descriptorType) {
     // Some of these must match VkPhysicalDeviceDescriptorHeapPropertiesEXT
@@ -2137,5 +2138,6 @@ static VKAPI_ATTR VkDeviceSize VKAPI_CALL GetPhysicalDeviceDescriptorSizeEXT(VkP
     }
     return 0;
 }
+#endif  // VULKANSC
 
 }  // namespace icd
