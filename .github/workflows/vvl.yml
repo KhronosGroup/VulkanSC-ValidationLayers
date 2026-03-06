@@ -181,6 +181,10 @@ jobs:
     strategy:
       matrix:
         arch: [ amd64, amd64_x86 ]
+        config: [ debug, release ]
+        exclude:
+          - arch: amd64_x86
+            config: debug
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -203,7 +207,7 @@ jobs:
             ${{ github.workspace }}/external/Vulkan-Utility-Libraries/build/install
           key: windows-dependencies-${{ matrix.arch }}-${{ hashfiles('scripts/known_good.json') }}
       - name: Build
-        run: python3 scripts/tests_vksc.py --build --config debug --cmake='-DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON'
+        run: python3 scripts/tests_vksc.py --build --config ${{ matrix.config }} --cmake='-DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON'
       - name: Test Max Profile
         run: python scripts/tests_vksc.py --test
         env:
