@@ -161,6 +161,14 @@ class PipelineCacheData {
     }
 };
 
+struct PipelineJsonData {
+    Json::Value json{};
+    std::vector<std::string> entrypoint_name{};
+    std::vector<std::unique_ptr<vku::safe_VkSpecializationInfo>> specialization_info{};
+
+    PipelineJsonData(const PipelineCacheData::Entry& cache_entry);
+};
+
 class PipelineCache : public vvl::PipelineCache {
   public:
     class Entry {
@@ -169,9 +177,7 @@ class PipelineCache : public vvl::PipelineCache {
         using StageModules = std::vector<std::shared_ptr<vvl::ShaderModule>>;
 
         Entry(const DeviceState& state_data, const PipelineCacheData::Entry& cache_entry)
-            : id_(cache_entry.PipelineID()),
-              shader_modules_(InitShaderModules(state_data, cache_entry)),
-              json_data_(ParseJsonData(cache_entry)) {}
+            : id_(cache_entry.PipelineID()), shader_modules_(InitShaderModules(state_data, cache_entry)), json_data_(cache_entry) {}
 
         ID PipelineID() const { return id_; }
 
@@ -200,18 +206,11 @@ class PipelineCache : public vvl::PipelineCache {
         }
 
       private:
-        struct JsonData {
-            Json::Value json{};
-            std::vector<std::string> entrypoint_name{};
-            std::vector<std::unique_ptr<vku::safe_VkSpecializationInfo>> specialization_info{};
-        };
-
         StageModules InitShaderModules(const DeviceState& state_data, const PipelineCacheData::Entry& cache_entry);
-        JsonData ParseJsonData(const PipelineCacheData::Entry& cache_entry);
 
         ID id_;
         const StageModules shader_modules_;
-        JsonData json_data_;
+        PipelineJsonData json_data_;
     };
 
     PipelineCache(const DeviceState& state_data, VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo* pCreateInfo);
