@@ -292,7 +292,15 @@
             ]
         },
         {
-            "reason": "TODO: These tests fail due to some SPIR-V Tools bugs and do not happen to show up upstream as they do spec constant folding and other optimizations on SPIR-V before validation, unlike our device-create-time SPIR-V validation",
+            "reason": "TODO: These tests fail due to a combination of glslang and SPIR-V Tools bugs",
+            "details": [
+                "The two bugs that cause this are as follows:",
+                " - glslang incorrectly generates the InputAttachmentArrayDynamicIndexing cap into the SPIR-V",
+                " - spirv-val claims that InputAttachmentArrayDynamicIndexing is not supported in Vulkan 1.2 (which it is)",
+                "This does not happen upstream because the shader is built with the Vulkan 1.0 SPIR-V environment not, Vulkan 1.2, therefore:",
+                " - glslang does not generate the InputAttachmentArrayDynamicIndexing into the SPIR-V because it does not exist in that version",
+                " - hence spirv-val does not complain"
+            ],
             "cases": [
                 "NegativeSubpass.InputAttachmentMissingSpecConstant",
                 "PositiveSubpass.InputAttachmentMissingSpecConstant"
