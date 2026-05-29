@@ -173,6 +173,45 @@ TEST_F(VkSCLayerTest, CreateDescriptorSetLayoutExceededBindingLimit) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(VkSCLayerTest, GetDescriptorSetLayoutSupportExceededBindingLimit) {
+    TEST_DESCRIPTION("vkGetDescriptorSetLayoutSupport - binding index cannot exceed descriptorSetLayoutBindingLimit");
+
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto object_reservation_info1 = vksc::GetDefaultObjectReservationCreateInfo();
+    auto object_reservation_info2 = vksc::GetDefaultObjectReservationCreateInfo();
+    auto object_reservation_info3 = vksc::GetDefaultObjectReservationCreateInfo();
+
+    object_reservation_info1.pNext = &sc_10_features;
+    object_reservation_info2.pNext = &object_reservation_info1;
+    object_reservation_info3.pNext = &object_reservation_info2;
+
+    object_reservation_info1.descriptorSetLayoutBindingLimit = 1;
+    object_reservation_info2.descriptorSetLayoutBindingLimit = 4;
+    object_reservation_info3.descriptorSetLayoutBindingLimit = 3;
+
+    RETURN_IF_SKIP(InitFramework());
+    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info3));
+
+    VkDescriptorSetLayoutBinding bindings[] = {
+        {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+        {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+        {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+        {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+    };
+
+    auto create_info = vku::InitStruct<VkDescriptorSetLayoutCreateInfo>();
+    create_info.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+    create_info.pBindings = &bindings[0];
+
+    auto support = vku::InitStruct<VkDescriptorSetLayoutSupport>();
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutBinding-binding-05012");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutBinding-binding-05012");
+    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(VkSCLayerTest, CreateDescriptorSetLayoutExceededBindingCountLimit) {
     TEST_DESCRIPTION("vkCreateDescriptorSetLayout - binding count cannot exceed descriptorSetLayoutBindingLimit");
 
@@ -202,6 +241,38 @@ TEST_F(VkSCLayerTest, CreateDescriptorSetLayoutExceededBindingCountLimit) {
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-bindingCount-05011");
     vksc::CreateDescriptorSetLayout(m_device->handle(), &create_info, nullptr, &layout);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkSCLayerTest, GetDescriptorSetLayoutSupportExceededBindingCountLimit) {
+    TEST_DESCRIPTION("vkGetDescriptorSetLayoutSupport - binding count cannot exceed descriptorSetLayoutBindingLimit");
+
+    RETURN_IF_SKIP(InitFramework());
+
+    const uint32_t limit = GetVulkanSC10Properties().maxDescriptorSetLayoutBindings;
+
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
+
+    object_reservation_info.pNext = &sc_10_features;
+    object_reservation_info.descriptorSetLayoutBindingLimit = limit + 1;
+
+    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info));
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    for (uint32_t i = 0; i <= limit; ++i) {
+        VkDescriptorSetLayoutBinding binding = {i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT};
+        bindings.push_back(binding);
+    }
+
+    auto create_info = vku::InitStruct<VkDescriptorSetLayoutCreateInfo>();
+    create_info.bindingCount = static_cast<uint32_t>(bindings.size());
+    create_info.pBindings = bindings.data();
+
+    auto support = vku::InitStruct<VkDescriptorSetLayoutSupport>();
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-bindingCount-05011");
+    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
     m_errorMonitor->VerifyFound();
 }
 
@@ -260,6 +331,63 @@ TEST_F(VkSCLayerTest, CreateDescriptorSetLayoutExceededImmutableSamplerLimit) {
     // Should succeed if we exclude the last two bindings
     create_info.bindingCount--;
     vkt::DescriptorSetLayout set_layout(*m_device, create_info);
+}
+
+TEST_F(VkSCLayerTest, GetDescriptorSetLayoutSupportExceededImmutableSamplerLimit) {
+    TEST_DESCRIPTION("vkGetDescriptorSetLayoutSupport - immutable sampler limit cannot exceed descriptorSetLayoutBindingLimit");
+
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto object_reservation_info1 = vksc::GetDefaultObjectReservationCreateInfo();
+    auto object_reservation_info2 = vksc::GetDefaultObjectReservationCreateInfo();
+    auto object_reservation_info3 = vksc::GetDefaultObjectReservationCreateInfo();
+
+    object_reservation_info1.pNext = &sc_10_features;
+    object_reservation_info2.pNext = &object_reservation_info1;
+    object_reservation_info3.pNext = &object_reservation_info2;
+
+    object_reservation_info1.maxImmutableSamplersPerDescriptorSetLayout = 0;
+    object_reservation_info2.maxImmutableSamplersPerDescriptorSetLayout = 7;
+    object_reservation_info3.maxImmutableSamplersPerDescriptorSetLayout = 5;
+
+    RETURN_IF_SKIP(InitFramework());
+    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info3));
+
+    auto sampler_ci = vku::InitStruct<VkSamplerCreateInfo>();
+    vkt::Sampler sampler(*m_device, sampler_ci);
+
+    std::vector<VkSampler> samplers(10, sampler.handle());
+
+    VkDescriptorSetLayoutBinding bindings[] = {
+        {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
+        {1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
+        {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
+        {3, VK_DESCRIPTOR_TYPE_SAMPLER, 3, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+        {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
+        // The bindings below will cause the limit to be exceeded
+        {5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
+        {6, VK_DESCRIPTOR_TYPE_SAMPLER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
+    };
+
+    auto create_info = vku::InitStruct<VkDescriptorSetLayoutCreateInfo>();
+    create_info.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+    create_info.pBindings = &bindings[0];
+
+    auto support = vku::InitStruct<VkDescriptorSetLayoutSupport>();
+
+    // Should fail with all bindings
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071");
+    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
+    m_errorMonitor->VerifyFound();
+
+    // Should still fail if we exclude the last binding
+    create_info.bindingCount--;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071");
+    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
+    m_errorMonitor->VerifyFound();
+
+    // Should succeed if we exclude the last two bindings
+    create_info.bindingCount--;
+    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
 }
 
 TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
