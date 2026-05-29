@@ -668,47 +668,13 @@ bool Device::PreCallValidateCreateDescriptorSetLayout(VkDevice device, const VkD
                                    "descriptorSetLayout", sc_device_state->sc_object_limits_.descriptorSetLayoutRequestCount, 1);
 
     if (pCreateInfo) {
-        const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
-
-        if (pCreateInfo->bindingCount > sc_device_state->phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings) {
-            skip |=
-                LogError("VUID-VkDescriptorSetLayoutCreateInfo-bindingCount-05011", device, create_info_loc.dot(Field::bindCount),
-                         "(%u) exceeds the device limit "
-                         "VkPhysicalDeviceVulkanSC10Properties::maxDescriptorSetLayoutBindings (%u).",
-                         pCreateInfo->bindingCount, sc_device_state->phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings);
-        }
+        skip |= ValidateDescriptorSetLayoutCreateInfoSC(*pCreateInfo, error_obj.location.dot(Field::pCreateInfo));
 
         skip |= ValidateCombinedRequestCount(
             device, error_obj.location, "VUID-vkCreateDescriptorSetLayout-layoutbindings-device-05089", "VkDescriptorSetLayout",
             "descriptor set layout bindings", sc_device_state->sc_reserved_objects_.descriptor_set_layout_bindings.load(),
             "descriptorSetLayoutBinding", sc_device_state->sc_object_limits_.descriptorSetLayoutBindingRequestCount,
             "pCreateInfo->bindingCount", pCreateInfo->bindingCount);
-
-        uint32_t requested_immutable_samplers = 0;
-        for (uint32_t i = 0; i < pCreateInfo->bindingCount; ++i) {
-            const auto& binding = pCreateInfo->pBindings[i];
-            if (binding.binding >= sc_device_state->sc_object_limits_.descriptorSetLayoutBindingLimit) {
-                skip |= LogError("VUID-VkDescriptorSetLayoutBinding-binding-05012", device,
-                                 create_info_loc.dot(Field::pBindings, i).dot(Field::binding),
-                                 "(%u) exceeds the limit requested in "
-                                 "VkDeviceObjectReservationCreateInfo::descriptorSetLayoutBindingLimit (%u).",
-                                 binding.binding, sc_device_state->sc_object_limits_.descriptorSetLayoutBindingLimit);
-            }
-
-            if ((binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER ||
-                 binding.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) &&
-                binding.pImmutableSamplers != nullptr) {
-                requested_immutable_samplers += binding.descriptorCount;
-            }
-        }
-
-        if (requested_immutable_samplers > sc_device_state->sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout) {
-            skip |= LogError("VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071", device, error_obj.location,
-                             "the total immutable samplers (%u) across the specified bindings exceeds the limit requested "
-                             "in VkDeviceObjectReservationCreateInfo::maxImmutableSamplersPerDescriptorSetLayout (%u).",
-                             requested_immutable_samplers,
-                             sc_device_state->sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout);
-        }
     }
 
     return skip;
@@ -1451,6 +1417,54 @@ bool Device::PreCallValidateGetFaultData(VkDevice device, VkFaultQueryBehavior f
         skip |= LogError("VUID-vkGetFaultData-pFaultCount-05020", device, error_obj.location.dot(Field::pFaultCount),
                          "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxQueryFaultCount (%u).",
                          *pFaultCount, sc_device_state->phys_dev_props_sc_10_.maxQueryFaultCount);
+    }
+
+    return skip;
+}
+
+bool Device::PreCallValidateGetDescriptorSetLayoutSupport(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo,
+                                                          VkDescriptorSetLayoutSupport* pSupport,
+                                                          const ErrorObject& error_obj) const {
+    bool skip = BaseClass::PreCallValidateGetDescriptorSetLayoutSupport(device, pCreateInfo, pSupport, error_obj);
+    skip |= ValidateDescriptorSetLayoutCreateInfoSC(*pCreateInfo, error_obj.location.dot(Field::pCreateInfo));
+    return skip;
+}
+
+bool Device::ValidateDescriptorSetLayoutCreateInfoSC(const VkDescriptorSetLayoutCreateInfo& create_info,
+                                                     const Location& create_info_loc) const {
+    bool skip = false;
+
+    if (create_info.bindingCount > sc_device_state->phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings) {
+        skip |= LogError("VUID-VkDescriptorSetLayoutCreateInfo-bindingCount-05011", device, create_info_loc.dot(Field::bindCount),
+                         "(%u) exceeds the device limit "
+                         "VkPhysicalDeviceVulkanSC10Properties::maxDescriptorSetLayoutBindings (%u).",
+                         create_info.bindingCount, sc_device_state->phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings);
+    }
+
+    uint32_t requested_immutable_samplers = 0;
+    for (uint32_t i = 0; i < create_info.bindingCount; ++i) {
+        const auto& binding = create_info.pBindings[i];
+        if (binding.binding >= sc_device_state->sc_object_limits_.descriptorSetLayoutBindingLimit) {
+            skip |= LogError("VUID-VkDescriptorSetLayoutBinding-binding-05012", device,
+                             create_info_loc.dot(Field::pBindings, i).dot(Field::binding),
+                             "(%u) exceeds the limit requested in "
+                             "VkDeviceObjectReservationCreateInfo::descriptorSetLayoutBindingLimit (%u).",
+                             binding.binding, sc_device_state->sc_object_limits_.descriptorSetLayoutBindingLimit);
+        }
+
+        if ((binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER ||
+             binding.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) &&
+            binding.pImmutableSamplers != nullptr) {
+            requested_immutable_samplers += binding.descriptorCount;
+        }
+    }
+
+    if (requested_immutable_samplers > sc_device_state->sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout) {
+        skip |=
+            LogError("VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071", device, create_info_loc,
+                     "the total immutable samplers (%u) across the specified bindings exceeds the limit requested "
+                     "in VkDeviceObjectReservationCreateInfo::maxImmutableSamplersPerDescriptorSetLayout (%u).",
+                     requested_immutable_samplers, sc_device_state->sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout);
     }
 
     return skip;
