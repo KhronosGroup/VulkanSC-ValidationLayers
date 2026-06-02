@@ -11,6 +11,14 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
+TEST_F(VkSCLayerTest, NoVulkanOnlyEntryPoints) {
+    TEST_DESCRIPTION("Test that the validation layer does not expose Vulkan-only entry points");
+
+    RETURN_IF_SKIP(Init());
+
+    EXPECT_EQ(vksc::GetDeviceProcAddr(m_device->handle(), "vkTrimCommandPool"), nullptr);
+}
+
 TEST_F(VkSCPositiveRemoved, SetNegativeViewport) {
     TEST_DESCRIPTION("vkCmdSetViewport - test that the removed VUID 07917 is not triggered in Vulkan SC");
 

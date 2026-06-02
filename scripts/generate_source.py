@@ -220,7 +220,7 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
         },
         'chassis.cpp' : {
             'generator' : LayerChassisOutputGenerator,
-            'genCombined': True,
+            'genCombined': False,
         },
         'dispatch_object_device_methods.h' : {
             'generator' : DispatchObjectGenerator,
