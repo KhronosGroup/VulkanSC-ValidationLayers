@@ -1560,6 +1560,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceExternalTensorPropertiesARM(
 }
 #endif  // VULKANSC
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_ARM_data_graph
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM(
     VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, uint32_t* pQueueFamilyDataGraphPropertyCount,
     VkQueueFamilyDataGraphPropertiesARM* pQueueFamilyDataGraphProperties) {
@@ -1644,6 +1645,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceQueueFamilyDataGraphOptic
     }
     return VK_SUCCESS;
 }
+#endif  // VULKANSC
 
 static VKAPI_ATTR VkResult VKAPI_CALL
 GetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2* pImageFormatInfo,
@@ -1775,10 +1777,12 @@ static VKAPI_ATTR VkResult VKAPI_CALL EnumeratePhysicalDeviceGroups(
     return VK_SUCCESS;
 }
 
+#ifndef VULKANSC  // Vulkan SC does not supportVK_KHR_device_fault
 static VKAPI_ATTR VkResult VKAPI_CALL GetDeviceFaultReportsKHR(VkDevice device, uint64_t timeout, uint32_t* pFaultCounts,
                                                                VkDeviceFaultInfoKHR* pFaultInfo) {
     return timeout == 0 ? VK_SUCCESS : VK_TIMEOUT;
 }
+#endif  // VULKANSC
 
 #ifndef VULKANSC  // Vulkan SC does not support these platform APIs
 #ifdef VK_USE_PLATFORM_WIN32_KHR
@@ -2203,9 +2207,6 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPipelineBinaryDataKHR(VkDevice device, 
 #endif  // VULKANSC
 
 #ifndef VULKANSC  // Vulkan SC does not support VK_NV_partitioned_acceleration_structure
-static VKAPI_ATTR void VKAPI_CALL GetPartitionedAccelerationStructuresBuildSizesNV(VkDevice device,
-                                                                                    const VkPartitionedAccelerationStructureInstancesInputNV* pInfo,
-                                                                                    VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) {
 static VKAPI_ATTR void VKAPI_CALL
 GetPartitionedAccelerationStructuresBuildSizesNV(VkDevice device, const VkPartitionedAccelerationStructureInstancesInputNV* pInfo,
                                                  VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) {

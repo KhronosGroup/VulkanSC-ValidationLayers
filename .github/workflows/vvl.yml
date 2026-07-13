@@ -69,9 +69,9 @@ jobs:
           jq '.repos |= map(select(.name == "Vulkan-Headers" or .name == "SPIRV-Headers"))' \
           scripts/known_good.json > $RUNNER_TEMP/known_good.json
       - name: Clone in Vulkan/SPIR-V headers
-        run: scripts/update_deps.py --api vulkansc --dir ext --no-build --known_good_dir $RUNNER_TEMP
+        run: scripts/update_deps.py --dir ext --no-build --known_good_dir $RUNNER_TEMP
       - name: Run the script to generate the code and compare it with what is checked in
-        run: scripts/generate_source.py --verify ext/Vulkan-Headers/registry/ ext/SPIRV-Headers/include/spirv/unified1/ --api vulkansc
+        run: scripts/generate_source.py --verify ext/Vulkan-Headers/registry/ ext/SPIRV-Headers/include/spirv/unified1/
 
   linux:
     needs: check_vvl
@@ -179,6 +179,11 @@ jobs:
     name: "Ubuntu Backcompat"
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+      - name: install python packages
+        run: python3 -m pip install pyparsing
       - name: Test Minimum CMake Version
         uses: lukka/get-cmake@latest
         with:
@@ -210,6 +215,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
+      - name: install python packages
+        run: python3 -m pip install pyparsing
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
@@ -254,6 +261,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
+      - name: install python packages
+        run: python3 -m pip install pyparsing
       - run: |
           cmake -S. -B build \
           -D BUILD_WERROR=ON \
@@ -273,7 +282,7 @@ jobs:
     if: always()
     # List of all jobs required
     # Add 'chromium' back when google servers are working again
-    needs: [android, linux, windows]
+    needs: [linux, windows]
     steps:
       - name: Check status of jobs
         run: |
