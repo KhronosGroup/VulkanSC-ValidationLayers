@@ -34,14 +34,14 @@ DescriptorSetManager::DescriptorSetManager(VkDevice device, uint32_t num_binding
     : device(device), num_bindings_in_set(num_bindings_in_set) {}
 
 DescriptorSetManager::~DescriptorSetManager() {
-    for (auto &pool : desc_pool_map_) {
+    for (auto& pool : desc_pool_map_) {
         DispatchDestroyDescriptorPool(device, pool.first, nullptr);
     }
     desc_pool_map_.clear();
 }
 
-VkResult DescriptorSetManager::GetDescriptorSet(VkDescriptorPool *out_desc_pool, VkDescriptorSetLayout ds_layout,
-                                                VkDescriptorSet *out_desc_sets) {
+VkResult DescriptorSetManager::GetDescriptorSet(VkDescriptorPool* out_desc_pool, VkDescriptorSetLayout ds_layout,
+                                                VkDescriptorSet* out_desc_sets) {
     std::vector<VkDescriptorSet> desc_sets;
     VkResult result = GetDescriptorSets(1, out_desc_pool, ds_layout, &desc_sets);
     assert(result == VK_SUCCESS);
@@ -51,8 +51,8 @@ VkResult DescriptorSetManager::GetDescriptorSet(VkDescriptorPool *out_desc_pool,
     return result;
 }
 
-VkResult DescriptorSetManager::GetDescriptorSets(uint32_t count, VkDescriptorPool *out_pool, VkDescriptorSetLayout ds_layout,
-                                                 std::vector<VkDescriptorSet> *out_desc_sets) {
+VkResult DescriptorSetManager::GetDescriptorSets(uint32_t count, VkDescriptorPool* out_pool, VkDescriptorSetLayout ds_layout,
+                                                 std::vector<VkDescriptorSet>* out_desc_sets) {
     std::lock_guard guard(lock_);
 
     VkResult result = VK_SUCCESS;
@@ -65,7 +65,7 @@ VkResult DescriptorSetManager::GetDescriptorSets(uint32_t count, VkDescriptorPoo
     out_desc_sets->clear();
     out_desc_sets->resize(count);
 
-    for (auto &[desc_pool, pool_tracker] : desc_pool_map_) {
+    for (auto& [desc_pool, pool_tracker] : desc_pool_map_) {
         if (pool_tracker.used + count < pool_tracker.size) {
             desc_pool_to_use = desc_pool;
             break;
@@ -142,7 +142,7 @@ void DescriptorSetManager::PutBackDescriptorSet(VkDescriptorPool desc_pool, VkDe
     return;
 }
 
-void *Buffer::GetMappedPtr() const { return mapped_ptr; }
+void* Buffer::GetMappedPtr() const { return mapped_ptr; }
 
 void Buffer::FlushAllocation(VkDeviceSize offset, VkDeviceSize size) const {
     VkResult result = vmaFlushAllocation(gpuav.vma_allocator_, allocation, offset, size);
@@ -190,7 +190,7 @@ VkResult Buffer::Create(const VkBufferCreateInfo* buffer_create_info, const VmaA
     static_assert(VK_MAX_MEMORY_HEAPS <= 16u);
     VmaBudget budgets[VK_MAX_MEMORY_HEAPS] = {};
     vmaGetHeapBudgets(gpuav.vma_allocator_, budgets);
-    constexpr std::array<const char *, VK_MAX_MEMORY_HEAPS> heap_names = {
+    constexpr std::array<const char*, VK_MAX_MEMORY_HEAPS> heap_names = {
         {"GPU Heap 0 (kB)", "GPU Heap 1 (kB)", "GPU Heap 2 (kB)", "GPU Heap 3 (kB)", "GPU Heap 4 (kB)", "GPU Heap 5 (kB)",
          "GPU Heap 6 (kB)", "GPU Heap 7 (kB)", "GPU Heap 8 (kB)", "GPU Heap 9 (kB)", "GPU Heap 10 (kB)", "GPU Heap 11 (kB)",
          "GPU Heap 12 (kB)", "GPU Heap 13 (kB)", "GPU Heap 14 (kB)", "GPU Heap 15 (kB)"}};
@@ -217,7 +217,7 @@ void Buffer::Destroy() {
     static_assert(VK_MAX_MEMORY_HEAPS <= 16u);
     VmaBudget budgets[VK_MAX_MEMORY_HEAPS] = {};
     vmaGetHeapBudgets(gpuav.vma_allocator_, budgets);
-    constexpr std::array<const char *, VK_MAX_MEMORY_HEAPS> heap_names = {
+    constexpr std::array<const char*, VK_MAX_MEMORY_HEAPS> heap_names = {
         {"GPU Heap 0 (kB)", "GPU Heap 1 (kB)", "GPU Heap 2 (kB)", "GPU Heap 3 (kB)", "GPU Heap 4 (kB)", "GPU Heap 5 (kB)",
          "GPU Heap 6 (kB)", "GPU Heap 7 (kB)", "GPU Heap 8 (kB)", "GPU Heap 9 (kB)", "GPU Heap 10 (kB)", "GPU Heap 11 (kB)",
          "GPU Heap 12 (kB)", "GPU Heap 13 (kB)", "GPU Heap 14 (kB)", "GPU Heap 15 (kB)"}};
@@ -230,25 +230,25 @@ void Buffer::Destroy() {
 void Buffer::Clear() const {
     // Caller is in charge of calling Flush/Invalidate as needed
     assert(mapped_ptr);
-    memset((uint8_t *)mapped_ptr, 0, static_cast<size_t>(size));
+    memset((uint8_t*)mapped_ptr, 0, static_cast<size_t>(size));
 }
 
 void BufferRange::Clear() const {
     // Caller is in charge of calling Flush/Invalidate as needed
     assert(offset_mapped_ptr);
-    memset((uint8_t *)offset_mapped_ptr, 0, static_cast<size_t>(size));
+    memset((uint8_t*)offset_mapped_ptr, 0, static_cast<size_t>(size));
 }
 
-void CmdSynchronizedCopyBufferRange(VkCommandBuffer cb, const vko::BufferRange &dst, const vko::BufferRange &src) {
+void CmdSynchronizedCopyBufferRange(VkCommandBuffer cb, const vko::BufferRange& dst, const vko::BufferRange& src) {
     assert(dst.size == src.size);
     VkBufferMemoryBarrier barrier_write_after_read = vku::InitStructHelper();
-    barrier_write_after_read.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    barrier_write_after_read.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier_write_after_read.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier_write_after_read.buffer = dst.buffer;
     barrier_write_after_read.offset = dst.offset;
     barrier_write_after_read.size = dst.size;
 
-    DispatchCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 1,
+    DispatchCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1,
                                &barrier_write_after_read, 0, nullptr);
 
     VkBufferCopy copy;
@@ -259,7 +259,7 @@ void CmdSynchronizedCopyBufferRange(VkCommandBuffer cb, const vko::BufferRange &
 
     VkBufferMemoryBarrier barrier_read_before_write = vku::InitStructHelper();
     barrier_read_before_write.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier_read_before_write.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    barrier_read_before_write.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier_read_before_write.buffer = dst.buffer;
     barrier_read_before_write.offset = dst.offset;
     barrier_read_before_write.size = dst.size;
@@ -268,7 +268,8 @@ void CmdSynchronizedCopyBufferRange(VkCommandBuffer cb, const vko::BufferRange &
                                &barrier_read_before_write, 0, nullptr);
 }
 
-GpuResourcesManager::GpuResourcesManager(Validator &gpuav) : gpuav_(gpuav) {
+GpuResourcesManager::GpuResourcesManager(Validator& gpuav, bool thread_safe_buffer_caches)
+    : gpuav_(gpuav), buffer_caches_(thread_safe_buffer_caches) {
     const bool force_host_access = gpuav.IsAllDeviceLocalMappable();
 
     {
@@ -326,7 +327,7 @@ GpuResourcesManager::GpuResourcesManager(Validator &gpuav) : gpuav_(gpuav) {
 VkDescriptorSet GpuResourcesManager::GetManagedDescriptorSet(VkDescriptorSetLayout desc_set_layout) {
     // Look for a descriptor set layout matching input,
     // if found get or add an associated descriptor set
-    for (LayoutToSets &layout_to_sets : cache_layouts_to_sets_) {
+    for (LayoutToSets& layout_to_sets : cache_layouts_to_sets_) {
         if (layout_to_sets.desc_set_layout != desc_set_layout) {
             continue;
         }
@@ -365,6 +366,10 @@ vko::BufferRange GpuResourcesManager::GetHostCoherentBufferRange(VkDeviceSize si
     return buffer_caches_.host_coherent.GetBufferRange(gpuav_, size, alignment, min_buffer_block_size);
 }
 
+void GpuResourcesManager::ReturnHostCoherentBufferRange(const vko::BufferRange& buffer_range) {
+    buffer_caches_.host_coherent.ReturnBufferRange(buffer_range);
+}
+
 vko::BufferRange GpuResourcesManager::GetHostCachedBufferRange(VkDeviceSize size) {
     // Kind of arbitrary, considered "big enough"
     constexpr VkDeviceSize min_buffer_block_size = 4 * 1024;
@@ -375,12 +380,12 @@ vko::BufferRange GpuResourcesManager::GetHostCachedBufferRange(VkDeviceSize size
 }
 
 // Only used for Host Cache
-void GpuResourcesManager::FlushAllocation(const vko::BufferRange &buffer_range) {
+void GpuResourcesManager::FlushAllocation(const vko::BufferRange& buffer_range) {
     vmaFlushAllocation(gpuav_.vma_allocator_, buffer_range.vma_alloc, 0, VK_WHOLE_SIZE);
 }
 
 // Only used for Host Cache
-void GpuResourcesManager::InvalidateAllocation(const vko::BufferRange &buffer_range) {
+void GpuResourcesManager::InvalidateAllocation(const vko::BufferRange& buffer_range) {
     vmaInvalidateAllocation(gpuav_.vma_allocator_, buffer_range.vma_alloc, 0, VK_WHOLE_SIZE);
 }
 
@@ -391,6 +396,10 @@ vko::BufferRange GpuResourcesManager::GetDeviceLocalBufferRange(VkDeviceSize siz
     const VkDeviceSize alignment =
         std::max<VkDeviceSize>(gpuav_.phys_dev_props.limits.minStorageBufferOffsetAlignment, buffer_address_alignment);
     return buffer_caches_.device_local.GetBufferRange(gpuav_, size, alignment, min_buffer_block_size);
+}
+
+void GpuResourcesManager::ReturnDeviceLocalBufferRange(const vko::BufferRange& buffer_range) {
+    buffer_caches_.device_local.ReturnBufferRange(buffer_range);
 }
 
 vko::BufferRange GpuResourcesManager::GetDeviceLocalIndirectBufferRange(VkDeviceSize size) {
@@ -412,7 +421,7 @@ vko::BufferRange GpuResourcesManager::GetStagingBufferRange(VkDeviceSize size) {
 }
 
 void GpuResourcesManager::ReturnResources() {
-    for (LayoutToSets &layout_to_set : cache_layouts_to_sets_) {
+    for (LayoutToSets& layout_to_set : cache_layouts_to_sets_) {
         layout_to_set.first_available_desc_set = 0;
     }
 
@@ -420,8 +429,8 @@ void GpuResourcesManager::ReturnResources() {
 }
 
 void GpuResourcesManager::DestroyResources() {
-    for (LayoutToSets &layout_to_set : cache_layouts_to_sets_) {
-        for (CachedDescriptor &cached_descriptor : layout_to_set.cached_descriptors) {
+    for (LayoutToSets& layout_to_set : cache_layouts_to_sets_) {
+        for (CachedDescriptor& cached_descriptor : layout_to_set.cached_descriptors) {
             gpuav_.desc_set_manager_->PutBackDescriptorSet(cached_descriptor.desc_pool, cached_descriptor.desc_set);
         }
         layout_to_set.cached_descriptors.clear();
@@ -432,19 +441,29 @@ void GpuResourcesManager::DestroyResources() {
 }
 
 void GpuResourcesManager::BufferCache::Create(VkBufferUsageFlags buffer_usage_flags, const VmaAllocationCreateInfo allocation_ci) {
+    std::unique_lock<std::mutex> lock(mtx, std::defer_lock);
+    if (thread_safe_) {
+        lock.lock();
+    }
+
     buffer_usage_flags_ = buffer_usage_flags;
     allocation_ci_ = allocation_ci;
 }
 
 GpuResourcesManager::BufferCache::~BufferCache() { DestroyBuffers(); }
 
-vko::BufferRange GpuResourcesManager::BufferCache::GetBufferRange(Validator &gpuav, VkDeviceSize byte_size, VkDeviceSize alignment,
+vko::BufferRange GpuResourcesManager::BufferCache::GetBufferRange(Validator& gpuav, VkDeviceSize byte_size, VkDeviceSize alignment,
                                                                   VkDeviceSize min_buffer_block_byte_size) {
+    std::unique_lock<std::mutex> lock(mtx, std::defer_lock);
+    if (thread_safe_) {
+        lock.lock();
+    }
+
     // Try to find a cached buffer block big enough to sub-allocate from it
     if (total_available_byte_size_ >= byte_size) {
         for (size_t i = 0; i < cached_buffers_blocks_.size(); ++i) {
             const size_t cached_buffer_i = (next_avail_buffer_pos_hint_ + i) % cached_buffers_blocks_.size();
-            CachedBufferBlock &cached_buffer = cached_buffers_blocks_[cached_buffer_i];
+            CachedBufferBlock& cached_buffer = cached_buffers_blocks_[cached_buffer_i];
 
             // Is there enough space in the current cached buffer to fit the aligned sub-allocation?
             const VkDeviceAddress aligned_free_range_begin = Align(cached_buffer.used_range.end, alignment);
@@ -470,15 +489,17 @@ vko::BufferRange GpuResourcesManager::BufferCache::GetBufferRange(Validator &gpu
                     next_avail_buffer_pos_hint_ = (cached_buffer_i + 1) % cached_buffers_blocks_.size();
                 }
                 const VkDeviceSize buffer_offset = returned_addr_range.begin - cached_buffer.buffer.Address();
-                uint8_t *offset_mapped_ptr = nullptr;
+                uint8_t* offset_mapped_ptr = nullptr;
                 if (cached_buffer.buffer.GetMappedPtr()) {
-                    offset_mapped_ptr = (uint8_t *)cached_buffer.buffer.GetMappedPtr() + buffer_offset;
+                    offset_mapped_ptr = (uint8_t*)cached_buffer.buffer.GetMappedPtr() + buffer_offset;
                 }
                 const VkDeviceAddress offset_address = returned_addr_range.begin;
                 assert(offset_address % alignment == 0);
-                return {
+                vko::BufferRange range{
                     cached_buffer.buffer.VkHandle(),  buffer_offset, returned_addr_range.size(), offset_mapped_ptr, offset_address,
                     cached_buffer.buffer.Allocation()};
+                assert(range.offset + range.size <= cached_buffer.buffer.Size());
+                return range;
             }
         }
     }
@@ -486,7 +507,7 @@ vko::BufferRange GpuResourcesManager::BufferCache::GetBufferRange(Validator &gpu
     // Did not find a cached buffer, create one, cache it and return its handle
     Buffer buffer(gpuav);
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = std::max(min_buffer_block_byte_size, Align<VkDeviceSize>(byte_size + alignment, buffer_address_alignment));
+    buffer_ci.size = std::max(min_buffer_block_byte_size, byte_size + std::max(alignment, buffer_address_alignment));
     buffer_ci.usage = buffer_usage_flags_;
     const VkResult result = buffer.Create(&buffer_ci, &allocation_ci_);
     if (result != VK_SUCCESS) {
@@ -499,34 +520,69 @@ vko::BufferRange GpuResourcesManager::BufferCache::GetBufferRange(Validator &gpu
 
     total_available_byte_size_ += buffer_ci.size - byte_size;
     const VkDeviceSize buffer_offset = cached_buffer_block.used_range.begin - cached_buffer_block.buffer.Address();
-    return {buffer.VkHandle(),
-            buffer_offset,
-            cached_buffer_block.used_range.size(),
-            (uint8_t *)cached_buffer_block.buffer.GetMappedPtr() + buffer_offset,
-            returned_addr,
-            cached_buffer_block.buffer.Allocation()};
+
+    vko::BufferRange range{buffer.VkHandle(),
+                           buffer_offset,
+                           cached_buffer_block.used_range.size(),
+                           (uint8_t*)cached_buffer_block.buffer.GetMappedPtr() + buffer_offset,
+                           returned_addr,
+                           cached_buffer_block.buffer.Allocation()};
+    assert(range.offset + range.size <= buffer_ci.size);
+    return range;
+}
+
+void GpuResourcesManager::BufferCache::ReturnBufferRange(const vko::BufferRange& buffer_range) {
+    std::unique_lock<std::mutex> lock(mtx, std::defer_lock);
+    if (thread_safe_) {
+        lock.lock();
+    }
+
+    for (CachedBufferBlock& cached_buffer_block : cached_buffers_blocks_) {
+        if (buffer_range.buffer != cached_buffer_block.buffer.VkHandle()) {
+            continue;
+        }
+
+        const VkDeviceAddress buffer_range_end_addr = buffer_range.offset_address + buffer_range.size;
+        if (buffer_range_end_addr != cached_buffer_block.used_range.end) {
+            continue;
+        }
+
+        cached_buffer_block.used_range.end -= buffer_range.size;
+        total_available_byte_size_ += buffer_range.size;
+        return;
+    }
 }
 
 void GpuResourcesManager::BufferCache::ReturnBuffers() {
+    std::unique_lock<std::mutex> lock(mtx, std::defer_lock);
+    if (thread_safe_) {
+        lock.lock();
+    }
+
     total_available_byte_size_ = 0;
-    for (CachedBufferBlock &cached_buffer_block : cached_buffers_blocks_) {
+    for (CachedBufferBlock& cached_buffer_block : cached_buffers_blocks_) {
         cached_buffer_block.used_range = {cached_buffer_block.buffer.Address(), cached_buffer_block.buffer.Address()};
         total_available_byte_size_ += cached_buffer_block.total_range.size();
     }
 }
 
 void GpuResourcesManager::BufferCache::DestroyBuffers() {
-    for (CachedBufferBlock &cached_buffer_block : cached_buffers_blocks_) {
+    std::unique_lock<std::mutex> lock(mtx, std::defer_lock);
+    if (thread_safe_) {
+        lock.lock();
+    }
+
+    for (CachedBufferBlock& cached_buffer_block : cached_buffers_blocks_) {
         cached_buffer_block.buffer.Destroy();
     }
     cached_buffers_blocks_.clear();
 }
 
-bool StagingBuffer::CanDeviceEverStage(Validator &gpuav) {
+bool StagingBuffer::CanDeviceEverStage(Validator& gpuav) {
     return gpuav.phys_dev_props.deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
 }
 
-StagingBuffer::StagingBuffer(GpuResourcesManager &gpu_resources_manager, VkDeviceSize size, VkCommandBuffer cb)
+StagingBuffer::StagingBuffer(GpuResourcesManager& gpu_resources_manager, VkDeviceSize size, VkCommandBuffer cb)
     : gpu_resources_manager(gpu_resources_manager) {
     VVL_ZoneScoped;
     // Never use staging buffer on integrated GPUs
@@ -580,16 +636,29 @@ void StagingBuffer::CmdCopyDeviceToHost(VkCommandBuffer cb) const {
         return;
     }
 
-    // Dispatch a copy command, copying staging buffer device local memory to host visible
-    VkBufferMemoryBarrier barrier_read_after_write = vku::InitStructHelper();
+    // Dispatch a copy command, copying staging buffer device local memory to host visible.
+    std::array<VkBufferMemoryBarrier, 2> barriers;
+    // Source: make the device buffer's write visible to the transfer read.
+    VkBufferMemoryBarrier& barrier_read_after_write = barriers[0];
+    barrier_read_after_write = vku::InitStructHelper();
     barrier_read_after_write.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
     barrier_read_after_write.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     barrier_read_after_write.buffer = device_buffer_range.buffer;
     barrier_read_after_write.offset = device_buffer_range.offset;
     barrier_read_after_write.size = device_buffer_range.size;
 
-    DispatchCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1,
-                               &barrier_read_after_write, 0, nullptr);
+    // Destination: The host  buffer range is taken from a cache and may have been written by a previous
+    // vkCmdCopyBuffer (from an earlier submission reusing the same range).
+    VkBufferMemoryBarrier& barrier_write_after_write = barriers[1];
+    barrier_write_after_write = vku::InitStructHelper();
+    barrier_write_after_write.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier_write_after_write.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier_write_after_write.buffer = host_buffer_range.buffer;
+    barrier_write_after_write.offset = host_buffer_range.offset;
+    barrier_write_after_write.size = host_buffer_range.size;
+
+    DispatchCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
+                               static_cast<uint32_t>(barriers.size()), barriers.data(), 0, nullptr);
 
     VkBufferCopy copy = {};
     copy.srcOffset = device_buffer_range.offset;
@@ -601,7 +670,7 @@ void StagingBuffer::CmdCopyDeviceToHost(VkCommandBuffer cb) const {
     // => will wait for cb's fence before reading.
 }
 
-CommandPool::CommandPool(Validator &gpuav, uint32_t queue_family_i, const Location &loc) : gpuav_(gpuav) {
+CommandPool::CommandPool(Validator& gpuav, uint32_t queue_family_i, const Location& loc) : gpuav_(gpuav) {
     VkCommandPoolCreateInfo cmd_pool_ci = vku::InitStructHelper();
     cmd_pool_ci.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     cmd_pool_ci.queueFamilyIndex = queue_family_i;
@@ -626,7 +695,7 @@ CommandPool::CommandPool(Validator &gpuav, uint32_t queue_family_i, const Locati
     }
 
     fences_.resize(cmd_buf_ai.commandBufferCount);
-    for (VkFence &fence : fences_) {
+    for (VkFence& fence : fences_) {
         VkFenceCreateInfo fence_ci = vku::InitStructHelper();
         fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
         result = DispatchCreateFence(gpuav_.device, &fence_ci, nullptr, &fence);

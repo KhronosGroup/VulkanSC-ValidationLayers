@@ -16,9 +16,11 @@
 */
 
 #include <algorithm>
+#include <array>
 #include "test_icd.h"
 #include "test_icd_helper.h"
 #include <vulkan/utility/vk_format_utils.h>
+#include <vulkan/vulkan_core.h>
 #include <cstddef>
 #include <vulkan/utility/vk_struct_helper.hpp>
 
@@ -655,7 +657,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL QueueSubmit(VkQueue queue, uint32_t submit
                                                   VkFence fence) {
     // Special way to cause DEVICE_LOST
     // Picked VkExportFenceCreateInfo because needed some struct that wouldn't get cleared by validation Safe Struct
-    // ... TODO - It would be MUCH nicer to have a layer or other setting control when this occured
+    // ... TODO - It would be MUCH nicer to have a layer or other setting control when this occurred
     // For now this is used to allow Validation Layers test reacting to device losts
     if (submitCount > 0 && pSubmits) {
         auto pNext = reinterpret_cast<const VkBaseInStructure*>(pSubmits[0].pNext);
@@ -797,7 +799,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBuff
     unique_lock_t lock(global_lock);
     *pBuffer = (VkBuffer)global_unique_handle++;
     // Some address for RTX need to be aligned to 256
-    if (pCreateInfo->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT || pCreateInfo->usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) {
+    if (pCreateInfo->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT ||
+        pCreateInfo->usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) {
         const uint64_t rtx_alignment = current_available_address % 256;
         if (rtx_alignment != 0) {
             current_available_address += (256 - rtx_alignment);
@@ -913,8 +916,7 @@ static VKAPI_ATTR void VKAPI_CALL GetImageMemoryRequirements2(VkDevice device, c
 
 #ifndef VULKANSC  // Vulkan SC does not support VK_ARM_tensors
 static VKAPI_ATTR void VKAPI_CALL GetTensorMemoryRequirementsARM(VkDevice device, const VkTensorMemoryRequirementsInfoARM* pInfo,
-                                                                 VkMemoryRequirements2* pMemoryRequirements)
-{
+                                                                 VkMemoryRequirements2* pMemoryRequirements) {
     VkMemoryRequirements& memReq = pMemoryRequirements->memoryRequirements;
     memReq.size = 1024;
     memReq.alignment = 32;
@@ -1068,8 +1070,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilitiesKHR(Vk
     // In general just say max supported is available for requested surface
     pSurfaceCapabilities->minImageCount = 1;
     pSurfaceCapabilities->maxImageCount = 0;
-    pSurfaceCapabilities->currentExtent.width = 0xFFFFFFFF;
-    pSurfaceCapabilities->currentExtent.height = 0xFFFFFFFF;
+    pSurfaceCapabilities->currentExtent.width = 64;
+    pSurfaceCapabilities->currentExtent.height = 64;
     pSurfaceCapabilities->minImageExtent.width = 1;
     pSurfaceCapabilities->minImageExtent.height = 1;
     pSurfaceCapabilities->maxImageExtent.width = 0xFFFF;
@@ -1527,12 +1529,9 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFormatProperties2(VkPhysicalD
 
     if (auto* tensor_props = vku::FindStructInPNextChain<VkTensorFormatPropertiesARM>(pFormatProperties->pNext)) {
         constexpr VkFormatFeatureFlagBits2 tensor_flags =
-            VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT |
-            VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT |
-            VK_FORMAT_FEATURE_2_TENSOR_SHADER_BIT_ARM |
-            VK_FORMAT_FEATURE_2_TENSOR_SHADER_BIT_ARM |
-            VK_FORMAT_FEATURE_2_TENSOR_IMAGE_ALIASING_BIT_ARM |
-            VK_FORMAT_FEATURE_2_TENSOR_DATA_GRAPH_BIT_ARM;
+            VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT |
+            VK_FORMAT_FEATURE_2_TENSOR_SHADER_BIT_ARM | VK_FORMAT_FEATURE_2_TENSOR_SHADER_BIT_ARM |
+            VK_FORMAT_FEATURE_2_TENSOR_IMAGE_ALIASING_BIT_ARM | VK_FORMAT_FEATURE_2_TENSOR_DATA_GRAPH_BIT_ARM;
         tensor_props->linearTilingTensorFeatures = tensor_flags;
         tensor_props->optimalTilingTensorFeatures = tensor_flags;
     }
@@ -1542,7 +1541,6 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFormatProperties2(VkPhysicalD
 static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceExternalTensorPropertiesARM(
     VkPhysicalDevice physicalDevice, const VkPhysicalDeviceExternalTensorInfoARM* pExternalTensorInfo,
     VkExternalTensorPropertiesARM* pExternalTensorProperties) {
-
     constexpr VkExternalMemoryHandleTypeFlags supported_flags = VK_EXTERNAL_MEMORY_HANDLE_TYPE_FLAG_BITS_MAX_ENUM;
     if (pExternalTensorInfo->handleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID) {
         // Can't have dedicated memory with AHB
@@ -1561,6 +1559,91 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceExternalTensorPropertiesARM(
     }
 }
 #endif  // VULKANSC
+
+static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM(
+    VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, uint32_t* pQueueFamilyDataGraphPropertyCount,
+    VkQueueFamilyDataGraphPropertiesARM* pQueueFamilyDataGraphProperties) {
+    // TODO: Need a way for test to decide to support or not support various engines
+
+    if (pQueueFamilyDataGraphProperties == nullptr) {
+        *pQueueFamilyDataGraphPropertyCount = 2;
+    } else {
+        pQueueFamilyDataGraphProperties[0].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM;
+        pQueueFamilyDataGraphProperties[0].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM, false};
+        pQueueFamilyDataGraphProperties[0].operation = {
+            VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_SPIRV_EXTENDED_INSTRUCTION_SET_ARM, "TOSA.001000.1", 0};
+        pQueueFamilyDataGraphProperties[1].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM;
+        pQueueFamilyDataGraphProperties[1].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM, false};
+        pQueueFamilyDataGraphProperties[1].operation = {VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_OPTICAL_FLOW_ARM,
+                                                        "OpticalFlow", 1};
+    }
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceQueueFamilyDataGraphEngineOperationPropertiesARM(
+    VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
+    const VkQueueFamilyDataGraphPropertiesARM* pQueueFamilyDataGraphProperties, VkBaseOutStructure* pProperties) {
+    if (pProperties->sType == VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_OPTICAL_FLOW_PROPERTIES_ARM) {
+        auto* properties = reinterpret_cast<VkQueueFamilyDataGraphOpticalFlowPropertiesARM*>(pProperties);
+        properties->supportedOutputGridSizes =
+            VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_1X1_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_2X2_BIT_ARM |
+            VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_4X4_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_8X8_BIT_ARM;
+        properties->supportedHintGridSizes =
+            VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_1X1_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_2X2_BIT_ARM |
+            VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_4X4_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_8X8_BIT_ARM;
+        properties->hintSupported = VK_TRUE;
+        properties->costSupported = VK_TRUE;
+        properties->minWidth = 10;
+        properties->minHeight = 10;
+        properties->maxWidth = 10000;
+        properties->maxHeight = 10000;
+    }
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM(
+    VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
+    const VkQueueFamilyDataGraphPropertiesARM* pQueueFamilyDataGraphProperties,
+    const VkDataGraphOpticalFlowImageFormatInfoARM* pOpticalFlowImageFormatInfo, uint32_t* pFormatCount,
+    VkDataGraphOpticalFlowImageFormatPropertiesARM* pImageFormatProperties) {
+    switch (pOpticalFlowImageFormatInfo->usage) {
+        case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_INPUT_BIT_ARM: {
+            static constexpr std::array<VkFormat, 6> input_formats = {
+                VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8_UNORM,
+                VK_FORMAT_B8G8R8_UNORM,   VK_FORMAT_R8_UNORM,       VK_FORMAT_B10G11R11_UFLOAT_PACK32,
+            };
+            if (pImageFormatProperties != nullptr) {
+                for (uint32_t i = 0; i < *pFormatCount; ++i) {
+                    pImageFormatProperties[i].sType = VK_STRUCTURE_TYPE_DATA_GRAPH_OPTICAL_FLOW_IMAGE_FORMAT_PROPERTIES_ARM;
+                    pImageFormatProperties[i].format = input_formats[i];
+                }
+            } else {
+                *pFormatCount = static_cast<uint32_t>(input_formats.size());
+            }
+            break;
+        }
+        case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_OUTPUT_BIT_ARM:
+        case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_HINT_BIT_ARM:
+            if (pImageFormatProperties != nullptr) {
+                pImageFormatProperties[0].sType = VK_STRUCTURE_TYPE_DATA_GRAPH_OPTICAL_FLOW_IMAGE_FORMAT_PROPERTIES_ARM;
+                pImageFormatProperties[0].format = VK_FORMAT_R16G16_SFLOAT;
+            } else {
+                *pFormatCount = 1;
+            }
+            break;
+        case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_COST_BIT_ARM:
+            if (pImageFormatProperties != nullptr) {
+                pImageFormatProperties[0].sType = VK_STRUCTURE_TYPE_DATA_GRAPH_OPTICAL_FLOW_IMAGE_FORMAT_PROPERTIES_ARM;
+                pImageFormatProperties[0].format = VK_FORMAT_R16_UINT;
+            } else {
+                *pFormatCount = 1;
+            }
+            break;
+        default:
+            break;
+    }
+    return VK_SUCCESS;
+}
 
 static VKAPI_ATTR VkResult VKAPI_CALL
 GetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2* pImageFormatInfo,
@@ -1690,6 +1773,11 @@ static VKAPI_ATTR VkResult VKAPI_CALL EnumeratePhysicalDeviceGroups(
         pPhysicalDeviceGroupProperties->subsetAllocation = VK_FALSE;
     }
     return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL GetDeviceFaultReportsKHR(VkDevice device, uint64_t timeout, uint32_t* pFaultCounts,
+                                                               VkDeviceFaultInfoKHR* pFaultInfo) {
+    return timeout == 0 ? VK_SUCCESS : VK_TIMEOUT;
 }
 
 #ifndef VULKANSC  // Vulkan SC does not support these platform APIs
@@ -1912,6 +2000,25 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixProperti
 #endif  // VULKANSC
 
 #ifndef VULKANSC  // Vulkan SC does not support VK_NV_cooperative_vector
+static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(
+    VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkCooperativeMatrixFlexibleDimensionsPropertiesNV* pProperties) {
+    if (!pProperties) {
+        *pPropertyCount = 1;
+    } else if (*pPropertyCount >= 1) {
+        pProperties[0].MGranularity = 16;
+        pProperties[0].NGranularity = 16;
+        pProperties[0].KGranularity = 16;
+        pProperties[0].AType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[0].BType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[0].CType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[0].ResultType = VK_COMPONENT_TYPE_FLOAT16_KHR;
+        pProperties[0].saturatingAccumulation = VK_FALSE;
+        pProperties[0].scope = VK_SCOPE_WORKGROUP_KHR;
+        pProperties[0].workgroupInvocations = 64;
+    }
+    return VK_SUCCESS;
+}
+
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeVectorPropertiesNV(VkPhysicalDevice physicalDevice,
                                                                                      uint32_t* pPropertyCount,
                                                                                      VkCooperativeVectorPropertiesNV* pProperties) {
@@ -2099,13 +2206,17 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPipelineBinaryDataKHR(VkDevice device, 
 static VKAPI_ATTR void VKAPI_CALL GetPartitionedAccelerationStructuresBuildSizesNV(VkDevice device,
                                                                                     const VkPartitionedAccelerationStructureInstancesInputNV* pInfo,
                                                                                     VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) {
+static VKAPI_ATTR void VKAPI_CALL
+GetPartitionedAccelerationStructuresBuildSizesNV(VkDevice device, const VkPartitionedAccelerationStructureInstancesInputNV* pInfo,
+                                                 VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) {
     // value from real running test
     pSizeInfo->accelerationStructureSize = 1062400;
     pSizeInfo->updateScratchSize = 4;
     pSizeInfo->buildScratchSize = 388480;
 }
 
-static VKAPI_ATTR void VKAPI_CALL GetClusterAccelerationStructureBuildSizesNV(VkDevice device, const VkClusterAccelerationStructureInputInfoNV* pInfo, VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo){
+static VKAPI_ATTR void VKAPI_CALL GetClusterAccelerationStructureBuildSizesNV(
+    VkDevice device, const VkClusterAccelerationStructureInputInfoNV* pInfo, VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) {
     pSizeInfo->accelerationStructureSize = 256;
     pSizeInfo->buildScratchSize = 256;
     pSizeInfo->updateScratchSize = 4;

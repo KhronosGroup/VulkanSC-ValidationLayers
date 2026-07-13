@@ -1,6 +1,6 @@
-/* Copyright (c) 2025 The Khronos Group Inc.
- * Copyright (c) 2025 Valve Corporation
- * Copyright (c) 2025 LunarG, Inc.
+/* Copyright (c) 2025-2026 The Khronos Group Inc.
+ * Copyright (c) 2025-2026 Valve Corporation
+ * Copyright (c) 2025-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,9 +33,9 @@ static VkAccessFlags2 ExpandAccessFlags(VkAccessFlags2 access_mask) {
 }
 
 template <typename Flags, typename Map>
-static SyncAccessFlags AccessScopeImpl(Flags flag_mask, const Map &map) {
+static SyncAccessFlags AccessScopeImpl(Flags flag_mask, const Map& map) {
     SyncAccessFlags scope;
-    for (const auto &[flag_bits2, sync_access_flags] : map) {
+    for (const auto& [flag_bits2, sync_access_flags] : map) {
         if (flag_mask < flag_bits2) {
             break;
         }
@@ -68,32 +68,7 @@ static SyncAccessFlags AccessScopeByAccess(VkAccessFlags2 accesses) {
     return sync_accesses;
 }
 
-static VkPipelineStageFlags2 RelatedPipelineStages(
-    VkPipelineStageFlags2 stage_mask,
-    const vvl::unordered_map<VkPipelineStageFlagBits2, VkPipelineStageFlags2> &earlier_or_later_stages) {
-    VkPipelineStageFlags2 unscanned = stage_mask;
-    VkPipelineStageFlags2 related = 0;
-    for (const auto &[stage, related_stages] : earlier_or_later_stages) {
-        if (stage & unscanned) {
-            related |= related_stages;
-            unscanned &= ~stage;
-            if (!unscanned) {
-                break;
-            }
-        }
-    }
-    return related;
-}
-
-static VkPipelineStageFlags2 WithEarlierPipelineStages(VkPipelineStageFlags2 stage_mask) {
-    return stage_mask | RelatedPipelineStages(stage_mask, syncLogicallyEarlierStages());
-}
-
-static VkPipelineStageFlags2 WithLaterPipelineStages(VkPipelineStageFlags2 stage_mask) {
-    return stage_mask | RelatedPipelineStages(stage_mask, syncLogicallyLaterStages());
-}
-
-static SyncAccessFlags AccessScope(const SyncAccessFlags &stage_scope, VkAccessFlags2 accesses) {
+static SyncAccessFlags AccessScope(const SyncAccessFlags& stage_scope, VkAccessFlags2 accesses) {
     SyncAccessFlags access_scope = stage_scope & AccessScopeByAccess(accesses);
 
     // Special case. AS copy operations (e.g., vkCmdCopyAccelerationStructureKHR) can be synchronized using
@@ -112,95 +87,111 @@ static SyncAccessFlags AccessScope(const SyncAccessFlags &stage_scope, VkAccessF
 
 namespace syncval {
 
-SyncExecScope SyncExecScope::MakeSrc(VkQueueFlags queue_flags, VkPipelineStageFlags2 mask_param,
+SyncExecScope SyncExecScope::MakeSrc(VkQueueFlags queue_flags, VkPipelineStageFlags2 stage_mask,
                                      VkPipelineStageFlags2 disabled_feature_mask) {
-    const VkPipelineStageFlags2 expanded_mask = sync_utils::ExpandPipelineStages(mask_param, queue_flags, disabled_feature_mask);
+    const VkPipelineStageFlags2 expanded_mask = sync_utils::ExpandPipelineStages(stage_mask, queue_flags, disabled_feature_mask);
 
     SyncExecScope result;
-    result.mask_param = mask_param;
-    result.exec_scope = WithEarlierPipelineStages(expanded_mask);
-    result.valid_accesses = AccessScopeByStage(expanded_mask);
+    result.stage_mask = stage_mask;
+    result.exec_scope = sync_utils::AddEarlierPipelineStages(expanded_mask);
+    result.stage_mask_accesses = AccessScopeByStage(expanded_mask);
+    result.exec_scope_accesses = AccessScopeByStage(result.exec_scope);
 
-    // ALL_COMMANDS stage includes all accesses performed by the gpu, not only accesses defined by the stages
-    if (mask_param & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT) {
-        result.valid_accesses |= SYNC_IMAGE_LAYOUT_TRANSITION_BIT;
+    // ALL_COMMANDS stage includes all operations performed by the gpu, not only operations that run on the stages.
+    // BOTTOM_OF_PIPE has no accesses of its own, so does not add to stage_mask_accesses, but in the context of
+    // semaphoer scopes it adds to exec_scope_accesses
+    if (stage_mask & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT) {
+        result.stage_mask_accesses |= SYNC_IMAGE_LAYOUT_TRANSITION_BIT;
+    }
+    if (stage_mask & (VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT)) {
+        result.exec_scope_accesses |= SYNC_IMAGE_LAYOUT_TRANSITION_BIT;
     }
     return result;
 }
 
-SyncExecScope SyncExecScope::MakeDst(VkQueueFlags queue_flags, VkPipelineStageFlags2 mask_param) {
-    const VkPipelineStageFlags2 expanded_mask = sync_utils::ExpandPipelineStages(mask_param, queue_flags);
+SyncExecScope SyncExecScope::MakeDst(VkQueueFlags queue_flags, VkPipelineStageFlags2 stage_mask) {
+    const VkPipelineStageFlags2 expanded_mask = sync_utils::ExpandPipelineStages(stage_mask, queue_flags);
 
     SyncExecScope result;
-    result.mask_param = mask_param;
-    result.exec_scope = WithLaterPipelineStages(expanded_mask);
-    result.valid_accesses = AccessScopeByStage(expanded_mask);
+    result.stage_mask = stage_mask;
+    result.exec_scope = sync_utils::AddLaterPipelineStages(expanded_mask);
+    result.stage_mask_accesses = AccessScopeByStage(expanded_mask);
+    result.exec_scope_accesses = AccessScopeByStage(result.exec_scope);
 
-    // ALL_COMMANDS stage includes all accesses performed by the gpu, not only accesses defined by the stages
-    if (mask_param & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT) {
-        result.valid_accesses |= SYNC_IMAGE_LAYOUT_TRANSITION_BIT;
+    // ALL_COMMANDS stage includes all accesses performed by the gpu, not only accesses defined by the stages.
+    // TOP_OF_PIPE has no accesses of its own, so does not add to stage_mask_accesses, but in the context of
+    // semaphore scopes it adds to exec_scope_accesses
+    if (stage_mask & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT) {
+        result.stage_mask_accesses |= SYNC_IMAGE_LAYOUT_TRANSITION_BIT;
+    }
+    if (stage_mask & (VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT)) {
+        result.exec_scope_accesses |= SYNC_IMAGE_LAYOUT_TRANSITION_BIT;
     }
     return result;
 }
 
-bool SyncExecScope::operator==(const SyncExecScope &other) const {
-    return mask_param == other.mask_param && exec_scope == other.exec_scope && valid_accesses == other.valid_accesses;
+bool SyncExecScope::operator==(const SyncExecScope& other) const {
+    // Check that the fields are packed without gaps so we can use fast memcmp.
+    // If not true, switch to memberwise compare
+    static_assert(sizeof(SyncExecScope) == 64, "Gap detected, use memberwise compare");
+    return memcmp(this, &other, sizeof(SyncExecScope)) == 0;
 }
 
 size_t SyncExecScope::Hash() const {
     hash_util::HashCombiner hc;
-    hc << mask_param;
+    hc << stage_mask;
     hc << exec_scope;
-    valid_accesses.HashCombine(hc);
+    stage_mask_accesses.HashCombine(hc);
+    exec_scope_accesses.HashCombine(hc);
     return hc.Value();
 }
 
-SyncBarrier::SyncBarrier(const SyncExecScope &src_exec, const SyncExecScope &dst_exec)
+SyncBarrier::SyncBarrier(const SyncExecScope& src_exec, const SyncExecScope& dst_exec)
     : src_exec_scope(src_exec), dst_exec_scope(dst_exec) {}
 
-SyncBarrier::SyncBarrier(const SyncExecScope &src_exec, const SyncExecScope &dst_exec, const SyncBarrier::AllAccess &)
+SyncBarrier::SyncBarrier(const SyncExecScope& src_exec, const SyncExecScope& dst_exec, const SyncBarrier::AllAccess&)
     : src_exec_scope(src_exec),
-      src_access_scope(src_exec.valid_accesses),
+      src_access_scope(src_exec.exec_scope_accesses),
       dst_exec_scope(dst_exec),
-      dst_access_scope(dst_exec.valid_accesses) {}
+      dst_access_scope(dst_exec.exec_scope_accesses) {}
 
-SyncBarrier::SyncBarrier(const SyncExecScope &src_exec, VkAccessFlags2 src_access_mask, const SyncExecScope &dst_exec,
+SyncBarrier::SyncBarrier(const SyncExecScope& src_exec, VkAccessFlags2 src_access_mask, const SyncExecScope& dst_exec,
                          VkAccessFlags2 dst_access_mask)
     : src_exec_scope(src_exec),
-      src_access_scope(AccessScope(src_exec.valid_accesses, src_access_mask)),
+      src_access_scope(AccessScope(src_exec.stage_mask_accesses, src_access_mask)),
       original_src_access(src_access_mask),
       dst_exec_scope(dst_exec),
-      dst_access_scope(AccessScope(dst_exec.valid_accesses, dst_access_mask)),
+      dst_access_scope(AccessScope(dst_exec.stage_mask_accesses, dst_access_mask)),
       original_dst_access(dst_access_mask) {}
 
-SyncBarrier::SyncBarrier(VkQueueFlags queue_flags, const VkSubpassDependency2 &subpass) {
+SyncBarrier::SyncBarrier(VkQueueFlags queue_flags, const VkSubpassDependency2& subpass) {
     const auto barrier = vku::FindStructInPNextChain<VkMemoryBarrier2>(subpass.pNext);
     if (barrier) {
         auto src = SyncExecScope::MakeSrc(queue_flags, barrier->srcStageMask);
         src_exec_scope = src;
-        src_access_scope = AccessScope(src.valid_accesses, barrier->srcAccessMask);
+        src_access_scope = AccessScope(src.stage_mask_accesses, barrier->srcAccessMask);
         original_src_access = barrier->srcAccessMask;
 
         auto dst = SyncExecScope::MakeDst(queue_flags, barrier->dstStageMask);
         dst_exec_scope = dst;
-        dst_access_scope = AccessScope(dst.valid_accesses, barrier->dstAccessMask);
+        dst_access_scope = AccessScope(dst.stage_mask_accesses, barrier->dstAccessMask);
         original_dst_access = barrier->dstAccessMask;
     } else {
         auto src = SyncExecScope::MakeSrc(queue_flags, subpass.srcStageMask);
         src_exec_scope = src;
-        src_access_scope = AccessScope(src.valid_accesses, subpass.srcAccessMask);
+        src_access_scope = AccessScope(src.stage_mask_accesses, subpass.srcAccessMask);
         original_src_access = subpass.srcAccessMask;
 
         auto dst = SyncExecScope::MakeDst(queue_flags, subpass.dstStageMask);
         dst_exec_scope = dst;
-        dst_access_scope = AccessScope(dst.valid_accesses, subpass.dstAccessMask);
+        dst_access_scope = AccessScope(dst.stage_mask_accesses, subpass.dstAccessMask);
         original_dst_access = subpass.dstAccessMask;
     }
 }
 
-SyncBarrier::SyncBarrier(const std::vector<SyncBarrier> &barriers) {
+SyncBarrier::SyncBarrier(const std::vector<SyncBarrier>& barriers) {
     // Merge each barrier
-    for (const SyncBarrier &barrier : barriers) {
+    for (const SyncBarrier& barrier : barriers) {
         // Note that after merge, only the exec_scope and access_scope fields are fully valid
         // TODO: Do we need to update any of the other fields?  Merging has limited application.
         src_exec_scope.exec_scope |= barrier.src_exec_scope.exec_scope;
@@ -210,7 +201,7 @@ SyncBarrier::SyncBarrier(const std::vector<SyncBarrier> &barriers) {
     }
 }
 
-bool SyncBarrier::operator==(const SyncBarrier &other) const {
+bool SyncBarrier::operator==(const SyncBarrier& other) const {
     return (src_exec_scope == other.src_exec_scope) && (src_access_scope == other.src_access_scope) &&
            (dst_exec_scope == other.dst_exec_scope) && (dst_access_scope == other.dst_access_scope);
 }

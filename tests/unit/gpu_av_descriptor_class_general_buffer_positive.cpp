@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2020-2025 The Khronos Group Inc.
- * Copyright (c) 2020-2025 Valve Corporation
- * Copyright (c) 2020-2025 LunarG, Inc.
- * Copyright (c) 2020-2025 Google, Inc.
+ * Copyright (c) 2020-2026 The Khronos Group Inc.
+ * Copyright (c) 2020-2026 Valve Corporation
+ * Copyright (c) 2020-2026 LunarG, Inc.
+ * Copyright (c) 2020-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 
 class PositiveGpuAVDescriptorClassGeneralBuffer : public GpuAVDescriptorClassGeneralBuffer {};
 
-void GpuAVDescriptorClassGeneralBuffer::ComputeStorageBufferTest(const char *shader, int source_type, VkDeviceSize buffer_size,
-                                                                 const char *expected_error, uint32_t error_count) {
+void GpuAVDescriptorClassGeneralBuffer::ComputeStorageBufferTest(const char* shader, int source_type, VkDeviceSize buffer_size,
+                                                                 const char* expected_error, uint32_t error_count) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
@@ -104,7 +104,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, Basic) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    uint32_t *data = (uint32_t *)offset_buffer.Memory().Map();
+    uint32_t* data = (uint32_t*)offset_buffer.Memory().Map();
     *data = 1;
     m_default_queue->SubmitAndWait(m_command_buffer);
 
@@ -178,7 +178,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, GPL) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    uint32_t *data = (uint32_t *)offset_buffer.Memory().Map();
+    uint32_t* data = (uint32_t*)offset_buffer.Memory().Map();
     *data = 1;
     m_default_queue->SubmitAndWait(m_command_buffer);
 
@@ -209,7 +209,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, GPLNonInlined) {
     descriptor_set.WriteDescriptorBufferInfo(1, write_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
-    uint32_t *offset_buffer_ptr = (uint32_t *)offset_buffer.Memory().Map();
+    uint32_t* offset_buffer_ptr = (uint32_t*)offset_buffer.Memory().Map();
     *offset_buffer_ptr = 8;
 
     const char vertshader[] = R"glsl(
@@ -308,16 +308,16 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, GPLFragmentIndependentSets) {
     fragment_set.UpdateDescriptorSets();
 
     {
-        vvl::span<uint32_t> vert_data(static_cast<uint32_t *>(vs_buffer.Memory().Map()),
+        vvl::span<uint32_t> vert_data(static_cast<uint32_t*>(vs_buffer.Memory().Map()),
                                       static_cast<uint32_t>(buffer_size) / sizeof(uint32_t));
-        for (auto &v : vert_data) {
+        for (auto& v : vert_data) {
             v = 0x01030507;
         }
     }
     {
-        vvl::span<uint32_t> frag_data(static_cast<uint32_t *>(fs_buffer.Memory().Map()),
+        vvl::span<uint32_t> frag_data(static_cast<uint32_t*>(fs_buffer.Memory().Map()),
                                       static_cast<uint32_t>(buffer_size) / sizeof(uint32_t));
-        for (auto &v : frag_data) {
+        for (auto& v : frag_data) {
             v = 0x02040608;
         }
     }
@@ -431,7 +431,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, VertexFragmentMultiEntrypoint)
     // void frag_main() {
     //     data[4] = index[0];
     // }
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Fragment %frag_main "frag_main" %c_out
@@ -549,7 +549,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, PartialBoundDescriptorSSBO) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer foo {
             vec4 a; // offset 0
@@ -591,7 +591,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, PartialBoundDescriptorSSBOUpda
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer foo {
             vec4 a; // offset 0
@@ -633,7 +633,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, PartialBoundDescriptorBuffer) 
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer foo {
             vec4 a; // offset 0
@@ -675,7 +675,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, PartialBoundDescriptorCopy) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer foo {
             vec4 a; // offset 0
@@ -763,14 +763,14 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, RobustBuffer) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    uint32_t *data = (uint32_t *)offset_buffer.Memory().Map();
+    uint32_t* data = (uint32_t*)offset_buffer.Memory().Map();
     *data = 8;
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, VectorArray) {
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer foo {
             uvec4 a[8]; // stride 16
@@ -784,7 +784,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, VectorArray) {
 }
 
 TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, ArrayCopyGLSL) {
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer foo {
             uvec4 a;
@@ -805,7 +805,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, ArrayCopySlang) {
 
     RETURN_IF_SKIP(CheckSlangSupport());
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         struct Bar {
             uint4 a;
             uint b[4];
@@ -833,7 +833,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, ArrayStrideEnd) {
     // void main() {
     //     x[3] = 0;
     // }
-    const char *cs_source = R"(
+    const char* cs_source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main" %_
@@ -872,7 +872,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, ArrayCopyTwoBindingsGLSL) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0, std430) buffer foo1 {
             uvec4 a;
@@ -921,7 +921,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, ArrayCopyTwoBindingsSlang) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         struct Bar1 {
             uint4 a;
             uint b[4];
@@ -968,7 +968,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, ArrayCopyTwoBindingsSlang) {
 }
 
 TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, StructCopyGLSL) {
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
 
         struct Bar {
@@ -991,7 +991,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, StructCopyGLSL) {
     ComputeStorageBufferTest(cs_source, SPV_SOURCE_GLSL, 32);
 }
 TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, StructCopyGLSL2) {
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
 
         struct Bar {
@@ -1013,7 +1013,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, StructCopyGLSL2) {
 }
 
 TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, StructCopyGLSL3) {
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
 
         struct Bar2 {
@@ -1043,7 +1043,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, StructCopyGLSL3) {
 TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, StructCopySlang) {
     RETURN_IF_SKIP(CheckSlangSupport());
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         struct Bar {
           uint x;
           uint y;
@@ -1073,7 +1073,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, ChainOfAccessChains) {
 
     RETURN_IF_SKIP(CheckSlangSupport());
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         struct Bar {
             uint a;
             uint d[4];
@@ -1091,7 +1091,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, ChainOfAccessChains) {
 }
 
 TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, Atomics) {
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0, std430) buffer foo {
@@ -1114,7 +1114,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, AtomicsDescriptorIndex) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0, std430) buffer SSBO {
@@ -1164,7 +1164,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, AtomicsDescriptorIndexDescript
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0, std430) buffer SSBO {
@@ -1207,7 +1207,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, AtomicsDescriptorIndexDescript
 
     vkt::Buffer descriptor_buffer(*m_device, 4096, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
 
-    uint8_t *descriptor_data = reinterpret_cast<uint8_t *>(descriptor_buffer.Memory().Map());
+    uint8_t* descriptor_data = reinterpret_cast<uint8_t*>(descriptor_buffer.Memory().Map());
     VkDeviceSize buffer_offset = ds_layout.GetDescriptorBufferBindingOffset(0);
 
     vkt::DescriptorGetInfo buffer_get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, in_buffer, in_buffer.CreateInfo().size);
@@ -1240,7 +1240,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, DescriptorIndexSlang) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         struct Bar {
           uint4 a;
           uint b[4];
@@ -1282,7 +1282,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, OpArrayLength) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -1328,7 +1328,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, OpArrayLength) {
 }
 
 TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, Loops) {
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer Input {
             uint result;
@@ -1357,7 +1357,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, Loops) {
 }
 
 TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, LoopsEarlyBranch) {
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer Input {
             uint result;
@@ -1392,12 +1392,12 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, MeshTaskIndirect) {
 
     vkt::Buffer draw_buffer(*m_device, sizeof(VkDrawMeshTasksIndirectCommandEXT), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                             kHostVisibleMemProps);
-    auto *draw_ptr = static_cast<VkDrawMeshTasksIndirectCommandEXT *>(draw_buffer.Memory().Map());
+    auto* draw_ptr = static_cast<VkDrawMeshTasksIndirectCommandEXT*>(draw_buffer.Memory().Map());
     draw_ptr->groupCountX = 1;
     draw_ptr->groupCountY = 1;
     draw_ptr->groupCountZ = 1;
 
-    const char *task_source = R"glsl(
+    const char* task_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         taskPayloadSharedEXT uint payload;
@@ -1415,7 +1415,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, MeshTaskIndirect) {
         }
     )glsl";
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
@@ -1437,7 +1437,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, MeshTaskIndirect) {
         }
     )glsl";
 
-    const char *frag_source = R"glsl(
+    const char* frag_source = R"glsl(
         #version 460
         layout(location = 0) out vec4 uFragColor;
         layout(set = 0, binding = 2) readonly uniform UBO {
@@ -1583,5 +1583,240 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, InternalPipelineLayoutSelectio
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, SpecConstant) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout(constant_id = 0) const int INDEX = 7;
+        layout(set = 0, binding = 0) buffer foo {
+            uint a[8]; // 32 bytes
+        };
+        void main() {
+            a[INDEX] = 44;
+        }
+    )glsl";
+
+    uint32_t data = 2;
+    VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
+    VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    pipe.cs_ =
+        VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_GLSL, &specialization_info);
+    pipe.CreateComputePipeline();
+
+    vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, SpecConstantOp) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const char* cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_explicit_arithmetic_types_int64 : enable
+        layout(constant_id = 0) const uint64_t X = 1;
+        layout(constant_id = 1) const bool Y = false;
+        layout(constant_id = 2) const uint BAD = 16;
+        #define Z (X == 1 || X == 2 || X == 3)
+
+        layout(set = 0, binding = 0) buffer foo {
+            uint a[8]; // 32 bytes
+        };
+        void main() {
+            const uint i = Z ? BAD : 1;
+            const uint k = Y ? 1 : BAD;
+            a[i] = 1;
+            a[k] = 2;
+        }
+    )glsl";
+
+    uint64_t data[2] = {/*X*/ 4, /*Y*/ 1};
+    VkSpecializationMapEntry entries[2] = {{0, 0, sizeof(uint64_t)}, {1, sizeof(uint64_t), sizeof(VkBool32)}};
+    VkSpecializationInfo specialization_info = {2, entries, sizeof(uint64_t) * 2, &data};
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    pipe.cs_ =
+        VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_GLSL, &specialization_info);
+    pipe.CreateComputePipeline();
+
+    vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, SpecConstantOpVector) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderInt16);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const char* cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_explicit_arithmetic_types_int16 : enable
+
+        layout(constant_id = 0) const int16_t val = 4s;
+        const i16vec2 x = i16vec2(val, val);
+        const i16vec2 y = x * x;
+
+        layout(set = 0, binding = 0) buffer foo {
+            uint a[8]; // 32 bytes
+        };
+        void main() {
+            int16_t b = y[0];
+            a[b] = 1;
+        }
+    )glsl";
+
+    uint16_t data = 1;
+    VkSpecializationMapEntry entry = {0, 0, sizeof(uint16_t)};
+    VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint16_t), &data};
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    pipe.cs_ =
+        VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_GLSL, &specialization_info);
+    pipe.CreateComputePipeline();
+
+    vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVDescriptorClassGeneralBuffer, BloomDownsampleSlangPushDescriptor) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11738");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
+    AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
+    AddRequiredFeature(vkt::Feature::shaderStorageImageReadWithoutFormat);
+    AddRequiredFeature(vkt::Feature::shaderStorageImageWriteWithoutFormat);
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const char* shader_source_1 = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer SSBO0 { uint x[]; };
+        layout(set = 1, binding = 0) buffer SSBO1 { uint y[]; };
+        void main() {
+            x[3] = 0;
+            y[3] = 0; // need 16 bytes
+        }
+    )glsl";
+
+    const char* shader_source_2 = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer SSBO0 { uint x[]; };
+        layout(set = 1, binding = 0) buffer SSBO1 { uint y[]; };
+        void main() {
+            x[3] = 0;
+            y[0] = 0; // only need 4 bytes
+        }
+    )glsl";
+
+    vkt::Buffer ssbo_0(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    vkt::Buffer ssbo_1_full_bound(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    vkt::Buffer ssbo_1_partial_bound(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
+    name_info.objectType = VK_OBJECT_TYPE_BUFFER;
+    name_info.pObjectName = "ssbo_0";
+    name_info.objectHandle = uint64_t(ssbo_0.handle());
+    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
+
+    name_info.pObjectName = "ssbo_1_full_bound";
+    name_info.objectHandle = uint64_t(ssbo_1_full_bound.handle());
+    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
+
+    name_info.pObjectName = "ssbo_1_partial_bound";
+    name_info.objectHandle = uint64_t(ssbo_1_partial_bound.handle());
+    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
+
+    OneOffDescriptorSet descriptor_set0(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    OneOffDescriptorSet descriptor_set1(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}},
+                                        VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set0.layout_, &descriptor_set1.layout_});
+    descriptor_set0.WriteDescriptorBufferInfo(0, ssbo_0, 0, 32, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set0.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe_1(*this);
+    pipe_1.cp_ci_.layout = pipeline_layout;
+    pipe_1.cs_ = VkShaderObj(*m_device, shader_source_1, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3);
+    pipe_1.CreateComputePipeline();
+    CreateComputePipelineHelper pipe_2(*this);
+    pipe_2.cp_ci_.layout = pipeline_layout;
+    pipe_2.cs_ = VkShaderObj(*m_device, shader_source_2, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3);
+    pipe_2.CreateComputePipeline();
+
+    VkWriteDescriptorSet push_write = vku::InitStructHelper();
+    push_write.dstBinding = 0;
+    push_write.dstArrayElement = 0;
+    push_write.descriptorCount = 1;
+    push_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    VkDescriptorBufferInfo buffer_info = {ssbo_1_full_bound, 0, 32};
+    push_write.pBufferInfo = &buffer_info;
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set0.set_, 0,
+                              nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_1);
+    vk::CmdPushDescriptorSetKHR(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 1, 1, &push_write);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+
+    m_command_buffer.FullMemoryBarrier();
+
+    // Only bind the needed 4 bytes for "y[0]"
+    buffer_info = {ssbo_1_partial_bound, 0, 4};
+    push_write.pBufferInfo = &buffer_info;
+
+    // Binds set 0 the same
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set0.set_, 0,
+                              nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_2);
+    vk::CmdPushDescriptorSetKHR(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 1, 1, &push_write);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+
+    m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
 }

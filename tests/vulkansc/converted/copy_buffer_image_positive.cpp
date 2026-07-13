@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +16,7 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 class PositiveCopyBufferImage : public VkLayerTest {};
 
@@ -1747,7 +1747,7 @@ TEST_F(PositiveCopyBufferImage, MemoryIndirect) {
     const VkDeviceSize buffer_size = sizeof(cmds);
 
     vkt::Buffer indirect_buffer(*m_device, buffer_size, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
-    void *indirect_buffer_data = indirect_buffer.Memory().Map();
+    void* indirect_buffer_data = indirect_buffer.Memory().Map();
     memcpy(indirect_buffer_data, cmds, buffer_size);
 
     VkStridedDeviceAddressRangeKHR address_range = {};
@@ -1791,7 +1791,7 @@ TEST_F(PositiveCopyBufferImage, MemoryToImageIndirect) {
     VkCopyMemoryToImageIndirectCommandKHR cmds[2] = {cmd1, cmd2};
 
     vkt::Buffer indirect_buffer(*m_device, sizeof(cmds), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
-    void *indirect_buffer_data = indirect_buffer.Memory().Map();
+    void* indirect_buffer_data = indirect_buffer.Memory().Map();
     memcpy(indirect_buffer_data, cmds, sizeof(cmds));
 
     VkImageSubresourceLayers res_layer = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};

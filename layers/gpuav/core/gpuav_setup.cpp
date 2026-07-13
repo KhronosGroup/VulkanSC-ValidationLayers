@@ -24,7 +24,7 @@
 #include "chassis/dispatch_object.h"
 #include "gpuav/core/gpuav.h"
 #include "gpuav/core/gpuav_constants.h"
-#include "gpuav/instrumentation/descriptor_checks.h"
+#include "gpuav/instrumentation/descriptor_checks_classic.h"
 #include "gpuav/resources/gpuav_state_trackers.h"
 #include "gpuav/shaders/gpuav_error_header.h"
 #include "gpuav/shaders/gpuav_shaders_constants.h"
@@ -36,89 +36,89 @@ namespace gpuav {
 // Location to add per-queue submit debug info if built with -D DEBUG_CAPTURE_KEYBOARD=ON
 void Validator::DebugCapture() {}
 
-void Validator::Created(vvl::DescriptorSet &set) {
+void Validator::Created(vvl::DescriptorSet& set) {
     set.SetSubState(container_type, std::make_unique<DescriptorSetSubState>(set, *this));
 }
 
-void Validator::Created(vvl::CommandBuffer &cb_state) {
+void Validator::Created(vvl::CommandBuffer& cb_state) {
     cb_state.SetSubState(container_type, std::make_unique<CommandBufferSubState>(*this, cb_state));
 }
 
-void Validator::Created(vvl::Queue &queue) { queue.SetSubState(container_type, std::make_unique<QueueSubState>(*this, queue)); }
+void Validator::Created(vvl::Queue& queue) { queue.SetSubState(container_type, std::make_unique<QueueSubState>(*this, queue)); }
 
-void Validator::Created(vvl::Image &obj) {
-    DescriptorHeap &desc_heap = shared_resources_cache.Get<DescriptorHeap>();
-    obj.SetSubState(container_type, std::make_unique<ImageSubState>(obj, desc_heap));
+void Validator::Created(vvl::Image& obj) {
+    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
+    obj.SetSubState(container_type, std::make_unique<ImageSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::ImageView &obj) {
-    DescriptorHeap &desc_heap = shared_resources_cache.Get<DescriptorHeap>();
-    obj.SetSubState(container_type, std::make_unique<ImageViewSubState>(obj, desc_heap));
+void Validator::Created(vvl::ImageView& obj) {
+    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
+    obj.SetSubState(container_type, std::make_unique<ImageViewSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::Buffer &obj) {
-    DescriptorHeap &desc_heap = shared_resources_cache.Get<DescriptorHeap>();
-    obj.SetSubState(container_type, std::make_unique<BufferSubState>(obj, desc_heap));
+void Validator::Created(vvl::Buffer& obj) {
+    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
+    obj.SetSubState(container_type, std::make_unique<BufferSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::BufferView &obj) {
-    DescriptorHeap &desc_heap = shared_resources_cache.Get<DescriptorHeap>();
-    obj.SetSubState(container_type, std::make_unique<BufferViewSubState>(obj, desc_heap));
+void Validator::Created(vvl::BufferView& obj) {
+    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
+    obj.SetSubState(container_type, std::make_unique<BufferViewSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::Sampler &obj) {
-    DescriptorHeap &desc_heap = shared_resources_cache.Get<DescriptorHeap>();
-    obj.SetSubState(container_type, std::make_unique<SamplerSubState>(obj, desc_heap));
+void Validator::Created(vvl::Sampler& obj) {
+    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
+    obj.SetSubState(container_type, std::make_unique<SamplerSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::AccelerationStructureNV &obj) {
-    DescriptorHeap &desc_heap = shared_resources_cache.Get<DescriptorHeap>();
-    obj.SetSubState(container_type, std::make_unique<AccelerationStructureNVSubState>(obj, desc_heap));
+void Validator::Created(vvl::AccelerationStructureNV& obj) {
+    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
+    obj.SetSubState(container_type, std::make_unique<AccelerationStructureNVSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::AccelerationStructureKHR &obj) {
-    DescriptorHeap &desc_heap = shared_resources_cache.Get<DescriptorHeap>();
-    obj.SetSubState(container_type, std::make_unique<AccelerationStructureKHRSubState>(obj, desc_heap));
+void Validator::Created(vvl::AccelerationStructureKHR& obj) {
+    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
+    obj.SetSubState(container_type, std::make_unique<AccelerationStructureKHRSubState>(*this, obj, desc_id_pool));
 }
-void Validator::Created(vvl::Tensor &obj) {
-    DescriptorHeap &desc_heap = shared_resources_cache.Get<DescriptorHeap>();
-    obj.SetSubState(container_type, std::make_unique<TensorSubState>(obj, desc_heap));
+void Validator::Created(vvl::Tensor& obj) {
+    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
+    obj.SetSubState(container_type, std::make_unique<TensorSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::TensorView &obj) {
-    DescriptorHeap &desc_heap = shared_resources_cache.Get<DescriptorHeap>();
-    obj.SetSubState(container_type, std::make_unique<TensorViewSubState>(obj, desc_heap));
+void Validator::Created(vvl::TensorView& obj) {
+    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
+    obj.SetSubState(container_type, std::make_unique<TensorViewSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::ShaderObject &obj) { obj.SetSubState(container_type, std::make_unique<ShaderObjectSubState>(obj)); }
+void Validator::Created(vvl::ShaderObject& obj) { obj.SetSubState(container_type, std::make_unique<ShaderObjectSubState>(obj)); }
 
-void Validator::Created(vvl::Pipeline &obj) { obj.SetSubState(container_type, std::make_unique<PipelineSubState>(*this, obj)); }
+void Validator::Created(vvl::Pipeline& obj) { obj.SetSubState(container_type, std::make_unique<PipelineSubState>(*this, obj)); }
 
 // Trampolines to make VMA call Dispatch for Vulkan calls
-static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL gpuVkGetInstanceProcAddr(VkInstance inst, const char *name) {
+static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL gpuVkGetInstanceProcAddr(VkInstance inst, const char* name) {
     return DispatchGetInstanceProcAddr(inst, name);
 }
-static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL gpuVkGetDeviceProcAddr(VkDevice dev, const char *name) {
+static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL gpuVkGetDeviceProcAddr(VkDevice dev, const char* name) {
     return DispatchGetDeviceProcAddr(dev, name);
 }
 static VKAPI_ATTR void VKAPI_CALL gpuVkGetPhysicalDeviceProperties(VkPhysicalDevice physicalDevice,
-                                                                   VkPhysicalDeviceProperties *pProperties) {
+                                                                   VkPhysicalDeviceProperties* pProperties) {
     DispatchGetPhysicalDeviceProperties(physicalDevice, pProperties);
 }
 static VKAPI_ATTR void VKAPI_CALL gpuVkGetPhysicalDeviceMemoryProperties(VkPhysicalDevice physicalDevice,
-                                                                         VkPhysicalDeviceMemoryProperties *pMemoryProperties) {
+                                                                         VkPhysicalDeviceMemoryProperties* pMemoryProperties) {
     DispatchGetPhysicalDeviceMemoryProperties(physicalDevice, pMemoryProperties);
 }
-static VKAPI_ATTR VkResult VKAPI_CALL gpuVkAllocateMemory(VkDevice device, const VkMemoryAllocateInfo *pAllocateInfo,
-                                                          const VkAllocationCallbacks *pAllocator, VkDeviceMemory *pMemory) {
+static VKAPI_ATTR VkResult VKAPI_CALL gpuVkAllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
+                                                          const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory) {
     return DispatchAllocateMemory(device, pAllocateInfo, pAllocator, pMemory);
 }
-static VKAPI_ATTR void VKAPI_CALL gpuVkFreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks *pAllocator) {
+static VKAPI_ATTR void VKAPI_CALL gpuVkFreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator) {
     DispatchFreeMemory(device, memory, pAllocator);
 }
 static VKAPI_ATTR VkResult VKAPI_CALL gpuVkMapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size,
-                                                     VkMemoryMapFlags flags, void **ppData) {
+                                                     VkMemoryMapFlags flags, void** ppData) {
     return DispatchMapMemory(device, memory, offset, size, flags, ppData);
 }
 static VKAPI_ATTR void VKAPI_CALL gpuVkUnmapMemory(VkDevice device, VkDeviceMemory memory) { DispatchUnmapMemory(device, memory); }
 static VKAPI_ATTR VkResult VKAPI_CALL gpuVkFlushMappedMemoryRanges(VkDevice device, uint32_t memoryRangeCount,
-                                                                   const VkMappedMemoryRange *pMemoryRanges) {
+                                                                   const VkMappedMemoryRange* pMemoryRanges) {
     return DispatchFlushMappedMemoryRanges(device, memoryRangeCount, pMemoryRanges);
 }
 static VKAPI_ATTR VkResult VKAPI_CALL gpuVkInvalidateMappedMemoryRanges(VkDevice device, uint32_t memoryRangeCount,
-                                                                        const VkMappedMemoryRange *pMemoryRanges) {
+                                                                        const VkMappedMemoryRange* pMemoryRanges) {
     return DispatchInvalidateMappedMemoryRanges(device, memoryRangeCount, pMemoryRanges);
 }
 static VKAPI_ATTR VkResult VKAPI_CALL gpuVkBindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory,
@@ -130,35 +130,35 @@ static VKAPI_ATTR VkResult VKAPI_CALL gpuVkBindImageMemory(VkDevice device, VkIm
     return DispatchBindImageMemory(device, image, memory, memoryOffset);
 }
 static VKAPI_ATTR void VKAPI_CALL gpuVkGetBufferMemoryRequirements(VkDevice device, VkBuffer buffer,
-                                                                   VkMemoryRequirements *pMemoryRequirements) {
+                                                                   VkMemoryRequirements* pMemoryRequirements) {
     DispatchGetBufferMemoryRequirements(device, buffer, pMemoryRequirements);
 }
 static VKAPI_ATTR void VKAPI_CALL gpuVkGetImageMemoryRequirements(VkDevice device, VkImage image,
-                                                                  VkMemoryRequirements *pMemoryRequirements) {
+                                                                  VkMemoryRequirements* pMemoryRequirements) {
     DispatchGetImageMemoryRequirements(device, image, pMemoryRequirements);
 }
-static VKAPI_ATTR VkResult VKAPI_CALL gpuVkCreateBuffer(VkDevice device, const VkBufferCreateInfo *pCreateInfo,
-                                                        const VkAllocationCallbacks *pAllocator, VkBuffer *pBuffer) {
+static VKAPI_ATTR VkResult VKAPI_CALL gpuVkCreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo,
+                                                        const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer) {
     return DispatchCreateBuffer(device, pCreateInfo, pAllocator, pBuffer);
 }
-static VKAPI_ATTR void VKAPI_CALL gpuVkDestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks *pAllocator) {
+static VKAPI_ATTR void VKAPI_CALL gpuVkDestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks* pAllocator) {
     return DispatchDestroyBuffer(device, buffer, pAllocator);
 }
-static VKAPI_ATTR VkResult VKAPI_CALL gpuVkCreateImage(VkDevice device, const VkImageCreateInfo *pCreateInfo,
-                                                       const VkAllocationCallbacks *pAllocator, VkImage *pImage) {
+static VKAPI_ATTR VkResult VKAPI_CALL gpuVkCreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo,
+                                                       const VkAllocationCallbacks* pAllocator, VkImage* pImage) {
     return DispatchCreateImage(device, pCreateInfo, pAllocator, pImage);
 }
-static VKAPI_ATTR void VKAPI_CALL gpuVkDestroyImage(VkDevice device, VkImage image, const VkAllocationCallbacks *pAllocator) {
+static VKAPI_ATTR void VKAPI_CALL gpuVkDestroyImage(VkDevice device, VkImage image, const VkAllocationCallbacks* pAllocator) {
     DispatchDestroyImage(device, image, pAllocator);
 }
 static VKAPI_ATTR void VKAPI_CALL gpuVkCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer,
-                                                     uint32_t regionCount, const VkBufferCopy *pRegions) {
+                                                     uint32_t regionCount, const VkBufferCopy* pRegions) {
     DispatchCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, regionCount, pRegions);
 }
 
 static VkResult UtilInitializeVma(VkInstance instance, VkPhysicalDevice physical_device, VkDevice device,
-                                  VmaAllocator *pAllocator) {
-    VmaVulkanFunctions functions;
+                                  VmaAllocator* pAllocator) {
+    VmaVulkanFunctions functions = {};
     VmaAllocatorCreateInfo allocator_info = {};
     allocator_info.instance = instance;
     allocator_info.device = device;
@@ -191,10 +191,10 @@ static VkResult UtilInitializeVma(VkInstance instance, VkPhysicalDevice physical
     return vmaCreateAllocator(&allocator_info, pAllocator);
 }
 
-void Instance::PreCallRecordCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCreateInfo,
-                                         const VkAllocationCallbacks *pAllocator, VkDevice *pDevice, const RecordObject &record_obj,
-                                         vku::safe_VkDeviceCreateInfo *modified_create_info) {
-    BaseClass::PreCallRecordCreateDevice(physicalDevice, pCreateInfo, pAllocator, pDevice, record_obj, modified_create_info);
+void Instance::PreCallRecordCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
+                                         const VkAllocationCallbacks* pAllocator, VkDevice* pDevice, const RecordObject& record_obj,
+                                         vku::safe_VkDeviceCreateInfo* modified_create_info) {
+    InstanceProxy::PreCallRecordCreateDevice(physicalDevice, pCreateInfo, pAllocator, pDevice, record_obj, modified_create_info);
 
     // GPU-AV requirements not met, exit early or future Vulkan calls may be invalid
     if (api_version < VK_API_VERSION_1_1) {
@@ -205,7 +205,7 @@ void Instance::PreCallRecordCreateDevice(VkPhysicalDevice physicalDevice, const 
 }
 
 // Perform initializations that can be done at Create Device time.
-void Validator::FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) {
+void Validator::FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) {
     // GPU-AV not supported, exit early to prevent errors inside Validator::PostCallRecordCreateDevice
     if (api_version < VK_API_VERSION_1_1) {
         InternalError(device, loc, "GPU Shader Instrumentation requires Vulkan 1.1 or later.");
@@ -221,6 +221,8 @@ void Validator::FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const L
         {glsl::kBindingInstPostProcess, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // Buffer holding input from CPU into the shader for descriptor indexing
         {glsl::kBindingInstDescriptorIndexingOOB, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        // Buffer holding input from CPU into the shader for descriptor heap
+        {glsl::kBindingInstDescriptorHeap, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // Buffer holding buffer device addresses
         {glsl::kBindingInstBufferDeviceAddress, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // Buffer holding action command index in command buffer (a global buffer is used)
@@ -236,7 +238,7 @@ void Validator::FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const L
 
     // TODO - Now that GPU-AV and DebugPrintf are merged, we should just have a single FinishDeviceSetup if possible (or at least
     // better divide what belongs where as it is easy to mess)
-    BaseClass::FinishDeviceSetup(pCreateInfo, loc);
+    GpuShaderInstrumentor::FinishDeviceSetup(pCreateInfo, loc);
     // We might fail in parent class device creation if global requirements are not met
     if (aborted_) {
         return;
@@ -261,13 +263,13 @@ void Validator::FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const L
         vk_set_device_loader_data_ = chain_info->u.pfnSetDeviceLoaderData;
     }
 
-    DescriptorChecksOnFinishDeviceSetup(*this);
+    DescriptorChecksClassicOnFinishDeviceSetup(*this);
 
     // Create error logging buffer allocation pool
     {
         VkBufferCreateInfo error_buffer_ci = vku::InitStructHelper();
         error_buffer_ci.size = glsl::kErrorBufferByteSize;
-        error_buffer_ci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        error_buffer_ci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         VmaAllocationCreateInfo error_buffer_alloc_ci = {};
         error_buffer_alloc_ci.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
         error_buffer_alloc_ci.preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -285,7 +287,7 @@ void Validator::FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const L
         indices_buffer_alignment_ = Align(index_size, (uint32_t)phys_dev_props.limits.minStorageBufferOffsetAlignment);
 
         VkBufferCreateInfo buffer_info = vku::InitStructHelper();
-        buffer_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        buffer_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         buffer_info.size = gpuav_settings.indices_buffer_count * indices_buffer_alignment_;
         VmaAllocationCreateInfo alloc_info = {};
         alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -296,10 +298,24 @@ void Validator::FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const L
         }
 
         uint32_t stride = indices_buffer_alignment_ / sizeof(uint32_t);
-        uint32_t *indices_ptr = (uint32_t *)global_indices_buffer_.GetMappedPtr();
+        uint32_t* indices_ptr = (uint32_t*)global_indices_buffer_.GetMappedPtr();
         for (uint32_t i = 0; i < gpuav_settings.indices_buffer_count; ++i) {
             const uint32_t offset = i * stride;
             indices_ptr[offset] = i;
+        }
+    }
+
+    if (set_null_descriptors_) {
+        // Find the first possible queue to do internal transfer on
+        for (uint32_t i = 0; i < physical_device_state->queue_family_properties.size(); i++) {
+            const VkQueueFamilyProperties& props = physical_device_state->queue_family_properties[i];
+            if (props.queueFlags & VK_QUEUE_TRANSFER_BIT) {
+                internal_transfer_queue_family_index_ = i;
+                DispatchGetDeviceQueue(device, i, 0, &internal_transfer_queue_handle_);
+                if (internal_transfer_queue_handle_ != VK_NULL_HANDLE) {
+                    break;
+                }
+            }
         }
     }
 }
@@ -320,10 +336,13 @@ vko::Buffer& Validator::GetGlobalDescriptorBuffer() {
     return global_resource_descriptor_buffer_;
 }
 
+// This buffer is going to be the indirect buffer for a VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT mapping.
 vko::Buffer& Validator::GetGlobalDescriptorHeap() {
     if (global_resource_descriptor_heap_.IsDestroyed()) {
         VkBufferCreateInfo buffer_info = vku::InitStructHelper();
-        buffer_info.size = resource_heap_reserved_bytes_ + phys_dev_ext_props.descriptor_heap_props.minResourceHeapReservedRange;
+        buffer_info.size = heap_indirect_buffer_stride_ * gpuav_settings.indices_buffer_count;
+        // Note that maxUniformBufferRange is smaller likely to what we need here, but this buffer doesn't need to worry because we
+        // are not "binding" this, so we can use maxBufferSize instead
         buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         VmaAllocationCreateInfo alloc_info = {};
         alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -340,63 +359,58 @@ namespace setting {
 
 // Each setting in GPU-AV has a common interface to make adding a new setting easier
 struct Setting {
-    virtual bool IsEnabled(const GpuAVSettings &settings) = 0;
-    virtual bool HasRequiredFeatures(const DeviceFeatures &features) = 0;
-    virtual void Disable(GpuAVSettings &settings) = 0;
+    virtual bool IsEnabled(const GpuAVSettings& settings) = 0;
+    virtual bool HasRequiredFeatures(const DeviceFeatures& features) = 0;
+    virtual void Disable(GpuAVSettings& settings) = 0;
     virtual std::string DisableMessage() = 0;
 };
 
 struct BufferDeviceAddress : public Setting {
-    bool IsEnabled(const GpuAVSettings &settings) { return settings.shader_instrumentation.buffer_device_address; }
-    bool HasRequiredFeatures(const DeviceFeatures &features) { return features.shaderInt64; }
-    void Disable(GpuAVSettings &settings) { settings.shader_instrumentation.buffer_device_address = false; }
+    bool IsEnabled(const GpuAVSettings& settings) { return settings.shader_instrumentation.buffer_device_address; }
+    bool HasRequiredFeatures(const DeviceFeatures& features) { return features.shaderInt64; }
+    void Disable(GpuAVSettings& settings) { settings.shader_instrumentation.buffer_device_address = false; }
     std::string DisableMessage() {
         return "\tBuffer Device Address validation option was enabled, but the shaderInt64 feature is not supported. [Disabling "
                "gpuav_buffer_address_oob]\n";
     }
 };
 
-struct RayQuery : public Setting {
-    bool IsEnabled(const GpuAVSettings &settings) { return settings.shader_instrumentation.ray_query; }
-    bool HasRequiredFeatures(const DeviceFeatures &features) { return features.rayQuery; }
-    void Disable(GpuAVSettings &settings) { settings.shader_instrumentation.ray_query = false; }
+struct TraceRay : public Setting {
+    bool IsEnabled(const GpuAVSettings& settings) { return settings.shader_instrumentation.trace_ray; }
+    bool HasRequiredFeatures(const DeviceFeatures& features) { return features.rayTracingPipeline || features.rayQuery; }
+    void Disable(GpuAVSettings& settings) { settings.shader_instrumentation.trace_ray = false; }
     std::string DisableMessage() {
-        return "\tRay Query validation option was enabled, but the rayQuery feature is not supported. [Disabling "
-               "gpuav_validate_ray_query]\n";
+        return "\tRay Tracing validation option was enabled, but neither the rayTracingPipeline nor the rayQuery feature are "
+               "supported. [Disabling "
+               "gpuav_validate_trace_ray]\n";
     }
 };
-struct RayHitObject : public Setting {
-    bool IsEnabled(const GpuAVSettings &settings) { return settings.shader_instrumentation.ray_hit_object; }
-    bool HasRequiredFeatures(const DeviceFeatures &features) { return features.rayTracingInvocationReorder; }
-    void Disable(GpuAVSettings &settings) { settings.shader_instrumentation.ray_hit_object = false; }
-    std::string DisableMessage() {
-        return "\tRay Hit Object validation option was enabled, but the rayTracingInvocationReorder feature is not supported. [Disabling "
-               "gpuav_validate_ray_hit_object]\n";
-    }
-};
+
 struct MeshShading : public Setting {
-    bool IsEnabled(const GpuAVSettings &settings) { return settings.shader_instrumentation.mesh_shading; }
-    bool HasRequiredFeatures(const DeviceFeatures &features) { return features.meshShader; }
-    void Disable(GpuAVSettings &settings) { settings.shader_instrumentation.mesh_shading = false; }
+    bool IsEnabled(const GpuAVSettings& settings) { return settings.shader_instrumentation.mesh_shading; }
+    bool HasRequiredFeatures(const DeviceFeatures& features) { return features.meshShader; }
+    void Disable(GpuAVSettings& settings) { settings.shader_instrumentation.mesh_shading = false; }
     std::string DisableMessage() {
         return "\tMesh Shading validation option was enabled, but the meshShader feature is not supported. [Disabling "
                "gpuav_mesh_shading]\n";
     }
 };
+
 struct BufferCopies : public Setting {
-    bool IsEnabled(const GpuAVSettings &settings) { return settings.validate_buffer_copies; }
+    bool IsEnabled(const GpuAVSettings& settings) { return settings.validate_buffer_copies; }
     // copy_buffer_to_image.comp relies on uint8_t buffers to perform validation
-    bool HasRequiredFeatures(const DeviceFeatures &features) { return features.storageBuffer8BitAccess; }
-    void Disable(GpuAVSettings &settings) { settings.validate_buffer_copies = false; }
+    bool HasRequiredFeatures(const DeviceFeatures& features) { return features.storageBuffer8BitAccess; }
+    void Disable(GpuAVSettings& settings) { settings.validate_buffer_copies = false; }
     std::string DisableMessage() {
         return "\tBuffer copies option was enabled, but the storageBuffer8BitAccess feature is not supported. [Disabling "
                "gpuav_buffer_copies]\n";
     }
 };
+
 struct BufferContent : public Setting {
-    bool IsEnabled(const GpuAVSettings &settings) { return settings.IsBufferValidationEnabled(); }
-    bool HasRequiredFeatures(const DeviceFeatures &features) { return features.shaderInt64; }
-    void Disable(GpuAVSettings &settings) { settings.SetBufferValidationEnabled(false); }
+    bool IsEnabled(const GpuAVSettings& settings) { return settings.IsBufferValidationEnabled(); }
+    bool HasRequiredFeatures(const DeviceFeatures& features) { return features.shaderInt64; }
+    void Disable(GpuAVSettings& settings) { settings.SetBufferValidationEnabled(false); }
     std::string DisableMessage() {
         return "\tBuffer content validation option was enabled, but the shaderInt64 feature is not supported. [Disabling "
                "gpuav_buffers_validation]\n";
@@ -404,66 +418,69 @@ struct BufferContent : public Setting {
 };
 
 struct AccelerationStructuresBuild : public Setting {
-    bool IsEnabled(const GpuAVSettings &settings) { return settings.validate_acceleration_structures_builds; }
+    bool IsEnabled(const GpuAVSettings& settings) { return settings.validate_acceleration_structures_builds; }
     // Validation shader branches on a push constant value to fetch different descriptors
-    bool HasRequiredFeatures(const DeviceFeatures &features) {
+    bool HasRequiredFeatures(const DeviceFeatures& features) {
         return features.shaderInt64 && features.storageBuffer8BitAccess && features.storageBuffer16BitAccess;
     }
-    void Disable(GpuAVSettings &settings) { settings.validate_acceleration_structures_builds = false; }
+    void Disable(GpuAVSettings& settings) { settings.validate_acceleration_structures_builds = false; }
     std::string DisableMessage() {
-        return "\t structure builds validation option was enabled, but the shaderInt64 or storageBuffer8BitAccess or "
+        return "\tAcceleration structure builds validation option was enabled, but the shaderInt64 or storageBuffer8BitAccess or "
                "storageBuffer16BitAccess features are not "
                "supported. [Disabling "
                "gpuav_acceleration_structures_builds]\n";
     }
 };
+
+struct RayTracingBuffersConsistency : public Setting {
+    bool IsEnabled(const GpuAVSettings& settings) { return settings.ray_tracing_buffers_consistency; }
+    // Validation shader branches on a push constant value to fetch different descriptors
+    bool HasRequiredFeatures(const DeviceFeatures& features) {
+        return features.shaderInt64 && features.shaderInt16 && features.shaderInt8;
+    }
+    void Disable(GpuAVSettings& settings) { settings.ray_tracing_buffers_consistency = false; }
+    std::string DisableMessage() {
+        return "\tRay tracing buffers consistency option was enabled, but the shaderInt64 or shaderInt16 or shaderInt8 "
+               "features are not "
+               "supported. [Disabling "
+               "gpuav_ray_tracing_buffers_consistency]\n";
+    }
+};
+
 }  // namespace setting
 
 // At this point extensions/features may have been turned on by us in PreCallRecord.
 // Now that we have all the information, here is where we might disable GPU-AV settings that are missing requirements
-void Validator::InitSettings(const Location &loc) {
+void Validator::InitSettings(const Location& loc) {
     setting::BufferDeviceAddress buffer_device_address;
-    setting::RayQuery ray_query;
-    setting::RayHitObject ray_hit_object;
+    setting::TraceRay trace_ray;
     setting::MeshShading mesh_shading;
     setting::BufferCopies buffer_copies;
     setting::BufferContent buffer_content;
     setting::AccelerationStructuresBuild as_builds;
-    std::array<setting::Setting *, 7> all_settings = {&buffer_device_address, &ray_query,      &ray_hit_object,
-                                                      &mesh_shading,          &buffer_copies,  &buffer_content, &as_builds};
+    setting::RayTracingBuffersConsistency rt_buffers_consistency;
+    std::array<setting::Setting*, 7> all_settings = {&buffer_device_address, &trace_ray, &mesh_shading,          &buffer_copies,
+                                                     &buffer_content,        &as_builds, &rt_buffers_consistency};
 
     std::string adjustment_warnings;
-    for (auto &setting_object : all_settings) {
+    for (auto& setting_object : all_settings) {
         if (setting_object->IsEnabled(gpuav_settings) && !setting_object->HasRequiredFeatures(modified_features)) {
             setting_object->Disable(gpuav_settings);
             adjustment_warnings += setting_object->DisableMessage();
         }
     }
-    if (!adjustment_warnings.empty()) {
-        AdjustmentWarning(device, loc, adjustment_warnings.c_str());
+
+    if (IsExtEnabled(extensions.vk_ext_descriptor_buffer) && phys_dev_ext_props.descriptor_buffer_props.maxResourceDescriptorBufferBindings == 1) {
+        adjustment_warnings +=
+            "VK_EXT_descriptor_buffer is enabled with a device that only supports maxResourceDescriptorBufferBindings of "
+            "1, Currently the limiation to support VK_EXT_descriptor_buffer is to use our own internal binding to inject a buffer "
+            "into the shader. [Disabling debug_printf] [Disabling gpuav_shader_instrumentation]";
+        gpuav_settings.debug_printf_enabled = false;
+        gpuav_settings.DisableShaderInstrumentationAndOptions();
     }
 
-    if (IsExtEnabled(extensions.vk_ext_descriptor_buffer) && !gpuav_settings.descriptor_buffer_override) {
-        // "can" work, just need more testing now
-        AdjustmentWarning(
-            device, loc,
-            "VK_EXT_descriptor_buffer is enabled, but GPU-AV does not currently support validation of descriptor buffers. "
-            "[Disabling all shader instrumentation checks] (this does NOT include debug print)"
-            "\nThere is a VK_LAYER_GPUAV_DESCRIPTOR_BUFFER_OVERRIDE that can be set to bypass this if you know you are not going "
-            "to use descriptor buffers.");
-        gpuav_settings.DisableShaderInstrumentationAndOptions();
-
-        if (phys_dev_ext_props.descriptor_buffer_props.maxResourceDescriptorBufferBindings == 1) {
-            if (gpuav_settings.debug_printf_enabled) {
-                AdjustmentWarning(
-                    device, loc,
-                    "VK_EXT_descriptor_buffer is enabled with a device that only supports maxResourceDescriptorBufferBindings of "
-                    "1\nNeed to disable DebugPrintf as we currently don't have a fallback path. [Disabling debug_printf]"
-                    "\nThere is a VK_LAYER_GPUAV_DESCRIPTOR_BUFFER_OVERRIDE that can be set to bypass this if you know you "
-                    "are not going to use descriptor buffers.");
-                gpuav_settings.debug_printf_enabled = false;
-            }
-        }
+    if (!adjustment_warnings.empty()) {
+        AdjustmentWarning(device, loc, adjustment_warnings.c_str());
     }
 
     // If we have turned off all the possible things to instrument, turn off everything fully
@@ -474,18 +491,18 @@ void Validator::InitSettings(const Location &loc) {
     gpuav_settings.TracyLogSettings();
 }
 
-void Validator::InternalVmaError(LogObjectList objlist, VkResult result, const char *const specific_message) const {
+void Validator::InternalVmaError(LogObjectList objlist, VkResult result, const char* const specific_message) const {
     aborted_ = true;
     std::string error_message = specific_message;
 
-    char *stats_string;
+    char* stats_string;
     vmaBuildStatsString(vma_allocator_, &stats_string, false);
     error_message += " VMA statistics = ";
     error_message += stats_string;
     vmaFreeStatsString(vma_allocator_, stats_string);
 
-    const char *layer_name = gpuav_settings.debug_printf_only ? "DebugPrintf" : "GPU-AV";
-    const char *vuid = gpuav_settings.debug_printf_only ? "UNASSIGNED-DEBUG-PRINTF" : "UNASSIGNED-GPU-Assisted-Validation";
+    const char* layer_name = gpuav_settings.debug_printf_only ? "DebugPrintf" : "GPU-AV";
+    const char* vuid = gpuav_settings.debug_printf_only ? "UNASSIGNED-DEBUG-PRINTF" : "UNASSIGNED-GPU-Assisted-Validation";
 
     LogError(vuid, objlist, Location(vvl::Func::Empty), "Internal VMA Error (%s), %s is being disabled. Details:\n%s",
              string_VkResult(result), layer_name, error_message.c_str());
@@ -514,9 +531,9 @@ bool Validator::IsAllDeviceLocalMappable() const {
     return true;
 }
 
-// Things like DescriptorHeap are singleton class that lives in GPU-AV, but are used when state tracking adds/destroy new resources
-// we need to track. One issue is on vkDestroyDevice we need to teardown the GPU-AV class, then after we try and destroy leaked
-// state objects (ex. user forgot to call vkDestroySampler).
+// Things like DescriptorIdPool are singleton class that lives in GPU-AV, but are used when state tracking adds/destroy new
+// resources we need to track. One issue is on vkDestroyDevice we need to teardown the GPU-AV class, then after we try and destroy
+// leaked state objects (ex. user forgot to call vkDestroySampler).
 void Validator::DestroySubstate() {
     if (!dispatch_device_ || aborted_) {
         return;
@@ -526,7 +543,7 @@ void Validator::DestroySubstate() {
     for (auto object_it = dispatch_device_->object_dispatch.begin(); object_it != dispatch_device_->object_dispatch.end();
          object_it++) {
         if ((*object_it)->container_type == LayerObjectTypeStateTracker) {
-            auto &state_tracker = dynamic_cast<vvl::DeviceState &>(**object_it);
+            auto& state_tracker = dynamic_cast<vvl::DeviceState&>(**object_it);
             state_tracker.RemoveSubState(LayerObjectTypeGpuAssisted);
         }
     }

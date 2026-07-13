@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 NVIDIA Corporation
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 NVIDIA Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,8 +11,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class PositiveShaderCooperativeVector : public VkLayerTest {};
 
@@ -97,7 +97,7 @@ TEST_F(PositiveShaderCooperativeVector, CooperativeVectorSPIRV) {
         GTEST_SKIP() << "cooperativeVectorTrainingFloat16Accumulation not supported";
     }
 
-    const char *vt_source = R"glsl(
+    const char* vt_source = R"glsl(
         #version 450
         #extension GL_NV_cooperative_vector : enable
         #extension GL_KHR_shader_subgroup_basic : enable
@@ -144,7 +144,7 @@ TEST_F(PositiveShaderCooperativeVector, CooperativeVectorTraingingSPIRV) {
 
     const vkt::DescriptorSetLayout dsl(*m_device, {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr});
 
-    const char *vt_source = R"glsl(
+    const char* vt_source = R"glsl(
         #version 450
         #extension GL_NV_cooperative_vector : enable
         #extension GL_KHR_shader_subgroup_basic : enable

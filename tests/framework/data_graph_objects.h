@@ -130,5 +130,46 @@ class DataGraphPipelineHelper {
     VkPipeline pipeline_ = VK_NULL_HANDLE;
     HelperParameters params_ = HelperParameters();
 };
+
+namespace of {
+struct HelperParameters {
+    uint32_t height = 100;
+    uint32_t width = 100;
+    VkDataGraphOpticalFlowGridSizeFlagsARM outputGridSize = VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_UNKNOWN_ARM;
+    VkDataGraphOpticalFlowGridSizeFlagsARM hintGridSize = VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_UNKNOWN_ARM;
+};
+
+class OpticalFlowHelper {
+  private:
+    static constexpr uint32_t kResourceCount = 5u;
+    HelperParameters params_ = HelperParameters();
+
+  public:
+    std::vector<VkDataGraphPipelineSingleNodeConnectionARM> connections_;
+    VkDataGraphPipelineSingleNodeCreateInfoARM single_node_ci_ = {};
+    VkDataGraphPipelineOpticalFlowCreateInfoARM optical_flow_ci_ = {};
+    VkDataGraphOpticalFlowGridSizeFlagsARM optical_flow_grid_size_ = VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_UNKNOWN_ARM;
+    std::vector<vkt::Image> images_;
+    std::vector<vkt::ImageView> image_views_;
+    std::vector<VkDataGraphPipelineResourceInfoImageLayoutARM> image_layouts_;
+    DataGraphPipelineHelper dg_pipeline_;
+
+    VkLayerTest &layer_test_;
+    vkt::Device *device_ = nullptr;
+
+    explicit OpticalFlowHelper(VkLayerTest &test, const HelperParameters &params = HelperParameters());
+
+    void QueryOpticalFlowProperties();
+    std::vector<VkFormat> GetAllOpticalFlowFormats(VkDataGraphOpticalFlowImageUsageFlagsARM usage);
+    VkFormat GetAnyOpticalFlowFormat(VkDataGraphOpticalFlowImageUsageFlagsARM usage);
+    void CreateOpticalFlow();
+    void SetupImageDescriptors();
+    void InitDataGraphPipeline();
+    VkResult CreateDataGraphPipeline();
+
+    VkPipelineLayout PipelineLayout() const { return dg_pipeline_.pipeline_layout_; };
+    const VkDescriptorSet* DescriptorSet() const { return &dg_pipeline_.descriptor_set_.get()->set_; };
+};
+}  // namespace of
 }  // namespace dg
 }  // namespace vkt

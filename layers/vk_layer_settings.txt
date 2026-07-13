@@ -5,26 +5,6 @@
 
 # VK_LAYER_KHRONOS_validation
 
-# Command Buffer State
-# =====================
-# Check that all Vulkan objects used by a command buffer have not been destroyed. These checks can be CPU intensive for some applications.
-khronos_validation.check_command_buffer = true
-
-# Image Layout
-# =====================
-# Check that the layout of each image subresource is correct whenever it is used by a command buffer. These checks are very CPU intensive for some applications.
-khronos_validation.check_image_layout = true
-
-# Object in Use
-# =====================
-# Check that Vulkan objects are not in use by a command buffer when they are destroyed.
-khronos_validation.check_object_in_use = true
-
-# Query
-# =====================
-# Checks for commands that use VkQueryPool objects.
-khronos_validation.check_query = true
-
 # Shader
 # =====================
 # This will validate the contents of the SPIR-V which can be CPU intensive during application start up. This does internal checks as well as calling spirv-val. (Same effect using VK_VALIDATION_FEATURE_DISABLE_SHADERS_EXT)
@@ -40,6 +20,11 @@ khronos_validation.check_shaders_caching = true
 # Specifies what action is to be taken when a layer reports information
 khronos_validation.debug_action = VK_DBG_LAYER_ACTION_LOG_MSG,VK_DBG_LAYER_ACTION_DEBUG_OUTPUT
 
+# Descriptor Hashing
+# =====================
+# When enabled and using VK_EXT_descriptor_heap/VK_EXT_descriptor_buffer, this will attempt to track all descriptors seen such that GPU-AV and GPU Dump can detect more errors. This will increase the memory footprint.
+khronos_validation.descriptor_hashing = false
+
 # Max Duplicated Messages
 # =====================
 # Maximum number of times any single validation message should be reported.
@@ -50,10 +35,30 @@ khronos_validation.duplicate_message_limit = 10
 # Enable limiting of duplicate messages.
 khronos_validation.enable_message_limit = true
 
-# Fine Grained Locking
+# Dump VK_KHR_copy_memory_indirect
 # =====================
-# Enable fine grained locking for Core Validation, which should improve performance in multithreaded applications. This setting allows the optimization to be disabled for debugging.
-khronos_validation.fine_grained_locking = true
+# Dump information at each copy command when recording
+khronos_validation.gpu_dump_copy_memory_indirect = false
+
+# Dump Descriptor Heap/Buffer
+# =====================
+# Dump all the information at every draw/dispatch when recording VK_EXT_descriptor_heap or VK_EXT_descriptor_buffer
+khronos_validation.gpu_dump_descriptors = false
+
+# Force Device Copy
+# =====================
+# [Very experimental] For non-host visible memory, try and do a device copy during command recording to view the data inside a buffer.
+khronos_validation.gpu_dump_device_copy = false
+
+# Dump VK_EXT_device_generated_commands
+# =====================
+# Dump information at each vkCmdExecuteGeneratedCommands when recording
+khronos_validation.gpu_dump_device_generated_commands = false
+
+# Redirect all GPU Dump to stdout
+# =====================
+# Instead of using the debug callback with information severity, redirect to stdout instead.
+khronos_validation.gpu_dump_to_stdout = false
 
 # Acceleration structures builds
 # =====================
@@ -85,7 +90,7 @@ khronos_validation.gpuav_copy_memory_indirect = true
 # Enable descriptors and buffer out of bounds validation when using descriptor indexing
 khronos_validation.gpuav_descriptor_checks = true
 
-# GPU Assisted Validation
+# GPU Assisted Validation (GPU-AV)
 # =====================
 # Enable validation that cannot be done the CPU and needs hooks into the GPU execution
 khronos_validation.gpuav_enable = false
@@ -130,6 +135,11 @@ khronos_validation.gpuav_mesh_shading = true
 # Track which descriptor indexes were used in shader to run normal validation afterwards
 khronos_validation.gpuav_post_process_descriptor_indexing = true
 
+# Ray tracing buffers consistency
+# =====================
+# Validate that between a BLAS build and its update, triangle geometries using index buffer keep its content identical (VUID 03768), and that active/inactive primitives do not change this status (VUIDs 03663 and 03664). Warning: a record of vertex/index buffers will be maintained in device local memory, so validation can be GPU memory heavy.
+khronos_validation.gpuav_ray_tracing_buffers_consistency = false
+
 # Safe Mode
 # =====================
 # Will have GPU-AV try and prevent crashes, but will be much slower to validate. If using Safe Mode, consider using selective shader instrumentation, to only instrument the shaders/pipelines causing issues.
@@ -137,7 +147,7 @@ khronos_validation.gpuav_safe_mode = false
 
 # Enable instrumenting shaders selectively
 # =====================
-# Select which shaders to instrument by passing a VkValidationFeaturesEXT struct with GPU-AV enabled in the VkShaderModuleCreateInfo pNext or using a regex matching a shader/pipeline debug name. Because this only validates the selected shaders, it will allow GPU-AV to run much faster.
+# Select which shaders to instrument by passing a VkValidationFeaturesEXT struct with GPU-AV enabled in the VkShaderModuleCreateInfo pNext or using a regex matching a shader/pipeline debug name. Because this only validates the selected shaders/pipelines, it will allow GPU-AV to run much faster.
 khronos_validation.gpuav_select_instrumented_shaders = false
 
 # Shader instrumentation
@@ -155,10 +165,15 @@ khronos_validation.gpuav_shader_sanitizer = true
 # Any shader or pipeline library debug name (set with vkSetDebugUtilsObjectNameEXT) fully matching any listed regular expression will be instrumented when creating pipelines with those shaders or libraries. Regex grammar: Modified ECMAScript. No support for shader objects yet. Warning: instrumentation being performed at final pipeline creation time, if shaders modules have already been destroyed at this step (possible when using pipeline libraries), they won't be found by this regex selection system. In this case, consider naming pipeline libraries instead.
 khronos_validation.gpuav_shaders_to_instrument =
 
-# RayQuery SPIR-V instructions
+# Shared Memory Data Race Detection
 # =====================
-# Enable shader instrumentation on OpRayQueryInitializeKHR
-khronos_validation.gpuav_validate_ray_query = true
+# Detects data races on shared memory (Compute shaders only). Limitations: This does not handle mixing atomics and non-atomics on the same locations without a barrier in between, this could lead to false positives. This assumes barrier() is used for all shared memory synchronization.
+khronos_validation.gpuav_shared_memory_data_race = true
+
+# TraceRay SPIR-V instructions
+# =====================
+# Enable shader instrumentation on OpTraceRayKHR, OpHitObject*, OpReportIntersectionKHR, OpRayQueryInitializeKHR
+khronos_validation.gpuav_validate_trace_ray = true
 
 # Out of bounds vertex attribute fetching
 # =====================
@@ -187,7 +202,7 @@ khronos_validation.message_format_json = false
 
 # Mute Message VUIDs
 # =====================
-# List of VUIDs and VUID identifiers which are to be IGNORED by the validation layer
+# List of VUIDs which are to be IGNORED by the validation layer. The list is comma seperated and can be either the entire VUID string, the hashed value, or the last 5 digit number of a VUID
 khronos_validation.message_id_filter =
 
 # Object Lifetime
@@ -207,7 +222,7 @@ khronos_validation.printf_enable = false
 
 # Debug Printf only preset
 # =====================
-# A single, quick setting to turn on only DebugPrintf and turn off everything else
+# A single, quick setting to turn on only DebugPrintf and turn off everything else. Main usage is for people not able to use VkConfig and still want a fast preset to use.
 khronos_validation.printf_only_preset = false
 
 # Redirect Printf messages to stdout
@@ -223,7 +238,7 @@ khronos_validation.printf_verbose = false
 # Message Severity
 # =====================
 # Comma-delineated list of options specifying the types of messages to be reported
-khronos_validation.report_flags = error
+khronos_validation.report_flags = error,warn
 
 # Stateless Parameter
 # =====================

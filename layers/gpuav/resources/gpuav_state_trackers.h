@@ -18,11 +18,14 @@
 
 #pragma once
 
+#include <array>
 #include <vector>
 
+#include "containers/small_vector.h"
 #include "external/inplace_function.h"
-#include "gpuav/instrumentation/descriptor_checks.h"
+#include "gpuav/instrumentation/descriptor_checks_classic.h"
 #include "gpuav/resources/gpuav_vulkan_objects.h"
+#include "gpuav/spirv/instrumentation_status.h"
 
 // We pull in most the core state tracking files
 // gpuav_state_trackers.h should NOT be included by any other header file
@@ -39,10 +42,22 @@
 #include "state_tracker/tensor_state.h"
 #include "state_tracker/descriptor_mode.h"
 
+struct LastBound;
+
 namespace gpuav {
 
 class Validator;
 class QueueSubState;
+struct InstrumentedShader;
+
+// Unify data needed Classic/Buffer/Heap descriptor mode for on_instrumention callbacks
+struct CommonDescriptorUpdate {
+    VkBuffer buffer{VK_NULL_HANDLE};  // classic
+    VkDeviceSize offset{0};           // classic
+    VkDeviceSize range{0};            // classic/buffer
+    VkDeviceAddress address{0};       // heaps/buffer
+    uint32_t binding{0};
+};
 
 class CommandBufferSubState : public vvl::CommandBufferSubState {
   public:
@@ -50,21 +65,13 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
         const std::vector<std::string> &initial_label_stack;
     };
 
-    using InstrumentationErrorLogger =
-        stdext::inplace_function<bool(Validator &gpuav, const Location &loc, const uint32_t *error_record,
-                                      std::string &out_error_msg, std::string &out_vuid_msg)>;
+    using InstrumentationErrorLogger = stdext::inplace_function<bool(
+        Validator& gpuav, const Location& loc, const uint32_t* error_record, const InstrumentedShader* instrumented_shader,
+        std::string& out_error_msg, std::string& out_vuid_msg)>;
     using OnInstrumentationErrorLoggerRegister = stdext::inplace_function<InstrumentationErrorLogger(
         Validator &gpuav, CommandBufferSubState &cb, const LastBound &last_bound)>;
-    using OnInstrumentationDescSetUpdate =
-        stdext::inplace_function<void(CommandBufferSubState &cb, VkPipelineBindPoint bind_point, const Location &loc,
-                                      VkDescriptorBufferInfo &out_buffer_info, uint32_t &out_dst_binding),
-                                 48>;
-    using OnInstrumentationDescBufferUpdate =
-        stdext::inplace_function<void(CommandBufferSubState &cb, VkPipelineBindPoint bind_point,
-                                      VkDescriptorAddressInfoEXT &out_address_info, uint32_t &out_dst_binding),
-                                 48>;
-    using OnInstrumentationDescHeapUpdate =
-        stdext::inplace_function<void(CommandBufferSubState &cb, VkPipelineBindPoint bind_point, VkDeviceAddress &out_address), 48>;
+    using OnInstrumentationCommonDescUpdate = stdext::inplace_function<
+        void(CommandBufferSubState& cb, const LastBound& last_bound, const Location& loc, CommonDescriptorUpdate& out_update), 48>;
     using OnCommandBufferSubmission =
         stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, VkCommandBuffer per_submission_cb)>;
     using OnCommandBufferCompletion =
@@ -76,9 +83,7 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     using OnPostCommandBufferSubmission =
         stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, VkCommandBuffer per_post_submission_cb)>;
     std::vector<OnInstrumentationErrorLoggerRegister> on_instrumentation_error_logger_register_functions;
-    std::vector<OnInstrumentationDescSetUpdate> on_instrumentation_desc_set_update_functions;
-    std::vector<OnInstrumentationDescBufferUpdate> on_instrumentation_desc_buffer_update_functions;
-    std::vector<OnInstrumentationDescHeapUpdate> on_instrumentation_desc_heap_update_functions;
+    std::vector<OnInstrumentationCommonDescUpdate> on_instrumentation_common_desc_update_functions;
     std::vector<OnPreCommandBufferSubmission> on_pre_cb_submission_functions;
     std::vector<OnPostCommandBufferSubmission> on_post_cb_submission_functions;
     std::vector<OnCommandBufferCompletion> on_cb_completion_functions;
@@ -94,6 +99,7 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
 
     std::vector<PushConstantData> push_constant_data_chunks;
     std::array<VkPipelineLayout, vvl::BindPointCount> push_constant_latest_used_layout{};
+    std::vector<uint8_t> push_data_value;
 
     CommandBufferSubState(Validator &gpuav, vvl::CommandBuffer &cb);
     ~CommandBufferSubState();
@@ -131,6 +137,12 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
                              const void *values) final;
     void ClearPushConstants() final;
 
+    void RecordPushData(const VkPushDataInfoEXT& push_data_info) final;
+    void ClearPushData() final;
+
+    void RecordBindResourceHeap() final;
+    void RecordBindSamplerHeap() final;
+
     void RecordEndRendering(const VkRenderingEndInfoEXT *pRenderingEndInfo) final;
     void RecordEndRenderPass(const VkSubpassEndInfo *subpass_end_info, const Location &loc) final;
 
@@ -160,12 +172,13 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     // Track which index we have bound our Descriptor Buffer in CmdBindDescriptorBuffersEXT
     uint32_t resource_descriptor_buffer_index_;
 
+    Validator& gpuav_;
+
   private:
     void AllocateResources(const Location &loc);
     void ResetCBState(bool should_destroy);
     bool NeedsPostProcess();
 
-    Validator &gpuav_;
     VkDescriptorSetLayout instrumentation_desc_set_layout_ = VK_NULL_HANDLE;
     std::vector<CommandErrorLogger> command_error_loggers_;
 };
@@ -182,7 +195,7 @@ class DescriptorSetBindings {
         // Those spots are updated at command buffer submission time.
         vko::BufferRange desc_set_binding_to_post_process_buffers_lut{};
 
-        vko::BufferRange descritpor_state_ssbo{};  // type BoundDescriptorSetsStateSSBO
+        vko::BufferRange bound_desc_sets_ssbo{};  // type BoundDescriptorSetsSSBO
 
         // The index into this vector will start from vkCmdBindDescriptorSets::firstSet
         // The vector size is vkCmdBindDescriptorSets::descriptorSetCount
@@ -193,6 +206,28 @@ class DescriptorSetBindings {
         stdext::inplace_function<void(Validator &gpuav, CommandBufferSubState &cb, BindingCommand &)>;
     std::vector<OnDescriptorSetBindingFunc> on_update_bound_descriptor_sets;
     std::vector<BindingCommand> descriptor_set_binding_commands;
+};
+
+// Track descriptor heaps bound in a command buffer
+class DescriptorHeapBindings {
+  public:
+    // Each time vkCmdBindResourceHeap/vkCmdBindSamplerHeap is called, we store the current state of the command buffer in here
+    struct BindingCommand {
+        // Hold SSBO buffer to be viewed by the GPU
+        vko::BufferRange bound_heap_info_resource{};  // type BoundHeapInfo
+        vko::BufferRange bound_heap_info_sampler{};   // type BoundHeapInfo
+
+        // These are copies of the CPU StateTracking as it has all the information we want for the error message, but too much data
+        // to bring the GPU
+        vvl::CommandBuffer::DescriptorHeap heap_cb_state;
+    };
+    // Most common case we will have 1 call to vkCmdBindResourceHeap and vkCmdBindSamplerHeap only
+    small_vector<BindingCommand, 2> bound_heap_snapshots;
+
+    // Callback system to route the state tracking into the single file doing all the logic
+    using OnDescriptorHeapBindingFunc =
+        stdext::inplace_function<void(Validator& gpuav, CommandBufferSubState& cb, BindingCommand&, bool)>;
+    OnDescriptorHeapBindingFunc on_update_bound_descriptor_heap;
 };
 
 class QueueSubState : public vvl::QueueSubState {
@@ -219,7 +254,7 @@ class QueueSubState : public vvl::QueueSubState {
 
 class ImageSubState : public vvl::ImageSubState {
   public:
-    ImageSubState(vvl::Image &obj, DescriptorHeap &heap);
+    ImageSubState(vvl::Image& obj, DescriptorIdPool& id_pool);
     void Destroy() override;
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
@@ -235,7 +270,7 @@ static inline const ImageSubState &SubState(const vvl::Image &obj) {
 
 class ImageViewSubState : public vvl::ImageViewSubState {
   public:
-    ImageViewSubState(vvl::ImageView &obj, DescriptorHeap &heap);
+    ImageViewSubState(vvl::ImageView& obj, DescriptorIdPool& id_pool);
     void Destroy() override;
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
@@ -251,7 +286,7 @@ static inline const ImageViewSubState &SubState(const vvl::ImageView &obj) {
 
 class BufferSubState : public vvl::BufferSubState {
   public:
-    BufferSubState(vvl::Buffer &obj, DescriptorHeap &heap);
+    BufferSubState(vvl::Buffer& obj, DescriptorIdPool& id_pool);
     void Destroy() override;
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
@@ -267,7 +302,7 @@ static inline const BufferSubState &SubState(const vvl::Buffer &obj) {
 
 class BufferViewSubState : public vvl::BufferViewSubState {
   public:
-    BufferViewSubState(vvl::BufferView &obj, DescriptorHeap &heap);
+    BufferViewSubState(vvl::BufferView& obj, DescriptorIdPool& id_pool);
     void Destroy() override;
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
@@ -283,7 +318,7 @@ static inline const BufferViewSubState &SubState(const vvl::BufferView &obj) {
 
 class SamplerSubState : public vvl::SamplerSubState {
   public:
-    SamplerSubState(vvl::Sampler &obj, DescriptorHeap &heap);
+    SamplerSubState(vvl::Sampler& obj, DescriptorIdPool& id_pool);
     void Destroy() override;
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
@@ -299,7 +334,7 @@ static inline const SamplerSubState &SubState(const vvl::Sampler &obj) {
 
 class AccelerationStructureNVSubState : public vvl::AccelerationStructureNVSubState {
   public:
-    AccelerationStructureNVSubState(vvl::AccelerationStructureNV &obj, DescriptorHeap &heap);
+    AccelerationStructureNVSubState(vvl::AccelerationStructureNV& obj, DescriptorIdPool& id_pool);
     void Destroy() override;
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
@@ -314,12 +349,23 @@ static inline const AccelerationStructureNVSubState &SubState(const vvl::Acceler
 }
 class AccelerationStructureKHRSubState : public vvl::AccelerationStructureKHRSubState {
   public:
-    AccelerationStructureKHRSubState(vvl::AccelerationStructureKHR &obj, DescriptorHeap &heap);
+    AccelerationStructureKHRSubState(Validator& validator, vvl::AccelerationStructureKHR& obj, DescriptorIdPool& id_pool);
     void Destroy() override;
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
     DescriptorId Id() const { return id_tracker ? id_tracker->id : 0; }
     std::optional<DescriptorIdTracker> id_tracker;
+    // sized by geometryCount supplied during build
+    std::vector<vko::BufferRange> index_buffer_copies{};
+    struct GeometryBufferRange {
+        vko::BufferRange range{};
+        VkDeviceSize stride{};
+    };
+    std::vector<GeometryBufferRange> geometry_buffer_copies{};
+    vko::BufferRange gpu_state;
+
+  private:
+    Validator& validator;
 };
 static inline AccelerationStructureKHRSubState &SubState(vvl::AccelerationStructureKHR &obj) {
     return *static_cast<AccelerationStructureKHRSubState *>(obj.SubState(LayerObjectTypeGpuAssisted));
@@ -330,7 +376,7 @@ static inline const AccelerationStructureKHRSubState &SubState(const vvl::Accele
 
 class TensorSubState : public vvl::TensorSubState {
   public:
-    TensorSubState(vvl::Tensor &obj, DescriptorHeap &heap);
+    TensorSubState(vvl::Tensor& obj, DescriptorIdPool& id_pool);
     void Destroy() override;
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
@@ -346,7 +392,7 @@ static inline const TensorSubState &SubState(const vvl::Tensor &obj) {
 
 class TensorViewSubState : public vvl::TensorViewSubState {
   public:
-    TensorViewSubState(vvl::TensorView &obj, DescriptorHeap &heap);
+    TensorViewSubState(vvl::TensorView& obj, DescriptorIdPool& id_pool);
     void Destroy() override;
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
@@ -364,8 +410,9 @@ class ShaderObjectSubState : public vvl::ShaderObjectSubState {
   public:
     explicit ShaderObjectSubState(vvl::ShaderObject &obj);
 
-    bool was_instrumented = false;
+    spirv::InstrumentationStatus instrumented_status;
     uint32_t unique_shader_id = 0;
+
     // We need to keep incase the user calls vkGetShaderBinaryDataEXT
     vku::safe_VkShaderCreateInfoEXT original_create_info;
     VkShaderEXT original_handle = VK_NULL_HANDLE;
@@ -383,15 +430,27 @@ class PipelineSubState : public vvl::PipelineSubState {
     explicit PipelineSubState(Validator &gpuav, vvl::Pipeline &pipeline);
 
     void Destroy() override;
-
+    // Specifically for pipeline instrumented post original creation:
+    // The old pipeline could be in use at time of instrumentation,
+    // so defer old pipeline destroy to Destroy() call.
+    void AddHandleToDestroy(VkPipeline pipeline);
     VkPipelineLayout GetPipelineLayoutUnion(const Location &loc, vvl::DescriptorMode mode) const;
 
-  private:
+    // We create a VkShaderModule that is instrumented and it needs to be destroyed before leaving the pipeline call
+    std::vector<VkShaderModule> shader_modules;
+
+    gpuav::spirv::InstrumentationStatus status;
+    // When we instrument GPL at link time, we need to hold the libraries created by GPU-AV so they can be re-used
+    VkPipeline instrumented_pipeline_lib = VK_NULL_HANDLE;
+
     // Multiple threads can record multiple commands using the same pipeline,
-    // so pipeline layout recreation has to be thread safe
-    mutable std::mutex recreated_layout_mutex{};
-    mutable VkPipelineLayout recreated_layout = VK_NULL_HANDLE;
+    // so layout recreation and deferred pipeline destruction have to be thread safe
+    mutable std::mutex mutex_{};
+
+  private:
+    mutable VkPipelineLayout recreated_layout_ = VK_NULL_HANDLE;
     Validator &gpuav_;
+    VkPipeline uninstrumented_pipeline = VK_NULL_HANDLE;
 };
 
 static inline PipelineSubState &SubState(vvl::Pipeline &pipeline) {

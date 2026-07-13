@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +16,8 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class NegativeGeometryTessellation : public VkLayerTest {};
 
@@ -90,7 +90,7 @@ TEST_F(NegativeGeometryTessellation, GeometryShaderEnabled) {
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkShaderModuleCreateInfo-pCode-08740");
     VkShaderObj gs(*m_device, kGeometryMinimalGlsl, VK_SHADER_STAGE_GEOMETRY_BIT);
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
@@ -114,7 +114,7 @@ TEST_F(NegativeGeometryTessellation, TessellationShaderEnabled) {
         GTEST_SKIP() << "patchControlPoints not supported";
     }
 
-    const char *tcsSource = R"glsl(
+    const char* tcsSource = R"glsl(
         #version 450
         layout(location=0) out int x[];
         layout(vertices=3) out;
@@ -124,7 +124,7 @@ TEST_F(NegativeGeometryTessellation, TessellationShaderEnabled) {
            x[gl_InvocationID] = gl_InvocationID;
         }
     )glsl";
-    const char *tesSource = R"glsl(
+    const char* tesSource = R"glsl(
         #version 450
         layout(triangles, equal_spacing, cw) in;
         layout(location=0) patch in int x;
@@ -145,7 +145,7 @@ TEST_F(NegativeGeometryTessellation, TessellationShaderEnabled) {
 
     VkPipelineTessellationStateCreateInfo tsci{VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, nullptr, 0, 3};
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
         helper.gp_ci_.pTessellationState = &tsci;
         helper.gp_ci_.pInputAssemblyState = &iasci;
@@ -169,7 +169,7 @@ TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderDontWrite) {
     InitRenderTarget();
 
     // Create GS declaring PointSize and writing to it
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (points) out;
@@ -183,7 +183,7 @@ TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderDontWrite) {
     VkShaderObj vs(*m_device, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
@@ -212,7 +212,7 @@ TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderWrite) {
     //     gl_PointSize = 1.0f;
     //     EmitVertex();
     // }
-    const char *gsSource = R"(
+    const char* gsSource = R"(
                OpCapability Geometry
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -258,7 +258,7 @@ TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderWrite) {
     VkShaderObj vs(*m_device, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
@@ -291,7 +291,7 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockOrderMismatchVsGs) {
     //     EmitVertex();
     // }
 
-    const char *gsSource = R"(
+    const char* gsSource = R"(
                OpCapability Geometry
                OpCapability GeometryPointSize
           %1 = OpExtInstImport "GLSL.std.450"
@@ -349,7 +349,7 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockOrderMismatchVsGs) {
     VkShaderObj vs(*m_device, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
@@ -366,7 +366,7 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGs) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (points) out;
@@ -388,7 +388,7 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGs) {
     VkShaderObj vs(*m_device, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
@@ -407,7 +407,7 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGsShaderObject) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (points) out;
@@ -799,7 +799,7 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInstanceVertexCount) {
         )";
         VkShaderObj gs(*m_device, gsSourceStr.c_str(), VK_SHADER_STAGE_GEOMETRY_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
-        const auto set_info = [&](CreatePipelineHelper &helper) {
+        const auto set_info = [&](CreatePipelineHelper& helper) {
             helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
             helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), gs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
         };
@@ -825,7 +825,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_TessellationPatchDecorationMismatc
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *tcsSource = R"glsl(
+    const char* tcsSource = R"glsl(
         #version 450
         layout(location=0) out int x[];
         layout(vertices=3) out;
@@ -835,7 +835,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_TessellationPatchDecorationMismatc
            x[gl_InvocationID] = gl_InvocationID;
         }
     )glsl";
-    const char *tesSource = R"glsl(
+    const char* tesSource = R"glsl(
         #version 450
         layout(triangles, equal_spacing, cw) in;
         layout(location=0) patch in int x;
@@ -852,7 +852,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_TessellationPatchDecorationMismatc
 
     VkPipelineTessellationStateCreateInfo tsci{VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, nullptr, 0, 3};
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.gp_ci_.pTessellationState = &tsci;
         helper.gp_ci_.pInputAssemblyState = &iasci;
         helper.shader_stages_.emplace_back(tcs.GetStageCreateInfo());
@@ -868,7 +868,7 @@ TEST_F(NegativeGeometryTessellation, Tessellation) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *tcsSource = R"glsl(
+    const char* tcsSource = R"glsl(
         #version 450
         layout(vertices=3) out;
         void main(){
@@ -876,7 +876,7 @@ TEST_F(NegativeGeometryTessellation, Tessellation) {
            gl_TessLevelInner[0] = 1;
         }
     )glsl";
-    const char *tesSource = R"glsl(
+    const char* tesSource = R"glsl(
         #version 450
         layout(triangles, equal_spacing, cw) in;
         void main(){
@@ -894,11 +894,11 @@ TEST_F(NegativeGeometryTessellation, Tessellation) {
 
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages = {};
     VkPipelineInputAssemblyStateCreateInfo iasci_bad = iasci;
-    VkPipelineInputAssemblyStateCreateInfo *p_iasci = nullptr;
+    VkPipelineInputAssemblyStateCreateInfo* p_iasci = nullptr;
     VkPipelineTessellationStateCreateInfo tsci_bad = tsci;
-    VkPipelineTessellationStateCreateInfo *p_tsci = nullptr;
+    VkPipelineTessellationStateCreateInfo* p_tsci = nullptr;
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.gp_ci_.pTessellationState = p_tsci;
         helper.gp_ci_.pInputAssemblyState = p_iasci;
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
@@ -958,7 +958,7 @@ TEST_F(NegativeGeometryTessellation, PatchListTopology) {
                                                  VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE};
     VkPipelineTessellationStateCreateInfo tsci{VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, nullptr, 0, 3};
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.gp_ci_.pTessellationState = &tsci;
         helper.gp_ci_.pInputAssemblyState = &iasci;
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), helper.fs_->GetStageCreateInfo(), tcs.GetStageCreateInfo(),
@@ -1081,7 +1081,7 @@ TEST_F(NegativeGeometryTessellation, IncompatiblePrimitiveTopology) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (triangle_strip) out;
@@ -1102,7 +1102,7 @@ TEST_F(NegativeGeometryTessellation, IncompatiblePrimitiveTopology) {
     VkShaderObj vs(*m_device, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
@@ -1120,7 +1120,7 @@ TEST_F(NegativeGeometryTessellation, IncompatibleTessGeomPrimitiveTopology) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *tcsSource = R"glsl(
+    const char* tcsSource = R"glsl(
         #version 450
         layout(location=0) out int x[];
         layout(vertices=3) out;
@@ -1130,7 +1130,7 @@ TEST_F(NegativeGeometryTessellation, IncompatibleTessGeomPrimitiveTopology) {
            x[gl_InvocationID] = gl_InvocationID;
         }
     )glsl";
-    const char *tesSource = R"glsl(
+    const char* tesSource = R"glsl(
         #version 450
         layout(triangles, equal_spacing, cw) in;
         layout(location=0) patch in int x;
@@ -1139,7 +1139,7 @@ TEST_F(NegativeGeometryTessellation, IncompatibleTessGeomPrimitiveTopology) {
            gl_Position.w = x;
         }
     )glsl";
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (triangle_strip) out;
@@ -1165,7 +1165,7 @@ TEST_F(NegativeGeometryTessellation, IncompatibleTessGeomPrimitiveTopology) {
 
     VkPipelineTessellationStateCreateInfo tsci{VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, nullptr, 0, 3};
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
         helper.gp_ci_.pTessellationState = &tsci;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), tcs.GetStageCreateInfo(),
@@ -1257,7 +1257,7 @@ TEST_F(NegativeGeometryTessellation, GeometryStreamsCapability) {
     GetPhysicalDeviceProperties2(xfb_props);
 
     if (xfb_props.maxTransformFeedbackStreams <= 1) {
-        GTEST_SKIP() << "maxTransformFeedbackStreams lower than required";
+        GTEST_SKIP() << "maxTransformFeedbackStreams less than required";
     }
 
     const char geom_src[] = R"glsl(
@@ -1352,42 +1352,39 @@ TEST_F(NegativeGeometryTessellation, MismatchedTessellationExecutionModes) {
         GTEST_SKIP() << "Tessellation shaders not supported";
     }
 
-    std::string vuids[4] = {
-        "VUID-VkGraphicsPipelineCreateInfo-pStages-00732",
-        "VUID-VkGraphicsPipelineCreateInfo-pStages-00733",
-        "VUID-VkGraphicsPipelineCreateInfo-pStages-00734",
-        "VUID-VkGraphicsPipelineCreateInfo-pStages-00735",
+    std::string vuids[6] = {
+        "VUID-VkGraphicsPipelineCreateInfo-pStages-00732",  "VUID-VkGraphicsPipelineCreateInfo-pStages-00733",
+        "VUID-VkGraphicsPipelineCreateInfo-pStages-00734",  "VUID-VkGraphicsPipelineCreateInfo-pStages-00735",
+        "VUID-VkPipelineShaderStageCreateInfo-stage-00713", "VUID-VkPipelineShaderStageCreateInfo-stage-00713",
     };
 
-    std::string tesc_subdivision[4] = {
-        "",
-        "OpExecutionMode %main Quads",
-        "",
-        "",
+    std::string tesc_subdivision[6] = {
+        "", "OpExecutionMode %main Quads", "", "", "", "",
     };
 
-    std::string tese_subdivision[4] = {
+    std::string tese_subdivision[6] = {
         "",
         "OpExecutionMode %main Triangles",
         "OpExecutionMode %main Triangles",
         "OpExecutionMode %main Triangles",
+        "OpExecutionMode %main Triangles",
+        "OpExecutionMode %main Triangles",
     };
 
-    std::string tesc_output_vertices[4] = {
+    std::string tesc_output_vertices[6] = {
         "OpExecutionMode %main OutputVertices 4",
         "OpExecutionMode %main OutputVertices 4",
         "",
         "OpExecutionMode %main OutputVertices 4",
+        "OpExecutionMode %main OutputVertices 4096",
+        "OpExecutionMode %main OutputVertices 4096",
     };
 
-    std::string tese_output_vertices[4] = {
-        "",
-        "",
-        "",
-        "OpExecutionMode %main OutputVertices 3",
+    std::string tese_output_vertices[6] = {
+        "", "", "", "OpExecutionMode %main OutputVertices 3", "OpExecutionMode %main OutputVertices 4096", "",
     };
 
-    for (uint32_t i = 0; i < 4; ++i) {
+    for (uint32_t i = 0; i < 6; ++i) {
         std::string tesc_source = R"(
                OpCapability Tessellation
           %1 = OpExtInstImport "GLSL.std.450"
@@ -1532,7 +1529,7 @@ TEST_F(NegativeGeometryTessellation, MismatchedTessellationExecutionModesDraw) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    const char *tesc_src = R"(
+    const char* tesc_src = R"(
                OpCapability Tessellation
                OpMemoryModel Logical GLSL450
                OpEntryPoint TessellationControl %main "main" %gl_TessLevelOuter %gl_TessLevelInner
@@ -1569,7 +1566,7 @@ TEST_F(NegativeGeometryTessellation, MismatchedTessellationExecutionModesDraw) {
                OpFunctionEnd
     )";
 
-    const char *tese_src = R"(
+    const char* tese_src = R"(
                OpCapability Tessellation
                OpMemoryModel Logical GLSL450
                OpEntryPoint TessellationEvaluation %main "main" %_
@@ -1656,7 +1653,7 @@ TEST_F(NegativeGeometryTessellation, WritingToLayerWithSingleFramebufferLayer) {
             gl_Layer = 4;
         }
     )glsl";
-    const VkShaderObj gs(*m_device, gsSource.data(), VK_SHADER_STAGE_GEOMETRY_BIT);
+    VkShaderObj gs(*m_device, gsSource.data(), VK_SHADER_STAGE_GEOMETRY_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
@@ -1683,7 +1680,7 @@ TEST_F(NegativeGeometryTessellation, DrawDynamicPrimitiveTopology) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (triangle_strip) out;

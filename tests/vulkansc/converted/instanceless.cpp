@@ -1,9 +1,9 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
 // See vksc_convert_tests.py for modifications
 
-/* Copyright (c) 2020-2025 The Khronos Group Inc.
- * Copyright (c) 2020-2025 Valve Corporation
- * Copyright (c) 2020-2025 LunarG, Inc.
+/* Copyright (c) 2020-2026 The Khronos Group Inc.
+ * Copyright (c) 2020-2026 Valve Corporation
+ * Copyright (c) 2020-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@
 #include <thread>
 #include <vector>
 
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 static VkInstance dummy_instance;
 

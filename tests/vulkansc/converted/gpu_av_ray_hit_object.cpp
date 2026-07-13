@@ -18,9 +18,9 @@
  * limitations under the License.
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/ray_tracing_objects.h"
+#include "layer_validation_tests.h"
+#include "descriptor_helper.h"
+#include "ray_tracing_objects.h"
 
 class NegativeGpuAVRayHitObject : public GpuAVRayHitObjectTest {};
 
@@ -30,7 +30,7 @@ TEST_F(NegativeGpuAVRayHitObject, NegativeTmin) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -57,7 +57,7 @@ TEST_F(NegativeGpuAVRayHitObject, NegativeTmin) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = -1.0f;  // negative tmin
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -85,7 +85,7 @@ TEST_F(NegativeGpuAVRayHitObject, TmaxLessThanTmin) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -112,7 +112,7 @@ TEST_F(NegativeGpuAVRayHitObject, TmaxLessThanTmin) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = 10.0f;  // tmin
     ptr[1] = 5.0f;   // tmax < tmin
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
@@ -141,7 +141,7 @@ TEST_F(NegativeGpuAVRayHitObject, OriginNaN) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -169,7 +169,7 @@ TEST_F(NegativeGpuAVRayHitObject, OriginNaN) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = 1.0f;
     ptr[1] = 0.0f;  // division by zero -> inf, fract(inf) = NaN
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
@@ -198,7 +198,7 @@ TEST_F(NegativeGpuAVRayHitObject, OriginNonFinite) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -226,7 +226,7 @@ TEST_F(NegativeGpuAVRayHitObject, OriginNonFinite) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = 0.0f;  // causes division by zero -> +infinity
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -254,7 +254,7 @@ TEST_F(NegativeGpuAVRayHitObject, BothSkipFlags) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -282,7 +282,7 @@ TEST_F(NegativeGpuAVRayHitObject, BothSkipFlags) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<uint32_t *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     ptr[0] = 0x100 | 0x200;  // SkipTrianglesKHR | SkipAABBsKHR
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -310,7 +310,7 @@ TEST_F(NegativeGpuAVRayHitObject, OpaqueFlags) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -337,7 +337,7 @@ TEST_F(NegativeGpuAVRayHitObject, OpaqueFlags) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<uint32_t *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     ptr[0] = 0x1 | 0x2;  // OpaqueKHR | NoOpaqueKHR
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -365,7 +365,7 @@ TEST_F(NegativeGpuAVRayHitObject, SkipAndCullFlags) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -393,7 +393,7 @@ TEST_F(NegativeGpuAVRayHitObject, SkipAndCullFlags) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<uint32_t *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     ptr[0] = 0x100 | 0x10;  // SkipTrianglesKHR | CullBackFacingTrianglesKHR
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -422,7 +422,7 @@ TEST_F(NegativeGpuAVRayHitObject, SkipTrianglesWithPipelineSkipAABBs) {
     vkt::rt::Pipeline pipeline(*this, m_device);
     pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_SKIP_AABBS_BIT_KHR);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -450,7 +450,7 @@ TEST_F(NegativeGpuAVRayHitObject, SkipTrianglesWithPipelineSkipAABBs) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<uint32_t *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     ptr[0] = 0x100;  // SkipTrianglesKHR
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -479,7 +479,7 @@ TEST_F(NegativeGpuAVRayHitObject, SkipAABBsWithPipelineSkipTriangles) {
     vkt::rt::Pipeline pipeline(*this, m_device);
     pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_SKIP_TRIANGLES_BIT_KHR);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -507,7 +507,7 @@ TEST_F(NegativeGpuAVRayHitObject, SkipAABBsWithPipelineSkipTriangles) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<uint32_t *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     ptr[0] = 0x200;  // SkipAABBsKHR
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -536,7 +536,7 @@ TEST_F(NegativeGpuAVRayHitObject, MotionTimeOutOfRange) {
     vkt::rt::Pipeline pipeline(*this, m_device);
     pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_ALLOW_MOTION_BIT_NV);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -564,7 +564,7 @@ TEST_F(NegativeGpuAVRayHitObject, MotionTimeOutOfRange) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = 1.5f;  // time > 1.0, invalid
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -607,7 +607,7 @@ TEST_F(NegativeGpuAVRayHitObject, SBTIndexExceedsLimit) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_ray_query : require
@@ -637,7 +637,7 @@ TEST_F(NegativeGpuAVRayHitObject, SBTIndexExceedsLimit) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<uint32_t *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     ptr[0] = reorder_props.maxShaderBindingTableRecordIndex + 1;  // Exceed the limit
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -665,7 +665,7 @@ TEST_F(NegativeGpuAVRayHitObject, TraceReorderExecuteNegativeTmin) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -692,7 +692,7 @@ TEST_F(NegativeGpuAVRayHitObject, TraceReorderExecuteNegativeTmin) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = -1.0f;  // negative tmin
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -720,7 +720,7 @@ TEST_F(NegativeGpuAVRayHitObject, TraceMotionReorderExecuteNegativeTmin) {
     vkt::rt::Pipeline pipeline(*this, m_device);
     pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_ALLOW_MOTION_BIT_NV);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -748,7 +748,7 @@ TEST_F(NegativeGpuAVRayHitObject, TraceMotionReorderExecuteNegativeTmin) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = -1.0f;  // negative tmin
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -777,7 +777,7 @@ TEST_F(NegativeGpuAVRayHitObject, TraceMotionReorderExecuteTimeOutOfRange) {
     vkt::rt::Pipeline pipeline(*this, m_device);
     pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_ALLOW_MOTION_BIT_NV);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -805,7 +805,7 @@ TEST_F(NegativeGpuAVRayHitObject, TraceMotionReorderExecuteTimeOutOfRange) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = 1.5f;  // time > 1.0, invalid
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();

@@ -2,7 +2,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/render_pass_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
+#include "render_pass_helper.h"
 #include "utils/convert_utils.h"
 
 class PositiveRenderPass : public VkLayerTest {};
@@ -125,9 +125,17 @@ TEST_F(PositiveRenderPass, BeginSubpassZeroTransitionsApplied) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(rp, fb, 32, 32);
 
-    image.ImageMemoryBarrier(m_command_buffer, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    VkImageMemoryBarrier barrier = vku::InitStructHelper();
+    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_DEPENDENCY_BY_REGION_BIT);
 
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -198,12 +206,9 @@ TEST_F(PositiveRenderPass, BeginStencilLoadOp) {
     vkt::CommandBuffer cmdbuf(*m_device, m_command_pool);
     cmdbuf.Begin();
 
-    m_depthStencil->ImageMemoryBarrier(cmdbuf, VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                                       VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-                                       VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    cmdbuf.TransitionLayout(*m_depthStencil, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    cmdbuf.TransitionLayout(destImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    destImage.ImageMemoryBarrier(cmdbuf, 0, VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     VkImageCopy cregion;
     cregion.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1};
     cregion.srcOffset = {0, 0, 0};
@@ -526,9 +531,8 @@ TEST_F(PositiveRenderPass, SingleMipTransition) {
 
     // At this point the first miplevel should be in GENERAL due to the "finalLayout" in the render pass.
     // Note that these image barriers attempt to transition *all* miplevels, even though only 1 miplevel has transitioned.
-    colorImage.ImageMemoryBarrier(m_command_buffer, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                  VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    m_command_buffer.ImageBarrier(colorImage, VK_IMAGE_LAYOUT_GENERAL);
+
     m_command_buffer.End();
 }
 
@@ -900,9 +904,9 @@ TEST_F(PositiveRenderPass, SeparateDepthStencilSubresourceLayout) {
     {
         m_command_buffer.Begin();
         auto depth_barrier =
-            image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depth_range);
+            image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depth_range);
         auto stencil_barrier =
-            image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL, stencil_range);
+            image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL, stencil_range);
         vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                                nullptr, 0, nullptr, 1, &depth_barrier);
         vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
@@ -915,35 +919,31 @@ TEST_F(PositiveRenderPass, SeparateDepthStencilSubresourceLayout) {
     m_command_buffer.Begin();
 
     // Test that we handle initial layout in command buffer.
-    barriers.push_back(image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL,
-                                                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, depth_stencil_range));
+    barriers.push_back(image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL,
+                                                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, depth_stencil_range));
 
     // Test that we can transition aspects separately and use specific layouts.
-    barriers.push_back(image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                                                VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, depth_range));
+    barriers.push_back(image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                                                     VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, depth_range));
 
-    barriers.push_back(image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL,
-                                                VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL, stencil_range));
+    barriers.push_back(image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL,
+                                                     VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL, stencil_range));
 
     // Test that transition from UNDEFINED on depth aspect does not clobber stencil layout.
     barriers.push_back(
-        image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depth_range));
+        image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depth_range));
 
     // Test that we can transition aspects separately and use combined layouts. (Only care about the aspect in question).
-    barriers.push_back(image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                                VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, depth_range));
+    barriers.push_back(image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                                                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, depth_range));
 
-    barriers.push_back(image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-                                                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, stencil_range));
+    barriers.push_back(image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                                                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, stencil_range));
 
     // Test that we can transition back again with combined layout.
-    barriers.push_back(image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
-                                                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, depth_stencil_range));
+    barriers.push_back(image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+                                                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, depth_stencil_range));
 
-    VkRenderPassCreateInfo2 rp2 = vku::InitStructHelper();
-    VkAttachmentDescription2 desc = vku::InitStructHelper();
-    VkSubpassDescription2 sub = vku::InitStructHelper();
-    VkAttachmentReference2 att = vku::InitStructHelper();
     VkAttachmentDescriptionStencilLayout stencil_desc = vku::InitStructHelper();
     VkAttachmentReferenceStencilLayout stencil_att = vku::InitStructHelper();
     // Test that we can discard stencil layout.
@@ -951,6 +951,7 @@ TEST_F(PositiveRenderPass, SeparateDepthStencilSubresourceLayout) {
     stencil_desc.stencilFinalLayout = VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL;
     stencil_att.stencilLayout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription2 desc = vku::InitStructHelper(&stencil_desc);
     desc.format = ds_format;
     desc.initialLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
     desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
@@ -959,14 +960,16 @@ TEST_F(PositiveRenderPass, SeparateDepthStencilSubresourceLayout) {
     desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
     desc.samples = VK_SAMPLE_COUNT_1_BIT;
-    desc.pNext = &stencil_desc;
 
+    VkAttachmentReference2 att = vku::InitStructHelper(&stencil_att);
     att.layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
     att.attachment = 0;
-    att.pNext = &stencil_att;
 
+    VkSubpassDescription2 sub = vku::InitStructHelper();
     sub.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     sub.pDepthStencilAttachment = &att;
+
+    VkRenderPassCreateInfo2 rp2 = vku::InitStructHelper();
     rp2.subpassCount = 1;
     rp2.pSubpasses = &sub;
     rp2.attachmentCount = 1;
@@ -984,7 +987,7 @@ TEST_F(PositiveRenderPass, SeparateDepthStencilSubresourceLayout) {
     vkt::Framebuffer framebuffer_separate(*m_device, render_pass_separate, 1, &view.handle(), 1, 1);
     vkt::Framebuffer framebuffer_combined(*m_device, render_pass_combined, 1, &view.handle(), 1, 1);
 
-    for (auto &barrier : barriers) {
+    for (auto& barrier : barriers) {
         vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                                nullptr, 0, nullptr, 1, &barrier);
     }

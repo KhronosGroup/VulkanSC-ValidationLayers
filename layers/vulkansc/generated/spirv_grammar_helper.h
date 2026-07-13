@@ -38,6 +38,8 @@ const char* string_SpvDecoration(uint32_t decoration);
 const char* string_SpvBuiltIn(spv::BuiltIn built_in);
 const char* string_SpvDim(uint32_t dim);
 std::string string_SpvCooperativeMatrixOperands(uint32_t mask);
+std::string string_SpvRayFlagsMask(uint32_t mask);
+const char* string_SpvFPEncoding(spv::FPEncoding value);
 
 static constexpr bool OpcodeHasType(uint32_t opcode) {
     switch (opcode) {
@@ -327,6 +329,8 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpBufferPointerEXT:
         case spv::OpUntypedImageTexelPointerEXT:
         case spv::OpConstantSizeOfEXT:
+        case spv::OpConstantDataKHR:
+        case spv::OpSpecConstantDataKHR:
         case spv::OpHitObjectGetWorldToObjectNV:
         case spv::OpHitObjectGetObjectToWorldNV:
         case spv::OpHitObjectGetObjectRayDirectionNV:
@@ -458,6 +462,7 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpSubgroupMatrixMultiplyAccumulateINTEL:
         case spv::OpBitwiseFunctionINTEL:
         case spv::OpUntypedVariableLengthArrayINTEL:
+        case spv::OpPredicatedLoadINTEL:
         case spv::OpGroupIMulKHR:
         case spv::OpGroupFMulKHR:
         case spv::OpGroupBitwiseAndKHR:
@@ -467,11 +472,16 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpGroupLogicalOrKHR:
         case spv::OpGroupLogicalXorKHR:
         case spv::OpRoundFToTF32INTEL:
+        case spv::OpFDot2MixAcc32VALVE:
+        case spv::OpFDot2MixAcc16VALVE:
+        case spv::OpFDot4MixAcc32VALVE:
 #ifdef VK_ENABLE_BETA_EXTENSIONS
         case spv::OpAllocateNodePayloadsAMDX:
         case spv::OpFinishWritingNodePayloadAMDX:
         case spv::OpNodePayloadArrayLengthAMDX:
         case spv::OpIsNodePayloadValidAMDX:
+        case spv::OpPoisonKHR:
+        case spv::OpFreezeKHR:
         case spv::OpSpecConstantTargetINTEL:
         case spv::OpSpecConstantArchitectureINTEL:
         case spv::OpSpecConstantCapabilitiesINTEL:
@@ -798,6 +808,8 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpBufferPointerEXT:
         case spv::OpUntypedImageTexelPointerEXT:
         case spv::OpConstantSizeOfEXT:
+        case spv::OpConstantDataKHR:
+        case spv::OpSpecConstantDataKHR:
         case spv::OpHitObjectGetWorldToObjectNV:
         case spv::OpHitObjectGetObjectToWorldNV:
         case spv::OpHitObjectGetObjectRayDirectionNV:
@@ -936,6 +948,7 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpSubgroupMatrixMultiplyAccumulateINTEL:
         case spv::OpBitwiseFunctionINTEL:
         case spv::OpUntypedVariableLengthArrayINTEL:
+        case spv::OpPredicatedLoadINTEL:
         case spv::OpGroupIMulKHR:
         case spv::OpGroupFMulKHR:
         case spv::OpGroupBitwiseAndKHR:
@@ -945,6 +958,9 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpGroupLogicalOrKHR:
         case spv::OpGroupLogicalXorKHR:
         case spv::OpRoundFToTF32INTEL:
+        case spv::OpFDot2MixAcc32VALVE:
+        case spv::OpFDot2MixAcc16VALVE:
+        case spv::OpFDot4MixAcc32VALVE:
 #ifdef VK_ENABLE_BETA_EXTENSIONS
         case spv::OpAllocateNodePayloadsAMDX:
         case spv::OpTypeNodePayloadArrayAMDX:
@@ -953,6 +969,8 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpIsNodePayloadValidAMDX:
         case spv::OpConstantStringAMDX:
         case spv::OpSpecConstantStringAMDX:
+        case spv::OpPoisonKHR:
+        case spv::OpFreezeKHR:
         case spv::OpSpecConstantTargetINTEL:
         case spv::OpSpecConstantArchitectureINTEL:
         case spv::OpSpecConstantCapabilitiesINTEL:
@@ -1120,6 +1138,8 @@ static constexpr uint32_t OpcodeMemoryScopePosition(uint32_t opcode) {
             return 1;
         case spv::OpControlBarrier:
         case spv::OpAtomicStore:
+        case spv::OpControlBarrierArriveEXT:
+        case spv::OpControlBarrierWaitEXT:
             return 2;
         case spv::OpAtomicLoad:
         case spv::OpAtomicExchange:
@@ -1151,6 +1171,8 @@ static constexpr uint32_t OpcodeExecutionScopePosition(uint32_t opcode) {
     uint32_t position = 0;
     switch (opcode) {
         case spv::OpControlBarrier:
+        case spv::OpControlBarrierArriveEXT:
+        case spv::OpControlBarrierWaitEXT:
             return 1;
         case spv::OpGroupAll:
         case spv::OpGroupAny:

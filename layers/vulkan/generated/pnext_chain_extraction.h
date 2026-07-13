@@ -32,22 +32,22 @@
 namespace vvl {
 
 // Add element to the end of a pNext chain
-void *PnextChainAdd(void *chain, void *new_struct);
+void* PnextChainAdd(void* chain, void* new_struct);
 
 // Remove last element from a pNext chain
-void PnextChainRemoveLast(void *chain);
+void PnextChainRemoveLast(void* chain);
 
 // Free dynamically allocated pnext chain structs
-void PnextChainFree(void *chain);
+void PnextChainFree(void* chain);
 
 // Helper class relying on RAII to help with adding and removing an element from a pNext chain
 class PnextChainScopedAdd {
   public:
-    PnextChainScopedAdd(void *chain, void *new_struct) : chain(chain) { PnextChainAdd(chain, new_struct); }
+    PnextChainScopedAdd(void* chain, void* new_struct) : chain(chain) { PnextChainAdd(chain, new_struct); }
     ~PnextChainScopedAdd() { PnextChainRemoveLast(chain); }
 
   private:
-    void *chain = nullptr;
+    void* chain = nullptr;
 };
 
 // clang-format off
@@ -66,9 +66,13 @@ void *PnextChainExtract(const void */*in_pnext_chain*/, T &/*out*/) { assert(fal
 // and add your reference struct to the `target_structs` list at the beginning of the file.
 
 using PnextChainVkPhysicalDeviceImageFormatInfo2 = std::tuple<
+	VkDataGraphOpticalFlowImageFormatInfoARM,
 	VkImageCompressionControlEXT,
+	VkImageCreateFlags2CreateInfoKHR,
 	VkImageFormatListCreateInfo,
+	VkImageStencilUsage2CreateInfoKHR,
 	VkImageStencilUsageCreateInfo,
+	VkImageUsageFlags2CreateInfoKHR,
 	VkOpticalFlowImageFormatInfoNV,
 	VkPhysicalDeviceExternalImageFormatInfo,
 	VkPhysicalDeviceImageDrmFormatModifierInfoEXT,

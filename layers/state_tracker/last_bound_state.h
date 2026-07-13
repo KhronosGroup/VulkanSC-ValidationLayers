@@ -18,6 +18,7 @@
  */
 #pragma once
 
+#include "containers/limits.h"
 #include "state_tracker/pipeline_layout_state.h"
 #include "state_tracker/descriptor_mode.h"
 #include "utils/shader_utils.h"
@@ -38,6 +39,8 @@ namespace spirv {
 struct EntryPoint;
 }  // namespace spirv
 
+struct ShaderStageState;
+
 // Track last states that are bound per pipeline bind point (Gfx & Compute)
 struct LastBound {
     LastBound(vvl::CommandBuffer &cb, const VkPipelineBindPoint bind_point) : cb_state(cb), bind_point(bind_point) {}
@@ -49,13 +52,17 @@ struct LastBound {
     // All shader stages for a used pipeline bind point must be bound to with a valid shader or VK_NULL_HANDLE
     // We have to track shader_object_bound, because shader_object_states will be nullptr when VK_NULL_HANDLE is used
     bool shader_object_bound[kShaderObjectStageCount]{false};
-    vvl::ShaderObject *shader_object_states[kShaderObjectStageCount]{nullptr};
+    std::shared_ptr<vvl::ShaderObject> shader_object_states[kShaderObjectStageCount]{nullptr};
     // The compatible layout used binding descriptor sets (track location to provide better error message)
     std::shared_ptr<const vvl::PipelineLayout> desc_set_pipeline_layout;
     vvl::Func desc_set_bound_command = vvl::Func::Empty;  // will be something like vkCmdBindDescriptorSets
     std::shared_ptr<vvl::DescriptorSet> push_descriptor_set;
 
+    // Common worst case is using task/mesh/fragment, so chose size of 3 to start
+    small_vector<const ShaderStageState*, 3> GetStages() const;
+
     struct DescriptorBufferBinding {
+        uint32_t embedded = vvl::kNoIndex32;
         uint32_t index = 0;
         VkDeviceSize offset = 0;
     };
@@ -84,6 +91,9 @@ struct LastBound {
     // Ordered bound set tracking where index is set# that given set is bound to
     std::vector<DescriptorSetSlot> ds_slots;
 
+    void BindPipeline(vvl::Pipeline* pipe_state);
+    void BindShaderObject(VkShaderStageFlagBits shader_stage, const std::shared_ptr<vvl::ShaderObject>& shader_object_state);
+
     void Reset();
 
     void UnbindAndResetPushDescriptorSet(std::shared_ptr<vvl::DescriptorSet> &&ds);
@@ -102,6 +112,7 @@ struct LastBound {
     VkStencilOpState GetStencilOpStateBack() const;
     VkSampleCountFlagBits GetRasterizationSamples() const;
     bool IsRasterizationDisabled() const;
+    std::string DescribeRasterizationDisabled() const;
     bool IsLogicOpEnabled() const;
     VkColorComponentFlags GetColorWriteMask(uint32_t i) const;
     bool IsColorWriteEnabled(uint32_t i) const;
@@ -158,6 +169,8 @@ struct LastBound {
 
     // Since GPU-AV uses this to access an array, force a getter to ensure people use this correctly.
     vvl::DescriptorMode GetActionDescriptorMode() const;
+    // Will be Unknown if shader is not using any descriptor
+    // GetActionDescriptorMode() will check the bound pipeline/shaders if Unknown
     vvl::DescriptorMode GetDescriptorMode() const { return descriptor_mode; };
     void SetDescriptorMode(vvl::DescriptorMode new_mode, vvl::Func function) {
         previous_descriptor_mode = descriptor_mode;
@@ -165,6 +178,7 @@ struct LastBound {
         descriptor_mode = new_mode;
         set_descriptor_mode = function;
     };
+    vvl::Func GetDescriptorModeFunc() const { return set_descriptor_mode; }
     std::string DescribeInvalidDescriptorMode() const;
 
   private:

@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class PositiveMesh : public MeshTest {};
 
@@ -33,7 +33,7 @@ TEST_F(PositiveMesh, BasicUsage) {
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(max_vertices = 3, max_primitives=1) out;
@@ -236,7 +236,7 @@ TEST_F(PositiveMesh, TaskAndMeshShaderNV) {
     VkShaderObj ts(*m_device, taskShaderText, VK_SHADER_STAGE_TASK_BIT_NV, SPV_ENV_VULKAN_1_2);
     VkShaderObj ms(*m_device, meshShaderText, VK_SHADER_STAGE_MESH_BIT_NV, SPV_ENV_VULKAN_1_2);
 
-    const auto break_vp = [&](CreatePipelineHelper &helper) {
+    const auto break_vp = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {ts.GetStageCreateInfo(), ms.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, break_vp, kErrorBit);
@@ -292,7 +292,7 @@ TEST_F(PositiveMesh, MeshPerTaskNV) {
     VkShaderObj ts(*m_device, taskShaderText, VK_SHADER_STAGE_TASK_BIT_NV, SPV_ENV_VULKAN_1_2);
     VkShaderObj ms(*m_device, meshShaderText, VK_SHADER_STAGE_MESH_BIT_NV, SPV_ENV_VULKAN_1_2);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {ts.GetStageCreateInfo(), ms.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
@@ -319,7 +319,7 @@ TEST_F(PositiveMesh, DrawIndexMesh) {
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(max_vertices = 32, max_primitives = 32, triangles) out;
@@ -343,7 +343,7 @@ TEST_F(PositiveMesh, DrawIndexTask) {
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
-    const char *task_source = R"glsl(
+    const char* task_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         taskPayloadSharedEXT uint mesh_payload[32];
@@ -353,7 +353,7 @@ TEST_F(PositiveMesh, DrawIndexTask) {
         }
     )glsl";
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(max_vertices = 32, max_primitives = 32, triangles) out;
@@ -384,7 +384,7 @@ TEST_F(PositiveMesh, MeshAndTaskShaderDerivatives) {
         GTEST_SKIP() << "meshAndTaskShaderDerivatives is not supported";
     }
 
-    const char *ms_source = R"(
+    const char* ms_source = R"(
                OpCapability ComputeDerivativeGroupQuadsKHR
                OpCapability MeshShadingEXT
                OpExtension "SPV_EXT_mesh_shader"
@@ -429,7 +429,7 @@ TEST_F(PositiveMesh, TessellationDynamicState) {
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(max_vertices = 3, max_primitives=1) out;
@@ -461,7 +461,7 @@ TEST_F(PositiveMesh, TaskPayloadSharedSpecConstant) {
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
-    const char *task_source = R"glsl(
+    const char* task_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(constant_id = 0) const int SIZE = 64;
@@ -475,7 +475,7 @@ TEST_F(PositiveMesh, TaskPayloadSharedSpecConstant) {
         }
     )glsl";
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(max_vertices = 32, max_primitives = 32, triangles) out;

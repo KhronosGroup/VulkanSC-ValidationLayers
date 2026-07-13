@@ -12,10 +12,10 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/buffer_helper.h"
-#include "../framework/shader_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "buffer_helper.h"
+#include "shader_helper.h"
 
 class PositiveGpuAVVertexAttributeFetch : public GpuAVTest {};
 
@@ -25,7 +25,7 @@ TEST_F(PositiveGpuAVVertexAttributeFetch, IndirectDrawZeroStride) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 450
         layout(location=0) in vec3 pos;
         void main() {

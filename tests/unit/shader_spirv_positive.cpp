@@ -13,9 +13,10 @@
 
 #include <gtest/gtest.h>
 #include <spirv-tools/libspirv.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/shader_helper.h"
+#include <cstdint>
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "shader_helper.h"
 
 class PositiveShaderSpirv : public VkLayerTest {};
 
@@ -29,7 +30,7 @@ TEST_F(PositiveShaderSpirv, NonSemanticInfo) {
 
     // compute shader using a non-semantic extended instruction set.
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                    OpCapability Shader
                    OpExtension "SPV_KHR_non_semantic_info"
    %non_semantic = OpExtInstImport "NonSemantic.Validation.Test"
@@ -183,7 +184,7 @@ TEST_F(PositiveShaderSpirv, CapabilityExtension1of2) {
     InitRenderTarget();
 
     // Vertex shader using viewport array capability
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 450
         #extension GL_ARB_shader_viewport_layer_array : enable
         void main() {
@@ -209,7 +210,7 @@ TEST_F(PositiveShaderSpirv, CapabilityExtension2of2) {
     InitRenderTarget();
 
     // Vertex shader using viewport array capability
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 450
         #extension GL_ARB_shader_viewport_layer_array : enable
         void main() {
@@ -233,7 +234,7 @@ TEST_F(PositiveShaderSpirv, ShaderViewportIndexLayerEXT) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_ARB_shader_viewport_layer_array : enable
         void main() {
@@ -256,7 +257,7 @@ TEST_F(PositiveShaderSpirv, ShaderDrawParametersWithoutFeature) {
         GTEST_SKIP() << "requires Vulkan 1.0 exactly";
     }
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 460
         void main(){
            gl_Position = vec4(float(gl_BaseVertex));
@@ -265,7 +266,7 @@ TEST_F(PositiveShaderSpirv, ShaderDrawParametersWithoutFeature) {
     VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
 
     if (VK_SUCCESS == vs.InitFromGLSLTry()) {
-        const auto set_info = [&](CreatePipelineHelper &helper) {
+        const auto set_info = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
         };
         CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
@@ -283,7 +284,7 @@ TEST_F(PositiveShaderSpirv, ShaderDrawParametersWithoutFeature11) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 460
         void main(){
            gl_Position = vec4(float(gl_BaseVertex));
@@ -293,7 +294,7 @@ TEST_F(PositiveShaderSpirv, ShaderDrawParametersWithoutFeature11) {
 
     // make sure using SPIR-V 1.3 as extension is core and not needed in Vulkan then
     if (VK_SUCCESS == vs.InitFromGLSLTry()) {
-        const auto set_info = [&](CreatePipelineHelper &helper) {
+        const auto set_info = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
         };
         CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
@@ -317,7 +318,7 @@ TEST_F(PositiveShaderSpirv, ShaderDrawParametersWithFeature) {
     RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 460
         void main(){
            gl_Position = vec4(float(gl_BaseVertex));
@@ -327,7 +328,7 @@ TEST_F(PositiveShaderSpirv, ShaderDrawParametersWithFeature) {
 
     // make sure using SPIR-V 1.3 as extension is core and not needed in Vulkan then
     if (VK_SUCCESS == vs.InitFromGLSLTry()) {
-        const auto set_info = [&](CreatePipelineHelper &helper) {
+        const auto set_info = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
         };
         CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
@@ -346,9 +347,9 @@ TEST_F(PositiveShaderSpirv, Std430SpirvOptFlags10) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 
-    const char *fragment_source = R"glsl(
+    const char* fragment_source = R"glsl(
 #version 450
 #extension GL_ARB_separate_shader_objects:enable
 #extension GL_EXT_samplerless_texture_functions:require
@@ -376,8 +377,8 @@ void main() {
     float data = 2.0f;
     VkSpecializationMapEntry entry = {0, 0, sizeof(float)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(float), &data};
-    const VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
+                   &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
@@ -395,9 +396,9 @@ TEST_F(PositiveShaderSpirv, Std430SpirvOptFlags12) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 
-    const char *fragment_source = R"glsl(
+    const char* fragment_source = R"glsl(
 #version 450
 #extension GL_ARB_separate_shader_objects:enable
 #extension GL_EXT_samplerless_texture_functions:require
@@ -425,8 +426,8 @@ void main() {
     float data = 2.0f;
     VkSpecializationMapEntry entry = {0, 0, sizeof(float)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(float), &data};
-    const VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
+                   &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
@@ -557,7 +558,7 @@ TEST_F(PositiveShaderSpirv, SpecializationWordBoundryOffset) {
         5,
         entries,
         sizeof(uint8_t) * 8,
-        reinterpret_cast<void *>(data),
+        reinterpret_cast<void*>(data),
     };
 
     CreateComputePipelineHelper pipe(*this);
@@ -584,9 +585,9 @@ TEST_F(PositiveShaderSpirv, SpecializationWordBoundryOffset) {
     m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Make sure spec constants were updated correctly
-    void *pData;
+    void* pData;
     ASSERT_EQ(VK_SUCCESS, vk::MapMemory(device(), buffer.Memory(), 0, VK_WHOLE_SIZE, 0, &pData));
-    uint32_t *ssbo_data = reinterpret_cast<uint32_t *>(pData);
+    uint32_t* ssbo_data = reinterpret_cast<uint32_t*>(pData);
     ASSERT_EQ(ssbo_data[0], 0x02);
     ASSERT_EQ(ssbo_data[1], 0x05040302);
     ASSERT_EQ(ssbo_data[2], 0x06050403);
@@ -713,7 +714,7 @@ TEST_F(PositiveShaderSpirv, OpTypeStructRuntimeArray) {
     // %float = OpTypeFloat 32
     // %ra = OpTypeRuntimeArray %float
     // %struct = OpTypeStruct %ra
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set=0, binding=0) buffer sb {
             float values[];
@@ -740,19 +741,15 @@ TEST_F(PositiveShaderSpirv, UnnormalizedCoordinatesNotSampled) {
     // Verify that it is allowed on this implementation if
     // VK_KHR_format_feature_flags2 is available.
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
-        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
-        VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
-
-        vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);
-
-        if (!(fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT)) {
+        const auto fmt_props = m_device->FormatFeaturesOptimal(VK_FORMAT_R8G8B8A8_UNORM);
+        if (!(fmt_props & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT)) {
             GTEST_SKIP() << "R8G8B8A8_UNORM does not support OpImage*Dref* operations";
         }
     }
 
     VkShaderObj vs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 
-    const char *fsSource = R"(
+    const char* fsSource = R"(
                OpCapability Shader
                OpCapability ImageBuffer
                OpMemoryModel Logical GLSL450
@@ -897,7 +894,7 @@ TEST_F(PositiveShaderSpirv, SpecializeInt8) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_src = R"(
+    const char* fs_src = R"(
                OpCapability Shader
                OpCapability Int8
           %1 = OpExtInstImport "GLSL.std.450"
@@ -918,7 +915,7 @@ TEST_F(PositiveShaderSpirv, SpecializeInt8) {
                OpFunctionEnd
     )";
 
-    VkShaderObj const fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     const VkSpecializationMapEntry entry = {
         0,               // id
@@ -947,7 +944,7 @@ TEST_F(PositiveShaderSpirv, SpecializeInt16) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_src = R"(
+    const char* fs_src = R"(
                OpCapability Shader
                OpCapability Int16
           %1 = OpExtInstImport "GLSL.std.450"
@@ -968,7 +965,7 @@ TEST_F(PositiveShaderSpirv, SpecializeInt16) {
                OpFunctionEnd
     )";
 
-    VkShaderObj const fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     const VkSpecializationMapEntry entry = {
         0,                // id
@@ -996,7 +993,7 @@ TEST_F(PositiveShaderSpirv, SpecializeInt32) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_src = R"(
+    const char* fs_src = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -1016,7 +1013,7 @@ TEST_F(PositiveShaderSpirv, SpecializeInt32) {
                OpFunctionEnd
     )";
 
-    VkShaderObj const fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     const VkSpecializationMapEntry entry = {
         0,                // id
@@ -1045,7 +1042,7 @@ TEST_F(PositiveShaderSpirv, SpecializeInt64) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_src = R"(
+    const char* fs_src = R"(
                OpCapability Shader
                OpCapability Int64
           %1 = OpExtInstImport "GLSL.std.450"
@@ -1066,7 +1063,7 @@ TEST_F(PositiveShaderSpirv, SpecializeInt64) {
                OpFunctionEnd
     )";
 
-    VkShaderObj const fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     const VkSpecializationMapEntry entry = {
         0,                // id
@@ -1095,7 +1092,7 @@ TEST_F(PositiveShaderSpirv, SpecializationUnused) {
     InitRenderTarget();
 
     // layout (constant_id = 2) const int a = 3;
-    const char *cs_src = R"(
+    const char* cs_src = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main"
@@ -1298,7 +1295,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
     // 8 bit int test (not 8 bit float support in Vulkan)
     if ((support_8_bit == true) && (float_16_int_8_features.shaderInt8 == VK_TRUE)) {
         if (storage_8_bit_features.storageBuffer8BitAccess == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_8bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -1310,7 +1307,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             )glsl";
             VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
 
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
                 helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
@@ -1318,7 +1315,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
         }
 
         if (storage_8_bit_features.uniformAndStorageBuffer8BitAccess == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_8bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -1330,7 +1327,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             )glsl";
             VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
 
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
                 helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
@@ -1338,7 +1335,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
         }
 
         if (storage_8_bit_features.storagePushConstant8 == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_8bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -1353,7 +1350,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, 4};
             VkPipelineLayoutCreateInfo pipeline_layout_info{
                 VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, nullptr, 0, 0, nullptr, 1, &push_constant_range};
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
                 helper.pipeline_layout_ci_ = pipeline_layout_info;
             };
@@ -1364,7 +1361,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
     // 16 bit float tests
     if ((support_16_bit == true) && (float_16_int_8_features.shaderFloat16 == VK_TRUE)) {
         if (storage_16_bit_features.storageBuffer16BitAccess == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -1376,7 +1373,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             )glsl";
             VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
 
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
                 helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
@@ -1384,7 +1381,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
         }
 
         if (storage_16_bit_features.uniformAndStorageBuffer16BitAccess == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -1396,7 +1393,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             )glsl";
             VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
 
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
                 helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
@@ -1404,7 +1401,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
         }
 
         if (storage_16_bit_features.storagePushConstant16 == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -1419,7 +1416,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, 4};
             VkPipelineLayoutCreateInfo pipeline_layout_info{
                 VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, nullptr, 0, 0, nullptr, 1, &push_constant_range};
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
                 helper.pipeline_layout_ci_ = pipeline_layout_info;
             };
@@ -1427,7 +1424,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
         }
 
         if (storage_16_bit_features.storageInputOutput16 == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -1440,7 +1437,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
 
             // Need to match in/out
-            const char *fsSource = R"glsl(
+            const char* fsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -1452,7 +1449,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             )glsl";
             VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_1);
 
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
             };
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
@@ -1462,7 +1459,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
     // 16 bit int tests
     if ((support_16_bit == true) && (features2.features.shaderInt16 == VK_TRUE)) {
         if (storage_16_bit_features.storageBuffer16BitAccess == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -1474,7 +1471,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             )glsl";
             VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
 
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
                 helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
@@ -1482,7 +1479,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
         }
 
         if (storage_16_bit_features.uniformAndStorageBuffer16BitAccess == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -1494,7 +1491,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             )glsl";
             VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
 
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
                 helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
             };
@@ -1502,7 +1499,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
         }
 
         if (storage_16_bit_features.storagePushConstant16 == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -1517,7 +1514,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, 4};
             VkPipelineLayoutCreateInfo pipeline_layout_info{
                 VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, nullptr, 0, 0, nullptr, 1, &push_constant_range};
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
                 helper.pipeline_layout_ci_ = pipeline_layout_info;
             };
@@ -1525,7 +1522,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
         }
 
         if (storage_16_bit_features.storageInputOutput16 == VK_TRUE) {
-            const char *vsSource = R"glsl(
+            const char* vsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -1538,7 +1535,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
 
             // Need to match in/out
-            const char *fsSource = R"glsl(
+            const char* fsSource = R"glsl(
                 #version 450
                 #extension GL_EXT_shader_16bit_storage: enable
                 #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -1550,7 +1547,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
             )glsl";
             VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_1);
 
-            const auto set_info = [&](CreatePipelineHelper &helper) {
+            const auto set_info = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
             };
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
@@ -1564,7 +1561,7 @@ TEST_F(PositiveShaderSpirv, SubgroupRotate) {
     AddRequiredFeature(vkt::Feature::shaderSubgroupRotate);
     RETURN_IF_SKIP(Init());
 
-    const char *source = R"glsl(
+    const char* source = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_rotate: enable
         layout(binding = 0) buffer Buffers { vec4  x; } data;
@@ -1583,7 +1580,7 @@ TEST_F(PositiveShaderSpirv, SubgroupRotateClustered) {
     AddRequiredFeature(vkt::Feature::shaderSubgroupRotateClustered);
     RETURN_IF_SKIP(Init());
 
-    const char *source = R"glsl(
+    const char* source = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_rotate: enable
         layout(binding = 0) buffer Buffers { vec4  x; } data;
@@ -1604,7 +1601,7 @@ TEST_F(PositiveShaderSpirv, ReadShaderClockDevice) {
     InitRenderTarget();
 
     // Device scope using GL_EXT_shader_realtime_clock
-    const char *vsSourceDevice = R"glsl(
+    const char* vsSourceDevice = R"glsl(
         #version 450
         #extension GL_EXT_shader_realtime_clock: enable
         void main(){
@@ -1614,7 +1611,7 @@ TEST_F(PositiveShaderSpirv, ReadShaderClockDevice) {
     )glsl";
     VkShaderObj vs_device(*m_device, vsSourceDevice, VK_SHADER_STAGE_VERTEX_BIT);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {vs_device.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
@@ -1629,7 +1626,7 @@ TEST_F(PositiveShaderSpirv, ReadShaderClockSubgroup) {
     InitRenderTarget();
 
     // Subgroup scope using ARB_shader_clock
-    const char *vsSourceScope = R"glsl(
+    const char* vsSourceScope = R"glsl(
         #version 450
         #extension GL_ARB_shader_clock: enable
         void main(){
@@ -1639,7 +1636,7 @@ TEST_F(PositiveShaderSpirv, ReadShaderClockSubgroup) {
     )glsl";
     VkShaderObj vs_subgroup(*m_device, vsSourceScope, VK_SHADER_STAGE_VERTEX_BIT);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {vs_subgroup.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
@@ -1654,7 +1651,7 @@ TEST_F(PositiveShaderSpirv, PhysicalStorageBufferStructRecursion) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *cs_src = R"glsl(
+    const char* cs_src = R"glsl(
 #version 450 core
 #extension GL_EXT_buffer_reference : enable
 
@@ -1689,7 +1686,7 @@ TEST_F(PositiveShaderSpirv, OpCopyObjectSampler) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vertex_source = R"glsl(
+    const char* vertex_source = R"glsl(
 #version 450
 
 layout(location=0) out int idx;
@@ -1699,9 +1696,9 @@ void main() {
     gl_Position = vec4(0.0);
 }
         )glsl";
-    const VkShaderObj vs(*m_device, vertex_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vertex_source, VK_SHADER_STAGE_VERTEX_BIT);
 
-    const char *fragment_source = R"glsl(
+    const char* fragment_source = R"glsl(
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
 
@@ -1718,7 +1715,7 @@ void main() {
 }
 
     )glsl";
-    const VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
 
     CreatePipelineHelper pipe(*this);
     pipe.dsl_bindings_ = {
@@ -1733,7 +1730,7 @@ TEST_F(PositiveShaderSpirv, SpecConstantTextureArrayTessellation) {
     TEST_DESCRIPTION("Reproduces https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/6370");
     AddRequiredFeature(vkt::Feature::tessellationShader);
     RETURN_IF_SKIP(Init());
-    const char *source = R"glsl(
+    const char* source = R"glsl(
 #version 440
 layout(triangles, equal_spacing, cw) in;
 
@@ -1755,13 +1752,13 @@ void main() {
     float extraHeight = texture(sampler2D(heightTextures[heightTextureIndex], textureSampler), heightTexCoordinates).r;
 }
         )glsl";
-    const VkShaderObj tese(*m_device, source, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+    VkShaderObj tese(*m_device, source, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 }
 
 TEST_F(PositiveShaderSpirv, SpecConstantTextureArrayVertex) {
     TEST_DESCRIPTION("Reproduces https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/6370");
     RETURN_IF_SKIP(Init());
-    const char *source = R"glsl(
+    const char* source = R"glsl(
 #version 450
 layout(constant_id = 0) const int MAX_NUM_DESCRIPTOR_IMAGES = 100;
 
@@ -1774,7 +1771,7 @@ void main() {
     float extraHeight = texture(sampler2D(heightTextures[index], textureSampler), vec2(0.0)).r;
 }
         )glsl";
-    const VkShaderObj vs(*m_device, source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, source, VK_SHADER_STAGE_VERTEX_BIT);
 }
 
 TEST_F(PositiveShaderSpirv, SpecConstantTextureIndexDefault) {
@@ -1782,7 +1779,7 @@ TEST_F(PositiveShaderSpirv, SpecConstantTextureIndexDefault) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fragment_source = R"glsl(
+    const char* fragment_source = R"glsl(
         #version 450
         layout (location = 0) out vec4 out_color;
 
@@ -1794,7 +1791,7 @@ TEST_F(PositiveShaderSpirv, SpecConstantTextureIndexDefault) {
         }
     )glsl";
 
-    const VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr}};
@@ -1806,7 +1803,7 @@ TEST_F(PositiveShaderSpirv, SpecConstantTextureIndexValue) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fragment_source = R"(
+    const char* fragment_source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Fragment %main "main" %out_color
@@ -1847,8 +1844,8 @@ TEST_F(PositiveShaderSpirv, SpecConstantTextureIndexValue) {
     uint32_t data = 3;
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM,
+                   &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr}};
@@ -1860,7 +1857,7 @@ TEST_F(PositiveShaderSpirv, DescriptorCountSpecConstant) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         // over VkDescriptorSetLayoutBinding::descriptorCount
         layout (constant_id = 0) const int index = 4;
@@ -1874,10 +1871,9 @@ TEST_F(PositiveShaderSpirv, DescriptorCountSpecConstant) {
     uint32_t data = 2;
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
     };
@@ -1892,7 +1888,7 @@ TEST_F(PositiveShaderSpirv, PhysicalStorageBufferGlslang6) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450 core
         #extension GL_EXT_buffer_reference : enable
         layout (push_constant, std430) uniform Block { int identity[32]; } pc;
@@ -1924,7 +1920,7 @@ TEST_F(PositiveShaderSpirv, ShaderFloatControl2) {
         GTEST_SKIP() << "shaderSignedZeroInfNanPreserveFloat32 not supported";
     }
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
         OpCapability Shader
         OpCapability FloatControls2
         OpExtension "SPV_KHR_float_controls2"
@@ -1967,7 +1963,7 @@ TEST_F(PositiveShaderSpirv, FPFastMathMode) {
         GTEST_SKIP() << "shaderSignedZeroInfNanPreserveFloat32 is supported";
     }
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
         OpCapability Shader
         OpCapability FloatControls2
         OpExtension "SPV_KHR_float_controls2"
@@ -2004,7 +2000,7 @@ TEST_F(PositiveShaderSpirv, ScalarBlockLayoutShaderCache) {
     RETURN_IF_SKIP(Init());
 
     // Matches glsl from other ScalarBlockLayoutShaderCache test
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         #extension GL_EXT_buffer_reference : require
         #extension GL_EXT_scalar_block_layout : require
@@ -2041,7 +2037,7 @@ TEST_F(PositiveShaderSpirv, BFloat16) {
     AddRequiredFeature(vkt::Feature::shaderBFloat16Type);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450 core
 
         #extension GL_EXT_bfloat16 : require
@@ -2102,7 +2098,7 @@ TEST_F(PositiveShaderSpirv, BFloat16DotProduct) {
     AddRequiredFeature(vkt::Feature::shaderBFloat16DotProduct);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450 core
         #extension GL_EXT_bfloat16 : require
         #extension GL_EXT_shader_explicit_arithmetic_types : enable
@@ -2128,7 +2124,7 @@ TEST_F(PositiveShaderSpirv, Float8) {
     AddRequiredFeature(vkt::Feature::shaderInt8);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450 core
 
         #extension GL_EXT_float_e4m3 : require
@@ -2199,7 +2195,7 @@ TEST_F(PositiveShaderSpirv, ExtendedTypesEnabled) {
         GTEST_SKIP() << "Required features not supported";
     }
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_arithmetic : enable
         #extension GL_EXT_shader_subgroup_extended_types_float16 : enable
@@ -2224,7 +2220,7 @@ TEST_F(PositiveShaderSpirv, RayQueryPositionFetch) {
     AddRequiredFeature(vkt::Feature::rayTracingPositionFetch);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         #extension GL_EXT_ray_query : enable
         #extension GL_EXT_ray_tracing_position_fetch : enable
@@ -2256,7 +2252,7 @@ TEST_F(PositiveShaderSpirv, ImageGatherOffsetMaintenance8) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
                OpCapability ImageGatherExtended
                OpMemoryModel Logical GLSL450
@@ -2286,7 +2282,7 @@ TEST_F(PositiveShaderSpirv, ImageGatherOffsetMaintenance8) {
                OpReturn
                OpFunctionEnd
     )";
-    VkShaderObj const fs(*m_device, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 }
 
 TEST_F(PositiveShaderSpirv, NonSemanticInfoEnabled) {
@@ -2297,7 +2293,7 @@ TEST_F(PositiveShaderSpirv, NonSemanticInfoEnabled) {
         GTEST_SKIP() << "VK_KHR_shader_non_semantic_info not supported";
     }
 
-    const char *source = R"(
+    const char* source = R"(
                    OpCapability Shader
                    OpExtension "SPV_KHR_non_semantic_info"
    %non_semantic = OpExtInstImport "NonSemantic.Validation.Test"
@@ -2329,7 +2325,7 @@ TEST_F(PositiveShaderSpirv, ShaderRelaxedExtendedInstruction) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_physical_storage_buffer"
@@ -2398,7 +2394,7 @@ TEST_F(PositiveShaderSpirv, Bitwise32bitMaintenance9) {
     AddRequiredFeature(vkt::Feature::maintenance9);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_explicit_arithmetic_types_int64 : enable
 
@@ -2487,7 +2483,7 @@ TEST_F(PositiveShaderSpirv, ShaderFma) {
     AddRequiredFeature(vkt::Feature::shaderFmaFloat32);
     RETURN_IF_SKIP(Init());
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
                OpCapability FMAKHR
                OpExtension "SPV_KHR_fma"
@@ -2594,5 +2590,174 @@ TEST_F(PositiveShaderSpirv, LongVectorDotProductSpecConstant) {
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ =
         VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM, &specialization_info);
+    pipe.CreateComputePipeline();
+}
+
+TEST_F(PositiveShaderSpirv, SpecializationConstantDataDefault) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_CONSTANT_DATA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderConstantData);
+    RETURN_IF_SKIP(Init());
+    const char* cs_src = R"(
+               OpCapability Shader
+               OpCapability ConstantDataKHR
+               OpExtension "SPV_KHR_constant_data"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %length SpecId 1
+               OpDecorate %data SpecId 2
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+     %length = OpSpecConstant %uint 4
+ %array_length = OpTypeArray %uint %length
+       %data = OpSpecConstantDataKHR %array_length 1 2 3 4
+  %void_func = OpTypeFunction %void
+       %main = OpFunction %void None %void_func
+ %main_label = OpLabel
+               OpReturn
+               OpFunctionEnd
+        )";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    pipe.CreateComputePipeline();
+}
+
+TEST_F(PositiveShaderSpirv, SpecializationConstantDataExpand) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_CONSTANT_DATA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderConstantData);
+    RETURN_IF_SKIP(Init());
+    const char* cs_src = R"(
+               OpCapability Shader
+               OpCapability ConstantDataKHR
+               OpExtension "SPV_KHR_constant_data"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %length SpecId 1
+               OpDecorate %data SpecId 2
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+     %length = OpSpecConstant %uint 2
+ %array_length = OpTypeArray %uint %length
+       %data = OpSpecConstantDataKHR %array_length 1 2
+  %void_func = OpTypeFunction %void
+       %main = OpFunction %void None %void_func
+ %main_label = OpLabel
+               OpReturn
+               OpFunctionEnd
+        )";
+
+    uint32_t data[6] = {
+        5,             // length
+        8, 6, 8, 8, 9  // data
+    };
+
+    // {id, offset, size}
+    VkSpecializationMapEntry entries[2] = {
+        {1, 0, 4},   // length
+        {2, 4, 20},  // data
+    };
+
+    // int32_t data = 0;
+    VkSpecializationInfo specialization_info = {2, entries, 24, data};
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ =
+        VkShaderObj(*m_device, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, &specialization_info);
+    pipe.CreateComputePipeline();
+}
+
+TEST_F(PositiveShaderSpirv, SpecializationConstantDataShrink) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_CONSTANT_DATA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderConstantData);
+    RETURN_IF_SKIP(Init());
+    const char* cs_src = R"(
+               OpCapability Shader
+               OpCapability ConstantDataKHR
+               OpExtension "SPV_KHR_constant_data"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %length SpecId 1
+               OpDecorate %data SpecId 2
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+     %length = OpSpecConstant %uint 8
+ %array_length = OpTypeArray %uint %length
+       %data = OpSpecConstantDataKHR %array_length 1 2 3 4 5 6 7 8
+  %void_func = OpTypeFunction %void
+       %main = OpFunction %void None %void_func
+ %main_label = OpLabel
+               OpReturn
+               OpFunctionEnd
+        )";
+
+    uint32_t data[3] = {
+        2,        // length
+        0xa, 0xb  // data
+    };
+
+    // {id, offset, size}
+    VkSpecializationMapEntry entries[2] = {
+        {1, 0, 4},  // length
+        {2, 4, 8},  // data
+    };
+
+    VkSpecializationInfo specialization_info = {2, entries, 12, data};
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ =
+        VkShaderObj(*m_device, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, &specialization_info);
+    pipe.CreateComputePipeline();
+}
+
+TEST_F(PositiveShaderSpirv, SpecializationConstantInt8) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_CONSTANT_DATA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderConstantData);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    RETURN_IF_SKIP(Init());
+    const char* cs_src = R"(
+               OpCapability Shader
+               OpCapability Int8
+               OpCapability ConstantDataKHR
+               OpExtension "SPV_KHR_constant_data"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %length SpecId 1
+               OpDecorate %data SpecId 2
+       %void = OpTypeVoid
+       %char = OpTypeInt 8 0
+     %length = OpSpecConstant %char 200 ; to large if not set
+ %array_length = OpTypeArray %char %length
+       %data = OpSpecConstantDataKHR %array_length 0
+  %void_func = OpTypeFunction %void
+       %main = OpFunction %void None %void_func
+ %main_label = OpLabel
+               OpReturn
+               OpFunctionEnd
+        )";
+
+    uint8_t data[9] = {
+        1, 2, 3, 4, 5, 6, 7, 8,  // data
+        5                        // length
+    };
+
+    // {id, offset, size}
+    VkSpecializationMapEntry entries[2] = {
+        {1, 8, 1},  // length
+        {2, 2, 5},  // data
+    };
+
+    VkSpecializationInfo specialization_info = {2, entries, 9, data};
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ =
+        VkShaderObj(*m_device, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, &specialization_info);
     pipe.CreateComputePipeline();
 }

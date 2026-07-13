@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 The Khronos Group Inc.
+ * Copyright (c) 2025-2026 The Khronos Group Inc.
  * Copyright (C) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +14,7 @@
 #include "descriptor_helper.h"
 #include "data_graph_objects.h"
 #include "generated/pnext_chain_extraction.h"
+#include "layers/utils/vk_struct_compare.h"
 #include <vector>
 
 class NegativeDataGraph : public DataGraphTest {};
@@ -42,26 +43,25 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesFeatureNotEnabled) {
 
 TEST_F(NegativeDataGraph, CreateDataGraphPipelinesDeferredOperationNotNull) {
     TEST_DESCRIPTION("Try to create a DataGraphPipeline when deferredOperation is not VK_NULL_HANDLE");
-    InitBasicDataGraph();
     AddRequiredExtensions(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline_helper(*this);
     VkDeferredOperationKHR deferred_operation;
     vk::CreateDeferredOperationKHR(*m_device, nullptr, &deferred_operation);
     VkPipeline pipeline;
     m_errorMonitor->SetDesiredError("VUID-vkCreateDataGraphPipelinesARM-deferredOperation-09761");
-    vk::CreateDataGraphPipelinesARM(*m_device, deferred_operation, VK_NULL_HANDLE, 1, &pipeline_helper.pipeline_ci_, nullptr, &pipeline);
+    vk::CreateDataGraphPipelinesARM(*m_device, deferred_operation, VK_NULL_HANDLE, 1, &pipeline_helper.pipeline_ci_, nullptr,
+                                    &pipeline);
     m_errorMonitor->VerifyFound();
     vk::DestroyDeferredOperationKHR(*m_device, deferred_operation, nullptr);
 }
 
 TEST_F(NegativeDataGraph, CreateDataGraphPipelinesDeferredOperationWrongFlags) {
     TEST_DESCRIPTION("Try to create a DataGraphPipeline with deferredOperation and invalid pipeline flags");
-    InitBasicDataGraph();
     AddRequiredExtensions(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline_helper(*this);
     VkDeferredOperationKHR deferred_operation;
@@ -82,10 +82,9 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesDeferredOperationWrongFlags) {
 
 TEST_F(NegativeDataGraph, CreateDataGraphPipelinesInvalidFlags) {
     TEST_DESCRIPTION("Try to create a DataGraphPipeline with invalid flags in create_info");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    auto set_info = [](vkt::dg::DataGraphPipelineHelper &pipeline) {
+    auto set_info = [](vkt::dg::DataGraphPipelineHelper& pipeline) {
         pipeline.pipeline_ci_.flags = VK_PIPELINE_CREATE_2_VIEW_INDEX_FROM_DEVICE_INDEX_BIT_KHR;
     };
     vkt::dg::DataGraphPipelineHelper::OneshotTest(*this, set_info, 0, "VUID-VkDataGraphPipelineCreateInfoARM-flags-09764");
@@ -95,10 +94,9 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesNoProtectedAccessButFeatureNot
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipeline where flags include VK_PIPELINE_CREATE_2_NO_PROTECTED_ACCESS_BIT_EXT but "
         "pipelineProtectedAccess is not enabled");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    auto set_info = [](vkt::dg::DataGraphPipelineHelper &pipeline) {
+    auto set_info = [](vkt::dg::DataGraphPipelineHelper& pipeline) {
         pipeline.pipeline_ci_.flags = VK_PIPELINE_CREATE_2_NO_PROTECTED_ACCESS_BIT_EXT;
     };
     vkt::dg::DataGraphPipelineHelper::OneshotTest(*this, set_info, 0,
@@ -109,10 +107,9 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesProtectedAccessOnlyButFeatureN
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipeline where flags include VK_PIPELINE_CREATE_2_PROTECTED_ACCESS_ONLY_BIT_EXT but "
         "pipelineProtectedAccess is not enabled");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    auto set_info = [](vkt::dg::DataGraphPipelineHelper &pipeline) {
+    auto set_info = [](vkt::dg::DataGraphPipelineHelper& pipeline) {
         pipeline.pipeline_ci_.flags = VK_PIPELINE_CREATE_2_PROTECTED_ACCESS_ONLY_BIT_EXT;
     };
     vkt::dg::DataGraphPipelineHelper::OneshotTest(*this, set_info, 0,
@@ -123,12 +120,11 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesBothProtectedAccessBits) {
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipeline where flags include both VK_PIPELINE_CREATE_2_NO_PROTECTED_ACCESS_BIT_EXT and "
         "VK_PIPELINE_CREATE_2_PROTECTED_ACCESS_ONLY_BIT_EXT");
-    InitBasicDataGraph();
     AddRequiredExtensions(VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::pipelineProtectedAccess);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    auto set_info = [](vkt::dg::DataGraphPipelineHelper &pipeline) {
+    auto set_info = [](vkt::dg::DataGraphPipelineHelper& pipeline) {
         pipeline.pipeline_ci_.flags =
             VK_PIPELINE_CREATE_2_NO_PROTECTED_ACCESS_BIT_EXT | VK_PIPELINE_CREATE_2_PROTECTED_ACCESS_ONLY_BIT_EXT;
     };
@@ -139,15 +135,14 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesStageCreationFeedbackCountNotZ
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipeline where pNext contains a VkPipelineCreationFeedbackCreateInfo structure but the "
         "pipelineStageCreationFeedbackCount is not 0");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     VkPipelineCreationFeedback creation_feedback;
     VkPipelineCreationFeedbackCreateInfo creation_feedback_create_info = vku::InitStructHelper();
     creation_feedback_create_info.pPipelineCreationFeedback = &creation_feedback;
     creation_feedback_create_info.pipelineStageCreationFeedbackCount = 1;
     creation_feedback_create_info.pPipelineStageCreationFeedbacks = &creation_feedback;
-    auto set_info = [&](vkt::dg::DataGraphPipelineHelper &pipeline) {
+    auto set_info = [&](vkt::dg::DataGraphPipelineHelper& pipeline) {
         pipeline.shader_module_ci_.pNext = &creation_feedback_create_info;
     };
     vkt::dg::DataGraphPipelineHelper::OneshotTest(*this, set_info, 0, "VUID-VkDataGraphPipelineCreateInfoARM-pNext-09804");
@@ -157,11 +152,10 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesPushConstantCountNotZero) {
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipeline where the layout was created with a non-zero pushConstantRangeCount and non-NULL "
         "pushConstRange");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     std::vector<VkPushConstantRange> pcr = {{VK_SHADER_STAGE_ALL, 0, sizeof(uint32_t)}};
-    auto set_info = [&](vkt::dg::DataGraphPipelineHelper &pipeline) { pipeline.CreatePipelineLayout(pcr); };
+    auto set_info = [&](vkt::dg::DataGraphPipelineHelper& pipeline) { pipeline.CreatePipelineLayout(pcr); };
     vkt::dg::DataGraphPipelineHelper::OneshotTest(*this, set_info, 0, "VUID-VkDataGraphPipelineCreateInfoARM-layout-09767");
 }
 
@@ -169,10 +163,9 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesUpdateAfterBindFeatureNotEnabl
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipeline where the descriptorSetLayout used sets the BIND_AFTER_USE_BIT but the "
         "dataGraphUpdateAfterBind is not enabled");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    auto set_info = [&](vkt::dg::DataGraphPipelineHelper &pipeline) {
+    auto set_info = [&](vkt::dg::DataGraphPipelineHelper& pipeline) {
         pipeline.descriptor_set_.reset(new OneOffDescriptorSet(pipeline.device_, pipeline.descriptor_set_layout_bindings_,
                                                                VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT, nullptr,
                                                                VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT));
@@ -184,10 +177,9 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesUpdateAfterBindFeatureNotEnabl
 
 TEST_F(NegativeDataGraph, CreateDataGraphPipelinesMutableDescriptor) {
     TEST_DESCRIPTION("Try to create a DataGraphPipeline with a MUTABLE descriptor (not allowed in datagraph)");
-    InitBasicDataGraph();
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::mutableDescriptorType);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     VkDescriptorType types[] = {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE};
     VkMutableDescriptorTypeListEXT mutable_descriptor_type_list = {1, types};
@@ -196,7 +188,7 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesMutableDescriptor) {
     mutable_descriptor_info.mutableDescriptorTypeListCount = 1;
     mutable_descriptor_info.pMutableDescriptorTypeLists = &mutable_descriptor_type_list;
 
-    auto set_info = [&](vkt::dg::DataGraphPipelineHelper &pipeline) {
+    auto set_info = [&](vkt::dg::DataGraphPipelineHelper& pipeline) {
         pipeline.descriptor_set_layout_bindings_[0].descriptorType =
             VK_DESCRIPTOR_TYPE_MUTABLE_EXT;  // the pipeline sets this to tensor
         pipeline.descriptor_set_.reset(
@@ -210,10 +202,9 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesEarlyReturnFlagCacheControlNot
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipeline when flags contains VK_PIPELINE_CREATE_2_EARLY_RETURN_ON_FAILURE_BIT_KHR but the "
         "pipelineCreationCacheControl feature is not enabled");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    auto set_info = [](vkt::dg::DataGraphPipelineHelper &pipeline) {
+    auto set_info = [](vkt::dg::DataGraphPipelineHelper& pipeline) {
         pipeline.pipeline_ci_.flags = VK_PIPELINE_CREATE_2_EARLY_RETURN_ON_FAILURE_BIT_KHR;
     };
     vkt::dg::DataGraphPipelineHelper::OneshotTest(*this, set_info, 0,
@@ -224,10 +215,9 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesFailOnPipelineCompileFlagCache
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipeline when flags contains VK_PIPELINE_CREATE_2_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT_KHR but "
         "the pipelineCreationCacheControl feature is not enabled");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    auto set_info = [](vkt::dg::DataGraphPipelineHelper &pipeline) {
+    auto set_info = [](vkt::dg::DataGraphPipelineHelper& pipeline) {
         pipeline.pipeline_ci_.flags = VK_PIPELINE_CREATE_2_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT_KHR;
     };
     vkt::dg::DataGraphPipelineHelper::OneshotTest(*this, set_info, 0,
@@ -238,8 +228,7 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesTypeMismatch) {
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipeline where the descriptor slot in layout does not match the resource item used in the Shader "
         "Module");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::HelperParameters params;
     params.desc_type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;  // should be tensor
@@ -251,7 +240,7 @@ TEST_F(NegativeDataGraph, CreateDataGraphPipelinesTypeMismatch) {
     m_errorMonitor->VerifyFound();
 }
 
-static void InitDefaultComputePipeline(CreateComputePipelineHelper &pipeline, VkRenderFramework *framework) {
+static void InitDefaultComputePipeline(CreateComputePipelineHelper& pipeline, VkRenderFramework* framework) {
     std::vector<VkDescriptorSetLayoutBinding> bindings = {
         {0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
         {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
@@ -266,8 +255,7 @@ TEST_F(NegativeDataGraph, GetDataGraphPipelinePropertiesPipelineNotCreatedWithCr
     TEST_DESCRIPTION(
         "Try to get the datagraph pipeline properties for a pipeline not created with vkCreateDataGraphPipelinesARM (i.e. created "
         "with vkCreateComputePipeline)");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     CreateComputePipelineHelper pipeline(*m_device);
     InitDefaultComputePipeline(pipeline, this);
@@ -282,14 +270,13 @@ TEST_F(NegativeDataGraph, GetDataGraphPipelinePropertiesPipelineNotCreatedWithCr
     query_result.dataSize = 0;
     uint32_t prop_count = 1;
     m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineInfoARM-dataGraphPipeline-09803");
-    EXPECT_NE(VK_SUCCESS, vk::GetDataGraphPipelinePropertiesARM(m_device->handle(), &pipeline_info, prop_count, &query_result));
+    vk::GetDataGraphPipelinePropertiesARM(m_device->handle(), &pipeline_info, prop_count, &query_result);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeDataGraph, GetDataGraphPipelinePropertiesDuplicatedProperty) {
     TEST_DESCRIPTION("Duplicate property in datagraph pipeline properties request");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -319,10 +306,10 @@ TEST_F(NegativeDataGraph, GetDataGraphPipelinePropertiesDuplicatedProperty) {
 
 TEST_F(NegativeDataGraph, SessionCreateInfoInvalidGraphPipeline) {
     TEST_DESCRIPTION(
-        "Try to create a DataGraphPipelineSession where the dataGraphPipeline member of VkDataGraphPipelineSessionCreateInfoARM was "
+        "Try to create a DataGraphPipelineSession where the dataGraphPipeline member of VkDataGraphPipelineSessionCreateInfoARM "
+        "was "
         "not created by vkCreateDataGraphPipelinesARM");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     CreateComputePipelineHelper pipeline(*m_device);
     InitDefaultComputePipeline(pipeline, this);
@@ -340,8 +327,7 @@ TEST_F(NegativeDataGraph, SessionCreateInfoProtectedMemoryFeatureNotEnabled) {
     TEST_DESCRIPTION(
         "Try to create a DataGraphPipelineSession where the flags member of VkDataGraphPipelineSessionCreateInfoARM contains "
         "VK_DATA_GRAPH_PIPELINE_SESSION_CREATE_PROTECTED_BIT_ARM but the protectedMemory feature is not enabled");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -360,8 +346,7 @@ TEST_F(NegativeDataGraph, SessionGetMemoryRequirementsBindPointNotGottenPrior) {
     TEST_DESCRIPTION(
         "Try to get the memory requirements for a session without a prior call to "
         "vkGetDataGraphPipelineSessionBindPointRequirementsARM");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -369,7 +354,7 @@ TEST_F(NegativeDataGraph, SessionGetMemoryRequirementsBindPointNotGottenPrior) {
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
 
-    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    vkt::DataGraphPipelineSession session(*m_device, session_ci, vkt::no_mem);
 
     VkDataGraphPipelineSessionMemoryRequirementsInfoARM session_mem_reqs = vku::InitStructHelper();
     session_mem_reqs.session = session;
@@ -384,19 +369,14 @@ TEST_F(NegativeDataGraph, SessionGetMemoryRequirementsBindPointNotGottenPrior) {
 
 TEST_F(NegativeDataGraph, BindSessionTwice) {
     TEST_DESCRIPTION("Try to create a bind DataGraphPipelineSession on the same bindpoint twice");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem);
@@ -412,55 +392,45 @@ TEST_F(NegativeDataGraph, BindSessionTwice) {
 
 TEST_F(NegativeDataGraph, BindSessionMemoryOffsetLargerThanSize) {
     TEST_DESCRIPTION(
-        "Try to create a bind DataGraphPipelineSession to DeviceMemory at an offset which is larger than the allocated memory size");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+        "Try to create a bind DataGraphPipelineSession to DeviceMemory at an offset which is larger than the allocated memory "
+        "size");
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem);
 
     auto session_bind_infos = InitSessionBindInfo(session, device_mem);
-    auto &mem_req = session.MemReqs()[0];
+    auto& mem_req = session.MemReqs()[0];
     session_bind_infos[0].memoryOffset = mem_req.memoryRequirements.size + 2 * mem_req.memoryRequirements.alignment;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-memoryOffset-09787");
     vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
     m_errorMonitor->VerifyFound();
-
 }
 
 TEST_F(NegativeDataGraph, BindSessionMemoryInvalidMemoryBits) {
     TEST_DESCRIPTION(
         "Try to create a bind DataGraphPipelineSession on a memory type who's memoryTypeBits is incompatible with the required "
         "bits");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
 
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
-    auto &bind_point_reqs = session.BindPointReqs();
-    auto &mem_reqs = session.MemReqs();
+    auto& bind_point_reqs = session.BindPointReqs();
+    auto& mem_reqs = session.MemReqs();
     for (uint32_t i = 0; i < bind_point_reqs.size(); i++) {
         if (bind_point_reqs[i].bindPointType != VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TYPE_MEMORY_ARM) {
             continue;
@@ -483,8 +453,7 @@ TEST_F(NegativeDataGraph, BindSessionMemoryInvalidMemoryBits) {
 TEST_F(NegativeDataGraph, BindSessionMemoryInvalidOffsetAlignment) {
     TEST_DESCRIPTION(
         "Try to create a bind DataGraphPipelineSession at an offset which is not an integer multiple of the required alignment");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -493,14 +462,11 @@ TEST_F(NegativeDataGraph, BindSessionMemoryInvalidOffsetAlignment) {
     session_ci.dataGraphPipeline = pipeline;
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
 
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem, false, 2);
 
     auto session_bind_infos = InitSessionBindInfo(session, device_mem);
-    auto &mem_reqs = session.MemReqs();
+    auto& mem_reqs = session.MemReqs();
     session_bind_infos[0].memoryOffset = mem_reqs[0].memoryRequirements.alignment - 1;
 
     m_errorMonitor->SetDesiredError("VUID-VkBindDataGraphPipelineSessionMemoryInfoARM-memoryOffset-09789");
@@ -510,19 +476,14 @@ TEST_F(NegativeDataGraph, BindSessionMemoryInvalidOffsetAlignment) {
 
 TEST_F(NegativeDataGraph, BindSessionMemoryTooSmall) {
     TEST_DESCRIPTION("Try to create a bind DataGraphPipelineSession to device memory which is too small");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem, false, 1, -1);
@@ -535,9 +496,8 @@ TEST_F(NegativeDataGraph, BindSessionMemoryTooSmall) {
 
 TEST_F(NegativeDataGraph, BindProtectedSessionToUnprotectedMemory) {
     TEST_DESCRIPTION("Try to bind a protected DataGraphPipelineSession to unprotected memory");
-    InitBasicDataGraph();
     AddRequiredFeature(vkt::Feature::protectedMemory);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -547,12 +507,9 @@ TEST_F(NegativeDataGraph, BindProtectedSessionToUnprotectedMemory) {
     session_ci.dataGraphPipeline = pipeline;
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
 
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
     // allocate unprotected memory
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
-    auto &mem_reqs = session.MemReqs();
+    auto& mem_reqs = session.MemReqs();
     for (uint32_t i = 0; i < mem_reqs.size(); i++) {
         VkMemoryAllocateInfo session_alloc_info = vku::InitStructHelper();
         session_alloc_info.allocationSize = mem_reqs[i].memoryRequirements.size;
@@ -573,9 +530,8 @@ TEST_F(NegativeDataGraph, BindProtectedSessionToUnprotectedMemory) {
 
 TEST_F(NegativeDataGraph, BindUnprotectedSessionToProtectedMemory) {
     TEST_DESCRIPTION("Try to bind an unprotected DataGraphPipelineSession to protected memory");
-    InitBasicDataGraph();
     AddRequiredFeature(vkt::Feature::protectedMemory);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -584,12 +540,9 @@ TEST_F(NegativeDataGraph, BindUnprotectedSessionToProtectedMemory) {
     session_ci.dataGraphPipeline = pipeline;
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
 
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
     // allocate protected memory
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
-    auto &mem_reqs = session.MemReqs();
+    auto& mem_reqs = session.MemReqs();
     for (uint32_t i = 0; i < mem_reqs.size(); i++) {
         VkMemoryAllocateInfo session_alloc_info = vku::InitStructHelper();
         session_alloc_info.allocationSize = mem_reqs[i].memoryRequirements.size;
@@ -611,19 +564,14 @@ TEST_F(NegativeDataGraph, BindUnprotectedSessionToProtectedMemory) {
 TEST_F(NegativeDataGraph, BindSessionObjectIndexTooLarge) {
     TEST_DESCRIPTION(
         "Try to bind a DataGraphPipelineSession when the resource index is larger than the numObjects for the bindPoint");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem);
@@ -638,19 +586,14 @@ TEST_F(NegativeDataGraph, BindSessionObjectIndexTooLarge) {
 
 TEST_F(NegativeDataGraph, BindSessionObjectWrongBindPoint) {
     TEST_DESCRIPTION("Try to bind a DataGraphPipelineSession with the wrong bindpoint");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem);
@@ -669,20 +612,16 @@ TEST_F(NegativeDataGraph, BindSessionObjectWrongBindPoint) {
 
 TEST_F(NegativeDataGraph, DestroySessionInUse) {
     TEST_DESCRIPTION("Try destroying a datagraph pipeline session while it is in use");
-    InitBasicDataGraph();
+    SetTargetApiVersion(VK_API_VERSION_1_4);
     AddRequiredFeature(vkt::Feature::timelineSemaphore);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem);
@@ -703,8 +642,7 @@ TEST_F(NegativeDataGraph, DestroySessionInUse) {
     VkSemaphoreTypeCreateInfo sem_type = vku::InitStructHelper();
     sem_type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
     sem_type.initialValue = 0;
-    VkSemaphoreCreateInfo create_sem = vku::InitStructHelper();
-    create_sem.pNext = &sem_type;
+    VkSemaphoreCreateInfo create_sem = vku::InitStructHelper(&sem_type);
 
     vkt::Semaphore sem(*m_device, create_sem);
     VkTimelineSemaphoreSubmitInfo timeline_info = vku::InitStructHelper();
@@ -714,8 +652,7 @@ TEST_F(NegativeDataGraph, DestroySessionInUse) {
 
     VkPipelineStageFlags dst_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.pNext = &timeline_info;
+    VkSubmitInfo submit_info = vku::InitStructHelper(&timeline_info);
     submit_info.waitSemaphoreCount = 1;
     submit_info.pWaitSemaphores = &sem.handle();
     submit_info.pWaitDstStageMask = &dst_stage_mask;
@@ -738,8 +675,7 @@ TEST_F(NegativeDataGraph, DestroySessionInUse) {
 
 TEST_F(NegativeDataGraph, DestroySessionCreatedWithDestroyWithoutCallbacks) {
     TEST_DESCRIPTION("Try destroying without callbacks a datagraph pipeline session with callbacks");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -767,8 +703,7 @@ TEST_F(NegativeDataGraph, DestroySessionCreatedWithDestroyWithoutCallbacks) {
 
 TEST_F(NegativeDataGraph, DestroySessionCreatedWithoutDestroyWithCallbacks) {
     TEST_DESCRIPTION("Try destroying with callbacks a datagraph pipeline session without callbacks");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -790,19 +725,14 @@ TEST_F(NegativeDataGraph, CmdDispatchPipelineNotBound) {
     TEST_DESCRIPTION(
         "Try to add a CmdDispatchDataGraphARM to a command buffer when the pipeline was not bound to "
         "VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem);
@@ -816,7 +746,7 @@ TEST_F(NegativeDataGraph, CmdDispatchPipelineNotBound) {
     m_command_buffer.Begin();
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
                               &pipeline.descriptor_set_.get()->set_, 0, nullptr);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-09799");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-08606");
     vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
@@ -824,19 +754,14 @@ TEST_F(NegativeDataGraph, CmdDispatchPipelineNotBound) {
 
 TEST_F(NegativeDataGraph, CmdDispatchDescriptorSetNotBound) {
     TEST_DESCRIPTION("Try to dispatch a datagraph when the required descriptor set is not bound");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem);
@@ -849,7 +774,7 @@ TEST_F(NegativeDataGraph, CmdDispatchDescriptorSetNotBound) {
 
     m_command_buffer.Begin();
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-09797");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-08600");
     vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
@@ -857,19 +782,14 @@ TEST_F(NegativeDataGraph, CmdDispatchDescriptorSetNotBound) {
 
 TEST_F(NegativeDataGraph, CmdDispatchSessionNotBound) {
     TEST_DESCRIPTION("Try dispatching a graph command when not all required session resources have been bound");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.tensor_views_[0]->handle(), 0);
     pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.tensor_views_[1]->handle(), 0);
@@ -889,9 +809,8 @@ TEST_F(NegativeDataGraph, CmdDispatchProtectedNoFaultUnsupportedUnprotectedCmdBu
     TEST_DESCRIPTION(
         "Try dispatching a datagraph with protected resources - bound pipeline tensors have VK_TENSOR_CREATE_PROTECTED_BIT_ARM set "
         "- to an unprotected command buffer when protectedNoFault is not supported");
-    InitBasicDataGraph();
     AddRequiredFeature(vkt::Feature::protectedMemory);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     VkPhysicalDeviceProtectedMemoryProperties protected_memory_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(protected_memory_properties);
@@ -906,11 +825,7 @@ TEST_F(NegativeDataGraph, CmdDispatchProtectedNoFaultUnsupportedUnprotectedCmdBu
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
 
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem);
@@ -926,7 +841,9 @@ TEST_F(NegativeDataGraph, CmdDispatchProtectedNoFaultUnsupportedUnprotectedCmdBu
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
                               &pipeline.descriptor_set_.get()->set_, 0, nullptr);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-commandBuffer-09800");
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-commandBuffer-09800"); // We are using 2 protected resources in this unprotected command buffer and so need to log the error twice
+    m_errorMonitor->SetDesiredError(
+        "VUID-vkCmdDispatchDataGraphARM-commandBuffer-09800");  // We are using 2 protected resources in this unprotected command
+                                                                // buffer and so need to log the error twice
     vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
@@ -936,7 +853,15 @@ TEST_F(NegativeDataGraph, CmdDispatchProtectedNoFaultUnsupportedProtectedCmdBuff
     TEST_DESCRIPTION(
         "Try dispatching a datagraph with unprotected resources to a protected command buffer - command buffer created with "
         "VK_COMMAND_POOL_CREATE_PROTECTED_BIT set -  when protectedNoFault is not supported");
-    InitBasicDataGraph();
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_ARM_DATA_GRAPH_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tensors);
+    AddRequiredFeature(vkt::Feature::dataGraph);
+    AddRequiredFeature(vkt::Feature::dataGraphShaderModule);
+    AddRequiredFeature(vkt::Feature::shaderTensorAccess);
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
     AddRequiredFeature(vkt::Feature::protectedMemory);
     RETURN_IF_SKIP(InitFramework());
     RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_PROTECTED_BIT));
@@ -952,11 +877,7 @@ TEST_F(NegativeDataGraph, CmdDispatchProtectedNoFaultUnsupportedProtectedCmdBuff
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
-
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
     std::vector<vkt::DeviceMemory> device_mem(session.BindPointsCount());
     session.AllocSessionMem(device_mem);
 
@@ -972,7 +893,9 @@ TEST_F(NegativeDataGraph, CmdDispatchProtectedNoFaultUnsupportedProtectedCmdBuff
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
                               &pipeline.descriptor_set_.get()->set_, 0, nullptr);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-commandBuffer-09801");
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-commandBuffer-09801"); // We are using 2 unprotected resources in this protected command buffer and so need to log the error twice
+    m_errorMonitor->SetDesiredError(
+        "VUID-vkCmdDispatchDataGraphARM-commandBuffer-09801");  // We are using 2 unprotected resources in this protected command
+                                                                // buffer and so need to log the error twice
     vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
@@ -980,8 +903,7 @@ TEST_F(NegativeDataGraph, CmdDispatchProtectedNoFaultUnsupportedProtectedCmdBuff
 
 TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorNoUpdate) {
     TEST_DESCRIPTION("Try dispatching a datagraph but the descriptor has not been updated");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -989,10 +911,7 @@ TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorNoUpdate) {
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline.Handle();
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
-    auto &bind_point_reqs = session.BindPointReqs();
+    auto& bind_point_reqs = session.BindPointReqs();
     std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
     session.AllocSessionMem(device_mem);
     auto session_bind_infos = InitSessionBindInfo(session, device_mem);
@@ -1006,7 +925,7 @@ TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorNoUpdate) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.Handle());
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_.handle(), 0, 1,
                               &pipeline.descriptor_set_.get()->set_, 0, nullptr);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-09935");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-08114");
     vk::CmdDispatchDataGraphARM(m_command_buffer, session.handle(), nullptr);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
@@ -1014,8 +933,7 @@ TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorNoUpdate) {
 
 TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorDeletedObject) {
     TEST_DESCRIPTION("Try dispatching a datagraph but the tensor or the view are destroyed before dispatch");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // 2 runs: 1st time delete the tensor, 2nd the view, both make the descriptor invalid
     for (uint32_t i = 0; i < 2; i++) {
@@ -1025,10 +943,8 @@ TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorDeletedObject) {
         VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
         session_ci.dataGraphPipeline = pipeline.Handle();
         vkt::DataGraphPipelineSession session(*m_device, session_ci);
-        session.GetMemoryReqs();
-        CheckSessionMemory(session);
 
-        auto &bind_point_reqs = session.BindPointReqs();
+        auto& bind_point_reqs = session.BindPointReqs();
         std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
         session.AllocSessionMem(device_mem);
         auto session_bind_infos = InitSessionBindInfo(session, device_mem);
@@ -1049,7 +965,7 @@ TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorDeletedObject) {
         vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.Handle());
         vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_.handle(), 0, 1,
                                   &pipeline.descriptor_set_.get()->set_, 0, nullptr);
-        m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-09935");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-08114");
         vk::CmdDispatchDataGraphARM(m_command_buffer, session.handle(), nullptr);
         m_errorMonitor->VerifyFound();
         m_command_buffer.End();
@@ -1057,10 +973,10 @@ TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorDeletedObject) {
 }
 
 TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorBufferBit) {
-    TEST_DESCRIPTION("Try dispatching a datagraph with VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT set, but using descriptor sets.");
-    InitBasicDataGraph();
+    TEST_DESCRIPTION(
+        "Try dispatching a datagraph with VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT set, but using descriptor sets.");
     AddRequiredFeature(vkt::Feature::dataGraphDescriptorBuffer);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.pipeline_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
@@ -1069,10 +985,7 @@ TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorBufferBit) {
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline.Handle();
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
-    auto &bind_point_reqs = session.BindPointReqs();
+    auto& bind_point_reqs = session.BindPointReqs();
     std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
     session.AllocSessionMem(device_mem);
     auto session_bind_infos = InitSessionBindInfo(session, device_mem);
@@ -1085,22 +998,23 @@ TEST_F(NegativeDataGraph, CmdDispatchInvalidDescriptorBufferBit) {
     m_command_buffer.Begin();
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.Handle());
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_.handle(), 0, 1,
-                                &pipeline.descriptor_set_.get()->set_, 0, nullptr);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-09936");
+                              &pipeline.descriptor_set_.get()->set_, 0, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-08115");
     vk::CmdDispatchDataGraphARM(m_command_buffer, session.handle(), nullptr);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
 
 TEST_F(NegativeDataGraph, CmdDispatchMissingDescriptorBufferBit) {
-    TEST_DESCRIPTION("Try dispatching a datagraph with descriptor buffers but without the VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT.");
-    InitBasicDataGraph();
+    TEST_DESCRIPTION(
+        "Try dispatching a datagraph with descriptor buffers but without the VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT.");
+    SetTargetApiVersion(VK_API_VERSION_1_4);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::descriptorBuffer);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     AddRequiredFeature(vkt::Feature::dataGraphDescriptorBuffer);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
@@ -1122,10 +1036,7 @@ TEST_F(NegativeDataGraph, CmdDispatchMissingDescriptorBufferBit) {
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline.Handle();
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
-    auto &bind_point_reqs = session.BindPointReqs();
+    auto& bind_point_reqs = session.BindPointReqs();
     std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
     session.AllocSessionMem(device_mem);
     auto session_bind_infos = InitSessionBindInfo(session, device_mem);
@@ -1147,10 +1058,11 @@ TEST_F(NegativeDataGraph, CmdDispatchMissingDescriptorBufferBit) {
 
     uint32_t index = 0;
     VkDeviceSize offset = 0;
-    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline_layout, 0, 1, &index, &offset);
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline_layout, 0, 1, &index,
+                                         &offset);
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-09938");
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-09797");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-08117");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-None-08600");
     vk::CmdDispatchDataGraphARM(m_command_buffer, session.handle(), nullptr);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
@@ -1160,8 +1072,7 @@ TEST_F(NegativeDataGraph, ShaderModuleCreateInfoInvalidConstantID) {
     TEST_DESCRIPTION(
         "Try creating a datagraph pipeline where the VkDataGraphPipelineShaderModuleCreateInfoARM has a "
         "VkDataGraphPipelineConstantARM whose id member is not valid");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     VkDataGraphPipelineConstantARM graph_pipeline_constant = vku::InitStructHelper();
@@ -1176,11 +1087,11 @@ TEST_F(NegativeDataGraph, ShaderModuleCreateInfoInvalidConstantID) {
 }
 
 TEST_F(NegativeDataGraph, TensorSparsitySuppliedMissingDescription) {
-    TEST_DESCRIPTION("Try creating a datagraph pipeline with a tensor sparsity structure but missing a tensor description structure");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    TEST_DESCRIPTION(
+        "Try creating a datagraph pipeline with a tensor sparsity structure but missing a tensor description structure");
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1205,11 +1116,11 @@ TEST_F(NegativeDataGraph, TensorSparsitySuppliedMissingDescription) {
 
 TEST_F(NegativeDataGraph, TensorSparsityDimensionTooLarge) {
     TEST_DESCRIPTION(
-        "Try creating a datagraph pipeline with a tensor sparsity structure but the supplied dimension is larger than the dimensionCount in the tensor description supplied");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+        "Try creating a datagraph pipeline with a tensor sparsity structure but the supplied dimension is larger than the "
+        "dimensionCount in the tensor description supplied");
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1233,11 +1144,11 @@ TEST_F(NegativeDataGraph, TensorSparsityDimensionTooLarge) {
 
 TEST_F(NegativeDataGraph, TensorSparsityDescriptionDimensionNotMultipleOfSparsityGroupSize) {
     TEST_DESCRIPTION(
-        "Try creating a datagraph pipeline with a tensor sparsity structure but dimension[sparsity->dimension] is not a multiple of sparsity->groupSize");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+        "Try creating a datagraph pipeline with a tensor sparsity structure but dimension[sparsity->dimension] is not a multiple "
+        "of sparsity->groupSize");
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1264,10 +1175,9 @@ TEST_F(NegativeDataGraph, TensorSparsityDescriptionDimensionNotMultipleOfSparsit
 
 TEST_F(NegativeDataGraph, TensorSparsityDoubleDefinition) {
     TEST_DESCRIPTION("Try creating a datagraph pipeline with a tensor sparsity defined twice for the same dimension");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1300,10 +1210,9 @@ TEST_F(NegativeDataGraph, TensorSparsityDoubleDefinition) {
 
 TEST_F(NegativeDataGraph, GraphConstantTensorWrongID) {
     TEST_DESCRIPTION("Try creating a datagraph pipeline with a constant that has an id different from the spirv definition");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1327,10 +1236,9 @@ TEST_F(NegativeDataGraph, GraphConstantTensorWrongID) {
 TEST_F(NegativeDataGraph, GraphConstantTensorWrongRank) {
     TEST_DESCRIPTION(
         "Try creating a datagraph pipeline with a constant based on a tensor with rank different from the spirv definition");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1355,11 +1263,11 @@ TEST_F(NegativeDataGraph, GraphConstantTensorWrongRank) {
 }
 
 TEST_F(NegativeDataGraph, GraphConstantTensorWrongDimensions) {
-    TEST_DESCRIPTION("Try creating a datagraph pipeline with a constant based on a tensor with dimensions different from the spirv definition");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    TEST_DESCRIPTION(
+        "Try creating a datagraph pipeline with a constant based on a tensor with dimensions different from the spirv definition");
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1384,17 +1292,20 @@ TEST_F(NegativeDataGraph, GraphConstantTensorWrongDimensions) {
 }
 
 TEST_F(NegativeDataGraph, GraphConstantTensorWrongFormat) {
-    TEST_DESCRIPTION("Try creating a datagraph pipeline with a constant based on a tensor with format different from the spirv definition");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    TEST_DESCRIPTION(
+        "Try creating a datagraph pipeline with a constant based on a tensor with format different from the spirv definition");
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
 
-    // try a few different formats, different for sign, bit width, and type
-    for (auto format : {VK_FORMAT_R8_SINT, VK_FORMAT_R32_UINT, VK_FORMAT_R32_SFLOAT}) {
+    // try a few different formats, different for bit width, float encoding and type
+    // NOTE: VK_FORMAT_R8_SINT included as a sanity check: it is different only by sign from the actual format,
+    // meaning it is compatible, and it must NOT trigger the VU
+    for (auto format :
+         {VK_FORMAT_R8_SINT, VK_FORMAT_R8_BOOL_ARM, VK_FORMAT_R32_SINT, VK_FORMAT_R32_SFLOAT, VK_FORMAT_R8_SFLOAT_FPENCODING_FLOAT8E4M3_ARM}) {
         vkt::dg::DataGraphPipelineHelper pipeline(*this, params);
 
         VkTensorDescriptionARM desc = DefaultConstantTensorDesc();
@@ -1403,18 +1314,22 @@ TEST_F(NegativeDataGraph, GraphConstantTensorWrongFormat) {
         pipeline.shader_module_ci_.constantCount = 1;
         pipeline.shader_module_ci_.pConstants = &constant;
 
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-pNext-09921");
-        pipeline.CreateDataGraphPipeline();
-        m_errorMonitor->VerifyFound();
+        if (format == VK_FORMAT_R8_SINT) {
+            // INT check must not consider the sign, as required by TOSA function specifications
+            pipeline.CreateDataGraphPipeline();
+        } else {
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-pNext-09921");
+            pipeline.CreateDataGraphPipeline();
+            m_errorMonitor->VerifyFound();
+        }
     }
 }
 
 TEST_F(NegativeDataGraph, GraphConstantTensorMissingDescription) {
     TEST_DESCRIPTION("Try creating a datagraph pipeline with a constant that is missing the tensor description");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1433,10 +1348,9 @@ TEST_F(NegativeDataGraph, GraphConstantTensorMissingDescription) {
 
 TEST_F(NegativeDataGraph, GraphConstantTensorWrongTiling) {
     TEST_DESCRIPTION("Try creating a datagraph pipeline with a constant which corresponds to a tensor with the incorrect tiling");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1455,10 +1369,9 @@ TEST_F(NegativeDataGraph, GraphConstantTensorWrongTiling) {
 
 TEST_F(NegativeDataGraph, GraphConstantTensorMissingUsageFlags) {
     TEST_DESCRIPTION("Try creating a datagraph pipeline with a constant based on a tensor with the incorrect usage flags");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvConstantDataGraph();
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -1477,8 +1390,7 @@ TEST_F(NegativeDataGraph, GraphConstantTensorMissingUsageFlags) {
 
 TEST_F(NegativeDataGraph, ResourceTensorWrongDescriptorSet) {
     TEST_DESCRIPTION("Try creating a datagraph pipeline with a resource with descriptorSet different from the spirv definition");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
@@ -1496,8 +1408,7 @@ TEST_F(NegativeDataGraph, ResourceTensorWrongDescriptorSet) {
 
 TEST_F(NegativeDataGraph, ResourceTensorWrongBinding) {
     TEST_DESCRIPTION("Try creating a datagraph pipeline with a resource with binding different from the spirv definition");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
@@ -1515,8 +1426,7 @@ TEST_F(NegativeDataGraph, ResourceTensorWrongBinding) {
 
 TEST_F(NegativeDataGraph, ResourceTensorArrayElementNotZero) {
     TEST_DESCRIPTION("Try creating a datagraph pipeline with a resource with arrayElement greater than zero");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
@@ -1531,14 +1441,13 @@ TEST_F(NegativeDataGraph, ResourceTensorArrayElementNotZero) {
 TEST_F(NegativeDataGraph, ResourceTensorWrongRank) {
     TEST_DESCRIPTION(
         "Try creating a datagraph pipeline with a resource based on a tensor with rank different from the spirv definition");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
     // define a tensor with rank 3, the spirv has rank 4
-    auto *desc =
-        const_cast<VkTensorDescriptionARM *>(vku::FindStructInPNextChain<VkTensorDescriptionARM>(pipeline.resources_[0].pNext));
+    auto* desc =
+        const_cast<VkTensorDescriptionARM*>(vku::FindStructInPNextChain<VkTensorDescriptionARM>(pipeline.resources_[0].pNext));
     const std::vector<int64_t> dimensions{1, 4, 16};
     desc->dimensionCount = dimensions.size();
     desc->pDimensions = dimensions.data();
@@ -1551,14 +1460,13 @@ TEST_F(NegativeDataGraph, ResourceTensorWrongRank) {
 TEST_F(NegativeDataGraph, ResourceTensorWrongDimensions) {
     TEST_DESCRIPTION(
         "Try creating a datagraph pipeline with a resource based on a tensor with dimensions different from the spirv definition");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
     // dim[3] is different from the spirv (4)
-    auto *desc =
-        const_cast<VkTensorDescriptionARM *>(vku::FindStructInPNextChain<VkTensorDescriptionARM>(pipeline.resources_[0].pNext));
+    auto* desc =
+        const_cast<VkTensorDescriptionARM*>(vku::FindStructInPNextChain<VkTensorDescriptionARM>(pipeline.resources_[0].pNext));
     const std::vector<int64_t> dimensions{1, 8, 16, 1};  // dim[3] is 4 in the spirv
     desc->dimensionCount = dimensions.size();
     desc->pDimensions = dimensions.data();
@@ -1568,10 +1476,36 @@ TEST_F(NegativeDataGraph, ResourceTensorWrongDimensions) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeDataGraph, ResourceTensorWrongFormat) {
+    TEST_DESCRIPTION(
+        "Try creating a datagraph pipeline with a resource based on a tensor with format different from the spirv definition");
+    RETURN_IF_SKIP(InitBasicDataGraph());
+
+    // try a few different formats, different for bit width, type and float encoding
+    // NOTE: VK_FORMAT_R8_SINT included as a sanity check: it is different only by sign from the actual format,
+    // meaning it is compatible, and it must NOT trigger the VU
+    for (auto format :
+         {VK_FORMAT_R8_SINT, VK_FORMAT_R8_BOOL_ARM, VK_FORMAT_R32_SINT, VK_FORMAT_R32_SFLOAT, VK_FORMAT_R8_SFLOAT_FPENCODING_FLOAT8E4M3_ARM}) {
+        vkt::dg::DataGraphPipelineHelper pipeline(*this);
+
+        auto* desc =
+            const_cast<VkTensorDescriptionARM*>(vku::FindStructInPNextChain<VkTensorDescriptionARM>(pipeline.resources_[0].pNext));
+        desc->format = format;
+
+        if (format == VK_FORMAT_R8_SINT) {
+            // INT check must not consider the sign, as required by TOSA function specifications
+            pipeline.CreateDataGraphPipeline();
+        } else {
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-pNext-09923");
+            pipeline.CreateDataGraphPipeline();
+            m_errorMonitor->VerifyFound();
+        }
+    }
+}
+
 TEST_F(NegativeDataGraph, ResourceTensorMissingDescription) {
     TEST_DESCRIPTION("Try creating a datagraph pipeline with a resource missing the tensor description");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
@@ -1587,14 +1521,13 @@ TEST_F(NegativeDataGraph, ResourceTensorInvalidUsage) {
     TEST_DESCRIPTION(
         "Try creating a datagraph pipeline when the VkTensorDescriptionARM struct in the pNext of resources in resourceInfo do "
         "not have a valid Usage member");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
     // set an incorrect usage in the tensor description
-    auto *desc =
-        const_cast<VkTensorDescriptionARM *>(vku::FindStructInPNextChain<VkTensorDescriptionARM>(pipeline.resources_[0].pNext));
+    auto* desc =
+        const_cast<VkTensorDescriptionARM*>(vku::FindStructInPNextChain<VkTensorDescriptionARM>(pipeline.resources_[0].pNext));
     desc->usage = VK_TENSOR_USAGE_SHADER_BIT_ARM;  // should be VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM
     m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineResourceInfoARM-descriptorSet-09851");
     pipeline.CreateDataGraphPipeline();
@@ -1603,8 +1536,7 @@ TEST_F(NegativeDataGraph, ResourceTensorInvalidUsage) {
 
 TEST_F(NegativeDataGraph, SessionGetMemoryRequirementsIndexTooLarge) {
     TEST_DESCRIPTION("Try to get the memory requirements for a session with an out-of-bounds value for objectIndex");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -1612,17 +1544,17 @@ TEST_F(NegativeDataGraph, SessionGetMemoryRequirementsIndexTooLarge) {
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
 
-    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    vkt::DataGraphPipelineSession session(*m_device, session_ci, vkt::no_mem);
 
     uint32_t bind_point_req_count = 0;
     VkDataGraphPipelineSessionBindPointRequirementsInfoARM bind_point_req_info = vku::InitStructHelper();
     bind_point_req_info.session = session;
     vk::GetDataGraphPipelineSessionBindPointRequirementsARM(*m_device, &bind_point_req_info, &bind_point_req_count, nullptr);
     if (bind_point_req_count == 0) {
-        GTEST_FAIL() << "No bind points, " << IncorrectSpirvMessage;
+        GTEST_FAIL() << "No bind points, test incorrect. Possible causes: incorrect spirv, or inconsistency between spirv and tensor/constant declarations\n";
     }
     std::vector<VkDataGraphPipelineSessionBindPointRequirementARM> bind_point_reqs(bind_point_req_count);
-    for (auto &bp_req : bind_point_reqs) {
+    for (auto& bp_req : bind_point_reqs) {
         bp_req = vku::InitStructHelper();
     }
     vk::GetDataGraphPipelineSessionBindPointRequirementsARM(*m_device, &bind_point_req_info, &bind_point_req_count,
@@ -1643,8 +1575,7 @@ TEST_F(NegativeDataGraph, SessionGetMemoryRequirementsIndexTooLarge) {
 TEST_F(NegativeDataGraph, ShaderUsesSpecConstantsFeatureNotEnabled) {
     TEST_DESCRIPTION(
         "Try to create a datagraph with a VkSpecializationInfo used in the shader module when the feature is not enabled");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     const VkSpecializationMapEntry entry = {
@@ -1668,13 +1599,12 @@ TEST_F(NegativeDataGraph, ShaderUsesSpecConstantsFeatureNotEnabled) {
 TEST_F(NegativeDataGraph, ShaderSpirvUsesOpSpecFeatureNotEnabled) {
     TEST_DESCRIPTION(
         "Try to create a datagraph with a shader module which contains OpSpec commands when the feature is not enabled");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // inject a dummy line in the spirv to trigger the error
     vkt::dg::ModifiableShaderParameters spirv_params;
     spirv_params.types = R"(%dummy_spec_constant = OpSpecConstant %uint 3)";
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifyableDataGraph(spirv_params);
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifyableDataGraph(spirv_params);
 
     // ShaderModule in VkDataGraphPipelineShaderModuleCreateInfoARM::module
     {
@@ -1715,8 +1645,7 @@ TEST_F(NegativeDataGraph, DataGraphShaderModuleCreateInfoIncorrectName) {
     TEST_DESCRIPTION(
         "Create a datagraph pipeline where VkDataGraphPipelineShaderModuleCreateInfoARM::pName doesn't match the name in the spirv "
         "code.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.shader_module_ci_.pName = "NOT_the_correct_name";
@@ -1726,16 +1655,17 @@ TEST_F(NegativeDataGraph, DataGraphShaderModuleCreateInfoIncorrectName) {
 }
 
 TEST_F(NegativeDataGraph, DataGraphShaderModuleCreateInfoHasModuleAndShaderModuleCreateInfo) {
-    TEST_DESCRIPTION("Create a datagraph pipeline where VkDataGraphPipelineShaderModuleCreateInfoARM::module is not null, but it also includes a VkShaderModuleCreateInfo structure in its pNext chain.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    TEST_DESCRIPTION(
+        "Create a datagraph pipeline where VkDataGraphPipelineShaderModuleCreateInfoARM::module is not null, but it also includes "
+        "a VkShaderModuleCreateInfo structure in its pNext chain.");
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // the pipeline constructor adds the shader module in the "normal" way, as VkDataGraphPipelineShaderModuleCreateInfoARM::module
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
     // also add the same ShaderModule in the pNext chain
     spvtools::SpirvTools tools{SPV_ENV_UNIVERSAL_1_6};
-    const std::string &spirv_source = vkt::dg::DataGraphPipelineHelper::GetSpirvBasicDataGraph();
+    const std::string& spirv_source = vkt::dg::DataGraphPipelineHelper::GetSpirvBasicDataGraph();
     std::vector<uint32_t> spirv_binary;
     if (!tools.Assemble(spirv_source, &spirv_binary)) {
         Monitor().SetError("Failed to compile SPIRV shader module");
@@ -1768,9 +1698,10 @@ TEST_F(NegativeDataGraph, DataGraphShaderModuleCreateInfoHasModuleAndShaderModul
 }
 
 TEST_F(NegativeDataGraph, DataGraphShaderModuleCreateInfoInvalidModule) {
-    TEST_DESCRIPTION("Create a datagraph pipeline where VkDataGraphPipelineShaderModuleCreateInfoARM::module is NULL and there is no VkShaderModuleCreateInfo structure in its pNext chain.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    TEST_DESCRIPTION(
+        "Create a datagraph pipeline where VkDataGraphPipelineShaderModuleCreateInfoARM::module is NULL and there is no "
+        "VkShaderModuleCreateInfo structure in its pNext chain.");
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.shader_module_ci_.module = VK_NULL_HANDLE;
@@ -1781,9 +1712,8 @@ TEST_F(NegativeDataGraph, DataGraphShaderModuleCreateInfoInvalidModule) {
 
 TEST_F(NegativeDataGraph, DataGraphShaderModuleCreateInfoDescriptorBufferNoFeature) {
     TEST_DESCRIPTION("Create a datagraph pipeline with the flag for descriptor buffers but the feature is not enabled.");
-    InitBasicDataGraph();
     // NOT adding vkt::Feature::dataGraphDescriptorBuffer
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.pipeline_ci_.flags |= VK_PIPELINE_CREATE_2_DESCRIPTOR_BUFFER_BIT_EXT;
@@ -1813,15 +1743,14 @@ TEST_F(NegativeDataGraph, DataGraphShaderModuleNoFeature) {
 
 TEST_F(NegativeDataGraph, DataGraphWrongCreateInfoStructs) {
     TEST_DESCRIPTION("None or too many of the required info structures passed in pNext of vkCreateDataGraphPipelinesARM.");
-    InitBasicDataGraph();
     AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // none of the structs included
     {
         vkt::dg::DataGraphPipelineHelper pipeline(*this);
         pipeline.pipeline_ci_.pNext = nullptr;
-        m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineCreateInfoARM-pNext-09763");
+        m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineCreateInfoARM-pNext-09977");
         pipeline.CreateDataGraphPipeline();
         m_errorMonitor->VerifyFound();
     }
@@ -1846,7 +1775,7 @@ TEST_F(NegativeDataGraph, DataGraphWrongCreateInfoStructs) {
         VkResult err = vk::CreatePipelineCache(device(), &cache_create_info, nullptr, &pipeline_cache);
         ASSERT_EQ(VK_SUCCESS, err);
 
-        m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineCreateInfoARM-pNext-09763");
+        m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineCreateInfoARM-pNext-09977");
         pipeline.CreateDataGraphPipeline(pipeline_cache);
         m_errorMonitor->VerifyFound();
         vk::DestroyPipelineCache(device(), pipeline_cache, nullptr);
@@ -1855,8 +1784,7 @@ TEST_F(NegativeDataGraph, DataGraphWrongCreateInfoStructs) {
 
 TEST_F(NegativeDataGraph, DataGraphShaderModuleSpirvArrayWrongSize) {
     TEST_DESCRIPTION("Create a datagraph with Vulkan resource arrays not matching the spirv.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::HelperParameters params;
     params.graph_variant = vkt::dg::GraphVariant::AddTensorArraySpirv;
@@ -1877,9 +1805,9 @@ TEST_F(NegativeDataGraph, DataGraphShaderModuleSpirvArrayWrongSize) {
 
 TEST_F(NegativeDataGraph, DataGraphShaderModuleSpirvRuntimeArraySizeZero) {
     TEST_DESCRIPTION("Create a datagraph where a Vulkan resource is a runtime array with count 0.");
-    InitBasicDataGraph();
+    SetTargetApiVersion(VK_API_VERSION_1_4);
     AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::HelperParameters params;
     params.graph_variant = vkt::dg::GraphVariant::AddRuntimeTensorArraySpirv;
@@ -1900,11 +1828,10 @@ TEST_F(NegativeDataGraph, DataGraphShaderModuleSpirvRuntimeArraySizeZero) {
 
 TEST_F(NegativeDataGraph, DataGraphTensorNoShape) {
     TEST_DESCRIPTION("Create a datagraph using tensors without shape.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // input and output variables are tensors without a shape, rank only (%tensor_r4)
-    static const char *tensorNoShapeDataGraphSpirv = R"spirv(
+    static const char* tensorNoShapeDataGraphSpirv = R"spirv(
                             OpCapability GraphARM
                             OpCapability TensorsARM
                             OpCapability Int8
@@ -1963,9 +1890,8 @@ TEST_F(NegativeDataGraph, DataGraphTensorNoShape) {
 
 TEST_F(NegativeDataGraph, DataGraphPipelineIdentifierNoFlag) {
     TEST_DESCRIPTION("Create a datagraph with the ARM cache but the wrong flags.");
-    InitBasicDataGraph();
     AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     VkDataGraphPipelineIdentifierCreateInfoARM pipeline_id = vku::InitStructHelper();
@@ -1992,9 +1918,8 @@ TEST_F(NegativeDataGraph, DataGraphPipelineIdentifierNoFlag) {
 
 TEST_F(NegativeDataGraph, DataGraphPipelineIdentifierHasResources) {
     TEST_DESCRIPTION("Create a datagraph with the ARM cache but resources info still included.");
-    InitBasicDataGraph();
     AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     VkDataGraphPipelineIdentifierCreateInfoARM pipeline_id = vku::InitStructHelper();
@@ -2020,9 +1945,8 @@ TEST_F(NegativeDataGraph, DataGraphPipelineIdentifierHasResources) {
 
 TEST_F(NegativeDataGraph, DataGraphCreateInfoResourceCountZero) {
     TEST_DESCRIPTION("Create a datagraph with the ARM cache, resource count is zero, but resource pointer is not null.");
-    InitBasicDataGraph();
     AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     VkDataGraphPipelineIdentifierCreateInfoARM pipeline_id = vku::InitStructHelper();
@@ -2049,11 +1973,10 @@ TEST_F(NegativeDataGraph, DataGraphCreateInfoResourceCountZero) {
 
 TEST_F(NegativeDataGraph, DataGraphCreateInfoNullResources) {
     TEST_DESCRIPTION("Create a datagraph but resource count is zero.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
-    pipeline.pipeline_ci_.pResourceInfos = nullptr; // this is to avoid VU 12364
+    pipeline.pipeline_ci_.pResourceInfos = nullptr;  // this is to avoid VU 12364
     pipeline.pipeline_ci_.resourceInfoCount = 0;
 
     m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineCreateInfoARM-None-12365");
@@ -2066,9 +1989,8 @@ TEST_F(NegativeDataGraph, DataGraphCreateInfoNullResources) {
 
 TEST_F(NegativeDataGraph, DataGraphPipelineIdentifierNoCache) {
     TEST_DESCRIPTION("Create a datagraph using the cache identifier but without a valid cache object.");
-    InitBasicDataGraph();
     AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
 
@@ -2090,15 +2012,14 @@ TEST_F(NegativeDataGraph, DataGraphPipelineIdentifierNoCache) {
 
 TEST_F(NegativeDataGraph, DataGraphOpGraphConstantARMNoShape) {
     TEST_DESCRIPTION("Try to create a datagraph with an OpGraphConstantARM defined on a tensor without shape");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // inject in the spirv a constant based on a shapeless tensor
     vkt::dg::ModifiableShaderParameters spirv_params;
     spirv_params.types = R"(%tensor_r4 = OpTypeTensorARM %uchar %uint_4
             %constant_no_shape = OpGraphConstantARM %tensor_r4 0)";
     spirv_params.instructions = "%dummy = OpExtInst %uchar_1_2_4_4_tensor %tosa ADD %op_1 %constant_no_shape";
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifyableDataGraph(spirv_params);
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifyableDataGraph(spirv_params);
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -2115,8 +2036,7 @@ TEST_F(NegativeDataGraph, DataGraphOpGraphConstantARMNoShape) {
 
 TEST_F(NegativeDataGraph, DataGraphNoConstant) {
     TEST_DESCRIPTION("Try to create a datagraph without a required constant.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // get spirv with 2 entrypoints; has a constant in entrypoint 2
     const std::string two_entrypoint_spirv = vkt::dg::DataGraphPipelineHelper::GetSpirvMultiEntryTwoDataGraph();
@@ -2133,15 +2053,15 @@ TEST_F(NegativeDataGraph, DataGraphNoConstant) {
 
 TEST_F(NegativeDataGraph, DataGraphOpGraphConstantARMNotTensor) {
     TEST_DESCRIPTION("Try to create a datagraph with an OpGraphConstantARM that is not a tensor");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // inject in the spirv constants based on a scalar, not tensors
     vkt::dg::ModifiableShaderParameters spirv_params;
     spirv_params.types = R"(%constant_scalar_min = OpGraphConstantARM %uint 0
                 %constant_scalar_max = OpGraphConstantARM %uint 128)";
-    spirv_params.instructions = "%dummy = OpExtInst %uchar_1_2_4_4_tensor %tosa CLAMP %op_1 %constant_scalar_min %constant_scalar_max %uint_2";
-    const std::string &spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifyableDataGraph(spirv_params);
+    spirv_params.instructions =
+        "%dummy = OpExtInst %uchar_1_2_4_4_tensor %tosa CLAMP %op_1 %constant_scalar_min %constant_scalar_max %uint_2";
+    const std::string& spirv_string = vkt::dg::DataGraphPipelineHelper::GetSpirvModifyableDataGraph(spirv_params);
 
     vkt::dg::HelperParameters params;
     params.spirv_source = spirv_string.c_str();
@@ -2156,8 +2076,7 @@ TEST_F(NegativeDataGraph, DataGraphOpGraphConstantARMNotTensor) {
 // When this happens, remove the SetDesiredError and move to data_graph_positive.cpp
 TEST_F(NegativeDataGraph, DataGraphShaderModuleSpirvArray) {
     TEST_DESCRIPTION("Create a datagraph using a tensor array as input.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // currently tensor arrays are banned by VU 9923. The mock ICD doesn't create a pipeline, so we can still test
     // successfully if we ignore it, but a real driver will actually try to create something illegal, and likely crash
@@ -2180,9 +2099,9 @@ TEST_F(NegativeDataGraph, DataGraphShaderModuleSpirvArray) {
 // When this happens, remove the SetDesiredError and move to data_graph_positive.cpp
 TEST_F(NegativeDataGraph, DataGraphShaderModuleSpirvRuntimeArray) {
     TEST_DESCRIPTION("Create a datagraph using a tensor runtime array as input.");
-    InitBasicDataGraph();
+    SetTargetApiVersion(VK_API_VERSION_1_4);
     AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     // currently tensor arrays are banned by VU 9923. The mock ICD doesn't create a pipeline, so we can still test
     // successfully if we ignore it, but a real driver will actually try to create something illegal, and likely crash
@@ -2222,8 +2141,7 @@ TEST_F(NegativeDataGraph, DataGraphShaderModuleSpirvRuntimeArray) {
 
 TEST_F(NegativeDataGraph, CmdDispatchWrongPipeline) {
     TEST_DESCRIPTION("Try to create a datagraph where session and command buffer are bound to different pipelines.");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -2236,11 +2154,8 @@ TEST_F(NegativeDataGraph, CmdDispatchWrongPipeline) {
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline_copy.handle();
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
     // setup the command buffer with the _default_ pipeline, as usual.
-    auto &bind_point_reqs = session.BindPointReqs();
+    auto& bind_point_reqs = session.BindPointReqs();
     std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
     session.AllocSessionMem(device_mem);
     auto session_bind_infos = InitSessionBindInfo(session, device_mem);
@@ -2263,8 +2178,7 @@ TEST_F(NegativeDataGraph, CmdDispatchWrongPipeline) {
 
 TEST_F(NegativeDataGraph, CmdDispatchWrongTensorUsage) {
     TEST_DESCRIPTION("Create and execute a datagraph where tensors have the wrong usage flag");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     vkt::dg::DataGraphPipelineHelper pipeline(*this);
     pipeline.CreateDataGraphPipeline();
@@ -2272,10 +2186,7 @@ TEST_F(NegativeDataGraph, CmdDispatchWrongTensorUsage) {
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline;
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
-    session.GetMemoryReqs();
-    CheckSessionMemory(session);
-
-    auto &bind_point_reqs = session.BindPointReqs();
+    auto& bind_point_reqs = session.BindPointReqs();
     std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
     session.AllocSessionMem(device_mem);
     auto session_bind_infos = InitSessionBindInfo(session, device_mem);
@@ -2297,7 +2208,7 @@ TEST_F(NegativeDataGraph, CmdDispatchWrongTensorUsage) {
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
                               &pipeline.descriptor_set_.get()->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-pDescription-09930");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-pDescription-09900");
     vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
@@ -2305,8 +2216,7 @@ TEST_F(NegativeDataGraph, CmdDispatchWrongTensorUsage) {
 
 TEST_F(NegativeDataGraph, BindPipelineCommandPoolFromWrongQueue) {
     TEST_DESCRIPTION("Try to bind a datagraph pipeline with a command buffer using the wrong queue");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
     InitRenderTarget();
 
     // find a queue that doesn't support datagraph. Also require supporting either graphics
@@ -2338,8 +2248,7 @@ TEST_F(NegativeDataGraph, BindPipelineCommandPoolFromWrongQueue) {
 
 TEST_F(NegativeDataGraph, BindWrongBindPoint) {
     TEST_DESCRIPTION("Try to bind a graphics pipeline to the datagraph bind point");
-    InitBasicDataGraph();
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitBasicDataGraph());
 
     InitRenderTarget();
     CreatePipelineHelper pipeline(*this);
@@ -2349,4 +2258,289 @@ TEST_F(NegativeDataGraph, BindWrongBindPoint) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipelineBindPoint-09911");
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDataGraph, CmdDispatchWrongQueue) {
+    TEST_DESCRIPTION("Try to create a datagraph where the command buffer is allocated on a queue that does not support TOSA 1.0");
+    RETURN_IF_SKIP(InitBasicDataGraph());
+
+    // find a queue family that does NOT support TOSA
+    const VkQueueFamilyDataGraphPropertiesARM tosa_1_0_property{
+        VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM,
+        nullptr,
+        {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM, false},
+        {VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_SPIRV_EXTENDED_INSTRUCTION_SET_ARM, "TOSA.001000.1", 0}};
+    uint32_t queue_without_tosa_1_0_idx = UINT32_MAX;
+    uint32_t n_queue_families;
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &n_queue_families, nullptr);
+    for (uint32_t qfi = 0; qfi < n_queue_families; qfi++) {
+        uint32_t n_properties;
+        vk::GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM(Gpu(), qfi, &n_properties, nullptr);
+        std::vector<VkQueueFamilyDataGraphPropertiesARM> properties(n_properties,
+                                                                    {VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM});
+        vk::GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM(Gpu(), qfi, &n_properties, properties.data());
+
+        bool queue_supports_tosa_1_0 = false;
+        for (const auto& p : properties) {
+            if (CompareVkQueueFamilyDataGraphPropertiesARM(tosa_1_0_property, p)) {
+                queue_supports_tosa_1_0 = true;
+                break;
+            }
+        }
+        if (!queue_supports_tosa_1_0) {
+            queue_without_tosa_1_0_idx = qfi;
+            break;
+        }
+    }
+
+    if (UINT32_MAX == queue_without_tosa_1_0_idx) {
+        GTEST_SKIP() << "All queues support TOSA, impossible to create the error condition, skip.";
+    }
+
+    vkt::dg::DataGraphPipelineHelper pipeline(*this);
+    pipeline.CreateDataGraphPipeline();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = pipeline;
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    auto& bind_point_reqs = session.BindPointReqs();
+    std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
+    session.AllocSessionMem(device_mem);
+    auto session_bind_infos = InitSessionBindInfo(session, device_mem);
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
+
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.tensor_views_[0]->handle(), 0);
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.tensor_views_[1]->handle(), 0);
+    pipeline.descriptor_set_->UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
+                              &pipeline.descriptor_set_.get()->set_, 0, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-commandBuffer-09941");
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDataGraph, OpticalFlowWrongImageFormat) {
+    TEST_DESCRIPTION("Try to create an optical flow data graph pipeline with an unsupported input image format");
+
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    vkt::dg::of::OpticalFlowHelper optical_flow(*this);
+
+    /* Set an unsupported imageFormat. ASTC are block formats, incompatible with optical flow operations. */
+    optical_flow.optical_flow_ci_.imageFormat = VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
+
+    m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineOpticalFlowCreateInfoARM-imageFormat-09968");
+    (void)optical_flow.CreateDataGraphPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDataGraph, OpticalFlowWrongFlowVectorFormat) {
+    TEST_DESCRIPTION("Try to create an optical flow data graph pipeline with an unsupported flow vector image format");
+
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    vkt::dg::of::OpticalFlowHelper optical_flow(*this);
+
+    /* Set an unsupported flowVectorFormat. ASTC are block formats, incompatible with optical flow operations. */
+    optical_flow.optical_flow_ci_.flowVectorFormat = VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
+
+    m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineOpticalFlowCreateInfoARM-flowVectorFormat-09969");
+    (void)optical_flow.CreateDataGraphPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDataGraph, OpticalFlowWrongCostFormat) {
+    TEST_DESCRIPTION("Try to create an optical flow data graph pipeline with an unsupported cost image format");
+
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    vkt::dg::of::OpticalFlowHelper optical_flow(*this);
+
+    /* Set an unsupported costFormat. ASTC are block formats, incompatible with optical flow operations. */
+    optical_flow.optical_flow_ci_.costFormat = VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
+
+    m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineOpticalFlowCreateInfoARM-costFormat-09970");
+    (void)optical_flow.CreateDataGraphPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDataGraph, OpticalFlowWrongHint) {
+    TEST_DESCRIPTION("Execute optical flow with a wrong meanFlowL1NormHint value");
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    vkt::dg::of::OpticalFlowHelper optical_flow(*this);
+    optical_flow.CreateDataGraphPipeline();
+    optical_flow.SetupImageDescriptors();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = optical_flow.dg_pipeline_;
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+
+    auto& bind_point_reqs = session.BindPointReqs();
+    std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
+    session.AllocSessionMem(device_mem);
+    auto session_bind_infos = InitSessionBindInfo(session, device_mem);
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
+
+    // set a hint that is too high
+    VkDataGraphPipelineOpticalFlowDispatchInfoARM optical_flow_di = vku::InitStructHelper();
+    optical_flow_di.meanFlowL1NormHint = optical_flow.optical_flow_ci_.height + 1;
+    VkDataGraphPipelineDispatchInfoARM pipeline_di = vku::InitStructHelper(&optical_flow_di);
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.dg_pipeline_);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.PipelineLayout(), 0, 1,
+                              optical_flow.DescriptorSet(), 0, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-VkDataGraphPipelineOpticalFlowDispatchInfoARM-meanFlowL1NormHint-09976");
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, &pipeline_di);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDataGraph, OpticalFlowNoCacheSession) {
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    vkt::dg::of::OpticalFlowHelper optical_flow(*this);
+    optical_flow.CreateDataGraphPipeline();
+    optical_flow.SetupImageDescriptors();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = optical_flow.dg_pipeline_;
+
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    std::vector<vkt::DeviceMemory> device_mem(session.BindPointReqs().size());
+    session.AllocSessionMem(device_mem);
+    std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> session_bind_infos =
+        DataGraphTest::InitSessionBindInfo(session, device_mem);
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
+
+    VkDataGraphPipelineOpticalFlowDispatchInfoARM optical_flow_di = vku::InitStructHelper();
+    // Set one of the disallowed bits
+    optical_flow_di.flags = VK_DATA_GRAPH_OPTICAL_FLOW_EXECUTE_REFERENCE_UNCHANGED_BIT_ARM;
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.dg_pipeline_);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.dg_pipeline_.pipeline_layout_,
+                              0, 1, &optical_flow.dg_pipeline_.descriptor_set_.get()->set_, 0, nullptr);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-pInfo-09964");
+    VkDataGraphPipelineDispatchInfoARM pipeline_di = vku::InitStructHelper(&optical_flow_di);
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, &pipeline_di);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDataGraph, OpticalFlowDispatchWithoutOpticalFlowCreateInfo) {
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    vkt::dg::DataGraphPipelineHelper pipeline(*this);
+    pipeline.CreateDataGraphPipeline();
+
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.tensor_views_[0]->handle(), 0);
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.tensor_views_[1]->handle(), 0);
+    pipeline.descriptor_set_->UpdateDescriptorSets();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = pipeline;
+
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    std::vector<vkt::DeviceMemory> device_mem(session.BindPointReqs().size());
+    session.AllocSessionMem(device_mem);
+
+    std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> session_bind_infos =
+        DataGraphTest::InitSessionBindInfo(session, device_mem);
+
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
+
+    // Set optical flow dispatch info for `pipeline` which was not created with optical flow create info.
+    VkDataGraphPipelineOpticalFlowDispatchInfoARM optical_flow_di = vku::InitStructHelper();
+    VkDataGraphPipelineDispatchInfoARM pipeline_di = vku::InitStructHelper(&optical_flow_di);
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
+                              &pipeline.descriptor_set_.get()->set_, 0, nullptr);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-nodeType-09980");
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, &pipeline_di);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDataGraph, OpticalFlowConnectionsImageLayoutsNoUnifiedImageLayouts) {
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    vkt::dg::of::OpticalFlowHelper optical_flow(*this);
+    // Set the resource info image layout to VK_IMAGE_LAYOUT_GENERAL, where the connection references a descriptor in the
+    // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL layout. Since unifiedImageLayouts feature is not enabled this is invalid usage.
+    optical_flow.image_layouts_[0].layout = VK_IMAGE_LAYOUT_GENERAL;
+
+    optical_flow.CreateDataGraphPipeline();
+    optical_flow.SetupImageDescriptors();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = optical_flow.dg_pipeline_;
+
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    std::vector<vkt::DeviceMemory> device_mem(session.BindPointReqs().size());
+    session.AllocSessionMem(device_mem);
+    std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> session_bind_infos =
+        DataGraphTest::InitSessionBindInfo(session, device_mem);
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
+
+    VkDataGraphPipelineOpticalFlowDispatchInfoARM optical_flow_di = vku::InitStructHelper();
+    VkDataGraphPipelineDispatchInfoARM pipeline_di = vku::InitStructHelper(&optical_flow_di);
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.dg_pipeline_);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.dg_pipeline_.pipeline_layout_,
+                              0, 1, &optical_flow.dg_pipeline_.descriptor_set_.get()->set_, 0, nullptr);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-nodeType-09981");
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, &pipeline_di);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDataGraph, OpticalFlowConnectionsImageLayoutsUnifiedImageLayouts) {
+    AddRequiredFeature(vkt::Feature::unifiedImageLayouts);
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    vkt::dg::of::OpticalFlowHelper optical_flow(*this);
+    // Set the resource info image layout to VK_IMAGE_LAYOUT_UNDEFINED, where the connection references a descriptor in the
+    // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL layout.
+    optical_flow.image_layouts_[0].layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    optical_flow.CreateDataGraphPipeline();
+    optical_flow.SetupImageDescriptors();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = optical_flow.dg_pipeline_;
+
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    std::vector<vkt::DeviceMemory> device_mem(session.BindPointReqs().size());
+    session.AllocSessionMem(device_mem);
+    std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> session_bind_infos =
+        DataGraphTest::InitSessionBindInfo(session, device_mem);
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
+
+    VkDataGraphPipelineOpticalFlowDispatchInfoARM optical_flow_di = vku::InitStructHelper();
+    VkDataGraphPipelineDispatchInfoARM pipeline_di = vku::InitStructHelper(&optical_flow_di);
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.dg_pipeline_);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.dg_pipeline_.pipeline_layout_,
+                              0, 1, &optical_flow.dg_pipeline_.descriptor_set_.get()->set_, 0, nullptr);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchDataGraphARM-nodeType-09981");
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, &pipeline_di);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
 }

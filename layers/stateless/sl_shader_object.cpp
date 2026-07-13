@@ -18,10 +18,11 @@
 #include "stateless/stateless_validation.h"
 #include <spirv/unified1/spirv.hpp>
 #include "utils/math_utils.h"
+#include "utils/vk_api_utils.h"
 
 namespace stateless {
 
-bool Device::ValidateCreateShadersFlags(VkShaderCreateFlagsEXT flags, VkShaderStageFlagBits stage, const Location &flag_loc) const {
+bool Device::ValidateCreateShadersFlags(VkShaderCreateFlagsEXT flags, VkShaderStageFlagBits stage, const Location& flag_loc) const {
     bool skip = false;
     if ((flags & VK_SHADER_CREATE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_EXT) != 0 &&
         enabled_features.attachmentFragmentShadingRate == VK_FALSE) {
@@ -34,6 +35,11 @@ bool Device::ValidateCreateShadersFlags(VkShaderCreateFlagsEXT flags, VkShaderSt
         skip |=
             LogError("VUID-VkShaderCreateInfoEXT-flags-08489", device, flag_loc,
                      "is %s, but the fragmentDensityMap feature was not enabled.", string_VkShaderCreateFlagsEXT(flags).c_str());
+    }
+    if ((flags & VK_SHADER_CREATE_OPACITY_MICROMAP_DISALLOW_MIXED_SPECIAL_INDEX_BIT_EXT) != 0 && !enabled_features.micromap) {
+        skip |= LogError("VUID-VkShaderCreateInfoEXT-micromap-11623", device, flag_loc,
+                         "is %s, but the VkPhysicalDeviceOpacityMicromapFeaturesKHR::micromap feature was not enabled.",
+                         string_VkShaderCreateFlagsEXT(flags).c_str());
     }
     if ((flags & VK_SHADER_CREATE_64_BIT_INDEXING_BIT_EXT) != 0 && enabled_features.shader64BitIndexing == VK_FALSE) {
         skip |=
@@ -60,6 +66,11 @@ bool Device::ValidateCreateShadersFlags(VkShaderCreateFlagsEXT flags, VkShaderSt
         skip |=
             LogError("VUID-VkShaderCreateInfoEXT-flags-08485", device, flag_loc,
                      "includes VK_SHADER_CREATE_DISPATCH_BASE_BIT_EXT but the stage is %s.", string_VkShaderStageFlagBits(stage));
+    }
+
+    if ((stage == VK_SHADER_STAGE_COMPUTE_BIT) && ((flags & VK_SHADER_CREATE_INDEPENDENT_SETS_BIT_KHR) != 0)) {
+        skip |= LogError("VUID-VkShaderCreateInfoEXT-stage-12428", device, flag_loc,
+                         "includes VK_SHADER_CREATE_INDEPENDENT_SETS_BIT_KHR but the stage is VK_SHADER_STAGE_COMPUTE_BIT.");
     }
 
     if (stage != VK_SHADER_STAGE_FRAGMENT_BIT) {
@@ -92,11 +103,11 @@ bool Device::ValidateCreateShadersFlags(VkShaderCreateFlagsEXT flags, VkShaderSt
 }
 
 bool Device::manual_PreCallValidateCreateShadersEXT(VkDevice device, uint32_t createInfoCount,
-                                                    const VkShaderCreateInfoEXT *pCreateInfos,
-                                                    const VkAllocationCallbacks *pAllocator, VkShaderEXT *pShaders,
-                                                    const Context &context) const {
+                                                    const VkShaderCreateInfoEXT* pCreateInfos,
+                                                    const VkAllocationCallbacks* pAllocator, VkShaderEXT* pShaders,
+                                                    const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
 
     uint32_t linked_heap_stage = createInfoCount;
     uint32_t linked_non_heap_stage = createInfoCount;
@@ -113,11 +124,11 @@ bool Device::manual_PreCallValidateCreateShadersEXT(VkDevice device, uint32_t cr
                                  "is VK_SHADER_CODE_TYPE_SPIRV_EXT, but pCode (%p) is not aligned to 4 bytes.", create_info.pCode);
             } else if (!IsIntegerMultipleOf(create_info.codeSize, 4)) {
                 skip |= LogError("VUID-VkShaderCreateInfoEXT-codeSize-08735", device, create_info_loc.dot(Field::codeSize),
-                                 "(%" PRIu64 ") is not a multiple of 4. You might have forget to multiply by sizeof(uint32_t).",
+                                 "(%" PRIu64 ") is not a multiple of 4. You might have forgot to multiply by sizeof(uint32_t).",
                                  static_cast<uint64_t>(create_info.codeSize));
             } else {
                 // Can't cast this until we know it is aligned to 4 bytes or USAN will catch it
-                const uint32_t first_dword = ((uint32_t *)create_info.pCode)[0];
+                const uint32_t first_dword = ((uint32_t*)create_info.pCode)[0];
                 if (first_dword != spv::MagicNumber) {
                     skip |= LogError("VUID-VkShaderCreateInfoEXT-pCode-08738", device, create_info_loc.dot(Field::pCode),
                                      "doesn't point to a SPIR-V module. The first dword (0x%" PRIx32
@@ -201,6 +212,10 @@ bool Device::manual_PreCallValidateCreateShadersEXT(VkDevice device, uint32_t cr
         } else if (create_info.stage == VK_SHADER_STAGE_CLUSTER_CULLING_BIT_HUAWEI) {
             skip |= LogError("VUID-VkShaderCreateInfoEXT-stage-08426", device, create_info_loc.dot(Field::stage),
                              "is VK_SHADER_STAGE_CLUSTER_CULLING_BIT_HUAWEI.");
+        } else if (create_info.stage & kShaderStageAllRayTracing) {
+            skip |= LogError("VUID-VkShaderCreateInfoEXT-stage-12445", device, create_info_loc.dot(Field::stage),
+                             "is %s (ray tracing stages are not supported with VK_EXT_shader_object).",
+                             string_VkShaderStageFlagBits(create_info.stage));
         }
 
         if ((create_info.flags & VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT) != 0) {
@@ -260,10 +275,10 @@ bool Device::manual_PreCallValidateCreateShadersEXT(VkDevice device, uint32_t cr
     return skip;
 }
 
-bool Device::manual_PreCallValidateGetShaderBinaryDataEXT(VkDevice device, VkShaderEXT shader, size_t *pDataSize, void *pData,
-                                                          const Context &context) const {
+bool Device::manual_PreCallValidateGetShaderBinaryDataEXT(VkDevice device, VkShaderEXT shader, size_t* pDataSize, void* pData,
+                                                          const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
 
     if (pData) {
         if (!IsPointerAligned(pData, 16)) {

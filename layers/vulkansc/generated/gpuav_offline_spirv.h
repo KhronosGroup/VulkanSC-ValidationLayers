@@ -44,6 +44,19 @@ extern const uint32_t instrumentation_descriptor_class_texel_buffer_comp[];
 // These offset match the function in the order they are declared in the GLSL source
 extern const uint32_t instrumentation_descriptor_class_texel_buffer_comp_function_0_offset;
 
+extern const uint32_t instrumentation_descriptor_heap_comp_size;
+extern const uint32_t instrumentation_descriptor_heap_comp[];
+// These offset match the function in the order they are declared in the GLSL source
+extern const uint32_t instrumentation_descriptor_heap_comp_function_0_offset;
+extern const uint32_t instrumentation_descriptor_heap_comp_function_1_offset;
+extern const uint32_t instrumentation_descriptor_heap_comp_function_2_offset;
+extern const uint32_t instrumentation_descriptor_heap_comp_function_3_offset;
+extern const uint32_t instrumentation_descriptor_heap_comp_function_4_offset;
+extern const uint32_t instrumentation_descriptor_heap_comp_function_5_offset;
+extern const uint32_t instrumentation_descriptor_heap_comp_function_6_offset;
+extern const uint32_t instrumentation_descriptor_heap_comp_function_7_offset;
+extern const uint32_t instrumentation_descriptor_heap_comp_function_8_offset;
+
 extern const uint32_t instrumentation_descriptor_indexing_oob_comp_size;
 extern const uint32_t instrumentation_descriptor_indexing_oob_comp[];
 // These offset match the function in the order they are declared in the GLSL source
@@ -60,22 +73,12 @@ extern const uint32_t instrumentation_mesh_shading_comp_size;
 extern const uint32_t instrumentation_mesh_shading_comp[];
 // These offset match the function in the order they are declared in the GLSL source
 extern const uint32_t instrumentation_mesh_shading_comp_function_0_offset;
+extern const uint32_t instrumentation_mesh_shading_comp_function_1_offset;
 
 extern const uint32_t instrumentation_post_process_descriptor_index_comp_size;
 extern const uint32_t instrumentation_post_process_descriptor_index_comp[];
 // These offset match the function in the order they are declared in the GLSL source
 extern const uint32_t instrumentation_post_process_descriptor_index_comp_function_0_offset;
-
-extern const uint32_t instrumentation_ray_hit_object_comp_size;
-extern const uint32_t instrumentation_ray_hit_object_comp[];
-// These offset match the function in the order they are declared in the GLSL source
-extern const uint32_t instrumentation_ray_hit_object_comp_function_0_offset;
-extern const uint32_t instrumentation_ray_hit_object_comp_function_1_offset;
-
-extern const uint32_t instrumentation_ray_query_comp_size;
-extern const uint32_t instrumentation_ray_query_comp[];
-// These offset match the function in the order they are declared in the GLSL source
-extern const uint32_t instrumentation_ray_query_comp_function_0_offset;
 
 extern const uint32_t instrumentation_sanitizer_comp_size;
 extern const uint32_t instrumentation_sanitizer_comp[];
@@ -85,11 +88,38 @@ extern const uint32_t instrumentation_sanitizer_comp_function_1_offset;
 extern const uint32_t instrumentation_sanitizer_comp_function_2_offset;
 extern const uint32_t instrumentation_sanitizer_comp_function_3_offset;
 extern const uint32_t instrumentation_sanitizer_comp_function_4_offset;
+extern const uint32_t instrumentation_sanitizer_comp_function_5_offset;
+
+extern const uint32_t instrumentation_shared_memory_data_race_comp_size;
+extern const uint32_t instrumentation_shared_memory_data_race_comp[];
+// These offset match the function in the order they are declared in the GLSL source
+extern const uint32_t instrumentation_shared_memory_data_race_comp_function_0_offset;
+extern const uint32_t instrumentation_shared_memory_data_race_comp_function_1_offset;
+extern const uint32_t instrumentation_shared_memory_data_race_comp_function_2_offset;
+extern const uint32_t instrumentation_shared_memory_data_race_comp_function_3_offset;
+extern const uint32_t instrumentation_shared_memory_data_race_comp_function_4_offset;
+extern const uint32_t instrumentation_shared_memory_data_race_comp_function_5_offset;
+
+extern const uint32_t instrumentation_trace_ray_comp_size;
+extern const uint32_t instrumentation_trace_ray_comp[];
+// These offset match the function in the order they are declared in the GLSL source
+extern const uint32_t instrumentation_trace_ray_comp_function_0_offset;
+extern const uint32_t instrumentation_trace_ray_comp_function_1_offset;
+extern const uint32_t instrumentation_trace_ray_comp_function_2_offset;
+extern const uint32_t instrumentation_trace_ray_comp_function_3_offset;
+extern const uint32_t instrumentation_trace_ray_comp_function_4_offset;
+extern const uint32_t instrumentation_trace_ray_comp_function_5_offset;
 
 extern const uint32_t instrumentation_vertex_attribute_fetch_oob_vert_size;
 extern const uint32_t instrumentation_vertex_attribute_fetch_oob_vert[];
 // These offset match the function in the order they are declared in the GLSL source
 extern const uint32_t instrumentation_vertex_attribute_fetch_oob_vert_function_0_offset;
+
+extern const uint32_t setup_acceleration_structure_gpu_state_update_comp_size;
+extern const uint32_t setup_acceleration_structure_gpu_state_update_comp[];
+
+extern const uint32_t setup_descriptor_encoding_update_comp_size;
+extern const uint32_t setup_descriptor_encoding_update_comp[];
 
 extern const uint32_t validation_cmd_blas_comp_size;
 extern const uint32_t validation_cmd_blas_comp[];
@@ -114,6 +144,9 @@ extern const uint32_t validation_cmd_draw_mesh_indirect_comp[];
 
 extern const uint32_t validation_cmd_first_instance_comp_size;
 extern const uint32_t validation_cmd_first_instance_comp[];
+
+extern const uint32_t validation_cmd_memcmp_comp_size;
+extern const uint32_t validation_cmd_memcmp_comp[];
 
 extern const uint32_t validation_cmd_setup_draw_indexed_indirect_index_buffer_comp_size;
 extern const uint32_t validation_cmd_setup_draw_indexed_indirect_index_buffer_comp[];

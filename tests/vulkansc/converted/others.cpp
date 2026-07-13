@@ -18,12 +18,14 @@
 
 #include <vulkan/vulkan_core.h>
 #include <algorithm>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 #include "utils/hash_util.h"
 #include "generated/vk_validation_error_messages.h"
 
-TEST_F(VkLayerTest, VersionCheckPromotedAPIs) {
+class NegativeOther : public VkLayerTest {};
+
+TEST_F(NegativeOther, VersionCheckPromotedAPIs) {
     TEST_DESCRIPTION("Validate that promoted APIs are not valid in old versions.");
     SetTargetApiVersion(VK_API_VERSION_1_0);
 
@@ -50,7 +52,7 @@ TEST_F(VkLayerTest, VersionCheckPromotedAPIs) {
 }
 
 // Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
-TEST_F(VkLayerTest, DISABLED_UnsupportedPnextApiVersion) {
+TEST_F(NegativeOther, DISABLED_UnsupportedPnextApiVersion) {
     TEST_DESCRIPTION("Validate that newer pnext structs are not valid for old Vulkan versions.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
@@ -70,12 +72,12 @@ TEST_F(VkLayerTest, DISABLED_UnsupportedPnextApiVersion) {
     }
 }
 
-TEST_F(VkLayerTest, VuidCheckForHashCollisions) {
+TEST_F(NegativeOther, VuidCheckForHashCollisions) {
     TEST_DESCRIPTION("Ensure there are no VUID hash collisions");
 
     std::vector<uint32_t> hashes;
     hashes.reserve(GetVuidMap().size());
-    for (const auto &vuid_spec_text_pair : GetVuidMap()) {
+    for (const auto& vuid_spec_text_pair : GetVuidMap()) {
         const uint32_t hash = hash_util::VuidHash(vuid_spec_text_pair.first);
         hashes.push_back(hash);
     }
@@ -84,7 +86,7 @@ TEST_F(VkLayerTest, VuidCheckForHashCollisions) {
     ASSERT_TRUE(it == hashes.end());
 }
 
-TEST_F(VkLayerTest, VuidHashStability) {
+TEST_F(NegativeOther, VuidHashStability) {
     TEST_DESCRIPTION("Ensure stability of VUID hashes clients rely on for filtering");
     ASSERT_TRUE(hash_util::VuidHash("VUID-VkRenderPassCreateInfo-pNext-01963") == 0xa19880e3);
     ASSERT_TRUE(hash_util::VuidHash("VUID-BaryCoordKHR-BaryCoordKHR-04154") == 0xcc72e520);
@@ -92,10 +94,12 @@ TEST_F(VkLayerTest, VuidHashStability) {
     ASSERT_TRUE(hash_util::VuidHash("VUID-RayTmaxKHR-RayTmaxKHR-04349") == 0x8e67514c);
     ASSERT_TRUE(hash_util::VuidHash("VUID-RuntimeSpirv-SubgroupUniformControlFlowKHR-06379") == 0x2f574188);
     ASSERT_TRUE(hash_util::VuidHash("VVL-DEBUG-PRINTF") == 0x4fe1fef9);
+    ASSERT_TRUE(hash_util::VuidHash("GPU-DUMP") == 0xe5c5edc1);
     ASSERT_TRUE(hash_util::VuidHash("WARNING-Setting-Limit-Adjusted") == 0x86fe6721);
+    ASSERT_TRUE(hash_util::VuidHash("VALIDATION-SETTINGS") == 0x7f1922d7);
 }
 
-TEST_F(VkLayerTest, RequiredParameter) {
+TEST_F(NegativeOther, RequiredParameter) {
     TEST_DESCRIPTION("Specify VK_NULL_HANDLE, NULL, and 0 for required handle, pointer, array, and array count parameters");
 
     RETURN_IF_SKIP(Init());
@@ -186,7 +190,7 @@ TEST_F(VkLayerTest, RequiredParameter) {
 
 #ifdef ANNOTATED_SPEC_LINK
 // This test case are replaced with Vulkan SC specific ones
-TEST_F(VkLayerTest, DISABLED_SpecLinksImplicit) {
+TEST_F(NegativeOther, DISABLED_SpecLinksImplicit) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
 
@@ -200,7 +204,7 @@ TEST_F(VkLayerTest, DISABLED_SpecLinksImplicit) {
 }
 
 // This test case are replaced with Vulkan SC specific ones
-TEST_F(VkLayerTest, DISABLED_SpecLinksExplicit) {
+TEST_F(NegativeOther, DISABLED_SpecLinksExplicit) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
 
@@ -218,7 +222,7 @@ TEST_F(VkLayerTest, DISABLED_SpecLinksExplicit) {
 #else   // ANNOTATED_SPEC_LINK
 
 // This test case are replaced with Vulkan SC specific ones
-TEST_F(VkLayerTest, DISABLED_SpecLinksImplicit) {
+TEST_F(NegativeOther, DISABLED_SpecLinksImplicit) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
 
@@ -232,7 +236,7 @@ TEST_F(VkLayerTest, DISABLED_SpecLinksImplicit) {
 }
 
 // This test case are replaced with Vulkan SC specific ones
-TEST_F(VkLayerTest, DISABLED_SpecLinksExplicit) {
+TEST_F(NegativeOther, DISABLED_SpecLinksExplicit) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
 
@@ -249,7 +253,7 @@ TEST_F(VkLayerTest, DISABLED_SpecLinksExplicit) {
 }
 #endif  // ANNOTATED_SPEC_LINK
 
-TEST_F(VkLayerTest, PnextOnlyStructValidation) {
+TEST_F(NegativeOther, PnextOnlyStructValidation) {
     TEST_DESCRIPTION("See if checks occur on structs ONLY used in pnext chains.");
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
@@ -286,7 +290,7 @@ TEST_F(VkLayerTest, PnextOnlyStructValidation) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, ReservedParameter) {
+TEST_F(NegativeOther, ReservedParameter) {
     TEST_DESCRIPTION("Specify a non-zero value for a reserved parameter");
 
     RETURN_IF_SKIP(Init());
@@ -302,7 +306,7 @@ TEST_F(VkLayerTest, ReservedParameter) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, InvalidStructSType) {
+TEST_F(NegativeOther, InvalidStructSType) {
     TEST_DESCRIPTION("Specify an invalid VkStructureType for a Vulkan structure's sType field");
 
     RETURN_IF_SKIP(Init());
@@ -327,7 +331,7 @@ TEST_F(VkLayerTest, InvalidStructSType) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, InvalidStructPNext) {
+TEST_F(NegativeOther, InvalidStructPNext) {
     TEST_DESCRIPTION("Specify an invalid value for a Vulkan structure's pNext field");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -363,7 +367,7 @@ TEST_F(VkLayerTest, InvalidStructPNext) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UnrecognizedEnumOutOfRange) {
+TEST_F(NegativeOther, UnrecognizedEnumOutOfRange) {
     RETURN_IF_SKIP(Init());
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_maintenance5 is supported";
@@ -378,7 +382,7 @@ TEST_F(VkLayerTest, UnrecognizedEnumOutOfRange) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UnrecognizedEnumOutOfRange2) {
+TEST_F(NegativeOther, UnrecognizedEnumOutOfRange2) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
@@ -391,7 +395,7 @@ TEST_F(VkLayerTest, UnrecognizedEnumOutOfRange2) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UnrecognizedFlagOutOfRange) {
+TEST_F(NegativeOther, UnrecognizedFlagOutOfRange) {
     RETURN_IF_SKIP(Init());
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_maintenance5 is supported";
@@ -404,7 +408,7 @@ TEST_F(VkLayerTest, UnrecognizedFlagOutOfRange) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UnrecognizedFlagOutOfRange2) {
+TEST_F(NegativeOther, UnrecognizedFlagOutOfRange2) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
@@ -423,7 +427,7 @@ TEST_F(VkLayerTest, UnrecognizedFlagOutOfRange2) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UnrecognizedValueBadMask) {
+TEST_F(NegativeOther, UnrecognizedValueBadMask) {
     RETURN_IF_SKIP(Init());
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_maintenance5 is supported";
@@ -438,7 +442,7 @@ TEST_F(VkLayerTest, UnrecognizedValueBadMask) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UnrecognizedValueBadFlag) {
+TEST_F(NegativeOther, UnrecognizedValueBadFlag) {
     RETURN_IF_SKIP(Init());
 
     m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pWaitDstStageMask-parameter");
@@ -458,7 +462,7 @@ TEST_F(VkLayerTest, UnrecognizedValueBadFlag) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UnrecognizedValueBadBool) {
+TEST_F(NegativeOther, UnrecognizedValueBadBool) {
     // Make sure using VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE doesn't trigger a false positive.
     AddRequiredExtensions(VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
@@ -473,7 +477,7 @@ TEST_F(VkLayerTest, UnrecognizedValueBadBool) {
     CreateSamplerTest(sampler_info, "UNASSIGNED-GeneralParameterError-UnrecognizedBool32");
 }
 
-TEST_F(VkLayerTest, UnrecognizedValueMaxEnum) {
+TEST_F(NegativeOther, UnrecognizedValueMaxEnum) {
     RETURN_IF_SKIP(Init());
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_maintenance5 is supported";
@@ -486,7 +490,7 @@ TEST_F(VkLayerTest, UnrecognizedValueMaxEnum) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UseObjectWithWrongDevice) {
+TEST_F(NegativeOther, UseObjectWithWrongDevice) {
     TEST_DESCRIPTION(
         "Try to destroy a render pass object using a device other than the one it was created on. This should generate a distinct "
         "error from the invalid handle error.");
@@ -522,7 +526,7 @@ TEST_F(VkLayerTest, UseObjectWithWrongDevice) {
 }
 
 // Not supported in Vulkan SC: allocation callbacks
-TEST_F(VkLayerTest, DISABLED_InvalidAllocationCallbacks) {
+TEST_F(NegativeOther, DISABLED_InvalidAllocationCallbacks) {
     TEST_DESCRIPTION("Test with invalid VkAllocationCallbacks");
 
     RETURN_IF_SKIP(Init());
@@ -537,11 +541,11 @@ TEST_F(VkLayerTest, DISABLED_InvalidAllocationCallbacks) {
     VkCommandPool cmdPool;
 
     struct Alloc {
-        static VKAPI_ATTR void *VKAPI_CALL alloc(void *, size_t, size_t, VkSystemAllocationScope) { return nullptr; };
-        static VKAPI_ATTR void *VKAPI_CALL realloc(void *, void *, size_t, size_t, VkSystemAllocationScope) { return nullptr; };
-        static VKAPI_ATTR void VKAPI_CALL free(void *, void *){};
-        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
-        static VKAPI_ATTR void VKAPI_CALL internalFree(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+        static VKAPI_ATTR void* VKAPI_CALL alloc(void*, size_t, size_t, VkSystemAllocationScope) { return nullptr; };
+        static VKAPI_ATTR void* VKAPI_CALL realloc(void*, void*, size_t, size_t, VkSystemAllocationScope) { return nullptr; };
+        static VKAPI_ATTR void VKAPI_CALL free(void*, void*){};
+        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+        static VKAPI_ATTR void VKAPI_CALL internalFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
     };
 
     {
@@ -581,7 +585,7 @@ TEST_F(VkLayerTest, DISABLED_InvalidAllocationCallbacks) {
 }
 
 // Not supported in Vulkan SC: VK_EXT_validation_cache
-TEST_F(VkLayerTest, DISABLED_ValidationCacheTestBadMerge) {
+TEST_F(NegativeOther, DISABLED_ValidationCacheTestBadMerge) {
     AddRequiredExtensions(VK_EXT_VALIDATION_CACHE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     VkValidationCacheCreateInfoEXT validationCacheCreateInfo = vku::InitStructHelper();
@@ -599,7 +603,7 @@ TEST_F(VkLayerTest, DISABLED_ValidationCacheTestBadMerge) {
     vk::DestroyValidationCacheEXT(device(), validationCache, nullptr);
 }
 
-TEST_F(VkLayerTest, UnclosedAndDuplicateQueries) {
+TEST_F(NegativeOther, UnclosedAndDuplicateQueries) {
     TEST_DESCRIPTION("End a command buffer with a query still in progress, create nested queries.");
 
     RETURN_IF_SKIP(Init());
@@ -624,7 +628,7 @@ TEST_F(VkLayerTest, UnclosedAndDuplicateQueries) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, ExecuteUnrecordedCB) {
+TEST_F(NegativeOther, ExecuteUnrecordedCB) {
     TEST_DESCRIPTION("Attempt vkQueueSubmit with a CB in the initial state");
 
     RETURN_IF_SKIP(Init());
@@ -645,7 +649,7 @@ TEST_F(VkLayerTest, ExecuteUnrecordedCB) {
     // m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, ValidateArrayLength) {
+TEST_F(NegativeOther, ValidateArrayLength) {
     TEST_DESCRIPTION("Validate arraylength VUs");
 
     RETURN_IF_SKIP(Init());
@@ -721,7 +725,7 @@ TEST_F(VkLayerTest, ValidateArrayLength) {
     command_buffer.End();
 }
 
-TEST_F(VkLayerTest, DuplicatePhysicalDevices) {
+TEST_F(NegativeOther, DuplicatePhysicalDevices) {
     TEST_DESCRIPTION("Duplicated physical devices in DeviceGroupDeviceCreateInfo.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(InitFramework());
@@ -746,8 +750,7 @@ TEST_F(VkLayerTest, DuplicatePhysicalDevices) {
 
     vkt::QueueCreateInfoArray queue_info(m_device->Physical().queue_properties_);
 
-    VkDeviceCreateInfo create_info = vku::InitStructHelper();
-    create_info.pNext = &create_device_pnext;
+    VkDeviceCreateInfo create_info = vku::InitStructHelper(&create_device_pnext);
     create_info.queueCreateInfoCount = queue_info.Size();
     create_info.pQueueCreateInfos = queue_info.Data();
     create_info.enabledLayerCount = 0;
@@ -762,7 +765,7 @@ TEST_F(VkLayerTest, DuplicatePhysicalDevices) {
 }
 
 // Not supported in Vulkan SC: split-instance bind regions
-TEST_F(VkLayerTest, DISABLED_InvalidImageCreateFlagWithPhysicalDeviceCount) {
+TEST_F(NegativeOther, DISABLED_InvalidImageCreateFlagWithPhysicalDeviceCount) {
     TEST_DESCRIPTION("Test for invalid imageCreate flags bit with physicalDeviceCount.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
@@ -804,7 +807,7 @@ TEST_F(VkLayerTest, DISABLED_InvalidImageCreateFlagWithPhysicalDeviceCount) {
     CreateImageTest(ici, "VUID-VkImageCreateInfo-physicalDeviceCount-01421");
 }
 
-TEST_F(VkLayerTest, ZeroBitmask) {
+TEST_F(NegativeOther, ZeroBitmask) {
     TEST_DESCRIPTION("Test a reserved flags field set to a non-zero value");
 
     RETURN_IF_SKIP(Init());
@@ -817,7 +820,7 @@ TEST_F(VkLayerTest, ZeroBitmask) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, InvalidExtEnum) {
+TEST_F(NegativeOther, InvalidExtEnum) {
     TEST_DESCRIPTION("Use an enum from an extension that is not enabled.");
     RETURN_IF_SKIP(Init());
 
@@ -828,7 +831,7 @@ TEST_F(VkLayerTest, InvalidExtEnum) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, ExtensionNotEnabledYCbCr) {
+TEST_F(NegativeOther, ExtensionNotEnabledYCbCr) {
     TEST_DESCRIPTION("Validate that using an API from an unenabled extension returns an error");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -855,7 +858,7 @@ TEST_F(VkLayerTest, ExtensionNotEnabledYCbCr) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, DuplicateValidPNextStructures) {
+TEST_F(NegativeOther, DuplicateValidPNextStructures) {
     TEST_DESCRIPTION("Create a pNext chain containing valid structures, but with a duplicate structure type");
 
     // VK_KHR_get_physical_device_properties2 promoted to 1.1
@@ -877,7 +880,7 @@ TEST_F(VkLayerTest, DuplicateValidPNextStructures) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, GetPhysicalDeviceImageFormatPropertiesFlags) {
+TEST_F(NegativeOther, GetPhysicalDeviceImageFormatPropertiesFlags) {
     RETURN_IF_SKIP(Init());
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_maintenance5 is supported";
@@ -895,7 +898,7 @@ TEST_F(VkLayerTest, GetPhysicalDeviceImageFormatPropertiesFlags) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, GetCalibratedTimestampsDuplicate) {
+TEST_F(NegativeOther, GetCalibratedTimestampsDuplicate) {
     TEST_DESCRIPTION("vkGetCalibratedTimestampsEXT with duplicated timeDomain.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
@@ -919,7 +922,7 @@ TEST_F(VkLayerTest, GetCalibratedTimestampsDuplicate) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, GetCalibratedTimestampsDuplicateKHR) {
+TEST_F(NegativeOther, GetCalibratedTimestampsDuplicateKHR) {
     TEST_DESCRIPTION("vkGetCalibratedTimestampsKHR with duplicated timeDomain.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
@@ -943,7 +946,7 @@ TEST_F(VkLayerTest, GetCalibratedTimestampsDuplicateKHR) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, GetCalibratedTimestampsQuery) {
+TEST_F(NegativeOther, GetCalibratedTimestampsQuery) {
     TEST_DESCRIPTION("vkGetCalibratedTimestampsEXT with invalid timeDomain.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
@@ -969,7 +972,7 @@ TEST_F(VkLayerTest, GetCalibratedTimestampsQuery) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, ExtensionXmlDependsLogic) {
+TEST_F(NegativeOther, ExtensionXmlDependsLogic) {
     TEST_DESCRIPTION("Make sure the OR in 'depends' from XML is observed correctly");
     // VK_KHR_buffer_device_address requires
     // (VK_KHR_get_physical_device_properties2 AND VK_KHR_device_group) OR VK_VERSION_1_1
@@ -1011,7 +1014,7 @@ TEST_F(VkLayerTest, ExtensionXmlDependsLogic) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, ExtensionXmlDependsLogic2) {
+TEST_F(NegativeOther, ExtensionXmlDependsLogic2) {
     // VK_KHR_shared_presentable_image requires
     // VK_KHR_swapchain
     //    and
@@ -1058,7 +1061,7 @@ TEST_F(VkLayerTest, ExtensionXmlDependsLogic2) {
 }
 
 // Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
-TEST_F(VkLayerTest, DISABLED_ExtensionXmlDependsLogic3) {
+TEST_F(NegativeOther, DISABLED_ExtensionXmlDependsLogic3) {
     // VK_KHR_shared_presentable_image requires
     // VK_KHR_swapchain
     //    and
@@ -1104,7 +1107,7 @@ TEST_F(VkLayerTest, DISABLED_ExtensionXmlDependsLogic3) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, InvalidGetExternalBufferPropertiesUsage) {
+TEST_F(NegativeOther, InvalidGetExternalBufferPropertiesUsage) {
     TEST_DESCRIPTION("Call vkGetPhysicalDeviceExternalBufferProperties with invalid usage");
 
     AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
@@ -1134,7 +1137,7 @@ TEST_F(VkLayerTest, InvalidGetExternalBufferPropertiesUsage) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, DescriptorBufferNoExtension) {
+TEST_F(NegativeOther, DescriptorBufferNoExtension) {
     TEST_DESCRIPTION("Create VkBuffer without the extension.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(Init());
@@ -1148,7 +1151,7 @@ TEST_F(VkLayerTest, DescriptorBufferNoExtension) {
 }
 
 // This test case are replaced with Vulkan SC specific ones
-TEST_F(VkLayerTest, DISABLED_MissingCreateInfo) {
+TEST_F(NegativeOther, DISABLED_MissingCreateInfo) {
     RETURN_IF_SKIP(Init());
 
     VkBuffer buffer;
@@ -1264,7 +1267,7 @@ TEST_F(VkLayerTest, DISABLED_MissingCreateInfo) {
 
 // Android loader returns an error in this case, so never makes it to the VVL
 #if !defined(VK_USE_PLATFORM_ANDROID_KHR)
-TEST_F(VkLayerTest, GetDeviceProcAddrInstance) {
+TEST_F(NegativeOther, GetDeviceProcAddrInstance) {
     TEST_DESCRIPTION("Call GetDeviceProcAddr on an instance function");
     RETURN_IF_SKIP(Init());
     m_errorMonitor->SetDesiredWarning("WARNING-vkGetDeviceProcAddr-device");
@@ -1275,13 +1278,13 @@ TEST_F(VkLayerTest, GetDeviceProcAddrInstance) {
 
 // TODO - Can reproduce locally when setting VK_LAYER_MESSAGE_FORMAT_DISPLAY_APPLICATION_NAME
 // but need to unset variable and make sure works on Android before having CI run this
-TEST_F(VkLayerTest, DISABLED_DisplayApplicationName) {
+TEST_F(NegativeOther, DISABLED_DisplayApplicationName) {
     TEST_DESCRIPTION("Test message_format_display_application_name");
-    const char *name_0 = "first instance";
+    const char* name_0 = "first instance";
     app_info_.pApplicationName = name_0;
     RETURN_IF_SKIP(Init());
 
-    const char *name_1 = "second instance";
+    const char* name_1 = "second instance";
     app_info_.pApplicationName = name_1;
     const auto instance_create_info = GetInstanceCreateInfo();
     VkInstance instance2;
@@ -1311,11 +1314,12 @@ TEST_F(VkLayerTest, DISABLED_DisplayApplicationName) {
     ASSERT_NO_FATAL_FAILURE(vk::DestroyInstance(instance2, nullptr));
 }
 
-TEST_F(VkLayerTest, GetDeviceFaultInfoEXT) {
-    TEST_DESCRIPTION("Call vkGetDeviceFaultInfoEXT when no device is lost");
+TEST_F(NegativeOther, GetDeviceFaultInfoEXT) {
     AddRequiredExtensions(VK_EXT_DEVICE_FAULT_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::deviceFault);
-    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceFaultFeaturesEXT ext_features = vku::InitStructHelper();
+    auto features2 = GetPhysicalDeviceFeatures2(ext_features);
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     VkDeviceFaultCountsEXT fault_count = vku::InitStructHelper();
     VkDeviceFaultInfoEXT fault_info = vku::InitStructHelper();
     m_errorMonitor->SetDesiredError("VUID-vkGetDeviceFaultInfoEXT-device-07336");
@@ -1323,7 +1327,17 @@ TEST_F(VkLayerTest, GetDeviceFaultInfoEXT) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, PhysicalDeviceLayeredApiVulkanPropertiesKHR) {
+TEST_F(NegativeOther, GetDeviceFaultDebugInfo) {
+    AddRequiredExtensions(VK_KHR_DEVICE_FAULT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::deviceFault);
+    RETURN_IF_SKIP(Init());
+    VkDeviceFaultDebugInfoKHR debug_info = vku::InitStructHelper();
+    m_errorMonitor->SetDesiredError("VUID-vkGetDeviceFaultDebugInfoKHR-device-12383");
+    vk::GetDeviceFaultDebugInfoKHR(device(), &debug_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeOther, PhysicalDeviceLayeredApiVulkanPropertiesKHR) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::maintenance7);
@@ -1350,7 +1364,7 @@ TEST_F(VkLayerTest, PhysicalDeviceLayeredApiVulkanPropertiesKHR) {
 
 // stype-check off
 // TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9185
-TEST_F(VkLayerTest, DISABLED_PhysicalDeviceLayeredApiVulkanPropertiesPNext) {
+TEST_F(NegativeOther, DISABLED_PhysicalDeviceLayeredApiVulkanPropertiesPNext) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::maintenance7);
@@ -1373,14 +1387,14 @@ TEST_F(VkLayerTest, DISABLED_PhysicalDeviceLayeredApiVulkanPropertiesPNext) {
 }
 // stype-check on
 
-TEST_F(VkLayerTest, UnrecognizedEnumExtension) {
+TEST_F(NegativeOther, UnrecognizedEnumExtension) {
     RETURN_IF_SKIP(Init());
     m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-format-parameter");
     vkt::Image image(*m_device, 4, 4, VK_FORMAT_A4B4G4R4_UNORM_PACK16, VK_IMAGE_USAGE_SAMPLED_BIT);
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, MissingExtensionBufferUsageFlags2CreateInfo) {
+TEST_F(NegativeOther, MissingExtensionBufferUsageFlags2CreateInfo) {
     TEST_DESCRIPTION("Use VkBufferUsageFlags2CreateInfo without the extension");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
@@ -1409,7 +1423,7 @@ TEST_F(VkLayerTest, MissingExtensionBufferUsageFlags2CreateInfo) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, MissingExtensionPipelineCreateFlags2) {
+TEST_F(NegativeOther, MissingExtensionPipelineCreateFlags2) {
     TEST_DESCRIPTION("Use VkPipelineCreateFlags2 without the extension");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
@@ -1424,7 +1438,7 @@ TEST_F(VkLayerTest, MissingExtensionPipelineCreateFlags2) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, OverridePipelineCreateFlags2) {
+TEST_F(NegativeOther, OverridePipelineCreateFlags2) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
@@ -1439,7 +1453,7 @@ TEST_F(VkLayerTest, OverridePipelineCreateFlags2) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, UnkonwnStructType) {
+TEST_F(NegativeOther, UnkonwnStructType) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     VkBaseOutStructure bogus_struct{};
@@ -1452,7 +1466,7 @@ TEST_F(VkLayerTest, UnkonwnStructType) {
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10208
-TEST_F(VkLayerTest, DISABLED_MultipleExtensionOrDependency) {
+TEST_F(NegativeOther, DISABLED_MultipleExtensionOrDependency) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_NV_LOW_LATENCY_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
@@ -1462,7 +1476,7 @@ TEST_F(VkLayerTest, DISABLED_MultipleExtensionOrDependency) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, CooperativeMatrixProps) {
+TEST_F(NegativeOther, CooperativeMatrixProps) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-Docs/issues/2613");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
@@ -1487,7 +1501,7 @@ TEST_F(VkLayerTest, CooperativeMatrixProps) {
     }
 }
 
-TEST_F(VkLayerTest, FeatureNotPresentNoCoreFeatures) {
+TEST_F(NegativeOther, FeatureNotPresentNoCoreFeatures) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11390");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     RETURN_IF_SKIP(InitFramework());

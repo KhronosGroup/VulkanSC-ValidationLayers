@@ -1,6 +1,6 @@
-/* Copyright (c) 2022-2025 The Khronos Group Inc.
- * Copyright (c) 2022-2025 Valve Corporation
- * Copyright (c) 2022-2025 LunarG, Inc.
+/* Copyright (c) 2022-2026 The Khronos Group Inc.
+ * Copyright (c) 2022-2026 Valve Corporation
+ * Copyright (c) 2022-2026 LunarG, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -72,6 +72,7 @@ enum EnableFlags {
     debug_printf_validation,
     sync_validation,
     legacy_detection,
+    gpu_dump,
     // Insert new enables above this line
     kMaxEnableFlags,
 };
@@ -102,11 +103,15 @@ struct GlobalSettings {
     // If we want to have spirv-opt potentially do constant folding on the spec constants
     // (by far the largest performance bottle neck for large shaders using spec cosntants)
     bool spirv_const_fold = true;
+
+    // Option to track the hashes of descriptors in VK_EXT_descriptor_buffer/VK_EXT_descriptor_heap
+    bool descriptor_hashing = false;
 };
 
 class DebugReport;
 struct GpuAVSettings;
 struct SyncValSettings;
+struct GpuDumpSettings;
 struct MessageFormatSettings;
 struct ConfigAndEnvSettings {
     // Matches up with what is passed down to VK_EXT_layer_settings
@@ -127,6 +132,7 @@ struct ConfigAndEnvSettings {
     // Individual settings for different internal layers
     GpuAVSettings *gpuav_settings;
     SyncValSettings *syncval_settings;
+    GpuDumpSettings* gpu_dump_settings;
 };
 const std::vector<std::string> &GetDisableFlagNameHelper();
 const std::vector<std::string> &GetEnableFlagNameHelper();
@@ -134,4 +140,4 @@ const std::vector<std::string> &GetEnableFlagNameHelper();
 // Process validation features, flags and settings specified through extensions, a layer settings file, or environment variables
 void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data);
 
-std::vector<std::pair<uint32_t, uint32_t>> &GetCustomStypeInfo();
+bool& HasCustomStypeInfo();

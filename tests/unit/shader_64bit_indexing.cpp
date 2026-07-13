@@ -8,9 +8,10 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/shader_object_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "shader_object_helper.h"
+#include "shader_helper.h"
 
 class NegativeShader64BitIndexing : public VkLayerTest {};
 
@@ -21,7 +22,7 @@ TEST_F(NegativeShader64BitIndexing, Length64) {
     AddRequiredExtensions(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_64bit_indexing : enable
         layout(set = 0, binding = 0) readonly buffer B { float x[]; } b;
@@ -47,7 +48,7 @@ TEST_F(NegativeShader64BitIndexing, ShaderObjectLength64) {
     AddRequiredExtensions(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_64bit_indexing : enable
         layout(set = 0, binding = 0) readonly buffer B { float x[]; } b;
@@ -77,7 +78,7 @@ TEST_F(NegativeShader64BitIndexing, UntypedPointerLength64) {
     AddRequiredFeature(vkt::Feature::shaderUntypedPointers);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"(
+    const char* cs_source = R"(
                OpCapability Shader
                OpCapability UntypedPointersKHR
                OpCapability Int64
@@ -128,7 +129,7 @@ TEST_F(NegativeShader64BitIndexing, CoopVecMul) {
     AddRequiredExtensions(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_NV_cooperative_vector : enable
         #extension GL_EXT_shader_explicit_arithmetic_types : enable
@@ -161,7 +162,7 @@ TEST_F(NegativeShader64BitIndexing, CoopVecLoad) {
     AddRequiredExtensions(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_NV_cooperative_vector : enable
         #extension GL_EXT_shader_explicit_arithmetic_types : enable
@@ -189,7 +190,7 @@ TEST_F(NegativeShader64BitIndexing, PipelineMissingEnable) {
     AddRequiredExtensions(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_64bit_indexing : enable
         layout(set = 0, binding = 0) readonly buffer B { float x[]; } b;
@@ -219,7 +220,7 @@ TEST_F(NegativeShader64BitIndexing, ShaderMissingEnable) {
     AddRequiredExtensions(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_64bit_indexing : enable
         layout(set = 0, binding = 0) readonly buffer B { float x[]; } b;
@@ -272,15 +273,7 @@ TEST_F(NegativeShader64BitIndexing, ConstantSizeOfLength64) {
                OpReturn
                OpFunctionEnd
     )";
-    VkShaderObj cs_module = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
-
-    VkPipelineCreateFlags2CreateInfoKHR pipe_flags2 = vku::InitStructHelper();
-    pipe_flags2.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
-
-    CreateComputePipelineHelper pipe(*this, &pipe_flags2);
-    pipe.cp_ci_.stage = cs_module.GetStageCreateInfo();
-    pipe.cp_ci_.layout = VK_NULL_HANDLE;
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpConstantSizeOfEXT-11475");
-    pipe.CreateComputePipeline(false);
+    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_2, nullptr, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }

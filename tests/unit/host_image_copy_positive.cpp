@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
- * Copyright (c) 2023-2025 Google, Inc.
+ * Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
+ * Copyright (c) 2023-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,11 +11,12 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
+#include <vulkan/vulkan_core.h>
+#include "layer_validation_tests.h"
 #include <algorithm>
 
-bool HostImageCopyTest::CopyLayoutSupported(const std::vector<VkImageLayout> &src_layouts,
-                                            const std::vector<VkImageLayout> &dst_layouts, VkImageLayout layout) {
+bool HostImageCopyTest::CopyLayoutSupported(const std::vector<VkImageLayout>& src_layouts,
+                                            const std::vector<VkImageLayout>& dst_layouts, VkImageLayout layout) {
     return ((std::find(src_layouts.begin(), src_layouts.end(), layout) != src_layouts.end()) &&
             (std::find(dst_layouts.begin(), dst_layouts.end(), layout) != dst_layouts.end()));
 }
@@ -62,7 +63,7 @@ TEST_F(PositiveHostImageCopy, BasicUsage) {
 
     std::vector<uint8_t> pixels(width * height * 4);
     // Fill image with random values
-    for (auto &channel : pixels) {
+    for (auto& channel : pixels) {
         const uint32_t r = static_cast<uint32_t>(std::rand());
         channel = static_cast<uint8_t>((r & 0xffu) | ((r >> 8) & 0xff) | ((r >> 16) & 0xff) | (r >> 24));
     }
@@ -137,10 +138,8 @@ TEST_F(PositiveHostImageCopy, BasicUsage) {
     ASSERT_EQ(VK_SUCCESS, result);
     VkImageSubresourceRange image_sub_range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     VkImageMemoryBarrier image_barrier =
-        image2.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
+        image2.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
 
-    image_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    image_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     m_command_buffer.Begin();
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
                            0, nullptr, 1, &image_barrier);
@@ -200,7 +199,7 @@ TEST_F(PositiveHostImageCopy, BasicUsage14) {
 
     std::vector<uint8_t> pixels(width * height * 4);
     // Fill image with random values
-    for (auto &channel : pixels) {
+    for (auto& channel : pixels) {
         const uint32_t r = static_cast<uint32_t>(std::rand());
         channel = static_cast<uint8_t>((r & 0xffu) | ((r >> 8) & 0xff) | ((r >> 16) & 0xff) | (r >> 24));
     }
@@ -277,10 +276,8 @@ TEST_F(PositiveHostImageCopy, BasicUsage14) {
     ASSERT_EQ(VK_SUCCESS, result);
     VkImageSubresourceRange image_sub_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     VkImageMemoryBarrier image_barrier =
-        image2.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
+        image2.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
 
-    image_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    image_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     m_command_buffer.Begin();
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
                            0, nullptr, 1, &image_barrier);
@@ -405,4 +402,87 @@ TEST_F(PositiveHostImageCopy, TransitionImageLayoutDepthWrongAspect) {
     transition_info.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     transition_info.subresourceRange = range;
     vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
+}
+
+TEST_F(PositiveHostImageCopy, CopyImageToImageMemcpyUsesSubresourceExtent) {
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    image_ci.mipLevels = 2u;
+    VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL;
+
+    vkt::Image src(*m_device, image_ci);
+    vkt::Image dst(*m_device, image_ci);
+    src.SetLayout(layout);
+    dst.SetLayout(layout);
+
+    VkImageCopy2 region = vku::InitStructHelper();
+    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 1, 0, 1};
+    region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 1, 0, 1};
+    region.extent = {width / 2, height / 2, 1};
+
+    VkCopyImageToImageInfo copy = vku::InitStructHelper();
+    copy.flags = VK_HOST_IMAGE_COPY_MEMCPY;
+    copy.srcImage = src;
+    copy.dstImage = dst;
+    copy.srcImageLayout = layout;
+    copy.dstImageLayout = layout;
+    copy.regionCount = 1;
+    copy.pRegions = &region;
+
+    vk::CopyImageToImageEXT(*m_device, &copy);
+}
+
+TEST_F(PositiveHostImageCopy, CopyImageToMemoryLayers) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12212");
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    image_ci.arrayLayers = 2;
+    vkt::Image image(*m_device, image_ci);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+
+    const uint32_t buffer_size = width * height * 4u * image_ci.arrayLayers;
+    std::vector<uint8_t> data(buffer_size);
+
+    VkImageToMemoryCopy region = vku::InitStructHelper();
+    region.pHostPointer = data.data();
+    region.memoryRowLength = 0u;
+    region.memoryImageHeight = 0u;
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 0u, 2u};
+    region.imageOffset = {0u, 0u, 0u};
+    region.imageExtent = {32u, 32u, 1u};
+
+    VkCopyImageToMemoryInfo copy_to_image_memory = vku::InitStructHelper();
+    copy_to_image_memory.flags = VK_HOST_IMAGE_COPY_MEMCPY;
+    copy_to_image_memory.srcImage = image;
+    copy_to_image_memory.srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copy_to_image_memory.regionCount = 1u;
+    copy_to_image_memory.pRegions = &region;
+
+    vk::CopyImageToMemoryEXT(*m_device, &copy_to_image_memory);
+}
+
+TEST_F(PositiveHostImageCopy, CopyImageToImageLayers) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12212");
+    RETURN_IF_SKIP(InitHostImageCopyTest());
+
+    image_ci.arrayLayers = 2;
+    vkt::Image src_image(*m_device, image_ci);
+    src_image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Image dst_image(*m_device, image_ci);
+    dst_image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+
+    VkImageCopy2 image_copy_2 = vku::InitStructHelper();
+    image_copy_2.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 2u};
+    image_copy_2.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 2u};
+    image_copy_2.extent = {width, height, 1};
+    VkCopyImageToImageInfo copy_image_to_image = vku::InitStructHelper();
+    copy_image_to_image.flags = VK_HOST_IMAGE_COPY_MEMCPY;
+    copy_image_to_image.regionCount = 1;
+    copy_image_to_image.pRegions = &image_copy_2;
+    copy_image_to_image.srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copy_image_to_image.dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copy_image_to_image.srcImage = src_image;
+    copy_image_to_image.dstImage = dst_image;
+
+    vk::CopyImageToImageEXT(*m_device, &copy_image_to_image);
 }

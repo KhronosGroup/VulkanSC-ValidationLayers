@@ -35,7 +35,7 @@ class Instance : public vvl::sc::InstanceProxy<core::Instance> {
     void InitFilters();
 
   public:
-    Instance(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch) {}
+    Instance(vvl::DispatchInstance* dispatch) : BaseClass(dispatch) {}
 
     template <typename VkHandleType>
     bool ValidateRemovedCommand(VkHandleType handle, const Location& loc) const;
@@ -87,7 +87,7 @@ class Device : public vvl::sc::DeviceProxy<CoreChecks> {
     core::sc::Instance* instance_vo_;
 
   public:
-    Device(vvl::dispatch::Device* dev, core::sc::Instance* instance_vo) : BaseClass(dev, instance_vo), instance_vo_(instance_vo) {}
+    Device(vvl::DispatchDevice* dev, core::sc::Instance* instance_vo) : BaseClass(dev, instance_vo), instance_vo_(instance_vo) {}
 
     bool ValidateObjectRequestCount(VkDevice device, const Location& loc, const char* vuid, const char* object_name_plural,
                                     size_t existing_count, const char* requested_count_name, uint32_t requested_count,

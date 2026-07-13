@@ -18,15 +18,16 @@
 # ~~~
 
 set(VKSC_CONVERTED_TEST_FILES
-    converted/amd_best_practices.cpp
     converted/android_external_resolve.cpp
     converted/android_external_resolve_positive.cpp
     converted/android_hardware_buffer.cpp
     converted/android_hardware_buffer_positive.cpp
-    converted/arm_best_practices.cpp
     converted/atomics.cpp
     converted/atomics_positive.cpp
     converted/best_practices.cpp
+    converted/best_practices_amd.cpp
+    converted/best_practices_arm.cpp
+    converted/best_practices_nvidia.cpp
     converted/best_practices_positive.cpp
     converted/buffer.cpp
     converted/buffer_positive.cpp
@@ -45,10 +46,17 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/descriptor_buffer_positive.cpp
     converted/descriptor_heap.cpp
     converted/descriptor_heap_positive.cpp
+    converted/descriptor_heap_untyped.cpp
+    converted/descriptor_heap_untyped_positive.cpp
     converted/descriptor_indexing.cpp
     converted/descriptor_indexing_positive.cpp
     converted/descriptors.cpp
     converted/descriptors_positive.cpp
+    converted/device_address.cpp
+    converted/device_address_commands.cpp
+    converted/device_address_commands_positive.cpp
+    converted/device_address_commands_sync.cpp
+    converted/device_address_positive.cpp
     converted/device_feature_property.cpp
     converted/device_feature_property_positive.cpp
     converted/device_generated_commands.cpp
@@ -61,6 +69,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/dynamic_rendering_positive.cpp
     converted/dynamic_state.cpp
     converted/dynamic_state_positive.cpp
+    converted/event.cpp
+    converted/event_positive.cpp
     converted/external_memory_metal.cpp
     converted/external_memory_sync.cpp
     converted/external_memory_sync_positive.cpp
@@ -78,6 +88,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_copy_memory_indirect.cpp
     converted/gpu_av_copy_memory_indirect_positive.cpp
     converted/gpu_av_debug_printf.cpp
+    converted/gpu_av_descriptor_buffer.cpp
     converted/gpu_av_descriptor_buffer_positive.cpp
     converted/gpu_av_descriptor_class_general_buffer.cpp
     converted/gpu_av_descriptor_class_general_buffer_coop_mat.cpp
@@ -85,6 +96,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_descriptor_class_general_buffer_positive.cpp
     converted/gpu_av_descriptor_class_texel_buffer.cpp
     converted/gpu_av_descriptor_class_texel_buffer_positive.cpp
+    converted/gpu_av_descriptor_heap.cpp
+    converted/gpu_av_descriptor_heap_positive.cpp
     converted/gpu_av_descriptor_indexing.cpp
     converted/gpu_av_descriptor_indexing_positive.cpp
     converted/gpu_av_descriptor_post_process.cpp
@@ -106,10 +119,13 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_shader_object_positive.cpp
     converted/gpu_av_shader_sanitizer.cpp
     converted/gpu_av_shader_sanitizer_positive.cpp
+    converted/gpu_av_shared_memory_data_race.cpp
+    converted/gpu_av_shared_memory_data_race_positive.cpp
     converted/gpu_av_spirv.cpp
     converted/gpu_av_spirv_positive.cpp
     converted/gpu_av_vertex_attribute_fetch.cpp
     converted/gpu_av_vertex_attribute_fetch_positive.cpp
+    converted/gpu_dump.cpp
     converted/graphics_library.cpp
     converted/graphics_library_positive.cpp
     converted/host_image_copy.cpp
@@ -135,7 +151,6 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/mesh_positive.cpp
     converted/multiview.cpp
     converted/multiview_positive.cpp
-    converted/nvidia_best_practices.cpp
     converted/object_lifetime.cpp
     converted/object_lifetime_positive.cpp
     converted/other_positive.cpp
@@ -159,6 +174,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/query.cpp
     converted/query_positive.cpp
     converted/ray_tracing.cpp
+    converted/ray_tracing_micromap.cpp
+    converted/ray_tracing_micromap_positive.cpp
     converted/ray_tracing_nv.cpp
     converted/ray_tracing_pipeline.cpp
     converted/ray_tracing_pipeline_nv.cpp
@@ -232,6 +249,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/threading_positive.cpp
     converted/tile_memory_heap.cpp
     converted/tile_memory_heap_positive.cpp
+    converted/tile_shading.cpp
+    converted/tile_shading_positive.cpp
     converted/tooling.cpp
     converted/tooling_positive.cpp
     converted/transform_feedback.cpp
@@ -251,6 +270,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/video_encode.cpp
     converted/video_encode_av1.cpp
     converted/video_encode_av1_positive.cpp
+    converted/video_encode_feedback2.cpp
+    converted/video_encode_feedback2_positive.cpp
     converted/video_encode_h264.cpp
     converted/video_encode_h264_positive.cpp
     converted/video_encode_h265.cpp

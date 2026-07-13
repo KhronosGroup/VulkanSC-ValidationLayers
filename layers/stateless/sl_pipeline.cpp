@@ -19,21 +19,23 @@
 
 #include <vulkan/utility/vk_format_utils.h>
 #include "error_message/error_location.h"
+#include "error_message/logging.h"
+#include "generated/error_location_helper.h"
 #include "stateless/stateless_validation.h"
 #include "generated/enum_flag_bits.h"
 #include "generated/dispatch_functions.h"
 #include "stateless/sl_vuid_maps.h"
 #include "containers/container_utils.h"
 #include "utils/math_utils.h"
-#include "utils/vk_api_utils.h"
+#include "utils/descriptor_utils.h"
 
 namespace stateless {
 
-bool Device::manual_PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo *pCreateInfo,
-                                                      const VkAllocationCallbacks *pAllocator, VkShaderModule *pShaderModule,
-                                                      const Context &context) const {
+bool Device::manual_PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
+                                                      const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule,
+                                                      const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
 
     constexpr std::array allowed_structs = {VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
                                             VK_STRUCTURE_TYPE_SHADER_MODULE_VALIDATION_CACHE_CREATE_INFO_EXT,
@@ -46,11 +48,11 @@ bool Device::manual_PreCallValidateCreateShaderModule(VkDevice device, const VkS
     return skip;
 }
 
-bool Device::manual_PreCallValidateCreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo *pCreateInfo,
-                                                        const VkAllocationCallbacks *pAllocator, VkPipelineLayout *pPipelineLayout,
-                                                        const Context &context) const {
+bool Device::manual_PreCallValidateCreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo,
+                                                        const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout,
+                                                        const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
     if (pCreateInfo->setLayoutCount > phys_dev_props.limits.maxBoundDescriptorSets) {
         skip |= LogError("VUID-VkPipelineLayoutCreateInfo-setLayoutCount-00286", device, create_info_loc.dot(Field::setLayoutCount),
@@ -69,13 +71,20 @@ bool Device::manual_PreCallValidateCreatePipelineLayout(VkDevice device, const V
         }
     }
 
+    if (pCreateInfo->flags & VK_PIPELINE_LAYOUT_CREATE_NO_TASK_SHADER_BIT_KHR &&
+        !(pCreateInfo->flags & VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT)) {
+        skip |= LogError("VUID-VkPipelineLayoutCreateInfo-flags-13352", device, create_info_loc.dot(Field::flags),
+                         "is %s and does not include VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT.",
+                         string_VkPipelineLayoutCreateFlags(pCreateInfo->flags).c_str());
+    }
+
     skip |= ValidatePushConstantRange(pCreateInfo->pushConstantRangeCount, pCreateInfo->pPushConstantRanges, create_info_loc);
 
     return skip;
 }
 
-bool Device::ValidatePushConstantRange(uint32_t push_constant_range_count, const VkPushConstantRange *push_constant_ranges,
-                                       const Location &loc) const {
+bool Device::ValidatePushConstantRange(uint32_t push_constant_range_count, const VkPushConstantRange* push_constant_ranges,
+                                       const Location& loc) const {
     bool skip = false;
 
     if (!push_constant_ranges) {
@@ -117,7 +126,7 @@ bool Device::ValidatePushConstantRange(uint32_t push_constant_range_count, const
     for (uint32_t i = 0; i < push_constant_range_count; ++i) {
         for (uint32_t j = i + 1; j < push_constant_range_count; ++j) {
             if (0 != (push_constant_ranges[i].stageFlags & push_constant_ranges[j].stageFlags)) {
-                const char *vuid = loc.function == Func::vkCreatePipelineLayout
+                const char* vuid = loc.function == Func::vkCreatePipelineLayout
                                        ? "VUID-VkPipelineLayoutCreateInfo-pPushConstantRanges-00292"
                                        : "VUID-VkShaderCreateInfoEXT-pPushConstantRanges-10063";
                 skip |= LogError(vuid, device, loc,
@@ -172,6 +181,10 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                     mapping_j.resourceMask == VK_SPIRV_RESOURCE_TYPE_ALL_EXT) {
                     ss << "Hint: If using VK_SPIRV_RESOURCE_TYPE_ALL_EXT then different descriptor types will overlap each if "
                           "trying to use an array of descriptors. Instead only set resourceMask for what is needed.\n";
+                } else if (mapping_i.resourceMask == VK_SPIRV_RESOURCE_TYPE_ALL_EXT ||
+                           mapping_j.resourceMask == VK_SPIRV_RESOURCE_TYPE_ALL_EXT) {
+                    ss << "Hint: Using VK_SPIRV_RESOURCE_TYPE_ALL_EXT is a mask for all resources, so if you are trying to share "
+                          "this set/binding, then set the resourceMask for only what is needed.\n";
                 } else if (mapping_i.resourceMask == mapping_j.resourceMask) {
                     ss << "Hint: If using a descriptor of array such as\n\tlayout(binding = 0) uniform sampler2D "
                           "foo[8];\n\tlayout(binding = 2) uniform sampler2D bar;\nfoo[2] and bar are actually mapping to the same "
@@ -196,22 +209,51 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                       {VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_DATA_EXT, VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT,
                        VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT, VK_DESCRIPTOR_MAPPING_SOURCE_RESOURCE_HEAP_DATA_EXT}) &&
             mapping.bindingCount != 1) {
-            skip |= LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11245", device, map_loc.dot(Field::bindingCount),
-                             "is %" PRIu32 " (not 1).\nVkDescriptorSetAndBindingMappingEXT::source = %s", mapping.bindingCount,
-                             string_VkDescriptorMappingSourceEXT(mapping.source));
+            skip |= LogError(
+                "VUID-VkDescriptorSetAndBindingMappingEXT-source-11245", device, map_loc.dot(Field::bindingCount),
+                "is %" PRIu32
+                " (not 1).\nVkDescriptorSetAndBindingMappingEXT::source = %s\nHint: %s, which is nonsense and therefor disallowed.",
+                mapping.bindingCount, string_VkDescriptorMappingSourceEXT(mapping.source),
+                mapping.bindingCount == 0 ? "bindingCount of zero would mean this mapping is never going to be valid"
+                                          : "Since these mappings aren't allowed to use descriptor indexing, trying to use "
+                                            "bindingCount greater than 1 would mean all the bindings would share this mapping");
         }
-        if (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_DATA_EXT &&
-            !IsIntegerMultipleOf(mapping.sourceData.pushDataOffset, 4)) {
-            skip |= LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11246", device, data_loc.dot(Field::pushDataOffset),
+        if (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_DATA_EXT) {
+            if (!IsIntegerMultipleOf(mapping.sourceData.pushDataOffset, 4)) {
+                skip |=
+                    LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11246", device, data_loc.dot(Field::pushDataOffset),
                              "(%" PRIu32 ") is not a multiple of 4\nVkDescriptorSetAndBindingMappingEXT::source = %s",
                              mapping.sourceData.pushDataOffset, string_VkDescriptorMappingSourceEXT(mapping.source));
+            }
+
+            if (mapping.sourceData.pushDataOffset > phys_dev_ext_props.descriptor_heap_props.maxPushDataSize - 4) {
+                skip |=
+                    LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-12452", device, data_loc.dot(Field::pushDataOffset),
+                             "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
+                             ") - 4\nVkDescriptorSetAndBindingMappingEXT::source = %s\nHint - pushDataOffset points to data "
+                             "inside the push data at and this is currently going to access OOB",
+                             mapping.sourceData.pushDataOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
+                             string_VkDescriptorMappingSourceEXT(mapping.source));
+            }
         }
-        if (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT &&
-            !IsIntegerMultipleOf(mapping.sourceData.pushAddressOffset, 8)) {
-            skip |=
-                LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11247", device, data_loc.dot(Field::pushAddressOffset),
-                         "(%" PRIu32 ") is not a multiple of 8\nVkDescriptorSetAndBindingMappingEXT::source = %s",
-                         mapping.sourceData.pushAddressOffset, string_VkDescriptorMappingSourceEXT(mapping.source));
+        if (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT) {
+            if (!IsIntegerMultipleOf(mapping.sourceData.pushAddressOffset, 8)) {
+                skip |= LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11247", device,
+                                 data_loc.dot(Field::pushAddressOffset),
+                                 "(%" PRIu32 ") is not a multiple of 8\nVkDescriptorSetAndBindingMappingEXT::source = %s",
+                                 mapping.sourceData.pushAddressOffset, string_VkDescriptorMappingSourceEXT(mapping.source));
+            }
+
+            if (mapping.sourceData.pushAddressOffset > phys_dev_ext_props.descriptor_heap_props.maxPushDataSize - 8) {
+                skip |= LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-12453", device,
+                                 data_loc.dot(Field::pushAddressOffset),
+                                 "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
+                                 ") - 8\nVkDescriptorSetAndBindingMappingEXT::source = %s\nHint - pushAddressOffset points to an "
+                                 "address (8 bytes) "
+                                 "inside the push data, this is currently going to access OOB.",
+                                 mapping.sourceData.pushAddressOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
+                                 string_VkDescriptorMappingSourceEXT(mapping.source));
+            }
         }
         if ((mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_DATA_EXT ||
              mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT) &&
@@ -244,12 +286,14 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                                  push_index.pushOffset, string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             if (push_index.pushOffset > phys_dev_ext_props.descriptor_heap_props.maxPushDataSize - 4) {
-                skip |= LogError("VUID-VkDescriptorMappingSourcePushIndexEXT-pushOffset-11259", device,
-                                 data_loc.dot(Field::pushIndex).dot(Field::pushOffset),
-                                 "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
-                                 ") - 4\nVkDescriptorSetAndBindingMappingEXT::source = %s",
-                                 push_index.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
-                                 string_VkDescriptorMappingSourceEXT(mapping.source));
+                skip |= LogError(
+                    "VUID-VkDescriptorMappingSourcePushIndexEXT-pushOffset-11259", device,
+                    data_loc.dot(Field::pushIndex).dot(Field::pushOffset),
+                    "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
+                    ") - 4\nVkDescriptorSetAndBindingMappingEXT::source = %s\nHint - pushOffset points to an uint32_t (4 bytes) "
+                    "inside the push data, this is currently going to access OOB.",
+                    push_index.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
+                    string_VkDescriptorMappingSourceEXT(mapping.source));
             }
         }
         if (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT) {
@@ -259,15 +303,17 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                 skip |= LogError("VUID-VkDescriptorMappingSourceIndirectIndexEXT-pushOffset-11260", device,
                                  data_loc.dot(Field::indirectIndex).dot(Field::pushOffset),
                                  "(%" PRIu32 ") is not a multiple of 8\nVkDescriptorSetAndBindingMappingEXT::source = %s",
-                                 mapping.sourceData.indirectIndex.pushOffset, string_VkDescriptorMappingSourceEXT(mapping.source));
+                                 indirect_index.pushOffset, string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             if (indirect_index.pushOffset > phys_dev_ext_props.descriptor_heap_props.maxPushDataSize - 8) {
-                skip |= LogError("VUID-VkDescriptorMappingSourceIndirectIndexEXT-pushOffset-11261", device,
-                                 data_loc.dot(Field::indirectIndex).dot(Field::pushOffset),
-                                 "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
-                                 ") - 8\nVkDescriptorSetAndBindingMappingEXT::source = %s",
-                                 indirect_index.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
-                                 string_VkDescriptorMappingSourceEXT(mapping.source));
+                skip |= LogError(
+                    "VUID-VkDescriptorMappingSourceIndirectIndexEXT-pushOffset-11261", device,
+                    data_loc.dot(Field::indirectIndex).dot(Field::pushOffset),
+                    "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
+                    ") - 8\nVkDescriptorSetAndBindingMappingEXT::source = %s\nHint - pushOffset points to an address (8 bytes) "
+                    "inside the push data, this is currently going to access OOB.",
+                    indirect_index.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
+                    string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             if (!IsIntegerMultipleOf(indirect_index.addressOffset, 4)) {
                 skip |= LogError("VUID-VkDescriptorMappingSourceIndirectIndexEXT-addressOffset-11262", device,
@@ -293,12 +339,14 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                                  heap_data.pushOffset, string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             if (heap_data.pushOffset > phys_dev_ext_props.descriptor_heap_props.maxPushDataSize - 4) {
-                skip |= LogError("VUID-VkDescriptorMappingSourceHeapDataEXT-pushOffset-11265", device,
-                                 data_loc.dot(Field::heapData).dot(Field::pushOffset),
-                                 "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
-                                 ") - 4\nVkDescriptorSetAndBindingMappingEXT::source = %s",
-                                 heap_data.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
-                                 string_VkDescriptorMappingSourceEXT(mapping.source));
+                skip |= LogError(
+                    "VUID-VkDescriptorMappingSourceHeapDataEXT-pushOffset-11265", device,
+                    data_loc.dot(Field::heapData).dot(Field::pushOffset),
+                    "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
+                    ") - 4\nVkDescriptorSetAndBindingMappingEXT::source = %s\nHint - pushOffset points to an uint32_t (4 bytes) "
+                    "inside the push data, this is currently going to access OOB.",
+                    heap_data.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
+                    string_VkDescriptorMappingSourceEXT(mapping.source));
             }
         }
         if (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT) {
@@ -310,12 +358,14 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                                  indirect_address.pushOffset, string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             if (indirect_address.pushOffset > phys_dev_ext_props.descriptor_heap_props.maxPushDataSize - 8) {
-                skip |= LogError("VUID-VkDescriptorMappingSourceIndirectAddressEXT-pushOffset-11267", device,
-                                 data_loc.dot(Field::indirectAddress).dot(Field::pushOffset),
-                                 "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
-                                 ") - 8\nVkDescriptorSetAndBindingMappingEXT::source = %s",
-                                 indirect_address.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
-                                 string_VkDescriptorMappingSourceEXT(mapping.source));
+                skip |= LogError(
+                    "VUID-VkDescriptorMappingSourceIndirectAddressEXT-pushOffset-11267", device,
+                    data_loc.dot(Field::indirectAddress).dot(Field::pushOffset),
+                    "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
+                    ") - 8\nVkDescriptorSetAndBindingMappingEXT::source = %s\nHint - pushOffset points to an address (8 bytes) "
+                    "inside the push data, this is currently going to access OOB.",
+                    indirect_address.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
+                    string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             if (!IsIntegerMultipleOf(indirect_address.addressOffset, 8)) {
                 skip |= LogError("VUID-VkDescriptorMappingSourceIndirectAddressEXT-addressOffset-11268", device,
@@ -353,12 +403,14 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                                  indirect_index_array.pushOffset, string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             if (indirect_index_array.pushOffset > phys_dev_ext_props.descriptor_heap_props.maxPushDataSize - 8) {
-                skip |= LogError("VUID-VkDescriptorMappingSourceIndirectIndexArrayEXT-pushOffset-11360", device,
-                                 data_loc.dot(Field::indirectIndexArray).dot(Field::pushOffset),
-                                 "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
-                                 ") - 8.\nVkDescriptorSetAndBindingMappingEXT::source = %s",
-                                 indirect_index_array.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
-                                 string_VkDescriptorMappingSourceEXT(mapping.source));
+                skip |= LogError(
+                    "VUID-VkDescriptorMappingSourceIndirectIndexArrayEXT-pushOffset-11360", device,
+                    data_loc.dot(Field::indirectIndexArray).dot(Field::pushOffset),
+                    "(%" PRIu32 ") is greater than maxPushDataSize (%" PRIu64
+                    ") - 8.\nVkDescriptorSetAndBindingMappingEXT::source = %s\nHint - pushOffset points to an address (8 bytes) "
+                    "inside the push data, this is currently going to access OOB.",
+                    indirect_index_array.pushOffset, phys_dev_ext_props.descriptor_heap_props.maxPushDataSize,
+                    string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             if (!IsIntegerMultipleOf(indirect_index_array.addressOffset, 4)) {
                 skip |= LogError("VUID-VkDescriptorMappingSourceIndirectIndexArrayEXT-addressOffset-11361", device,
@@ -372,11 +424,12 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                           {VK_DESCRIPTOR_MAPPING_SOURCE_RESOURCE_HEAP_DATA_EXT, VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_DATA_EXT,
                            VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_DATA_EXT}) &&
                 (mapping.resourceMask & VK_SPIRV_RESOURCE_TYPE_UNIFORM_BUFFER_BIT_EXT) == 0) {
-                LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11356", device, map_loc.dot(Field::resourceMask),
-                         "is %s (missing "
-                         "VK_SPIRV_RESOURCE_TYPE_UNIFORM_BUFFER_BIT_EXT).\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
-                         string_VkSpirvResourceTypeFlagsEXT(mapping.resourceMask).c_str(),
-                         string_VkDescriptorMappingSourceEXT(mapping.source));
+                skip |=
+                    LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11356", device, map_loc.dot(Field::resourceMask),
+                             "is %s (missing "
+                             "VK_SPIRV_RESOURCE_TYPE_UNIFORM_BUFFER_BIT_EXT).\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
+                             string_VkSpirvResourceTypeFlagsEXT(mapping.resourceMask).c_str(),
+                             string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             const VkSpirvResourceTypeFlagsEXT valid_resource_buffer_and_as =
                 VK_SPIRV_RESOURCE_TYPE_UNIFORM_BUFFER_BIT_EXT | VK_SPIRV_RESOURCE_TYPE_READ_ONLY_STORAGE_BUFFER_BIT_EXT |
@@ -384,10 +437,10 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
             if ((mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT ||
                  mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_PUSH_ADDRESS_EXT) &&
                 ((mapping.resourceMask & valid_resource_buffer_and_as) == 0)) {
-                LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11357", device, map_loc.dot(Field::resourceMask),
-                         "is %s.\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
-                         string_VkSpirvResourceTypeFlagsEXT(mapping.resourceMask).c_str(),
-                         string_VkDescriptorMappingSourceEXT(mapping.source));
+                skip |= LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11357", device, map_loc.dot(Field::resourceMask),
+                                 "is %s.\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
+                                 string_VkSpirvResourceTypeFlagsEXT(mapping.resourceMask).c_str(),
+                                 string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             auto get_use_combined_image_sampler_index = [mapping]() {
                 switch (mapping.source) {
@@ -423,10 +476,10 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                                            VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT}) &&
                 get_use_combined_image_sampler_index() != VK_FALSE &&
                 ((mapping.resourceMask & valid_mask_sampling_resource) == 0)) {
-                LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11358", device, map_loc.dot(Field::resourceMask),
-                         "is %s.\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
-                         string_VkSpirvResourceTypeFlagsEXT(mapping.resourceMask).c_str(),
-                         string_VkDescriptorMappingSourceEXT(mapping.source));
+                skip |= LogError("VUID-VkDescriptorSetAndBindingMappingEXT-source-11358", device, map_loc.dot(Field::resourceMask),
+                                 "is %s.\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
+                                 string_VkSpirvResourceTypeFlagsEXT(mapping.resourceMask).c_str(),
+                                 string_VkDescriptorMappingSourceEXT(mapping.source));
             }
             if (IsValueIn(mapping.source, {VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT,
                                            VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT,
@@ -445,44 +498,59 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
                     const auto* object_name = vku::FindStructInPNextChain<VkDebugUtilsObjectNameInfoEXT>(embedded_sampler->pNext);
                     if (object_name && object_name->objectType != VK_OBJECT_TYPE_UNKNOWN) {
                         const auto vuid = (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT)
-                                              ? "VUID-VkDescriptorMappingSourcePushIndexEXT-pEmbeddedSampler-11402"
+                                              ? "VUID-VkDescriptorMappingSourcePushIndexEXT-pEmbeddedSampler-11415"
                                           : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT)
-                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexEXT-pEmbeddedSampler-11403"
+                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexEXT-pEmbeddedSampler-11415"
                                           : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT)
-                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexArrayEXT-pEmbeddedSampler-11404"
+                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexArrayEXT-pEmbeddedSampler-11415"
                                           : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT)
-                                              ? "VUID-VkDescriptorMappingSourceShaderRecordIndexEXT-pEmbeddedSampler-11405"
+                                              ? "VUID-VkDescriptorMappingSourceShaderRecordIndexEXT-pEmbeddedSampler-11415"
                                           : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT)
                                               ? "VUID-VkDescriptorMappingSourceConstantOffsetEXT-pEmbeddedSampler-11415"
-                                              : nullptr;
-                        if (vuid) {
-                            skip |= LogError(vuid, device, map_loc.dot(source_field).dot(Field::pEmbeddedSampler),
-                                             "contains VkDebugUtilsObjectNameInfoEXT structure with objectType "
-                                             "%s.\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
-                                             string_VkObjectType(object_name->objectType),
-                                             string_VkDescriptorMappingSourceEXT(mapping.source));
-                        }
+                                              : kVUIDUndefined;
+                        skip |= LogError(vuid, device, map_loc.dot(source_field).dot(Field::pEmbeddedSampler),
+                                         "contains VkDebugUtilsObjectNameInfoEXT structure with objectType "
+                                         "%s.\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
+                                         string_VkObjectType(object_name->objectType),
+                                         string_VkDescriptorMappingSourceEXT(mapping.source));
                     }
                     if (embedded_sampler->borderColor == VK_BORDER_COLOR_FLOAT_CUSTOM_EXT ||
                         embedded_sampler->borderColor == VK_BORDER_COLOR_INT_CUSTOM_EXT) {
                         const auto vuid = (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT)
-                                              ? "VUID-VkDescriptorMappingSourcePushIndexEXT-pEmbeddedSampler-11446"
+                                              ? "VUID-VkDescriptorMappingSourcePushIndexEXT-pEmbeddedSampler-11445"
                                           : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT)
-                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexEXT-pEmbeddedSampler-11447"
+                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexEXT-pEmbeddedSampler-11445"
                                           : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT)
-                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexArrayEXT-pEmbeddedSampler-11448"
+                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexArrayEXT-pEmbeddedSampler-11445"
                                           : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT)
-                                              ? "VUID-VkDescriptorMappingSourceShaderRecordIndexEXT-pEmbeddedSampler-11449"
+                                              ? "VUID-VkDescriptorMappingSourceShaderRecordIndexEXT-pEmbeddedSampler-11445"
                                           : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT)
                                               ? "VUID-VkDescriptorMappingSourceConstantOffsetEXT-pEmbeddedSampler-11445"
-                                              : nullptr;
-                        if (vuid) {
-                            skip |= LogError(vuid, device,
-                                             map_loc.dot(source_field).dot(Field::pEmbeddedSampler).dot(Field::borderColor),
-                                             "is %s.\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
-                                             string_VkBorderColor(embedded_sampler->borderColor),
-                                             string_VkDescriptorMappingSourceEXT(mapping.source));
-                        }
+                                              : kVUIDUndefined;
+                        skip |=
+                            LogError(vuid, device, map_loc.dot(source_field).dot(Field::pEmbeddedSampler).dot(Field::borderColor),
+                                     "is %s.\nVkDescriptorSetAndBindingMappingEXT::source = %s.",
+                                     string_VkBorderColor(embedded_sampler->borderColor),
+                                     string_VkDescriptorMappingSourceEXT(mapping.source));
+                    }
+                    if (vku::FindStructInPNextChain<VkOpaqueCaptureDescriptorDataCreateInfoEXT>(embedded_sampler->pNext)) {
+                        const auto vuid = (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_PUSH_INDEX_EXT)
+                                              ? "VUID-VkDescriptorMappingSourcePushIndexEXT-pEmbeddedSampler-12432"
+                                          : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT)
+                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexEXT-pEmbeddedSampler-12432"
+                                          : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_ARRAY_EXT)
+                                              ? "VUID-VkDescriptorMappingSourceIndirectIndexArrayEXT-pEmbeddedSampler-12432"
+                                          : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT)
+                                              ? "VUID-VkDescriptorMappingSourceShaderRecordIndexEXT-pEmbeddedSampler-12432"
+                                          : (mapping.source == VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT)
+                                              ? "VUID-VkDescriptorMappingSourceConstantOffsetEXT-pEmbeddedSampler-12432"
+                                              : kVUIDUndefined;
+                        skip |= LogError(
+                            vuid, device, map_loc.dot(source_field).dot(Field::pEmbeddedSampler).dot(Field::pNext),
+                            "contains VkOpaqueCaptureDescriptorDataCreateInfoEXT\nVkDescriptorSetAndBindingMappingEXT::source = "
+                            "%s\n%s",
+                            string_VkDescriptorMappingSourceEXT(mapping.source),
+                            PrintPNextChain(Struct::VkSamplerCreateInfo, embedded_sampler->pNext).c_str());
                     }
                 }
             }
@@ -493,8 +561,8 @@ bool Device::ValidateShaderDescriptorSetAndBindingMappingInfo(const VkShaderDesc
 }
 
 // Called from graphics, compute, raytracing, etc
-bool Device::ValidatePipelineShaderStageCreateInfoCommon(const Context &context, const VkPipelineShaderStageCreateInfo &create_info,
-                                                         const Location &loc) const {
+bool Device::ValidatePipelineShaderStageCreateInfoCommon(const Context& context, const VkPipelineShaderStageCreateInfo& create_info,
+                                                         const Location& loc) const {
     bool skip = false;
 
     if (create_info.pName) {
@@ -520,52 +588,25 @@ bool Device::ValidatePipelineShaderStageCreateInfoCommon(const Context &context,
 }
 
 // Called from graphics, compute, raytracing, etc
-bool Device::ValidatePipelineBinaryInfo(const void* next, VkPipelineCreateFlags flags, VkPipelineCache pipelineCache,
-                                        VkPipelineLayout layout, const Location& loc) const {
+bool Device::ValidatePipelineBinaryInfo(const void* next, VkPipelineCreateFlags2 create_flags_2, VkPipelineCache pipeline_cache,
+                                        const Location& loc) const {
     bool skip = false;
-    const auto *temp_flags_2 = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfo>(next);
-    const VkPipelineCreateFlags2 create_flags_2 = temp_flags_2 ? temp_flags_2->flags : static_cast<VkPipelineCreateFlags2>(flags);
-    const Location flag_loc =
-        temp_flags_2 ? loc.pNext(Struct::VkPipelineCreateFlags2CreateInfo, Field::flags) : loc.dot(Field::flags);
-
-    if ((create_flags_2 & VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR) != 0 && (pipelineCache != VK_NULL_HANDLE)) {
-        skip |= LogError(GetPipelineBinaryInfoVUID(flag_loc, vvl::PipelineBinaryInfoError::PNext_09617), device, flag_loc,
-                         "(%s) includes VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR while "
-                         "pipelineCache is not VK_NULL_HANDLE.",
-                         string_VkPipelineCreateFlags2(create_flags_2).c_str());
-    }
-
-    if ((create_flags_2 & VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT) != 0 && layout != VK_NULL_HANDLE) {
-        skip |= LogError(GetPipelineBinaryInfoVUID(flag_loc, vvl::PipelineBinaryInfoError::Flags_11311), device, flag_loc,
-                         "(%s) includes VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT while layout is not VK_NULL_HANDLE (%s).",
-                         string_VkPipelineCreateFlags2(create_flags_2).c_str(), FormatHandle(layout).c_str());
-    } else if ((create_flags_2 & VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT) == 0 && layout == VK_NULL_HANDLE) {
-        // The check is not found directly in the graphics pipeline because of all the rules around dynamic rendering and GPL (it is
-        // all caught elsewhere where layout must be valid)
-        if (flag_loc.function != Func::vkCreateGraphicsPipelines) {
-            skip |= LogError(GetPipelineBinaryInfoVUID(flag_loc, vvl::PipelineBinaryInfoError::Flags_11367), device, flag_loc,
-                             "(%s) does not include VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT while layout is VK_NULL_HANDLE.%s",
-                             string_VkPipelineCreateFlags2(flags).c_str(),
-                             !temp_flags_2 ? " (Make sure you set it with VkPipelineCreateFlags2CreateInfo)" : "");
-        }
-    }
 
     const auto binary_info = vku::FindStructInPNextChain<VkPipelineBinaryInfoKHR>(next);
 
     if (binary_info && (binary_info->binaryCount > 0)) {
-        if (pipelineCache != VK_NULL_HANDLE) {
+        if (pipeline_cache != VK_NULL_HANDLE) {
             skip |=
-                LogError(GetPipelineBinaryInfoVUID(flag_loc, vvl::PipelineBinaryInfoError::PNext_09616), device,
+                LogError(GetPipelineBinaryInfoVUID(loc, vvl::PipelineBinaryInfoError::PNext_09616), device,
                          loc.pNext(Struct::VkPipelineBinaryInfoKHR, Field::binaryCount),
                          "(%" PRIu32 ") is greater than zero while pipelineCache is not VK_NULL_HANDLE.", binary_info->binaryCount);
         }
 
-        const auto creation_feedback = vku::FindStructInPNextChain<VkPipelineCreationFeedbackCreateInfo>(next);
-        if (creation_feedback) {
+        if (const auto creation_feedback = vku::FindStructInPNextChain<VkPipelineCreationFeedbackCreateInfo>(next)) {
             if (creation_feedback->pPipelineCreationFeedback->flags &
                 VK_PIPELINE_CREATION_FEEDBACK_APPLICATION_PIPELINE_CACHE_HIT_BIT) {
                 skip |= LogError(
-                    GetPipelineBinaryInfoVUID(flag_loc, vvl::PipelineBinaryInfoError::BinaryCount_09620), device,
+                    GetPipelineBinaryInfoVUID(loc, vvl::PipelineBinaryInfoError::BinaryCount_09620), device,
                     loc.pNext(Struct::VkPipelineCreationFeedbackCreateInfo, Field::pPipelineCreationFeedback).dot(Field::flags),
                     "(%s) includes VK_PIPELINE_CREATION_FEEDBACK_APPLICATION_PIPELINE_CACHE_HIT_BIT while "
                     "binaryCount is greater than zero.",
@@ -575,7 +616,7 @@ bool Device::ValidatePipelineBinaryInfo(const void* next, VkPipelineCreateFlags 
             if (creation_feedback->pPipelineCreationFeedback->flags &
                 VK_PIPELINE_CREATION_FEEDBACK_BASE_PIPELINE_ACCELERATION_BIT) {
                 skip |= LogError(
-                    GetPipelineBinaryInfoVUID(flag_loc, vvl::PipelineBinaryInfoError::BinaryCount_09621), device,
+                    GetPipelineBinaryInfoVUID(loc, vvl::PipelineBinaryInfoError::BinaryCount_09621), device,
                     loc.pNext(Struct::VkPipelineCreationFeedbackCreateInfo, Field::pPipelineCreationFeedback).dot(Field::flags),
                     "(%s) includes VK_PIPELINE_CREATION_FEEDBACK_BASE_PIPELINE_ACCELERATION_BIT while "
                     "binaryCount is greater than zero.",
@@ -584,18 +625,18 @@ bool Device::ValidatePipelineBinaryInfo(const void* next, VkPipelineCreateFlags 
         }
 
         if (create_flags_2 & VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT) {
-            skip |= LogError(GetPipelineBinaryInfoVUID(flag_loc, vvl::PipelineBinaryInfoError::BinaryCount_09622), device, flag_loc,
-                             "(%s) includes VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT while "
+            skip |= LogError(GetPipelineBinaryInfoVUID(loc, vvl::PipelineBinaryInfoError::BinaryCount_09622), device, loc,
+                             "flags (%s) includes VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT while "
                              "binaryCount is greater than zero.",
-                             string_VkPipelineCreateFlags2(flags).c_str());
+                             string_VkPipelineCreateFlags2(create_flags_2).c_str());
         }
     }
 
     return skip;
 }
 
-bool Device::ValidatePipelineRenderingCreateInfo(const Context &context, const VkPipelineRenderingCreateInfo &rendering_struct,
-                                                 const Location &loc) const {
+bool Device::ValidatePipelineRenderingCreateInfo(const Context& context, const VkPipelineRenderingCreateInfo& rendering_struct,
+                                                 const Location& loc) const {
     bool skip = false;
 
     if ((rendering_struct.depthAttachmentFormat != VK_FORMAT_UNDEFINED)) {
@@ -649,7 +690,7 @@ bool Device::ValidatePipelineRenderingCreateInfo(const Context &context, const V
 }
 
 bool Device::ValidateCreatePipelinesFlags2(const VkPipelineCreateFlags flags1, const VkPipelineCreateFlags2 flags2,
-                                           const Location &flags1_loc) const {
+                                           const Location& flags1_loc) const {
     bool skip = false;
     // Discussed in https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/7607
     // Some wrappers include empty pNext structs which might be undesired here
@@ -662,7 +703,7 @@ bool Device::ValidateCreatePipelinesFlags2(const VkPipelineCreateFlags flags1, c
     return skip;
 }
 
-bool Device::ValidateCreateGraphicsPipelinesFlags(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const {
+bool Device::ValidateCreateGraphicsPipelinesFlags(const VkPipelineCreateFlags2 flags, const Location& flags_loc) const {
     bool skip = false;
     if ((flags & VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT) != 0 &&
         (flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) == 0) {
@@ -742,9 +783,15 @@ bool Device::ValidateCreateGraphicsPipelinesFlags(const VkPipelineCreateFlags2 f
                          "(%s) must not include VK_PIPELINE_CREATE_RAY_TRACING_ALLOW_MOTION_BIT_NV.",
                          string_VkPipelineCreateFlags2(flags).c_str());
     }
-    if ((flags & VK_PIPELINE_CREATE_RAY_TRACING_OPACITY_MICROMAP_BIT_EXT) != 0) {
+    if ((flags & VK_PIPELINE_CREATE_2_RAY_TRACING_OPACITY_MICROMAP_BIT_KHR) != 0) {
         skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-flags-07401", device, flags_loc,
-                         "(%s) must not include VK_PIPELINE_CREATE_RAY_TRACING_OPACITY_MICROMAP_BIT_EXT.",
+                         "(%s) must not include VK_PIPELINE_CREATE_2_RAY_TRACING_OPACITY_MICROMAP_BIT_KHR.",
+                         string_VkPipelineCreateFlags2(flags).c_str());
+    }
+    if (!enabled_features.micromap && (flags & VK_PIPELINE_CREATE_2_OPACITY_MICROMAP_DISALLOW_MIXED_SPECIAL_INDEX_BIT_KHR)) {
+        skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-flags-11595", device, flags_loc,
+                         "(%s) includes VK_PIPELINE_CREATE_2_OPACITY_MICROMAP_DISALLOW_MIXED_SPECIAL_INDEX_BIT_KHR, "
+                         "but the VkPhysicalDeviceOpacityMicromapFeaturesKHR::micromap feature was not enabled.",
                          string_VkPipelineCreateFlags2(flags).c_str());
     }
     if ((flags & VK_PIPELINE_CREATE_RAY_TRACING_DISPLACEMENT_MICROMAP_BIT_NV) != 0) {
@@ -756,7 +803,8 @@ bool Device::ValidateCreateGraphicsPipelinesFlags(const VkPipelineCreateFlags2 f
     return skip;
 }
 
-bool Device::ValidateCreatePipelinesFlagsCommon(VkPipelineCreateFlags2 flags, const Location &flags_loc) const {
+bool Device::ValidateCreatePipelinesFlagsCommon(VkPipelineCreateFlags2 flags, const Location& flags_loc,
+                                                VkPipelineCache pipeline_cache, VkPipelineLayout layout) const {
     bool skip = false;
 
     if (flags_loc.function == Func::vkCreateGraphicsPipelines) {
@@ -802,15 +850,37 @@ bool Device::ValidateCreatePipelinesFlagsCommon(VkPipelineCreateFlags2 flags, co
         }
     }
 
+    if ((flags & VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR) != 0 && (pipeline_cache != VK_NULL_HANDLE)) {
+        skip |= LogError(GetPipelineCreateFlagVUID(flags_loc, vvl::PipelineCreateFlagError::PNext_09617), device, flags_loc,
+                         "(%s) includes VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR while "
+                         "pipelineCache is not VK_NULL_HANDLE.",
+                         string_VkPipelineCreateFlags2(flags).c_str());
+    }
+
+    if ((flags & VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT) != 0 && layout != VK_NULL_HANDLE) {
+        skip |= LogError(GetPipelineCreateFlagVUID(flags_loc, vvl::PipelineCreateFlagError::Flags_11311), device, flags_loc,
+                         "(%s) includes VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT while layout is not VK_NULL_HANDLE (%s).",
+                         string_VkPipelineCreateFlags2(flags).c_str(), FormatHandle(layout).c_str());
+    } else if ((flags & VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT) == 0 && layout == VK_NULL_HANDLE) {
+        // The check is not found directly in the graphics pipeline because of all the rules around dynamic rendering and GPL (it is
+        // all caught elsewhere where layout must be valid)
+        if (flags_loc.function != Func::vkCreateGraphicsPipelines) {
+            skip |= LogError(GetPipelineCreateFlagVUID(flags_loc, vvl::PipelineCreateFlagError::Flags_11367), device, flags_loc,
+                             "(%s) does not include VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT while layout is "
+                             "VK_NULL_HANDLE.\nHint: Make sure you set it with VkPipelineCreateFlags2CreateInfo",
+                             string_VkPipelineCreateFlags2(flags).c_str());
+        }
+    }
+
     return skip;
 }
 
 bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
-                                                           const VkGraphicsPipelineCreateInfo *pCreateInfos,
-                                                           const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
-                                                           const Context &context) const {
+                                                           const VkGraphicsPipelineCreateInfo* pCreateInfos,
+                                                           const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                           const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
 
     if (!pCreateInfos) {
         return skip;
@@ -822,7 +892,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
         // Create a copy of create_info and set non-included sub-state to null
         VkGraphicsPipelineCreateInfo create_info = pCreateInfos[i];
 
-        const auto *create_flags_2 = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfo>(create_info.pNext);
+        const auto* create_flags_2 = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfo>(create_info.pNext);
         const VkPipelineCreateFlags2 flags =
             create_flags_2 ? create_flags_2->flags : static_cast<VkPipelineCreateFlags2>(create_info.flags);
         const Location flags_loc = create_flags_2 ? create_info_loc.pNext(Struct::VkPipelineCreateFlags2CreateInfo, Field::flags)
@@ -833,9 +903,9 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
         } else {
             skip |= ValidateCreatePipelinesFlags2(create_info.flags, flags, flags_loc);
         }
-        skip |= ValidateCreatePipelinesFlagsCommon(flags, flags_loc);
+        skip |= ValidateCreatePipelinesFlagsCommon(flags, flags_loc, pipelineCache, create_info.layout);
 
-        const auto *graphics_lib_info = vku::FindStructInPNextChain<VkGraphicsPipelineLibraryCreateInfoEXT>(create_info.pNext);
+        const auto* graphics_lib_info = vku::FindStructInPNextChain<VkGraphicsPipelineLibraryCreateInfoEXT>(create_info.pNext);
         if (graphics_lib_info) {
             if (!(graphics_lib_info->flags & VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT)) {
                 create_info.pVertexInputState = nullptr;
@@ -869,11 +939,11 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
             }
         }
 
+        const auto rendering_struct = vku::FindStructInPNextChain<VkPipelineRenderingCreateInfo>(create_info.pNext);
         if (!create_info.renderPass) {
             // Pipeline has fragment output state
             if ((flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) == 0 ||
                 (create_info.pColorBlendState && create_info.pMultisampleState)) {
-                const auto rendering_struct = vku::FindStructInPNextChain<VkPipelineRenderingCreateInfo>(create_info.pNext);
                 if (rendering_struct) {
                     skip |= ValidatePipelineRenderingCreateInfo(context, *rendering_struct, create_info_loc);
                 }
@@ -890,6 +960,13 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
                     }
                 }
             }
+        } else if (rendering_struct) {
+            skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pNext-12427", device, create_info_loc.dot(Field::renderPass),
+                             "(%s) is not VK_NULL_HANDLE, but the pNext chain includes VkPipelineRenderingCreateInfo. It is "
+                             "invalid to mix legacy RenderPass wit Dynamic Rendering as its ambiguous for an implementation to use "
+                             "the legacy RenderPass or the VkPipelineRenderingCreateInfo struct, so only one can be set.\n%s",
+                             FormatHandle(create_info.renderPass).c_str(),
+                             PrintPNextChain(Struct::VkGraphicsPipelineCreateInfo, create_info.pNext).c_str());
         }
 
         if (!IsExtEnabled(extensions.vk_ext_graphics_pipeline_library)) {
@@ -923,7 +1000,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
         vvl::unordered_map<VkDynamicState, uint32_t, vvl::hash<int>> dynamic_state_map;
         // TODO probably should check dynamic state from graphics libraries, at least when creating an "executable pipeline"
         if (create_info.pDynamicState != nullptr) {
-            const auto &dynamic_state_info = *create_info.pDynamicState;
+            const auto& dynamic_state_info = *create_info.pDynamicState;
             for (uint32_t state_index = 0; state_index < dynamic_state_info.dynamicStateCount; ++state_index) {
                 const VkDynamicState dynamic_state = dynamic_state_info.pDynamicStates[state_index];
 
@@ -1053,7 +1130,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
         const bool has_dynamic_vertex_input = vvl::Contains(dynamic_state_map, VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
         if (!has_dynamic_vertex_input && !(active_shaders & VK_SHADER_STAGE_MESH_BIT_EXT) &&
             (create_info.pVertexInputState != nullptr)) {
-            auto const &vertex_input_state = create_info.pVertexInputState;
+            auto const& vertex_input_state = create_info.pVertexInputState;
             const Location vertex_loc = create_info_loc.dot(Field::pVertexInputState);
             skip |= ValidatePipelineVertexInputStateCreateInfo(context, *vertex_input_state, vertex_loc);
 
@@ -1076,8 +1153,8 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
             vvl::unordered_set<uint32_t> vertex_bindings(vertex_input_state->vertexBindingDescriptionCount);
             for (uint32_t d = 0; d < vertex_input_state->vertexBindingDescriptionCount; ++d) {
                 const Location binding_loc = vertex_loc.dot(Field::pVertexBindingDescriptions);
-                auto const &vertex_bind_desc = vertex_input_state->pVertexBindingDescriptions[d];
-                auto const &binding_it = vertex_bindings.find(vertex_bind_desc.binding);
+                auto const& vertex_bind_desc = vertex_input_state->pVertexBindingDescriptions[d];
+                auto const& binding_it = vertex_bindings.find(vertex_bind_desc.binding);
                 if (binding_it != vertex_bindings.cend()) {
                     skip |= LogError("VUID-VkPipelineVertexInputStateCreateInfo-pVertexBindingDescriptions-00616", device,
                                      binding_loc.dot(Field::binding),
@@ -1105,8 +1182,8 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
             vvl::unordered_set<uint32_t> attribute_locations(vertex_input_state->vertexAttributeDescriptionCount);
             for (uint32_t d = 0; d < vertex_input_state->vertexAttributeDescriptionCount; ++d) {
                 const Location attribute_loc = vertex_loc.dot(Field::pVertexAttributeDescriptions);
-                auto const &vertex_attrib_desc = vertex_input_state->pVertexAttributeDescriptions[d];
-                auto const &location_it = attribute_locations.find(vertex_attrib_desc.location);
+                auto const& vertex_attrib_desc = vertex_input_state->pVertexAttributeDescriptions[d];
+                auto const& location_it = attribute_locations.find(vertex_attrib_desc.location);
                 if (location_it != attribute_locations.cend()) {
                     skip |= LogError("VUID-VkPipelineVertexInputStateCreateInfo-pVertexAttributeDescriptions-00617", device,
                                      attribute_loc.dot(Field::location),
@@ -1115,7 +1192,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
                 }
                 attribute_locations.insert(vertex_attrib_desc.location);
 
-                auto const &binding_it = vertex_bindings.find(vertex_attrib_desc.binding);
+                auto const& binding_it = vertex_bindings.find(vertex_attrib_desc.binding);
                 if (binding_it == vertex_bindings.cend()) {
                     skip |= LogError("VUID-VkPipelineVertexInputStateCreateInfo-binding-00615", device,
                                      attribute_loc.dot(Field::binding),
@@ -1171,23 +1248,23 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
             (create_info.pRasterizationState->rasterizerDiscardEnable == VK_FALSE)) {
             // Everything in here has a pre-rasterization shader state
             if (create_info.pViewportState) {
-                const auto &viewport_state = *create_info.pViewportState;
+                const auto& viewport_state = *create_info.pViewportState;
                 const Location viewport_loc = create_info_loc.dot(Field::pViewportState);
                 skip |= ValidatePipelineViewportStateCreateInfo(context, *create_info.pViewportState, viewport_loc);
 
-                const auto *exclusive_scissor_struct =
+                const auto* exclusive_scissor_struct =
                     vku::FindStructInPNextChain<VkPipelineViewportExclusiveScissorStateCreateInfoNV>(viewport_state.pNext);
-                const auto *shading_rate_image_struct =
+                const auto* shading_rate_image_struct =
                     vku::FindStructInPNextChain<VkPipelineViewportShadingRateImageStateCreateInfoNV>(viewport_state.pNext);
-                const auto *coarse_sample_order_struct =
+                const auto* coarse_sample_order_struct =
                     vku::FindStructInPNextChain<VkPipelineViewportCoarseSampleOrderStateCreateInfoNV>(viewport_state.pNext);
-                const auto *vp_swizzle_struct =
+                const auto* vp_swizzle_struct =
                     vku::FindStructInPNextChain<VkPipelineViewportSwizzleStateCreateInfoNV>(viewport_state.pNext);
-                const auto *vp_w_scaling_struct =
+                const auto* vp_w_scaling_struct =
                     vku::FindStructInPNextChain<VkPipelineViewportWScalingStateCreateInfoNV>(viewport_state.pNext);
-                const auto *depth_clip_control_struct =
+                const auto* depth_clip_control_struct =
                     vku::FindStructInPNextChain<VkPipelineViewportDepthClipControlCreateInfoEXT>(viewport_state.pNext);
-                const auto *depth_clamp_control_struct =
+                const auto* depth_clamp_control_struct =
                     vku::FindStructInPNextChain<VkPipelineViewportDepthClampControlCreateInfoEXT>(viewport_state.pNext);
 
                 if (!enabled_features.multiViewport) {
@@ -1268,8 +1345,8 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
 
                 if (!has_dynamic_scissor && viewport_state.pScissors) {
                     for (uint32_t scissor_i = 0; scissor_i < viewport_state.scissorCount; ++scissor_i) {
-                        const Location &scissor_loc = create_info_loc.dot(Field::pScissors, scissor_i);
-                        const auto &scissor = viewport_state.pScissors[scissor_i];
+                        const Location& scissor_loc = create_info_loc.dot(Field::pScissors, scissor_i);
+                        const auto& scissor = viewport_state.pScissors[scissor_i];
 
                         if (scissor.offset.x < 0) {
                             skip |= LogError("VUID-VkPipelineViewportStateCreateInfo-x-02821", device,
@@ -1322,7 +1399,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
                     if (!IsExtEnabled(extensions.vk_ext_extended_dynamic_state) ||
                         (!has_dynamic_viewport_with_count && !has_dynamic_scissor_with_count)) {
                         skip |= LogError("VUID-VkPipelineViewportStateCreateInfo-scissorCount-04134", device, viewport_loc,
-                                         "scissorCount (%" PRIu32 ") is different to viewportCount (%" PRIu32 ").",
+                                         "scissorCount (%" PRIu32 ") is different from viewportCount (%" PRIu32 ").",
                                          viewport_state.scissorCount, viewport_state.viewportCount);
                     }
                 }
@@ -1392,7 +1469,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
                 // validate the VkViewports
                 if (!has_dynamic_viewport && viewport_state.pViewports) {
                     for (uint32_t viewport_i = 0; viewport_i < viewport_state.viewportCount; ++viewport_i) {
-                        const auto &viewport = viewport_state.pViewports[viewport_i];  // will crash on invalid ptr
+                        const auto& viewport = viewport_state.pViewports[viewport_i];  // will crash on invalid ptr
                         skip |= ValidateViewport(viewport, VkCommandBuffer(0), viewport_loc.dot(Field::pViewports, viewport_i));
                     }
                 }
@@ -1497,7 +1574,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
                 std::unique_lock<std::mutex> lock(renderpass_map_mutex);
                 const auto subpasses_uses_it = renderpasses_states.find(create_info.renderPass);
                 if (subpasses_uses_it != renderpasses_states.end()) {
-                    const auto &subpasses_uses = subpasses_uses_it->second;
+                    const auto& subpasses_uses = subpasses_uses_it->second;
                     if (subpasses_uses.subpasses_using_color_attachment.count(create_info.subpass)) {
                         uses_color_attachment = true;
                     }
@@ -1510,13 +1587,13 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
 
             if (create_info.pDepthStencilState != nullptr && uses_depthstencil_attachment) {
                 const Location ds_loc = create_info_loc.dot(Field::pDepthStencilState);
-                auto const &ds_state = *create_info.pDepthStencilState;
+                auto const& ds_state = *create_info.pDepthStencilState;
                 skip |= ValidatePipelineDepthStencilStateCreateInfo(context, ds_state, ds_loc);
             }
 
             if (create_info.pColorBlendState != nullptr && uses_color_attachment) {
                 const Location color_loc = create_info_loc.dot(Field::pColorBlendState);
-                auto const &color_blend_state = *create_info.pColorBlendState;
+                auto const& color_blend_state = *create_info.pColorBlendState;
                 skip |= ValidatePipelineColorBlendStateCreateInfo(context, color_blend_state, color_loc);
 
                 // If logicOpEnable is VK_TRUE, logicOp must be a valid VkLogicOp value
@@ -1579,7 +1656,7 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
                                  create_info.pRasterizationState->lineWidth, i);
             }
 
-            const auto *line_state =
+            const auto* line_state =
                 vku::FindStructInPNextChain<VkPipelineRasterizationLineStateCreateInfo>(create_info.pRasterizationState->pNext);
             const bool dynamic_line_raster_mode = vvl::Contains(dynamic_state_map, VK_DYNAMIC_STATE_LINE_RASTERIZATION_MODE_EXT);
             const bool dynamic_line_stipple_enable = vvl::Contains(dynamic_state_map, VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT);
@@ -1698,14 +1775,13 @@ bool Device::manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
             }
         }
 
-        skip |=
-            ValidatePipelineBinaryInfo(create_info.pNext, create_info.flags, pipelineCache, create_info.layout, create_info_loc);
+        skip |= ValidatePipelineBinaryInfo(create_info.pNext, flags, pipelineCache, create_info_loc);
     }
 
     return skip;
 }
 
-bool Device::ValidateCreateComputePipelinesFlags(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const {
+bool Device::ValidateCreateComputePipelinesFlags(const VkPipelineCreateFlags2 flags, const Location& flags_loc) const {
     bool skip = false;
     if ((flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) != 0) {
         if (!enabled_features.shaderEnqueue) {
@@ -1754,9 +1830,15 @@ bool Device::ValidateCreateComputePipelinesFlags(const VkPipelineCreateFlags2 fl
                          "(%s) must not include VK_PIPELINE_CREATE_RAY_TRACING_ALLOW_MOTION_BIT_NV.",
                          string_VkPipelineCreateFlags2(flags).c_str());
     }
-    if ((flags & VK_PIPELINE_CREATE_RAY_TRACING_OPACITY_MICROMAP_BIT_EXT) != 0) {
+    if ((flags & VK_PIPELINE_CREATE_2_RAY_TRACING_OPACITY_MICROMAP_BIT_KHR) != 0) {
         skip |= LogError("VUID-VkComputePipelineCreateInfo-flags-07367", device, flags_loc,
-                         "(%s) must not include VK_PIPELINE_CREATE_RAY_TRACING_OPACITY_MICROMAP_BIT_EXT.",
+                         "(%s) must not include VK_PIPELINE_CREATE_2_RAY_TRACING_OPACITY_MICROMAP_BIT_KHR.",
+                         string_VkPipelineCreateFlags2(flags).c_str());
+    }
+    if (!enabled_features.micromap && (flags & VK_PIPELINE_CREATE_2_OPACITY_MICROMAP_DISALLOW_MIXED_SPECIAL_INDEX_BIT_KHR)) {
+        skip |= LogError("VUID-VkComputePipelineCreateInfo-flags-11593", device, flags_loc,
+                         "(%s) includes VK_PIPELINE_CREATE_2_OPACITY_MICROMAP_DISALLOW_MIXED_SPECIAL_INDEX_BIT_KHR, "
+                         "but the VkPhysicalDeviceOpacityMicromapFeaturesKHR::micromap feature was not enabled.",
                          string_VkPipelineCreateFlags2(flags).c_str());
     }
     if ((flags & VK_PIPELINE_CREATE_RAY_TRACING_DISPLACEMENT_MICROMAP_BIT_NV) != 0) {
@@ -1784,15 +1866,15 @@ bool Device::ValidateCreateComputePipelinesFlags(const VkPipelineCreateFlags2 fl
 }
 
 bool Device::manual_PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
-                                                          const VkComputePipelineCreateInfo *pCreateInfos,
-                                                          const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
-                                                          const Context &context) const {
+                                                          const VkComputePipelineCreateInfo* pCreateInfos,
+                                                          const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                          const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
 
     for (uint32_t i = 0; i < createInfoCount; i++) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfos, i);
-        const VkComputePipelineCreateInfo &create_info = pCreateInfos[i];
+        const VkComputePipelineCreateInfo& create_info = pCreateInfos[i];
 
         auto feedback_struct = vku::FindStructInPNextChain<VkPipelineCreationFeedbackCreateInfo>(create_info.pNext);
         if (feedback_struct) {
@@ -1805,7 +1887,7 @@ bool Device::manual_PreCallValidateCreateComputePipelines(VkDevice device, VkPip
             }
         }
 
-        const auto *create_flags_2 = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfo>(create_info.pNext);
+        const auto* create_flags_2 = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfo>(create_info.pNext);
         const VkPipelineCreateFlags2 flags =
             create_flags_2 ? create_flags_2->flags : static_cast<VkPipelineCreateFlags2>(create_info.flags);
         const Location flags_loc = create_flags_2 ? create_info_loc.pNext(Struct::VkPipelineCreateFlags2CreateInfo, Field::flags)
@@ -1816,7 +1898,7 @@ bool Device::manual_PreCallValidateCreateComputePipelines(VkDevice device, VkPip
         } else {
             skip |= ValidateCreatePipelinesFlags2(create_info.flags, flags, flags_loc);
         }
-        skip |= ValidateCreatePipelinesFlagsCommon(flags, flags_loc);
+        skip |= ValidateCreatePipelinesFlagsCommon(flags, flags_loc, pipelineCache, create_info.layout);
 
         // Make sure compute stage is selected
         if (create_info.stage.stage != VK_SHADER_STAGE_COMPUTE_BIT) {
@@ -1844,13 +1926,12 @@ bool Device::manual_PreCallValidateCreateComputePipelines(VkDevice device, VkPip
 
         skip |= ValidatePipelineShaderStageCreateInfoCommon(context, create_info.stage, create_info_loc.dot(Field::stage));
 
-        skip |=
-            ValidatePipelineBinaryInfo(create_info.pNext, create_info.flags, pipelineCache, create_info.layout, create_info_loc);
+        skip |= ValidatePipelineBinaryInfo(create_info.pNext, flags, pipelineCache, create_info_loc);
     }
     return skip;
 }
 
-bool Device::ValidateDepthClampRange(const VkDepthClampRangeEXT &depth_clamp_range, const Location &loc) const {
+bool Device::ValidateDepthClampRange(const VkDepthClampRangeEXT& depth_clamp_range, const Location& loc) const {
     bool skip = false;
     if (depth_clamp_range.minDepthClamp > depth_clamp_range.maxDepthClamp) {
         skip |=
@@ -1873,11 +1954,11 @@ bool Device::ValidateDepthClampRange(const VkDepthClampRangeEXT &depth_clamp_ran
     return skip;
 }
 
-bool Device::manual_PreCallValidateCreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo *pCreateInfo,
-                                                       const VkAllocationCallbacks *pAllocator, VkPipelineCache *pPipelineCache,
-                                                       const Context &context) const {
+bool Device::manual_PreCallValidateCreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo* pCreateInfo,
+                                                       const VkAllocationCallbacks* pAllocator, VkPipelineCache* pPipelineCache,
+                                                       const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
     const bool has_externally_sync = (pCreateInfo->flags & VK_PIPELINE_CACHE_CREATE_EXTERNALLY_SYNCHRONIZED_BIT) != 0;
     const bool has_internally_sync = (pCreateInfo->flags & VK_PIPELINE_CACHE_CREATE_INTERNALLY_SYNCHRONIZED_MERGE_BIT_KHR) != 0;
 
@@ -1904,9 +1985,9 @@ bool Device::manual_PreCallValidateCreatePipelineCache(VkDevice device, const Vk
 }
 
 bool Device::manual_PreCallValidateMergePipelineCaches(VkDevice device, VkPipelineCache dstCache, uint32_t srcCacheCount,
-                                                       const VkPipelineCache *pSrcCaches, const Context &context) const {
+                                                       const VkPipelineCache* pSrcCaches, const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
     if (pSrcCaches) {
         for (uint32_t index0 = 0; index0 < srcCacheCount; ++index0) {
             if (pSrcCaches[index0] == dstCache) {
@@ -1919,17 +2000,17 @@ bool Device::manual_PreCallValidateMergePipelineCaches(VkDevice device, VkPipeli
     return skip;
 }
 
-bool Device::manual_PreCallValidateGetPipelinePropertiesEXT(VkDevice device, const VkPipelineInfoEXT *pPipelineInfo,
-                                                            VkBaseOutStructure *pPipelineProperties, const Context &context) const {
+bool Device::manual_PreCallValidateGetPipelinePropertiesEXT(VkDevice device, const VkPipelineInfoEXT* pPipelineInfo,
+                                                            VkBaseOutStructure* pPipelineProperties, const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
 
     if (!enabled_features.pipelinePropertiesIdentifier) {
         skip |= LogError("VUID-vkGetPipelinePropertiesEXT-None-06766", device, error_obj.location,
                          "the pipelinePropertiesIdentifier feature was not enabled.");
     }
 
-    const Location &pipeline_properties_loc = error_obj.location.dot(Field::pPipelineProperties);
+    const Location& pipeline_properties_loc = error_obj.location.dot(Field::pPipelineProperties);
     if (pPipelineProperties) {
         if (pPipelineProperties->sType != VK_STRUCTURE_TYPE_PIPELINE_PROPERTIES_IDENTIFIER_EXT) {
             skip |=

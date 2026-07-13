@@ -17,9 +17,9 @@
 
 #include <gtest/gtest.h>
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "descriptor_helper.h"
+#include "pipeline_helper.h"
 
 class NegativeYcbcr : public VkLayerTest {};
 
@@ -123,7 +123,7 @@ TEST_F(NegativeYcbcr, Sampler) {
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     sampler_info.minFilter = VK_FILTER_NEAREST;  // Different than chromaFilter
     sampler_info.magFilter = VK_FILTER_LINEAR;
-    sampler_info.pNext = (void *)&sampler_ycbcr_info;
+    sampler_info.pNext = (void*)&sampler_ycbcr_info;
     CreateSamplerTest(sampler_info, "VUID-VkSamplerCreateInfo-minFilter-01645");
 
     sampler_info.magFilter = VK_FILTER_NEAREST;
@@ -547,8 +547,7 @@ TEST_F(NegativeYcbcr, MultiplaneImageCopyBufferToImage) {
 
     m_command_buffer.Reset();
     m_command_buffer.Begin();
-    image.ImageMemoryBarrier(m_command_buffer, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    m_command_buffer.TransitionLayout(image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     std::array<VkImageAspectFlagBits, 3> aspects = {
         {VK_IMAGE_ASPECT_PLANE_0_BIT, VK_IMAGE_ASPECT_PLANE_1_BIT, VK_IMAGE_ASPECT_PLANE_2_BIT}};
@@ -1621,7 +1620,7 @@ TEST_F(NegativeYcbcr, DisjointImageWithDrmFormatModifier) {
     vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &format_props);
 
     for (uint32_t i = 0; i < mod_props.drmFormatModifierCount; ++i) {
-        auto &mod = mod_props.pDrmFormatModifierProperties[i];
+        auto& mod = mod_props.pDrmFormatModifierProperties[i];
         if (((mod.drmFormatModifierTilingFeatures &
               (VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT | VK_FORMAT_FEATURE_DISJOINT_BIT)) ==
              (VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT | VK_FORMAT_FEATURE_DISJOINT_BIT))) {
@@ -1790,7 +1789,7 @@ TEST_F(NegativeYcbcr, TexelFetchNonArrayPartiallyBound) {
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
 
     vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *buffer_ptr = (uint32_t *)buffer.Memory().Map();
+    uint32_t* buffer_ptr = (uint32_t*)buffer.Memory().Map();
     buffer_ptr[0] = 1;
 
     OneOffDescriptorIndexingSet descriptor_set(
@@ -2084,7 +2083,7 @@ TEST_F(NegativeYcbcr, MultiplaneImageCopyAspectMask) {
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-dstImage-08714");
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyImage-aspectMask-00143");
-    image.ImageMemoryBarrier(m_command_buffer, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    m_command_buffer.TransitionLayout(image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
     vk::CmdCopyImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, image, VK_IMAGE_LAYOUT_GENERAL, 1, &image_copy);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
@@ -2109,7 +2108,7 @@ TEST_F(NegativeYcbcr, DescriptorIndexCombinedSampledImage) {
                                        });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : require
         layout(set = 0, binding = 0) uniform sampler2D ycbcr[4];
@@ -2197,7 +2196,7 @@ TEST_F(NegativeYcbcr, DescriptorIndexSlang) {
                                        });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    const char *cs_source = R"slang(
+    const char* cs_source = R"slang(
         [[vk::binding(0, 0)]]
         uniform Sampler2D ycbcr[4];
 
@@ -2243,7 +2242,7 @@ TEST_F(NegativeYcbcr, DescriptorIndexShaderObject) {
                                            {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                                        });
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : require
         layout(set = 0, binding = 0) uniform sampler2D ycbcr[4];
@@ -2263,5 +2262,44 @@ TEST_F(NegativeYcbcr, DescriptorIndexShaderObject) {
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-12205");
     const vkt::Shader comp_shader(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
                                   &descriptor_set.layout_.handle());
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeYcbcr, MutableFullImageView) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_6_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance6);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT) &&
+        !FormatFeaturesAreSupported(Gpu(), VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+        GTEST_SKIP() << "Required formats/features not supported";
+    }
+    auto image_ci = vkt::Image::ImageCreateInfo2D(256, 256, 1, 1, VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM,
+                                                  VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+    image_ci.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+
+    VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+    if (!IsImageFormatSupported(Gpu(), image_ci, features)) {
+        // Assume there's low ROI on searching for different mp formats
+        GTEST_SKIP() << "Multiplane image format not supported";
+    }
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
+
+    vkt::SamplerYcbcrConversion conversion(*m_device, VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM);
+    auto conversion_info = conversion.ConversionInfo();
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
+
+    auto ivci = vku::InitStruct<VkImageViewCreateInfo>(&conversion_info);
+    ivci.image = image;
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.format = VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-format-12398");
+    vkt::ImageView view(*m_device, ivci);
     m_errorMonitor->VerifyFound();
 }

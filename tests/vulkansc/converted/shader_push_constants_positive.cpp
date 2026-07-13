@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class PositiveShaderPushConstants : public VkLayerTest {};
 
@@ -25,7 +25,7 @@ TEST_F(PositiveShaderPushConstants, OverlappingPushConstantRange) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *const vsSource = R"glsl(
+    const char* const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { float x[8]; } constants;
         void main(){
@@ -33,7 +33,7 @@ TEST_F(PositiveShaderPushConstants, OverlappingPushConstantRange) {
         }
     )glsl";
 
-    const char *const fsSource = R"glsl(
+    const char* const fsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { float x[4]; } constants;
         layout(location=0) out vec4 o;
@@ -42,8 +42,8 @@ TEST_F(PositiveShaderPushConstants, OverlappingPushConstantRange) {
         }
     )glsl";
 
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPushConstantRange push_constant_ranges[2]{{VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float) * 8},
                                                 {VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 4}};
@@ -142,11 +142,11 @@ TEST_F(PositiveShaderPushConstants, MultipleEntryPointVert) {
 
     // Vertex entry point first
     {
-        VkShaderObj const vs(*m_device, vert_first.c_str(), VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
-                             "main_v");
-        VkShaderObj const fs(*m_device, vert_first.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM,
-                             nullptr, "main_f");
-        const auto set_info = [&](CreatePipelineHelper &helper) {
+        VkShaderObj vs(*m_device, vert_first.c_str(), VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
+                       "main_v");
+        VkShaderObj fs(*m_device, vert_first.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
+                       "main_f");
+        const auto set_info = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.pipeline_layout_ci_ = pipeline_layout_info;
         };
@@ -155,11 +155,11 @@ TEST_F(PositiveShaderPushConstants, MultipleEntryPointVert) {
 
     // Fragment entry point first
     {
-        VkShaderObj const vs(*m_device, frag_first.c_str(), VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
-                             "main_v");
-        VkShaderObj const fs(*m_device, frag_first.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM,
-                             nullptr, "main_f");
-        const auto set_info = [&](CreatePipelineHelper &helper) {
+        VkShaderObj vs(*m_device, frag_first.c_str(), VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
+                       "main_v");
+        VkShaderObj fs(*m_device, frag_first.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
+                       "main_f");
+        const auto set_info = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.pipeline_layout_ci_ = pipeline_layout_info;
         };
@@ -251,11 +251,11 @@ TEST_F(PositiveShaderPushConstants, MultipleEntryPointFrag) {
 
     // Vertex entry point first
     {
-        VkShaderObj const vs(*m_device, vert_first.c_str(), VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
-                             "main_v");
-        VkShaderObj const fs(*m_device, vert_first.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM,
-                             nullptr, "main_f");
-        const auto set_info = [&](CreatePipelineHelper &helper) {
+        VkShaderObj vs(*m_device, vert_first.c_str(), VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
+                       "main_v");
+        VkShaderObj fs(*m_device, vert_first.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
+                       "main_f");
+        const auto set_info = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.pipeline_layout_ci_ = pipeline_layout_info;
         };
@@ -264,11 +264,11 @@ TEST_F(PositiveShaderPushConstants, MultipleEntryPointFrag) {
 
     // Fragment entry point first
     {
-        VkShaderObj const vs(*m_device, frag_first.c_str(), VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
-                             "main_v");
-        VkShaderObj const fs(*m_device, frag_first.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM,
-                             nullptr, "main_f");
-        const auto set_info = [&](CreatePipelineHelper &helper) {
+        VkShaderObj vs(*m_device, frag_first.c_str(), VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
+                       "main_v");
+        VkShaderObj fs(*m_device, frag_first.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr,
+                       "main_f");
+        const auto set_info = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.pipeline_layout_ci_ = pipeline_layout_info;
         };
@@ -281,7 +281,7 @@ TEST_F(PositiveShaderPushConstants, CompatibilityGraphicsOnly) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *const vsSource = R"glsl(
+    const char* const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { layout(offset = 16) vec4 x; } constants;
         void main(){
@@ -289,8 +289,8 @@ TEST_F(PositiveShaderPushConstants, CompatibilityGraphicsOnly) {
         }
     )glsl";
 
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // range A and B are the same while range C is different
     // All 3 ranges fit the range from the shader
@@ -421,7 +421,7 @@ TEST_F(PositiveShaderPushConstants, StaticallyUnused) {
     VkPipelineLayoutCreateInfo pipeline_layout_info = {
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, nullptr, 0, 0, nullptr, 1, &push_constant_range};
 
-    const char *vsSourceUnused = R"glsl(
+    const char* vsSourceUnused = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { float x; } consts;
         void main(){
@@ -429,7 +429,7 @@ TEST_F(PositiveShaderPushConstants, StaticallyUnused) {
         }
     )glsl";
 
-    const char *vsSourceEmpty = R"glsl(
+    const char* vsSourceEmpty = R"glsl(
         #version 450
         void main(){
            gl_Position = vec4(1.0);
@@ -478,7 +478,7 @@ TEST_F(PositiveShaderPushConstants, OffsetVector) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *const vsSource = R"glsl(
+    const char* const vsSource = R"glsl(
         #version 450
 
         layout(push_constant) uniform Material {
@@ -490,8 +490,8 @@ TEST_F(PositiveShaderPushConstants, OffsetVector) {
         }
     )glsl";
 
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Set up a push constant range
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 16, 32};
@@ -519,7 +519,7 @@ TEST_F(PositiveShaderPushConstants, PhysicalStorageBufferBasic) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *const vsSource = R"glsl(
+    const char* const vsSource = R"glsl(
         #version 450
 
         #extension GL_EXT_buffer_reference : enable
@@ -539,8 +539,8 @@ TEST_F(PositiveShaderPushConstants, PhysicalStorageBufferBasic) {
         }
     )glsl";
 
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Use exact range
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 16, 28};
@@ -569,7 +569,7 @@ TEST_F(PositiveShaderPushConstants, PhysicalStorageBufferVertFrag) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vertex_source = R"glsl(
+    const char* vertex_source = R"glsl(
         #version 450
 
         #extension GL_EXT_buffer_reference : enable
@@ -589,9 +589,9 @@ TEST_F(PositiveShaderPushConstants, PhysicalStorageBufferVertFrag) {
             gl_Position = vec4(pcs.vb.x, 1.0);
         }
         )glsl";
-    const VkShaderObj vs(*m_device, vertex_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj vs(*m_device, vertex_source, VK_SHADER_STAGE_VERTEX_BIT);
 
-    const char *fragment_source = R"glsl(
+    const char* fragment_source = R"glsl(
         #version 450
 
         #extension GL_EXT_buffer_reference : enable
@@ -610,7 +610,7 @@ TEST_F(PositiveShaderPushConstants, PhysicalStorageBufferVertFrag) {
             o = vec4(pcs.vb.v, 1.0);
         }
     )glsl";
-    const VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     std::array<VkPushConstantRange, 2> push_ranges;
     push_ranges[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -643,7 +643,7 @@ TEST_F(PositiveShaderPushConstants, MultipleStructs) {
     //
     // layout(push_constant) uniform pc_a { layout(offset = 32) vec4 x; } a;
     // layout(push_constant) uniform pc_b { layout(offset = 16) vec4 x; } b;
-    const char *source = R"(
+    const char* source = R"(
                  OpCapability Shader
                  OpMemoryModel Logical GLSL450
                  OpEntryPoint Vertex %1 "main"
@@ -676,8 +676,8 @@ TEST_F(PositiveShaderPushConstants, MultipleStructs) {
                  OpFunctionEnd
     )";
 
-    VkShaderObj const vs(*m_device, source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 32, 16};
     const vkt::PipelineLayout pipeline_layout(*m_device, {}, {push_constant_range});
@@ -702,7 +702,7 @@ TEST_F(PositiveShaderPushConstants, SpecConstantSizeDefault) {
     TEST_DESCRIPTION("Use SpecConstant to adjust size of Push Constant Block, but use default value");
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         layout (constant_id = 2) const int my_array_size = 1;
         layout (push_constant) uniform my_buf {
@@ -727,7 +727,7 @@ TEST_F(PositiveShaderPushConstants, SpecConstantSizeSet) {
     TEST_DESCRIPTION("Use SpecConstant to adjust size of Push Constant Block");
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         layout (constant_id = 0) const int my_array_size = 256;
         layout (push_constant) uniform my_buf {
@@ -778,7 +778,7 @@ TEST_F(PositiveShaderPushConstants, Storage8BitPointers) {
     // void main(uint8_t* input) {
     //     result[0] = (int)input[0];
     // }
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability PhysicalStorageBufferAddresses
                OpCapability Int8
                OpCapability Shader

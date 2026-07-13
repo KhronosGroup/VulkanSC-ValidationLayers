@@ -13,8 +13,8 @@
  */
 
 #include "utils/cast_utils.h"
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 #include <algorithm>
 #include <cstdint>
 
@@ -37,7 +37,7 @@ TEST_F(NegativeQuery, PerformanceCreation) {
         if (nCounters == 0) continue;
 
         counters.resize(nCounters);
-        for (auto &c : counters) {
+        for (auto& c : counters) {
             c = vku::InitStructHelper();
         }
         vk::EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(Gpu(), idx, &nCounters, &counters[0], nullptr);
@@ -113,7 +113,7 @@ TEST_F(NegativeQuery, PerformanceCounterCommandbufferScope) {
         if (nCounters == 0) continue;
 
         counters.resize(nCounters);
-        for (auto &c : counters) {
+        for (auto& c : counters) {
             c = vku::InitStructHelper();
         }
         vk::EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(Gpu(), idx, &nCounters, &counters[0], nullptr);
@@ -226,7 +226,7 @@ TEST_F(NegativeQuery, PerformanceCounterRenderPassScope) {
         if (nCounters == 0) continue;
 
         counters.resize(nCounters);
-        for (auto &c : counters) {
+        for (auto& c : counters) {
             c = vku::InitStructHelper();
         }
         vk::EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(Gpu(), idx, &nCounters, &counters[0], nullptr);
@@ -317,7 +317,7 @@ TEST_F(NegativeQuery, PerformanceReleaseProfileLockBeforeSubmit) {
         if (nCounters == 0) continue;
 
         counters.resize(nCounters);
-        for (auto &c : counters) {
+        for (auto& c : counters) {
             c = vku::InitStructHelper();
         }
         vk::EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(Gpu(), idx, &nCounters, &counters[0], nullptr);
@@ -453,7 +453,7 @@ TEST_F(NegativeQuery, PerformanceIncompletePasses) {
         if (nCounters == 0) continue;
 
         counters.resize(nCounters);
-        for (auto &c : counters) {
+        for (auto& c : counters) {
             c = vku::InitStructHelper();
         }
         vk::EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(Gpu(), idx, &nCounters, &counters[0], nullptr);
@@ -674,7 +674,7 @@ TEST_F(NegativeQuery, PerformanceResetAndBegin) {
         if (nCounters == 0) continue;
 
         counters.resize(nCounters);
-        for (auto &c : counters) {
+        for (auto& c : counters) {
             c = vku::InitStructHelper();
         }
         vk::EnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(Gpu(), idx, &nCounters, &counters[0], nullptr);
@@ -2425,7 +2425,7 @@ TEST_F(NegativeQuery, PerfQueryQueueFamilyIndex) {
     AddRequiredFeature(vkt::Feature::performanceCounterQueryPools);
     RETURN_IF_SKIP(Init());
 
-    vkt::Queue *queue0 = m_default_queue;
+    vkt::Queue* queue0 = m_default_queue;
     auto queue1_family = m_device->ComputeOnlyQueueFamily();
     if (!queue1_family.has_value()) {
         GTEST_SKIP() << "Can't find two different queue families";
@@ -2561,5 +2561,23 @@ TEST_F(NegativeQuery, QueryPoolResultsStride) {
     m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-stride-08993");
     vk::GetQueryPoolResults(*m_device, query_pool, 0u, 2u, sizeof(uint32_t) * 4, data_space, sizeof(uint32_t),
                             VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeQuery, PrimitivesGeneratedQuerySize) {
+    AddRequiredExtensions(VK_EXT_PRIMITIVES_GENERATED_QUERY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::primitivesGeneratedQuery);
+    RETURN_IF_SKIP(Init());
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT, 1u);
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 1u);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    uint32_t data = 0u;
+    m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-dataSize-00817");
+    vk::GetQueryPoolResults(*m_device, query_pool, 0u, 1u, 1u, &data, sizeof(data), 0u);
     m_errorMonitor->VerifyFound();
 }

@@ -16,7 +16,7 @@
 
 #include <cstdarg>
 #include <cstdint>
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 class NegativeLayerSettings : public VkLayerTest {};
 
@@ -26,7 +26,7 @@ TEST_F(NegativeLayerSettings, CustomStypeStructString) {
     // Create a custom structure
     typedef struct CustomStruct {
         VkStructureType sType;
-        const void *pNext;
+        const void* pNext;
         uint32_t custom_data;
     } CustomStruct;
 
@@ -37,7 +37,7 @@ TEST_F(NegativeLayerSettings, CustomStypeStructString) {
     custom_struct.custom_data = 44;
 
     // Communicate list of structinfo pairs to layers
-    const char *id[] = {"3000300000", "24"};
+    const char* id[] = {"3000300000", "24"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "custom_stype_list", VK_LAYER_SETTING_TYPE_STRING_EXT,
                                        static_cast<uint32_t>(std::size(id)), &id};
     VkLayerSettingsCreateInfoEXT layer_setting_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
@@ -54,7 +54,7 @@ TEST_F(NegativeLayerSettings, CustomStypeStructString) {
     vkt::BufferView buffer_view(*m_device, bvci);
 }
 
-static std::string format(const char *message, ...) {
+static std::string format(const char* message, ...) {
     std::size_t const STRING_BUFFER(4096);
 
     assert(message != nullptr);
@@ -76,7 +76,7 @@ TEST_F(NegativeLayerSettings, CustomStypeStructStringArray) {
     // Create a custom structure
     typedef struct CustomStruct {
         VkStructureType sType;
-        const void *pNext;
+        const void* pNext;
         uint32_t custom_data;
     } CustomStruct;
 
@@ -97,7 +97,7 @@ TEST_F(NegativeLayerSettings, CustomStypeStructStringArray) {
     const std::string string_stype_b = format("%u", custom_stype_b);
     const std::string sizeof_struct = format("%d", sizeof(CustomStruct));
 
-    const char *ids[] = {
+    const char* ids[] = {
         string_stype_a.c_str(), sizeof_struct.c_str(),  string_stype_b.c_str(),
         sizeof_struct.c_str(),  string_stype_a.c_str(), sizeof_struct.c_str(),
     };
@@ -123,7 +123,7 @@ TEST_F(NegativeLayerSettings, CustomStypeStructIntegerArray) {
     // Create a custom structure
     typedef struct CustomStruct {
         VkStructureType sType;
-        const void *pNext;
+        const void* pNext;
         uint32_t custom_data;
     } CustomStruct;
 
@@ -301,7 +301,7 @@ TEST_F(NegativeLayerSettings, VuidIdFilterString) {
     // This test would normally produce an unexpected error or two.  Use the message filter instead of
     // the error_monitor's SetUnexpectedError to test the filtering.
 
-    const char *ids[] = {"VUID-VkRenderPassCreateInfo-pNext-01963"};
+    const char* ids[] = {"VUID-VkRenderPassCreateInfo-pNext-01963"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids};
     VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
                                                                &setting};
@@ -335,7 +335,7 @@ TEST_F(NegativeLayerSettings, VuidFilterHexInt) {
     // This test would normally produce an unexpected error or two.  Use the message filter instead of
     // the error_monitor's SetUnexpectedError to test the filtering.
 
-    const char *ids[] = {"0xa19880e3"};
+    const char* ids[] = {"0xa19880e3"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids};
     VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
                                                                &setting};
@@ -369,7 +369,7 @@ TEST_F(NegativeLayerSettings, VuidFilterInt) {
     // This test would normally produce an unexpected error or two.  Use the message filter instead of
     // the error_monitor's SetUnexpectedError to test the filtering.
 
-    const char *ids[] = {"2711126243"};
+    const char* ids[] = {"2711126243"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids};
     VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
                                                                &setting};
@@ -396,7 +396,7 @@ TEST_F(NegativeLayerSettings, VuidFilterInt) {
 }
 
 TEST_F(NegativeLayerSettings, DebugAction) {
-    const char *action = "VK_DBG_LAYER_ACTION_NOT_A_REAL_THING";
+    const char* action = "VK_DBG_LAYER_ACTION_NOT_A_REAL_THING";
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "debug_action", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &action};
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_DEBUG_ACTION");
@@ -406,7 +406,7 @@ TEST_F(NegativeLayerSettings, DebugAction) {
 }
 
 TEST_F(NegativeLayerSettings, DebugAction2) {
-    const char *actions[2] = {"VK_DBG_LAYER_ACTION_IGNORE,VK_DBG_LAYER_ACTION_CALLBACK"};
+    const char* actions[2] = {"VK_DBG_LAYER_ACTION_IGNORE,VK_DBG_LAYER_ACTION_CALLBACK"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "debug_action", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, actions};
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_DEBUG_ACTION");
@@ -416,7 +416,7 @@ TEST_F(NegativeLayerSettings, DebugAction2) {
 }
 
 TEST_F(NegativeLayerSettings, DebugAction3) {
-    const char *actions[2] = {"VK_DBG_LAYER_ACTION_DEFAULT", "VK_DBG_LAYER_ACTION_NOT_A_REAL_THING"};
+    const char* actions[2] = {"VK_DBG_LAYER_ACTION_DEFAULT", "VK_DBG_LAYER_ACTION_NOT_A_REAL_THING"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "debug_action", VK_LAYER_SETTING_TYPE_STRING_EXT, 2, actions};
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_DEBUG_ACTION");
@@ -426,7 +426,7 @@ TEST_F(NegativeLayerSettings, DebugAction3) {
 }
 
 TEST_F(NegativeLayerSettings, ReportFlags) {
-    const char *report_flag = "fake";
+    const char* report_flag = "fake";
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "report_flags", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &report_flag};
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_REPORT_FLAGS");
@@ -436,7 +436,7 @@ TEST_F(NegativeLayerSettings, ReportFlags) {
 }
 
 TEST_F(NegativeLayerSettings, ReportFlags2) {
-    const char *report_flag = "warn,fake,info";
+    const char* report_flag = "warn,fake,info";
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "report_flags", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &report_flag};
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_REPORT_FLAGS");
@@ -446,7 +446,7 @@ TEST_F(NegativeLayerSettings, ReportFlags2) {
 }
 
 TEST_F(NegativeLayerSettings, ReportFlags3) {
-    const char *report_flag = "error,warn,info,verbose";
+    const char* report_flag = "error,warn,info,verbose";
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "report_flags", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &report_flag};
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().SetDesiredWarning("was not a valid option for VK_LAYER_REPORT_FLAGS");
@@ -457,7 +457,7 @@ TEST_F(NegativeLayerSettings, ReportFlags3) {
 
 #ifndef WIN32
 TEST_F(NegativeLayerSettings, LogFilename) {
-    const char *path[] = {"/fake/path"};
+    const char* path[] = {"/fake/path"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "log_filename", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, path};
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().SetDesiredWarning("(/fake/path) could not be opened, falling back to stdout instead");

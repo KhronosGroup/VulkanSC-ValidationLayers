@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,9 +15,9 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/shader_object_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "shader_object_helper.h"
 
 class NegativeShaderPushConstants : public VkLayerTest {};
 
@@ -31,7 +31,7 @@ TEST_F(NegativeShaderPushConstants, NotDeclared) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { float x; } consts;
         void main(){
@@ -201,7 +201,7 @@ TEST_F(NegativeShaderPushConstants, NotInLayout) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { float x; } consts;
         void main(){
@@ -221,39 +221,27 @@ TEST_F(NegativeShaderPushConstants, NotInLayout) {
 }
 
 TEST_F(NegativeShaderPushConstants, Range) {
-    TEST_DESCRIPTION("Invalid use of VkPushConstantRange values in vkCmdPushConstants.");
-
-    RETURN_IF_SKIP(InitFramework());
-
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
-    // Set limit to be same max as the shader usages
-    const uint32_t maxPushConstantsSize = 16;
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    props.limits.maxPushConstantsSize = maxPushConstantsSize;
-    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-
-    RETURN_IF_SKIP(InitState());
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *const vsSource = R"glsl(
+    const uint32_t max_size = m_device->Physical().limits_.maxPushConstantsSize;
+    if (max_size > 128) {
+        GTEST_SKIP() << "maxPushConstantsSize is too high";
+    }
+
+    const char* const vsSource = R"glsl(
         #version 450
-        layout(push_constant, std430) uniform foo { float x[4]; } constants;
+        layout(push_constant, std430) uniform foo { float x[32]; } constants;
         void main(){
            gl_Position = vec4(constants.x[0]);
         }
     )glsl";
 
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Set up a push constant range
-    VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, maxPushConstantsSize};
+    VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, max_size};
     const vkt::PipelineLayout pipeline_layout(*m_device, {}, {push_constant_range});
 
     CreatePipelineHelper pipe(*this);
@@ -261,7 +249,7 @@ TEST_F(NegativeShaderPushConstants, Range) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {}, {push_constant_range});
     pipe.CreateGraphicsPipeline();
 
-    const float data[16] = {};  // dummy data to match shader size
+    const float data[128] = {};  // dummy data to match shader size
 
     m_command_buffer.Begin();
 
@@ -283,16 +271,16 @@ TEST_F(NegativeShaderPushConstants, Range) {
     // offset at limit
     m_errorMonitor->SetDesiredError("VUID-vkCmdPushConstants-offset-00370");
     m_errorMonitor->SetDesiredError("VUID-vkCmdPushConstants-size-00371");
-    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, maxPushConstantsSize, 4, data);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, max_size, 4, data);
     m_errorMonitor->VerifyFound();
 
     // size at limit
     m_errorMonitor->SetDesiredError("VUID-vkCmdPushConstants-size-00371");
-    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, maxPushConstantsSize + 4, data);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, max_size + 4, data);
     m_errorMonitor->VerifyFound();
 
     // Size at limit, should be valid
-    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, maxPushConstantsSize, data);
+    vk::CmdPushConstants(m_command_buffer, pipe.pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, max_size, data);
 
     m_command_buffer.End();
 }
@@ -306,7 +294,7 @@ TEST_F(NegativeShaderPushConstants, DrawWithoutUpdate) {
     InitRenderTarget();
 
     // push constant range: 0-99
-    const char *const vsSource = R"glsl(
+    const char* const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo {
            bool b;
@@ -330,7 +318,7 @@ TEST_F(NegativeShaderPushConstants, DrawWithoutUpdate) {
     )glsl";
 
     // push constant range: 0 - 95
-    const char *const fsSource = R"glsl(
+    const char* const fsSource = R"glsl(
         #version 450
         struct foo1{
            int i[4];
@@ -350,8 +338,8 @@ TEST_F(NegativeShaderPushConstants, DrawWithoutUpdate) {
         }
     )glsl";
 
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 128};
     VkPushConstantRange push_constant_range_small = {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 4, 4};
@@ -381,8 +369,8 @@ TEST_F(NegativeShaderPushConstants, DrawWithoutUpdate) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-maintenance4-08602");  // vertex
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-maintenance4-08602");  // fragment
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08601");  // vertex
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08601");  // fragment
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe);
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_, 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
@@ -395,13 +383,13 @@ TEST_F(NegativeShaderPushConstants, DrawWithoutUpdate) {
     //       See https://gitlab.khronos.org/vulkan/vulkan/-/issues/2602 and
     //       https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/2689
     //       for more details.
-    // m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-maintenance4-08602");
+    // m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08601");
     // vk::CmdPushConstants(m_command_buffer, g_pipe.pipeline_layout_,
     //                     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 96, dummy_values);
     // vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     // m_errorMonitor->VerifyFound();
 
-    // m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-maintenance4-08602");
+    // m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08601");
     // vk::CmdPushConstants(m_command_buffer, pipeline_layout_small, VK_SHADER_STAGE_VERTEX_BIT, 4, 4, dummy_values);
     // vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
     // m_errorMonitor->VerifyFound();
@@ -421,7 +409,7 @@ TEST_F(NegativeShaderPushConstants, BufferDeviceAddress) {
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     RETURN_IF_SKIP(Init());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, buffer_reference_align = 16, std430) buffer BDA {
@@ -470,7 +458,7 @@ TEST_F(NegativeShaderPushConstants, MultipleEntryPoint) {
     // void main(){
     //     uFragColor = vec4(0.0);
     // }
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Fragment %main_f "main" %4
@@ -531,8 +519,8 @@ TEST_F(NegativeShaderPushConstants, MultipleEntryPoint) {
     pipeline_layout_info.pPushConstantRanges = &push_constant_range;
     vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_info);
 
-    VkShaderObj const vs(*m_device, source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    VkShaderObj const fs(*m_device, source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj vs(*m_device, source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -555,7 +543,7 @@ TEST_F(NegativeShaderPushConstants, SpecConstantSize) {
     TEST_DESCRIPTION("Use SpecConstant to adjust size of Push Constant Block");
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         layout (constant_id = 0) const int my_array_size = 1;
         layout (push_constant) uniform my_buf {
@@ -602,7 +590,7 @@ TEST_F(NegativeShaderPushConstants, ArrayOf8Bit) {
     // storagePushConstant8 is not enabled
     RETURN_IF_SKIP(Init());
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_8bit_storage: enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -630,7 +618,7 @@ TEST_F(NegativeShaderPushConstants, StructOf8Bit) {
     // storagePushConstant8 is not enabled
     RETURN_IF_SKIP(Init());
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_8bit_storage: enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -665,7 +653,7 @@ TEST_F(NegativeShaderPushConstants, ArrayOfStructOf8Bit) {
     // storagePushConstant8 is not enabled
     RETURN_IF_SKIP(Init());
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_8bit_storage: enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable

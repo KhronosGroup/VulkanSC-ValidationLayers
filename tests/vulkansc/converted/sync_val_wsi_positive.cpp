@@ -1,9 +1,9 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
 // See vksc_convert_tests.py for modifications
 
-/* Copyright (c) 2025 The Khronos Group Inc.
- * Copyright (c) 2025 Valve Corporation
- * Copyright (c) 2025 LunarG, Inc.
+/* Copyright (c) 2026 The Khronos Group Inc.
+ * Copyright (c) 2026 Valve Corporation
+ * Copyright (c) 2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-#include "../framework/sync_val_tests.h"
+#include "sync_val_tests.h"
 #include <vulkan/utility/vk_format_utils.h>
 #include <thread>
 
@@ -144,33 +144,15 @@ TEST_F(PositiveSyncValWsi, PresentAfterSubmitNoneDstStage) {
 TEST_F(PositiveSyncValWsi, ThreadedSubmitAndFenceWaitAndPresent) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7250");
     AddSurfaceExtension();
-    RETURN_IF_SKIP(InitSyncValFramework());
-    RETURN_IF_SKIP(InitState());
+    RETURN_IF_SKIP(InitSyncVal());
     RETURN_IF_SKIP(InitSwapchain());
 
     const auto swapchain_images = m_swapchain.GetImages();
-    {
-        vkt::CommandBuffer cmd(*m_device, m_command_pool);
-        cmd.Begin();
-        for (VkImage image : swapchain_images) {
-            VkImageMemoryBarrier transition = vku::InitStructHelper();
-            transition.srcAccessMask = 0;
-            transition.dstAccessMask = 0;
-            transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            transition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            transition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            transition.image = image;
-            transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            vk::CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0,
-                                   nullptr, 1, &transition);
-        }
-        cmd.End();
-        m_default_queue->Submit(cmd);
-        m_default_queue->Wait();
+    if (!m_swapchain.TryTransitionToPresentLayout(*m_device, *m_default_queue, m_command_pool)) {
+        GTEST_SKIP() << "Failed to pre-transition swapchain images";
     }
 
-    constexpr int N = 1'000;
+    constexpr int N = 100;  // Initially 1000 for higher repro rate
     std::mutex queue_mutex;
 
     // Worker thread submits accesses and waits on the fence.
@@ -214,8 +196,8 @@ TEST_F(PositiveSyncValWsi, ThreadedSubmitAndFenceWaitAndPresent) {
                                         vkt::Signal(submit_semaphores[image_index]), fence);
                 m_default_queue->Present(m_swapchain, image_index, submit_semaphores[image_index]);
             }
-            vk::WaitForFences(device(), 1, &fence.handle(), VK_TRUE, kWaitTimeout);
-            vk::ResetFences(device(), 1, &fence.handle());
+            fence.Wait(kWaitTimeout);
+            fence.Reset();
         }
         {
             // We did not synchronize with the presentation request from the last iteration.
@@ -233,9 +215,8 @@ TEST_F(PositiveSyncValWsi, WaitForFencesWithPresentBatches) {
     RETURN_IF_SKIP(InitSyncVal());
     RETURN_IF_SKIP(InitSwapchain());
     const auto swapchain_images = m_swapchain.GetImages();
-    for (auto image : swapchain_images) {
-        SetPresentImageLayout(image);
-    }
+
+    vkt::CommandBuffer frame1_cb(*m_device, m_command_pool);
 
     vkt::Semaphore acquire_semaphore(*m_device);
     vkt::Semaphore submit_semaphore(*m_device);
@@ -254,6 +235,8 @@ TEST_F(PositiveSyncValWsi, WaitForFencesWithPresentBatches) {
         const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
 
         m_command_buffer.Begin();
+        m_command_buffer.TransitionLayout(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED,
+                                          VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
         m_command_buffer.Copy(src_buffer, buffer);
         m_command_buffer.End();
 
@@ -264,11 +247,11 @@ TEST_F(PositiveSyncValWsi, WaitForFencesWithPresentBatches) {
     {
         const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore2, kWaitTimeout);
 
-        // TODO: Present should be able to accept semaphore from Acquire directly, but due to
-        // another bug we need this intermediate sumbit. Remove it and make present to wait
-        // on image_ready_semaphore semaphore when acquire->present direct synchronization is fixed.
-        m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore2), vkt::Signal(submit_semaphore2));
+        frame1_cb.Begin();
+        frame1_cb.TransitionLayout(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        frame1_cb.End();
 
+        m_default_queue->Submit(frame1_cb, vkt::Wait(acquire_semaphore2), vkt::Signal(submit_semaphore2));
         m_default_queue->Present(m_swapchain, image_index, submit_semaphore2);
     }
     // Frame 2
@@ -305,9 +288,6 @@ TEST_F(PositiveSyncValWsi, RecreateBuffer) {
     std::vector<vkt::Buffer> src_buffers(swapchain_images.size());
     std::vector<vkt::Buffer> dst_buffers(swapchain_images.size());
 
-    for (VkImage image : swapchain_images) {
-        SetPresentImageLayout(image);
-    }
     for (size_t i = 0; i < swapchain_images.size(); i++) {
         acquire_fences.emplace_back(*m_device);
         command_buffers.emplace_back(*m_device, m_command_pool);
@@ -324,20 +304,21 @@ TEST_F(PositiveSyncValWsi, RecreateBuffer) {
         current_fence.Wait(kWaitTimeout);
         current_fence.Reset();
 
-        auto &src_buffer = src_buffers[image_index];
+        auto& src_buffer = src_buffers[image_index];
         src_buffer.Destroy();
         src_buffer = vkt::Buffer(*m_device, 1024, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
-        auto &dst_buffer = dst_buffers[image_index];
+        auto& dst_buffer = dst_buffers[image_index];
         dst_buffer.Destroy();
         dst_buffer = vkt::Buffer(*m_device, 1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
-        auto &command_buffer = command_buffers[image_index];
+        auto& command_buffer = command_buffers[image_index];
         command_buffer.Begin();
+        command_buffer.TransitionLayout(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
         command_buffer.Copy(src_buffer, dst_buffer);
         command_buffer.End();
 
-        auto &submit_semaphore = submit_semaphores[image_index];
+        auto& submit_semaphore = submit_semaphores[image_index];
         m_default_queue->Submit(command_buffer, vkt::Signal(submit_semaphore));
         m_default_queue->Present(m_swapchain, image_index, submit_semaphore);
         std::swap(acquire_fences[image_index], current_fence);
@@ -367,9 +348,6 @@ TEST_F(PositiveSyncValWsi, RecreateImage) {
     const vkt::Buffer src_buffer(*m_device, width * height * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
     std::vector<vkt::Image> dst_images(swapchain_images.size());
 
-    for (auto image : swapchain_images) {
-        SetPresentImageLayout(image);
-    }
     for (size_t i = 0; i < swapchain_images.size(); i++) {
         acquire_fences.emplace_back(*m_device);
         command_buffers.emplace_back(*m_device, m_command_pool);
@@ -386,7 +364,7 @@ TEST_F(PositiveSyncValWsi, RecreateImage) {
         current_fence.Wait(kWaitTimeout);
         current_fence.Reset();
 
-        auto &dst_image = dst_images[image_index];
+        auto& dst_image = dst_images[image_index];
         dst_image.Destroy();
         dst_image = vkt::Image(*m_device, width, height, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
@@ -394,23 +372,14 @@ TEST_F(PositiveSyncValWsi, RecreateImage) {
         region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         region.imageExtent = {width, height, 1};
 
-        VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
-        layout_transition.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
-        layout_transition.srcAccessMask = VK_ACCESS_2_NONE;
-        layout_transition.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
-        layout_transition.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-        layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        layout_transition.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        layout_transition.image = dst_image;
-        layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-        auto &command_buffer = command_buffers[image_index];
+        auto& command_buffer = command_buffers[image_index];
         command_buffer.Begin();
-        command_buffer.Barrier(layout_transition);
+        command_buffer.TransitionLayout(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        command_buffer.TransitionLayout(dst_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         vk::CmdCopyBufferToImage(command_buffer, src_buffer, dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
         command_buffer.End();
 
-        auto &submit_semaphore = submit_semaphores[image_index];
+        auto& submit_semaphore = submit_semaphores[image_index];
         m_default_queue->Submit(command_buffer, vkt::Signal(submit_semaphore));
         m_default_queue->Present(m_swapchain, image_index, submit_semaphore);
         std::swap(acquire_fences[image_index], current_fence);
@@ -434,8 +403,8 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain) {
     if (swapchain_images.size() != 2) {
         GTEST_SKIP() << "The test requires swapchain with 2 images";
     }
-    for (auto image : swapchain_images) {
-        SetPresentImageLayout(image);
+    if (!m_swapchain.TryTransitionToPresentLayout(*m_device, *m_default_queue, m_command_pool)) {
+        GTEST_SKIP() << "Failed to pre-transition swapchain images";
     }
     const VkImage swapchain_image0 = swapchain_images[0];
 
@@ -457,8 +426,8 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain) {
     transition_swapchain_image0.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     const SurfaceInformation info = GetSwapchainInfo(m_surface);
-    const uint32_t width = info.surface_capabilities.minImageExtent.width;
-    const uint32_t height = info.surface_capabilities.minImageExtent.height;
+    const uint32_t width = GetSwapchainExtent(info.surface_capabilities).width;
+    const uint32_t height = GetSwapchainExtent(info.surface_capabilities).height;
     const uint32_t format_size = vkuFormatTexelBlockSize(info.surface_formats[0].format);
     vkt::Buffer buffer(*m_device, width * height * format_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
@@ -547,8 +516,8 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain2) {
     if (swapchain_images.size() != 2) {
         GTEST_SKIP() << "The test requires swapchain with 2 images";
     }
-    for (auto image : swapchain_images) {
-        SetPresentImageLayout(image);
+    if (!m_swapchain.TryTransitionToPresentLayout(*m_device, *m_default_queue, m_command_pool)) {
+        GTEST_SKIP() << "Failed to pre-transition swapchain images";
     }
     const VkImage swapchain_image0 = swapchain_images[0];
 
@@ -570,8 +539,8 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain2) {
     transition_swapchain_image0.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     const SurfaceInformation info = GetSwapchainInfo(m_surface);
-    const uint32_t width = info.surface_capabilities.minImageExtent.width;
-    const uint32_t height = info.surface_capabilities.minImageExtent.height;
+    const uint32_t width = GetSwapchainExtent(info.surface_capabilities).width;
+    const uint32_t height = GetSwapchainExtent(info.surface_capabilities).height;
     const uint32_t format_size = vkuFormatTexelBlockSize(info.surface_formats[0].format);
     vkt::Buffer buffer(*m_device, width * height * format_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
@@ -635,9 +604,10 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain3) {
     if (swapchain_images.size() != 2) {
         GTEST_SKIP() << "The test requires swapchain with 2 images";
     }
-    for (auto image : swapchain_images) {
-        SetPresentImageLayout(image);
+    if (!m_swapchain.TryTransitionToPresentLayout(*m_device, *m_default_queue, m_command_pool)) {
+        GTEST_SKIP() << "Failed to pre-transition swapchain images";
     }
+
     const VkImage swapchain_image0 = swapchain_images[0];
 
     vkt::Semaphore acquire_semaphore0(*m_device);
@@ -658,8 +628,8 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain3) {
     transition_swapchain_image0.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     const SurfaceInformation info = GetSwapchainInfo(m_surface);
-    const uint32_t width = info.surface_capabilities.minImageExtent.width;
-    const uint32_t height = info.surface_capabilities.minImageExtent.height;
+    const uint32_t width = GetSwapchainExtent(info.surface_capabilities).width;
+    const uint32_t height = GetSwapchainExtent(info.surface_capabilities).height;
     const uint32_t format_size = vkuFormatTexelBlockSize(info.surface_formats[0].format);
     vkt::Buffer buffer(*m_device, width * height * format_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
@@ -733,9 +703,10 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain4) {
     if (swapchain_images.size() != 3) {
         GTEST_SKIP() << "The test requires swapchain with 3 images";
     }
-    for (auto image : swapchain_images) {
-        SetPresentImageLayout(image);
+    if (!swapchain.TryTransitionToPresentLayout(*m_device, *m_default_queue, m_command_pool)) {
+        GTEST_SKIP() << "Failed to pre-transition swapchain images";
     }
+
     const VkImage swapchain_image0 = swapchain_images[0];
 
     vkt::Semaphore acquire_semaphore0(*m_device);
@@ -758,8 +729,8 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain4) {
     transition_swapchain_image.image = swapchain_image0;
     transition_swapchain_image.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    const uint32_t width = surface_info.surface_capabilities.minImageExtent.width;
-    const uint32_t height = surface_info.surface_capabilities.minImageExtent.height;
+    const uint32_t width = GetSwapchainExtent(surface_info.surface_capabilities).width;
+    const uint32_t height = GetSwapchainExtent(surface_info.surface_capabilities).height;
     const uint32_t format_size = vkuFormatTexelBlockSize(surface_info.surface_formats[0].format);
     vkt::Buffer buffer(*m_device, width * height * format_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
@@ -940,6 +911,9 @@ TEST_F(PositiveSyncValWsi, BindSwapchainImage) {
     RETURN_IF_SKIP(InitSyncVal());
     RETURN_IF_SKIP(InitSwapchain());
 
+    vkt::CommandBuffer cb0(*m_device, m_command_pool);
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
+
     const uint32_t image_count = m_swapchain.GetImageCount();
     if (image_count < 2) {
         GTEST_SKIP() << "The test requires swapchain with at least 2 images";
@@ -952,8 +926,8 @@ TEST_F(PositiveSyncValWsi, BindSwapchainImage) {
     image_ci.pNext = &image_swapchain_ci;
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = m_surface_formats[0].format;
-    image_ci.extent.width = m_surface_capabilities.minImageExtent.width;
-    image_ci.extent.height = m_surface_capabilities.minImageExtent.height;
+    image_ci.extent.width = GetSwapchainExtent(m_surface_capabilities).width;
+    image_ci.extent.height = GetSwapchainExtent(m_surface_capabilities).height;
     image_ci.extent.depth = 1;
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
@@ -975,8 +949,6 @@ TEST_F(PositiveSyncValWsi, BindSwapchainImage) {
         bind_info.image = images.back();
 
         vk::BindImageMemory2(device(), 1, &bind_info);
-
-        images.back().SetLayout(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     }
 
     vkt::Semaphore acquire_semaphore0(*m_device);
@@ -986,11 +958,17 @@ TEST_F(PositiveSyncValWsi, BindSwapchainImage) {
     vkt::Semaphore submit_semaphore1(*m_device);
 
     const uint32_t image_index0 = m_swapchain.AcquireNextImage(acquire_semaphore0, kWaitTimeout);
-    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore0), vkt::Signal(submit_semaphore0));
+    cb0.Begin();
+    cb0.TransitionLayout(images[image_index0], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    cb0.End();
+    m_default_queue->Submit(cb0, vkt::Wait(acquire_semaphore0), vkt::Signal(submit_semaphore0));
     m_default_queue->Present(m_swapchain, image_index0, submit_semaphore0);
 
     const uint32_t image_index1 = m_swapchain.AcquireNextImage(acquire_semaphore1, kWaitTimeout);
-    m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore1), vkt::Signal(submit_semaphore1));
+    cb1.Begin();
+    cb1.TransitionLayout(images[image_index1], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    cb1.End();
+    m_default_queue->Submit(cb1, vkt::Wait(acquire_semaphore1), vkt::Signal(submit_semaphore1));
     m_default_queue->Present(m_swapchain, image_index1, submit_semaphore1);
 
     m_default_queue->Wait();
@@ -1018,8 +996,8 @@ TEST_F(PositiveSyncValWsi, BindSwapchainImage2) {
     image_ci.pNext = &image_swapchain_ci;
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = m_surface_formats[0].format;
-    image_ci.extent.width = m_surface_capabilities.minImageExtent.width;
-    image_ci.extent.height = m_surface_capabilities.minImageExtent.height;
+    image_ci.extent.width = GetSwapchainExtent(m_surface_capabilities).width;
+    image_ci.extent.height = GetSwapchainExtent(m_surface_capabilities).height;
     image_ci.extent.depth = 1;
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
@@ -1075,6 +1053,303 @@ TEST_F(PositiveSyncValWsi, BindSwapchainImage2) {
     const uint32_t image_index1 = m_swapchain.AcquireNextImage(acquire_semaphore1, kWaitTimeout);
     m_default_queue->Submit2(command_buffer1, vkt::Wait(acquire_semaphore1), vkt::Signal(submit_semaphore1));
     m_default_queue->Present(m_swapchain, image_index1, submit_semaphore1);
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, PresentAfterAcquire) {
+    TEST_DESCRIPTION("Present waits for acquire's semaphore");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    if (!m_swapchain.TryTransitionToPresentLayout(*m_device, *m_default_queue, m_command_pool)) {
+        GTEST_SKIP() << "Failed to pre-transition swapchain images";
+    }
+
+    // Test that present can directly wait for acquire semaphore
+    vkt::Semaphore acquire_semaphore(*m_device);
+    const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+    m_default_queue->Present(m_swapchain, image_index, acquire_semaphore);
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, ConcurrentPresentAndSubmit) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11226
+    TEST_DESCRIPTION("Present and Submit to different queues at the same time");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    if (!m_second_queue) {
+        GTEST_SKIP() << "Test requires two queues";
+    }
+    if (!m_swapchain.TryTransitionToPresentLayout(*m_device, *m_default_queue, m_command_pool)) {
+        GTEST_SKIP() << "Failed to pre-transition swapchain images";
+    }
+
+    const auto swapchain_images = m_swapchain.GetImages();
+    const int N = 100;  // Initially 500 for higher repro rate
+
+    std::atomic<bool> bailout{false};
+    monitor_.SetBailout(&bailout);
+
+    // QueueSubmit on the second queue and QueuePresent on the main queue run in parallel.
+    // It is a valid setup because submits to different queues do not require synchronization.
+    std::thread thread([&] {
+        vkt::Fence fence(*m_device);
+        for (int i = 0; i < N; i++) {
+            m_second_queue->Submit(vkt::no_cmd, fence);
+            fence.Wait(kWaitTimeout);
+            fence.Reset();
+            if (bailout.load()) {
+                break;
+            }
+        }
+    });
+    {
+        vkt::Semaphore acquire_semaphore(*m_device);
+        for (int i = 0; i < N; i++) {
+            const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
+            m_default_queue->Present(m_swapchain, image_index, acquire_semaphore);
+            m_default_queue->Wait();
+            if (bailout.load()) {
+                break;
+            }
+        }
+    }
+    thread.join();
+    monitor_.SetBailout(nullptr);
+}
+
+TEST_F(PositiveSyncValWsi, WaitAcquireFenceForDestoryedSwapchain) {
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(InitSyncVal());
+    RETURN_IF_SKIP(InitSurface());
+    InitSwapchainInfo();
+
+    const SurfaceInformation surface_info = GetSwapchainInfo(m_surface);
+    const VkSwapchainCreateInfoKHR swapchain_ci = GetDefaultSwapchainCreateInfo(m_surface, surface_info);
+    vkt::Swapchain swapchain(*m_device, swapchain_ci);
+
+    vkt::Fence fence(*m_device);
+    [[maybe_unused]] const uint32_t image_index = swapchain.AcquireNextImage(fence, kWaitTimeout);
+    swapchain.Destroy();
+    fence.Wait(kWaitTimeout);
+}
+
+TEST_F(PositiveSyncValWsi, ConcurrentPresentMultipleSwapchains) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8576");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(InitSyncVal());
+
+    const uint32_t num_threads = 6; /* Initially 8 */
+    const uint32_t num_frames_in_flight = 2;
+    const uint32_t N = 100; /* Initially 200 */
+
+    std::mutex queue_mutex;
+
+    std::vector<SurfaceContext> surface_contexts(num_threads);
+    std::vector<vkt::Surface> surfaces(num_threads);
+    std::vector<vkt::Swapchain> swapchains;
+
+    for (uint32_t i = 0; i < num_threads; i++) {
+        if (CreateSurface(surface_contexts[i], surfaces[i]) != VK_SUCCESS) {
+            GTEST_SKIP() << "Failed to create surface " << i;
+        }
+        const SurfaceInformation surface_info = GetSwapchainInfo(surfaces[i]);
+        const VkSwapchainCreateInfoKHR swapchain_ci = GetDefaultSwapchainCreateInfo(surfaces[i], surface_info);
+        swapchains.emplace_back(*m_device, swapchain_ci);
+    }
+
+    std::atomic<bool> bailout{false};
+    monitor_.SetBailout(&bailout);
+
+    auto presenter_thread = [&, this](uint32_t thread_index) {
+        vkt::Swapchain& swapchain = swapchains[thread_index];
+        const auto swapchain_images = swapchain.GetImages();
+
+        std::vector<vkt::Semaphore> acquire_semaphores;
+        std::vector<vkt::Semaphore> present_semaphores;
+        std::vector<vkt::Fence> frame_fences;
+
+        vkt::CommandPool command_pool(*m_device, m_default_queue->family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+        std::vector<vkt::CommandBuffer> command_buffers;
+        for (uint32_t i = 0; i < num_frames_in_flight; i++) {
+            acquire_semaphores.emplace_back(*m_device);
+            frame_fences.emplace_back(*m_device, VK_FENCE_CREATE_SIGNALED_BIT);
+            command_buffers.emplace_back(*m_device, command_pool);
+        }
+        for (uint32_t i = 0; i < swapchain.GetImageCount(); i++) {
+            present_semaphores.emplace_back(*m_device);
+        }
+        uint32_t current_frame = 0;
+        for (uint32_t i = 0; i < N; i++) {
+            const uint32_t frame_index = current_frame % num_frames_in_flight;
+            frame_fences[frame_index].Wait(kWaitTimeout);
+            frame_fences[frame_index].Reset();
+
+            const uint32_t image_index = swapchain.AcquireNextImage(acquire_semaphores[frame_index], kWaitTimeout);
+
+            vkt::CommandBuffer& command_buffer = command_buffers[frame_index];
+            command_buffer.Begin();
+            command_buffer.TransitionLayout(swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED,
+                                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            command_buffer.End();
+
+            {
+                std::unique_lock<std::mutex> lock(queue_mutex);
+                m_default_queue->Submit(command_buffer, vkt::Wait(acquire_semaphores[frame_index]),
+                                        vkt::Signal(present_semaphores[image_index]), frame_fences[frame_index]);
+            }
+            {
+                std::unique_lock<std::mutex> lock(queue_mutex);
+                m_default_queue->Present(swapchain, image_index, present_semaphores[image_index]);
+            }
+            current_frame++;
+            if (bailout.load()) {
+                break;
+            }
+        }
+        {
+            std::unique_lock<std::mutex> lock(queue_mutex);
+            m_default_queue->Wait();
+        }
+    };
+    std::vector<std::thread> presenters;
+    for (int i = 0; i < num_threads; i++) {
+        presenters.emplace_back(presenter_thread, i);
+    }
+
+    for (auto& presenter : presenters) {
+        presenter.join();
+    }
+    monitor_.SetBailout(nullptr);
+}
+
+TEST_F(PositiveSyncValWsi, WaitForFencesClearsLastSynchronizedPresents) {
+    // It's a single threaded deterministic version of ConcurrentPresentMultipleSwapchains.
+    // If present access is marked as synchronized (last_synchronized_present in syncval implementation),
+    // then WaitForFences must clear such accesses.
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8576");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(InitSyncVal());
+
+    struct SwapchainContext {
+        SurfaceContext surface_context;
+        vkt::Surface surface;
+        vkt::Swapchain swapchain;
+        std::vector<VkImage> swapchain_images;
+        vkt::Fence frame_fence;
+        vkt::CommandBuffer command_buffer;
+        vkt::Semaphore acquire_semaphore;
+        std::vector<vkt::Semaphore> present_semaphores;
+
+        void Init(PositiveSyncValWsi& test, vkt::CommandPool& command_pool) {
+            if (test.CreateSurface(surface_context, surface) != VK_SUCCESS) {
+                GTEST_SKIP() << "Failed to create surfac";
+            }
+            const SurfaceInformation surface_info = test.GetSwapchainInfo(surface);
+            const VkSwapchainCreateInfoKHR swapchain_ci = GetDefaultSwapchainCreateInfo(surface, surface_info);
+            swapchain = vkt::Swapchain(*test.DeviceObj(), swapchain_ci);
+            swapchain_images = swapchain.GetImages();
+            if (swapchain_images.size() != 2) {
+                GTEST_SKIP() << "The test requires swapchain with 2 images";
+            }
+            frame_fence = vkt::Fence(*test.DeviceObj(), VK_FENCE_CREATE_SIGNALED_BIT);
+            command_buffer = vkt::CommandBuffer(*test.DeviceObj(), command_pool);
+            acquire_semaphore = vkt::Semaphore(*test.DeviceObj());
+            for (size_t i = 0; i < swapchain_images.size(); i++) {
+                present_semaphores.emplace_back(*test.DeviceObj());
+            }
+        }
+    };
+    SwapchainContext ctx_a;
+    SwapchainContext ctx_b;
+    RETURN_IF_SKIP(ctx_a.Init(*this, m_command_pool));
+    RETURN_IF_SKIP(ctx_b.Init(*this, m_command_pool));
+
+    auto begin_frame = [&](SwapchainContext& ctx) {
+        ctx.frame_fence.Wait(kWaitTimeout);
+        ctx.frame_fence.Reset();
+
+        const uint32_t image_index = ctx.swapchain.AcquireNextImage(ctx.acquire_semaphore, kWaitTimeout);
+        ctx.command_buffer.Begin();
+        ctx.command_buffer.TransitionLayout(ctx.swapchain_images[image_index], VK_IMAGE_LAYOUT_UNDEFINED,
+                                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        ctx.command_buffer.End();
+        return image_index;
+    };
+    auto submit = [&](SwapchainContext& ctx, uint32_t image_index) {
+        m_default_queue->Submit(ctx.command_buffer, vkt::Wait(ctx.acquire_semaphore),
+                                vkt::Signal(ctx.present_semaphores[image_index]), ctx.frame_fence);
+    };
+    auto present = [&](SwapchainContext& ctx, uint32_t image_index) {
+        m_default_queue->Present(ctx.swapchain, image_index, ctx.present_semaphores[image_index]);
+    };
+
+    // Re-acquire image on swapchain A (need image that was already presented)
+    {
+        uint32_t image_index = begin_frame(ctx_a);
+        if (image_index != 0) {
+            GTEST_SKIP() << "Expected image index 0";
+        }
+        submit(ctx_a, image_index);
+        present(ctx_a, image_index);
+
+        image_index = begin_frame(ctx_a);
+        if (image_index != 1) {
+            m_default_queue->Wait();
+            GTEST_SKIP() << "Expected image index 1";
+        }
+        submit(ctx_a, image_index);
+        present(ctx_a, image_index);
+
+        image_index = begin_frame(ctx_a);
+        if (image_index != 0) {  // get image 0 again
+            m_default_queue->Wait();
+            GTEST_SKIP() << "Expected image index 0";
+        }
+    }
+
+    // Run frame on B. This imports A's synchronized present access into ctx B.
+    // (synchronized because image was re-acquired)
+    {
+        const uint32_t image_index = begin_frame(ctx_b);
+        if (image_index != 0) {
+            m_default_queue->Wait();
+            GTEST_SKIP() << "Expected image index 0";
+        }
+        submit(ctx_b, image_index);
+        present(ctx_b, image_index);
+    }
+
+    // Submit layout transition on A
+    submit(ctx_a, 0);
+
+    {
+        // Import A's layout transition into B (via last batch)
+        const uint32_t image_index = begin_frame(ctx_b);
+        if (image_index != 1) {
+            m_default_queue->Wait();
+            GTEST_SKIP() << "Expected image index 1";
+        }
+        submit(ctx_b, image_index);
+        present(ctx_b, image_index);
+
+        // Import synchronized present accesses from B's image 0
+        // Fence wait removes imported A's layout transitions.
+        // In the original issue this did not remove *already synchronized present accesses* though
+        const uint32_t image_index2 = begin_frame(ctx_b);
+        if (image_index2 != 0) {
+            m_default_queue->Wait();
+            GTEST_SKIP() << "Expected image index 0";
+        }
+        submit(ctx_b, image_index2);
+    }
+
+    // This caused WRITE-AFTER-PRESENT hazard in the original issue
+    present(ctx_a, 0);
 
     m_default_queue->Wait();
 }

@@ -2,7 +2,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,9 +12,10 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 #include "shader_templates.h"
+#include "test_framework.h"
 
 class NegativeMesh : public MeshTest {};
 
@@ -109,7 +110,7 @@ TEST_F(NegativeMesh, BasicUsage) {
     // Test pipeline creation
     {
         // can't mix mesh with vertex
-        const auto break_vp = [&](CreatePipelineHelper &helper) {
+        const auto break_vp = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo(), ms.GetStageCreateInfo()};
         };
         CreatePipelineHelper::OneshotTest(*this, break_vp, kErrorBit,
@@ -117,13 +118,13 @@ TEST_F(NegativeMesh, BasicUsage) {
 
         // vertex or mesh must be present
         // 02096 overlaps with 06896
-        const auto break_vp2 = [&](CreatePipelineHelper &helper) { helper.shader_stages_ = {fs.GetStageCreateInfo()}; };
+        const auto break_vp2 = [&](CreatePipelineHelper& helper) { helper.shader_stages_ = {fs.GetStageCreateInfo()}; };
         CreatePipelineHelper::OneshotTest(*this, break_vp2, kErrorBit,
                                           std::vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-stage-02096",
                                                                     "VUID-VkGraphicsPipelineCreateInfo-pStages-06896"}));
 
         // vertexinput and inputassembly must be valid when vertex stage is present
-        const auto break_vp3 = [&](CreatePipelineHelper &helper) {
+        const auto break_vp3 = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.gp_ci_.pVertexInputState = nullptr;
             helper.gp_ci_.pInputAssemblyState = nullptr;
@@ -131,7 +132,7 @@ TEST_F(NegativeMesh, BasicUsage) {
         CreatePipelineHelper::OneshotTest(*this, break_vp3, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-pStages-02097");
 
         // xfb with mesh shader
-        const auto break_vp4 = [&](CreatePipelineHelper &helper) {
+        const auto break_vp4 = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {ms_xfb.GetStageCreateInfo(), fs.GetStageCreateInfo()};
         };
         CreatePipelineHelper::OneshotTest(*this, break_vp4, kErrorBit,
@@ -143,7 +144,7 @@ TEST_F(NegativeMesh, BasicUsage) {
             {VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE}, {VK_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT},
             {VK_DYNAMIC_STATE_VERTEX_INPUT_EXT},
         };
-        const char *err_vuids[] = {
+        const char* err_vuids[] = {
             "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07065", "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07065",
             "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07066", "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07066",
             "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07067"};
@@ -152,7 +153,7 @@ TEST_F(NegativeMesh, BasicUsage) {
             dyn_state.dynamicStateCount = dyn_states[i].size();
             dyn_state.pDynamicStates = dyn_states[i].data();
             if (*dyn_state.pDynamicStates == VK_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT) continue;
-            const auto break_vp5 = [&](CreatePipelineHelper &helper) {
+            const auto break_vp5 = [&](CreatePipelineHelper& helper) {
                 helper.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
                 helper.gp_ci_.pDynamicState = &dyn_state;
             };
@@ -160,19 +161,23 @@ TEST_F(NegativeMesh, BasicUsage) {
         }
 
         // viewMask without enabling multiviewMeshShader feature
-        VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-        pipeline_rendering_info.viewMask = 0x2;
-        VkFormat color_formats[] = {VK_FORMAT_UNDEFINED};
-        pipeline_rendering_info.colorAttachmentCount = 1;
-        pipeline_rendering_info.pColorAttachmentFormats = color_formats;
+        VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
+        GetPhysicalDeviceProperties2(mesh_shader_properties);
+        if (mesh_shader_properties.maxMeshMultiviewViewCount >= 2) {
+            VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+            pipeline_rendering_info.viewMask = 0x2;
+            VkFormat color_formats[] = {VK_FORMAT_UNDEFINED};
+            pipeline_rendering_info.colorAttachmentCount = 1;
+            pipeline_rendering_info.pColorAttachmentFormats = color_formats;
 
-        const auto break_vp5 = [&](CreatePipelineHelper &helper) {
-            helper.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-            helper.gp_ci_.pNext = &pipeline_rendering_info;
-            helper.gp_ci_.renderPass = VK_NULL_HANDLE;
-        };
-        CreatePipelineHelper::OneshotTest(*this, break_vp5, kErrorBit,
-                                          std::vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-renderPass-07720"}));
+            const auto break_vp5 = [&](CreatePipelineHelper& helper) {
+                helper.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+                helper.gp_ci_.pNext = &pipeline_rendering_info;
+                helper.gp_ci_.renderPass = VK_NULL_HANDLE;
+            };
+            CreatePipelineHelper::OneshotTest(*this, break_vp5, kErrorBit,
+                                              std::vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-renderPass-07720"}));
+        }
     }
 }
 
@@ -189,7 +194,7 @@ TEST_F(NegativeMesh, ExtensionDisabled) {
     VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // mesh and task shaders not supported
-    const auto break_vp = [&](CreatePipelineHelper &helper) {
+    const auto break_vp = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {task_shader.GetStageCreateInfo(), mesh_shader.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, break_vp, kErrorBit,
@@ -311,7 +316,7 @@ TEST_F(NegativeMesh, RuntimeSpirv) {
     VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // mesh and task shaders which exceeds workgroup size limits
-    const auto break_vp = [&](CreatePipelineHelper &helper) {
+    const auto break_vp = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {task_shader.GetStageCreateInfo(), mesh_shader.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, break_vp, kErrorBit, error_vuids);
@@ -485,7 +490,7 @@ TEST_F(NegativeMesh, BasicUsageNV) {
     // Test pipeline creation
     {
         // can't mix mesh with vertex
-        const auto break_vp = [&](CreatePipelineHelper &helper) {
+        const auto break_vp = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo(), ms.GetStageCreateInfo()};
         };
         CreatePipelineHelper::OneshotTest(*this, break_vp, kErrorBit,
@@ -493,13 +498,13 @@ TEST_F(NegativeMesh, BasicUsageNV) {
 
         // vertex or mesh must be present
         // 02096 overlaps with 06896
-        const auto break_vp2 = [&](CreatePipelineHelper &helper) { helper.shader_stages_ = {fs.GetStageCreateInfo()}; };
+        const auto break_vp2 = [&](CreatePipelineHelper& helper) { helper.shader_stages_ = {fs.GetStageCreateInfo()}; };
         CreatePipelineHelper::OneshotTest(*this, break_vp2, kErrorBit,
                                           std::vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-stage-02096",
                                                                     "VUID-VkGraphicsPipelineCreateInfo-pStages-06896"}));
 
         // vertexinput and inputassembly must be valid when vertex stage is present
-        const auto break_vp3 = [&](CreatePipelineHelper &helper) {
+        const auto break_vp3 = [&](CreatePipelineHelper& helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.gp_ci_.pVertexInputState = nullptr;
             helper.gp_ci_.pInputAssemblyState = nullptr;
@@ -623,7 +628,7 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
     // void main() {
     //     OUT.baseID = 1;
     // }
-    const char *task_src = R"(
+    const char* task_src = R"(
                OpCapability MeshShadingNV
                OpExtension "SPV_NV_mesh_shader"
           %1 = OpExtInstImport "GLSL.std.450"
@@ -678,7 +683,7 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
     VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // mesh and task shaders not supported
-    const auto break_vp = [&](CreatePipelineHelper &helper) {
+    const auto break_vp = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {task_shader.GetStageCreateInfo(), mesh_shader.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, break_vp, kErrorBit,
@@ -688,6 +693,7 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
 
 TEST_F(NegativeMesh, DrawCmds) {
     AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::drawIndirectCount);
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
@@ -710,9 +716,9 @@ TEST_F(NegativeMesh, DrawCmds) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
-    uint32_t max_group_count_x = mesh_shader_properties.maxTaskWorkGroupCount[0];
-    uint32_t max_group_count_y = mesh_shader_properties.maxTaskWorkGroupCount[1];
-    uint32_t max_group_count_z = mesh_shader_properties.maxTaskWorkGroupCount[2];
+    uint32_t max_group_count_x = mesh_shader_properties.maxMeshWorkGroupCount[0];
+    uint32_t max_group_count_y = mesh_shader_properties.maxMeshWorkGroupCount[1];
+    uint32_t max_group_count_z = mesh_shader_properties.maxMeshWorkGroupCount[2];
 
     if (max_group_count_x < vvl::kU32Max) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-TaskEXT-07326");
@@ -824,6 +830,7 @@ TEST_F(NegativeMesh, MultiDrawIndirect) {
     TEST_DESCRIPTION("Test VK_EXT_mesh_shader indirect draw command.");
     AddRequiredFeature(vkt::Feature::maintenance4);
     AddRequiredFeature(vkt::Feature::multiDrawIndirect);
+    AddRequiredFeature(vkt::Feature::drawIndirectCount);
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
@@ -1041,15 +1048,15 @@ TEST_F(NegativeMesh, MeshTasksWorkgroupCount) {
     VkShaderObj frag_shader(*m_device, frag_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3);
 
     // mesh and task shaders not supported
-    const auto mesh_tasks_x = [&](CreatePipelineHelper &helper) {
+    const auto mesh_tasks_x = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {task_shader_x.GetStageCreateInfo(), mesh_shader.GetStageCreateInfo(),
                                  frag_shader.GetStageCreateInfo()};
     };
-    const auto mesh_tasks_y = [&](CreatePipelineHelper &helper) {
+    const auto mesh_tasks_y = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {task_shader_y.GetStageCreateInfo(), mesh_shader.GetStageCreateInfo(),
                                  frag_shader.GetStageCreateInfo()};
     };
-    const auto mesh_tasks_z = [&](CreatePipelineHelper &helper) {
+    const auto mesh_tasks_z = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {task_shader_z.GetStageCreateInfo(), mesh_shader.GetStageCreateInfo(),
                                  frag_shader.GetStageCreateInfo()};
     };
@@ -1154,7 +1161,7 @@ TEST_F(NegativeMesh, DrawIndexMesh) {
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
-    const char *task_source = R"glsl(
+    const char* task_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         taskPayloadSharedEXT uint mesh_payload[32];
@@ -1164,7 +1171,7 @@ TEST_F(NegativeMesh, DrawIndexMesh) {
         }
     )glsl";
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(max_vertices = 32, max_primitives = 32, triangles) out;
@@ -1194,7 +1201,7 @@ TEST_F(NegativeMesh, DrawIndexMeshShaderObject) {
     RETURN_IF_SKIP(InitBasicMeshAndTask());
     InitRenderTarget();
 
-    const char *mesh_src = R"glsl(
+    const char* mesh_src = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(max_vertices = 32, max_primitives = 32, triangles) out;
@@ -1209,148 +1216,6 @@ TEST_F(NegativeMesh, DrawIndexMeshShaderObject) {
     const vkt::Shader meshShader(*m_device, VK_SHADER_STAGE_MESH_BIT_EXT,
                                  GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, mesh_src, SPV_ENV_VULKAN_1_2));
     m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeMesh, TaskPayloadSharedMissing) {
-    RETURN_IF_SKIP(InitBasicMeshAndTask());
-    InitRenderTarget();
-
-    const char *task_source = R"glsl(
-        #version 460
-        #extension GL_EXT_mesh_shader : enable
-        void main() {
-            EmitMeshTasksEXT(1u, 1u, 1u);
-        }
-    )glsl";
-
-    const char *mesh_source = R"glsl(
-        #version 460
-        #extension GL_EXT_mesh_shader : enable
-        layout(max_vertices = 32, max_primitives = 32, triangles) out;
-        taskPayloadSharedEXT uint payload;
-        void main() {
-            uint x = payload;
-            SetMeshOutputsEXT(3,1);
-        }
-    )glsl";
-
-    VkShaderObj ts(*m_device, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
-
-    CreatePipelineHelper pipe(*this);
-    pipe.shader_stages_ = {ts.GetStageCreateInfo(), ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-MeshEXT-10883");
-    pipe.CreateGraphicsPipeline();
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeMesh, TaskPayloadSharedMissing2) {
-    RETURN_IF_SKIP(InitBasicMeshAndTask());
-    InitRenderTarget();
-
-    const char *mesh_source = R"glsl(
-        #version 460
-        #extension GL_EXT_mesh_shader : enable
-        layout(max_vertices = 32, max_primitives = 32, triangles) out;
-        taskPayloadSharedEXT uint payload;
-        void main() {
-            uint x = payload;
-            SetMeshOutputsEXT(3,1);
-        }
-    )glsl";
-
-    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
-
-    CreatePipelineHelper pipe(*this);
-    pipe.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-MeshEXT-10883");
-    pipe.CreateGraphicsPipeline();
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeMesh, TaskPayloadSharedDifferent) {
-    RETURN_IF_SKIP(InitBasicMeshAndTask());
-    InitRenderTarget();
-
-    const char *task_source = R"glsl(
-        #version 460
-        #extension GL_EXT_mesh_shader : enable
-        struct Foo {
-            uint a[3];
-            uint b;
-        };
-        taskPayloadSharedEXT Foo payload;
-        void main() {
-            payload.b = 4;
-            EmitMeshTasksEXT(1u, 1u, 1u);
-        }
-    )glsl";
-
-    const char *mesh_source = R"glsl(
-        #version 460
-        #extension GL_EXT_mesh_shader : enable
-        layout(max_vertices = 32, max_primitives = 32, triangles) out;
-        taskPayloadSharedEXT uint payload;
-        void main() {
-            uint x = payload;
-            SetMeshOutputsEXT(3,1);
-        }
-    )glsl";
-
-    VkShaderObj ts(*m_device, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
-    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
-
-    CreatePipelineHelper pipe(*this);
-    pipe.shader_stages_ = {ts.GetStageCreateInfo(), ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-MeshEXT-10883");
-    pipe.CreateGraphicsPipeline();
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeMesh, TaskPayloadSharedMissingShaderObject) {
-    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
-    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::dynamicRendering);
-    AddRequiredFeature(vkt::Feature::maintenance4);
-    AddRequiredFeature(vkt::Feature::shaderObject);
-    RETURN_IF_SKIP(InitBasicMeshAndTask());
-    InitDynamicRenderTarget();
-
-    const char *task_source = R"glsl(
-        #version 460
-        #extension GL_EXT_mesh_shader : enable
-        void main() {
-            EmitMeshTasksEXT(1u, 1u, 1u);
-        }
-    )glsl";
-
-    const char *mesh_source = R"glsl(
-        #version 460
-        #extension GL_EXT_mesh_shader : enable
-        layout(max_vertices = 32, max_primitives = 32, triangles) out;
-        taskPayloadSharedEXT uint mesh_payload;
-        void main() {
-            uint x = mesh_payload;
-            SetMeshOutputsEXT(3,1);
-        }
-    )glsl";
-
-    const vkt::Shader task_shader(*m_device, VK_SHADER_STAGE_TASK_BIT_EXT, task_source);
-    const vkt::Shader mesh_shader(*m_device, VK_SHADER_STAGE_MESH_BIT_EXT, mesh_source);
-    const vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
-
-    m_command_buffer.Begin();
-    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    m_command_buffer.BindMeshShaders(task_shader, mesh_shader, frag_shader);
-    SetDefaultDynamicStatesExclude();
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-MeshEXT-10883");
-    vk::CmdDrawMeshTasksEXT(m_command_buffer, 1, 1, 1);
-    m_errorMonitor->VerifyFound();
-    m_command_buffer.EndRendering();
-    m_command_buffer.End();
 }
 
 TEST_F(NegativeMesh, RenderPassViewMask) {
@@ -1429,4 +1294,94 @@ TEST_F(NegativeMesh, RenderingViewMask) {
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-renderPass-12326");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeMesh, VertexCountConstant) {
+    TEST_DESCRIPTION("https://gitlab.khronos.org/vulkan/vulkan/-/issues/4694");
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
+
+    const char* mesh_source = R"glsl(
+        #version 450
+        #extension GL_EXT_mesh_shader : require
+        layout(triangles, max_vertices = 3, max_primitives = 1) out;
+        void main() {
+            SetMeshOutputsEXT(6, 1);
+            gl_MeshVerticesEXT[0].gl_Position = vec4(0);
+            gl_PrimitiveTriangleIndicesEXT[0] =  uvec3(0, 1, 2);
+        }
+    )glsl";
+
+    // spirv-val
+    // VUID-VkShaderModuleCreateInfo-pCode-08737
+    m_errorMonitor->SetDesiredError(
+        "OpSetMeshOutputsEXT Vertex Count (6) is larger than the OutputVertices in OpExecutionMode (3)");
+    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeMesh, PrimitiveCountConstant) {
+    TEST_DESCRIPTION("https://gitlab.khronos.org/vulkan/vulkan/-/issues/4694");
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
+    const char* mesh_source = R"glsl(
+        #version 450
+        #extension GL_EXT_mesh_shader : require
+        layout(triangles, max_vertices = 3, max_primitives = 1) out;
+        void main() {
+            SetMeshOutputsEXT(3, 2);
+            gl_MeshVerticesEXT[0].gl_Position = vec4(0);
+            gl_PrimitiveTriangleIndicesEXT[0] =  uvec3(0, 1, 2);
+        }
+    )glsl";
+
+    // spirv-val
+    // VUID-VkShaderModuleCreateInfo-pCode-08737
+    m_errorMonitor->SetDesiredError(
+        "OpSetMeshOutputsEXT Primitive Count (2) is larger than the OutputPrimitivesEXT in OpExecutionMode (1)");
+    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeMesh, IncompatiblePipelineStatisticsQuery) {
+    AddRequiredFeature(vkt::Feature::pipelineStatisticsQuery);
+    AddRequiredFeature(vkt::Feature::meshShaderQueries);
+    RETURN_IF_SKIP(InitBasicMeshAndTask());
+    InitRenderTarget();
+
+    const char* mesh_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : enable
+        layout(max_vertices = 3, max_primitives=1) out;
+        layout(triangles) out;
+        void main() {
+            SetMeshOutputsEXT(3, 1);
+        }
+    )glsl";
+
+    VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.pVertexInputState = nullptr;
+    pipe.gp_ci_.pInputAssemblyState = nullptr;
+    pipe.CreateGraphicsPipeline();
+
+    VkQueryPoolCreateInfo query_pool_create_info = vkt::QueryPool::CreateInfo(VK_QUERY_TYPE_PIPELINE_STATISTICS, 3);
+    query_pool_create_info.pipelineStatistics =
+        VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT | VK_QUERY_PIPELINE_STATISTIC_MESH_SHADER_INVOCATIONS_BIT_EXT;
+    vkt::QueryPool query_pool(*m_device, query_pool_create_info);
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0, query_pool_create_info.queryCount);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_->set_, 0, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-pipelineStatistics-07076");
+    vk::CmdDrawMeshTasksEXT(m_command_buffer, 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

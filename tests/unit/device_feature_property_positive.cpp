@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2025 The Khronos Group Inc.
- * Copyright (c) 2025 Valve Corporation
- * Copyright (c) 2025 LunarG, Inc.
+ * Copyright (c) 2025-2026 The Khronos Group Inc.
+ * Copyright (c) 2025-2026 Valve Corporation
+ * Copyright (c) 2025-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,12 +12,12 @@
 
 #include <gtest/gtest.h>
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 class PositiveDeviceFeatureProperty : public VkLayerTest {
   public:
     VkDeviceCreateInfo m_second_device_ci = vku::InitStructHelper();
-    vkt::QueueCreateInfoArray *m_queue_info = nullptr;
+    vkt::QueueCreateInfoArray* m_queue_info = nullptr;
     void InitDeviceFeatureProperty();
 
     ~PositiveDeviceFeatureProperty() {

@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+/* Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
@@ -17,25 +17,24 @@
  * limitations under the License.
  */
 #pragma once
+#include "state_tracker/event_state.h"
 #include "state_tracker/state_object.h"
 #include "state_tracker/fence_state.h"
 #include "state_tracker/semaphore_state.h"
-#include <condition_variable>
-#include <deque>
-#include <future>
-#include <thread>
-#include <vector>
-#include <string>
 #include "error_message/error_location.h"
 #include "chassis/dispatch_object.h"
 #include "vk_layer_config.h"
+#include <condition_variable>
+#include <deque>
+#include <future>
+#include <string>
+#include <thread>
+#include <vector>
 
 namespace vvl {
 
 class CommandBuffer;
 class DeviceState;
-class Image;
-class Queue;
 class QueueSubState;
 
 struct CommandBufferSubmission {
@@ -69,9 +68,12 @@ struct QueueSubmission {
     std::vector<SemaphoreInfo> signal_semaphores;
     std::shared_ptr<Fence> fence;
     bool has_external_fence = false;
-    // Swapchain handle if this submission represents QueuePresent request
-    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-    std::shared_ptr<const vvl::Image> swapchain_image;
+
+    // Swapchain is not null if this submission represents QueuePresent request
+    std::shared_ptr<Swapchain> swapchain;
+
+    // Pending event waits for host reset validation
+    EventWaitCommandMap event_wait_commands;
 
     LocationCapture loc;
     uint64_t seq{0};
@@ -129,30 +131,28 @@ static inline std::chrono::time_point<std::chrono::steady_clock> GetCondWaitTime
     return std::chrono::steady_clock::now() + std::chrono::seconds(timeout_seconds);
 }
 
-struct PreSubmitResult {
-    uint64_t last_submission_seq = 0;
-    uint64_t submission_seq = 0;
-};
-
 class Queue : public StateObject, public SubStateManager<QueueSubState> {
   public:
-    Queue(DeviceState &dev_data, VkQueue handle, uint32_t family_index, uint32_t queue_index, VkDeviceQueueCreateFlags flags,
-          const VkQueueFamilyProperties &queueFamilyProperties)
+    Queue(DeviceState& device_state, VkQueue handle, uint32_t family_index, uint32_t queue_index, VkDeviceQueueCreateFlags flags,
+          const VkQueueFamilyProperties& queue_family_properties)
         : StateObject(handle, kVulkanObjectTypeQueue),
           queue_family_index(family_index),
           queue_index(queue_index),
           create_flags(flags),
-          queue_family_properties(queueFamilyProperties),
-          dev_data_(dev_data) {}
+          device_state_(device_state),
+          queue_family_properties_(queue_family_properties) {}
 
     ~Queue() { Destroy(); }
     void Destroy() override;
 
     VkQueue VkHandle() const { return handle_.Cast<VkQueue>(); }
+    VkQueueFlags GetQueueFlags() const { return queue_family_properties_.queueFlags; }
 
-    // called from the various PreCallRecordQueueSubmit() methods
-    PreSubmitResult PreSubmit(std::vector<QueueSubmission> &&submissions);
-    // called from the various PostCallRecordQueueSubmit() methods
+    // Called from the various PreCallRecordQueueSubmit() methods.
+    // Returns seq number associated with the last QueueSubmission batch
+    uint64_t PreSubmit(std::vector<QueueSubmission>&& submissions);
+
+    // Called from the various PostCallRecordQueueSubmit() methods
     void PostSubmit();
 
     // Tell the queue thread that submissions up to and including the submission with
@@ -170,6 +170,8 @@ class Queue : public StateObject, public SubStateManager<QueueSubState> {
     // Check submissions up to and including until_seq.
     std::optional<SemaphoreInfo> FindTimelineWaitWithoutResolvingSignal(uint64_t until_seq) const;
 
+    vvl::Func GetPendingEventWaitCommand(VkEvent event) const;
+
     // VVL needs helps to retire submsissions on present-only queue that does not use explicit host synchronization
     void UpdatePresentOnlyQueueProgress(const DeviceState &device_state);
 
@@ -180,7 +182,6 @@ class Queue : public StateObject, public SubStateManager<QueueSubState> {
     const uint32_t queue_index;
 
     const VkDeviceQueueCreateFlags create_flags;
-    const VkQueueFamilyProperties queue_family_properties;
 
     // Track command buffer label stack accross all command buffers submitted to this queue.
     // Access to this variable relies on external queue synchronization.
@@ -204,19 +205,15 @@ class Queue : public StateObject, public SubStateManager<QueueSubState> {
     const std::deque<QueueSubmission> &Submissions() { return submissions_; }
 
   protected:
-    // called from the various PostCallRecordQueueSubmit() methods
-    void PostSubmit(QueueSubmission &submission);
-
     // called when the worker thread decides a submissions has finished executing
     void Retire(QueueSubmission &submission);
 
   private:
-    uint32_t timeline_wait_count_ = 0;
+    DeviceState& device_state_;
+    const VkQueueFamilyProperties queue_family_properties_;
 
     void ThreadFunc();
     QueueSubmission *NextSubmission();
-
-    DeviceState &dev_data_;
 
     // state related to submitting to the queue, all data members must
     // be accessed with lock_ held
@@ -228,6 +225,13 @@ class Queue : public StateObject, public SubStateManager<QueueSubState> {
     mutable std::mutex lock_;
     // condition to wake up the queue's thread
     std::condition_variable cond_;
+
+    // This is an early-exit hint for FindTimelineWaitWithoutResolvingSignal.
+    // Concurrent updates are safe: the counter can temporarily be larger than the
+    // actual wait count, but not smaller, which is required for correctness.
+    // FindTimelineWaitWithoutResolvingSignal cannot miss unresolved timeline waits,
+    // but it can iterate a bit longer.
+    std::atomic_uint32_t timeline_wait_count_ = 0;
 };
 
 class QueueSubState {

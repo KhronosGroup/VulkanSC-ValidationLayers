@@ -1,6 +1,6 @@
-/* Copyright (c) 2025 The Khronos Group Inc.
- * Copyright (c) 2025 Valve Corporation
- * Copyright (c) 2025 LunarG, Inc.
+/* Copyright (c) 2026 The Khronos Group Inc.
+ * Copyright (c) 2026 Valve Corporation
+ * Copyright (c) 2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,10 +26,10 @@ class Pipeline;
 struct ShaderObject;
 
 class IndirectExecutionSet : public StateObject {
+    // Currently this |safe_VkIndirectExecutionSetCreateInfoEXT| is not safe as it doesn't properly copy the union
+    // (https://github.com/KhronosGroup/Vulkan-Utility-Libraries/issues/361)
+    // Fortunately it is simple to track the information such that we should never need the |create_info| actually
   public:
-    const vku::safe_VkIndirectExecutionSetCreateInfoEXT safe_create_info;
-    const VkIndirectExecutionSetCreateInfoEXT &create_info;
-
     IndirectExecutionSet(DeviceState &dev, VkIndirectExecutionSetEXT handle,
                          const VkIndirectExecutionSetCreateInfoEXT *pCreateInfo);
     VkIndirectExecutionSetEXT VkHandle() const { return handle_.Cast<VkIndirectExecutionSetEXT>(); }
@@ -41,6 +41,7 @@ class IndirectExecutionSet : public StateObject {
     // "The characteristics of initialPipeline will be used to validate all pipelines added to the set even if they are removed from
     // the set or destroyed"
     std::shared_ptr<Pipeline> initial_pipeline;
+    std::shared_ptr<ShaderObject> initial_shader_object;
     std::shared_ptr<ShaderObject> initial_fragment_shader_object;
 
     uint32_t max_pipeline_count = 0;

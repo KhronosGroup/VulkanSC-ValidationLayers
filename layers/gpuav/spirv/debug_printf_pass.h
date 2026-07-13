@@ -1,4 +1,4 @@
-/* Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,6 @@
 namespace gpuav {
 namespace spirv {
 
-// This pass has no linking, it is all done inplace at runtime
-static const OfflineModule kNullOffline{nullptr, 0};
-
 struct Type;
 
 // Create a pass to instrument NonSemantic.DebugPrintf (GL_EXT_debug_printf) instructions
@@ -34,6 +31,7 @@ class DebugPrintfPass : public Pass {
     const char* Name() const final { return "DebugPrintfPass"; }
 
     bool Instrument() final;
+    void PostProcess() final;
     void PrintDebugInfo() const final;
 
   private:
@@ -66,7 +64,7 @@ class DebugPrintfPass : public Pass {
     // for debugging instrumented shaders
     std::vector<InternalOnlyDebugPrintf>& internal_only_debug_printf_;
 
-    const uint32_t binding_slot_;
+    const uint32_t binding_slot_;  // kBindingInstDebugPrintf
     uint32_t ext_import_id_ = 0;
 
     // <number of arguments in the function call, function id>

@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,9 +11,9 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 #include "error_message/log_message_type.h"
 
 class PositiveShaderStorageImage : public VkLayerTest {};
@@ -30,7 +30,7 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     // imageStore(storageImage, ivec2(1, 1), uvec3(1, 1, 1));
     //
     // Rg32ui == 2-component but writing 3 texels to it
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpCapability StorageImageExtendedFormats
                OpMemoryModel Logical GLSL450
@@ -100,7 +100,7 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
     // imageStore(storageImage, ivec2(1, 1), uvec3(1, 1, 1));
     //
     // Unknown will become a 2-component but writing 3 texels to it
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpCapability StorageImageExtendedFormats
                OpCapability StorageImageWriteWithoutFormat
@@ -140,10 +140,8 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
-    VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
-    VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
-    vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &fmt_props);
-    if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
+    const auto fmt_props = m_device->FormatFeaturesOptimal(format);
+    if ((fmt_props & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
         GTEST_SKIP() << "Format doesn't support storage write without format";
     }
 
@@ -178,7 +176,7 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
     // imageStore(storageImage, ivec2(1, 1), uvec3(1, sc, sc + 1));
     //
     // Rg32ui == 2-component but writing 3 texels to it
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpCapability StorageImageExtendedFormats
                OpMemoryModel Logical GLSL450
@@ -258,7 +256,7 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
 
     // The vertex and fragment shader are just a passthrough
     // The compute shader has the invalid OpImageWrite
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpCapability StorageImageWriteWithoutFormat
                OpMemoryModel Logical GLSL450
@@ -341,8 +339,8 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
     ds.WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL);
     ds.UpdateDescriptorSets();
 
-    VkShaderObj const vs(*m_device, source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
-    VkShaderObj const fs(*m_device, source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    VkShaderObj vs(*m_device, source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};

@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class PositivePipelineTopology : public VkLayerTest {};
 
@@ -67,7 +67,7 @@ TEST_F(PositivePipelineTopology, PointSizeGeomShaderDontEmit) {
     InitRenderTarget();
 
     // Never calls OpEmitVertex
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (points) out;
@@ -80,7 +80,7 @@ TEST_F(PositivePipelineTopology, PointSizeGeomShaderDontEmit) {
     VkShaderObj vs(*m_device, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
@@ -93,7 +93,7 @@ TEST_F(PositivePipelineTopology, LoosePointSizeWrite) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *LoosePointSizeWrite = R"(
+    const char* LoosePointSizeWrite = R"(
                                        OpCapability Shader
                                   %1 = OpExtInstImport "GLSL.std.450"
                                        OpMemoryModel Logical GLSL450
@@ -405,7 +405,7 @@ TEST_F(PositivePipelineTopology, Rasterizer) {
 
     InitRenderTarget();
 
-    const char *tcsSource = R"glsl(
+    const char* tcsSource = R"glsl(
         #version 450
         layout(vertices = 3) out;
         void main(){
@@ -413,7 +413,7 @@ TEST_F(PositivePipelineTopology, Rasterizer) {
            gl_TessLevelInner[0] = 1;
         }
     )glsl";
-    const char *tesSource = R"glsl(
+    const char* tesSource = R"glsl(
         #version 450
         layout(triangles, equal_spacing, cw) in;
         void main(){
@@ -421,7 +421,7 @@ TEST_F(PositivePipelineTopology, Rasterizer) {
            gl_Position.w = 1.0f;
         }
     )glsl";
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (triangles) in;
         layout (triangle_strip) out;
@@ -538,7 +538,7 @@ TEST_F(PositivePipelineTopology, PointSizeMaintenance5) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *source = R"glsl(
+    const char* source = R"glsl(
         #version 450
         vec2 vertices[3];
         out gl_PerVertex
@@ -556,7 +556,7 @@ TEST_F(PositivePipelineTopology, PointSizeMaintenance5) {
 
     VkShaderObj vs(*m_device, source, VK_SHADER_STAGE_VERTEX_BIT);
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };

@@ -2,7 +2,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,9 +13,9 @@
  */
 
 #include <thread>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/thread_helper.h"
+#include "layer_validation_tests.h"
+#include "descriptor_helper.h"
+#include "thread_helper.h"
 
 #if GTEST_IS_THREADSAFE
 class NegativeThreading : public VkLayerTest {};
@@ -54,7 +54,7 @@ TEST_F(NegativeThreading, CommandBufferCollision) {
     // Add many entries to command buffer from another thread.
     std::thread thread1(AddToCommandBuffer, &data);
     // Make non-conflicting calls from this thread at the same time.
-    for (int i = 0; i < 80000; i++) {
+    for (int i = 0; i < 1000 /* Initially 80000 to make machine miserable */; i++) {
         uint32_t count;
         vk::EnumeratePhysicalDevices(instance(), &count, NULL);
     }

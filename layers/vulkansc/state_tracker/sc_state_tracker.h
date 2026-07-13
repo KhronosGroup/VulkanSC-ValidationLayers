@@ -38,7 +38,7 @@ class InstanceState : public vvl::InstanceState {
     using BaseClass = vvl::InstanceState;
 
   public:
-    InstanceState(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch) {}
+    InstanceState(DispatchInstance* dispatch) : BaseClass(dispatch) {}
 };
 
 template <typename BASE>
@@ -48,7 +48,7 @@ class InstanceProxy : public BASE {
   public:
     vvl::sc::InstanceState* sc_instance_state;
 
-    InstanceProxy(vvl::dispatch::Instance* dispatch)
+    InstanceProxy(DispatchInstance* dispatch)
         : BaseClass(dispatch),
           sc_instance_state(dynamic_cast<vvl::sc::InstanceState*>(dispatch->GetValidationObject(LayerObjectTypeStateTracker))) {}
 };
@@ -57,7 +57,7 @@ class DeviceState : public vvl::DeviceState {
     using BaseClass = vvl::DeviceState;
 
   public:
-    DeviceState(vvl::dispatch::Device* dev, vvl::InstanceState* instance) : BaseClass(dev, instance) {}
+    DeviceState(DispatchDevice* dev, vvl::InstanceState* instance) : BaseClass(dev, instance) {}
 
     template <typename CreateInfo>
     void ReservePipelinePoolEntries(uint32_t create_info_count, const CreateInfo* create_info);
@@ -254,7 +254,7 @@ class DeviceProxy : public BASE {
     vvl::sc::InstanceState* sc_instance_state{};
 
     template <typename INSTANCE_TYPE>
-    DeviceProxy(vvl::dispatch::Device* dev, INSTANCE_TYPE* instance)
+    DeviceProxy(DispatchDevice* dev, INSTANCE_TYPE* instance)
         : BaseClass(dev, instance),
           sc_device_state(dynamic_cast<vvl::sc::DeviceState*>(dev->GetValidationObject(LayerObjectTypeStateTracker))),
           sc_instance_state(dynamic_cast<vvl::sc::InstanceState*>(instance->instance_state)) {}

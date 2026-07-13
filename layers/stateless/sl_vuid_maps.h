@@ -23,12 +23,9 @@ namespace vvl {
 
 enum class PipelineBinaryInfoError {
     PNext_09616,
-    PNext_09617,
     BinaryCount_09620,
     BinaryCount_09621,
     BinaryCount_09622,
-    Flags_11311,
-    Flags_11367,
 };
 
 const std::string &GetPipelineBinaryInfoVUID(const Location &loc, PipelineBinaryInfoError error);
@@ -38,7 +35,16 @@ enum class PipelineCreateFlagError {
     Shader64BitIndexing_11798,
     ProtectedAccess_07368,
     ProtectedAccess_07369,
+    PNext_09617,
+    Flags_11311,
+    Flags_11367,
 };
 const char *GetPipelineCreateFlagVUID(const Location &loc, PipelineCreateFlagError error);
+
+enum class AddressFlagError {
+    AliasesStorageBuffer_13100,
+    AliasesTransformFeedback_13101,
+};
+const char* GetAddressFlagVUID(const Location& loc, AddressFlagError error);
 
 }  // namespace vvl

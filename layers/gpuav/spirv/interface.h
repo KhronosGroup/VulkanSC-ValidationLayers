@@ -18,11 +18,22 @@
 #include <vulkan/vulkan_core.h>
 #include <string>
 #include <vector>
+#include "state_tracker/descriptor_mode.h"
 
 // The goal is to keep instrumentation a seperate library to draw a strong line where the GPU-AV SPIR-V logic is.
 // This header is designed as the interface that can be shared between the instrumentation passes and the rest of GPU-AV
 
 struct Location;
+struct DeviceFeatures;
+struct CachedDescriptorSize;
+
+namespace vvl {
+struct DeviceExtensionProperties;
+}
+
+namespace spirv {
+struct Module;
+}
 
 namespace gpuav {
 namespace spirv {
@@ -61,11 +72,6 @@ struct InstrumentationDescriptorSetLayouts {
     bool has_bindless_descriptors = false;
     // < set , [ bindings ] >
     std::vector<std::vector<spirv::BindingLayout>> set_index_to_bindings_layout_lut;
-
-    // Pipeline flags for ray tracing validation hit objects
-    bool pipeline_has_skip_aabbs_flag = false;
-    bool pipeline_has_skip_triangles_flag = false;
-    uint32_t max_shader_binding_table_record_index = 0;
 };
 
 // Top level struct to hold all the things we want to pass in from the Vulkan GPU-AV code into the SPIR-V instrumentation passes
@@ -79,6 +85,19 @@ struct InstrumentationInterface {
     VkShaderStageFlagBits entry_point_stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 
     InstrumentationDescriptorSetLayouts instrumentation_dsl;
+    const VkSpecializationInfo* specialization_info = nullptr;
+
+    const VkShaderDescriptorSetAndBindingMappingInfoEXT* mapping_info = nullptr;
+
+    // Used for MeshPass to know if a task will be used as well
+    bool has_task_shader = false;
+
+    // ray tracing validation
+    bool pipeline_has_skip_aabbs_flag = false;
+    bool pipeline_has_skip_triangles_flag = false;
+    uint32_t max_shader_binding_table_record_index = 0;
+
+    vvl::DescriptorMode descriptor_mode = vvl::DescriptorModeUnknown;
 
     const Location& loc;
 
@@ -98,10 +117,17 @@ struct DeviceSettings {
     bool print_debug_info;
     // zero is same as "unlimited"
     uint32_t max_instrumentations_count;
+    bool disable_dontinline;
     bool support_non_semantic_info;
     // Lets us embed the size instead of calling OpArrayLength
     uint32_t error_buffer_data_length;
     uint32_t debug_printf_buffer_size;
+
+    CachedDescriptorSize* cached_descriptor_size;
+
+    const VkPhysicalDeviceProperties* phys_dev_props;
+    const vvl::DeviceExtensionProperties* phys_dev_ext_props;
+    const DeviceFeatures* enabled_features;
 };
 
 // When running the DebugPrintf pass, if we detect an instrumented shader has a printf call (for debugging) we can hold them until

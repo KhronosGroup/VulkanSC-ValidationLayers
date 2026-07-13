@@ -2,8 +2,8 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023-2025 LunarG, Inc.
- * Copyright (c) 2023-2025 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class NegativeShaderImageAccess : public VkLayerTest {};
 
@@ -33,7 +33,7 @@ TEST_F(NegativeShaderImageAccess, FunctionOpImage) {
     // }
     //
     // but instead of passing the OpTypePointer, passes a OpImage to function
-    const char *fsSource = R"(
+    const char* fsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Fragment %main "main" %color
@@ -116,7 +116,7 @@ TEST_F(NegativeShaderImageAccess, ComponentTypeMismatchFunctionTwoArgs) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform isampler2D s; // accessed
         layout(set=0, binding=1) uniform usampler2D u; // not accessed
@@ -172,7 +172,7 @@ TEST_F(NegativeShaderImageAccess, UnnormalizedCoordinatesFunction) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (set = 0, binding = 0) uniform sampler2D tex;
 
@@ -226,7 +226,7 @@ TEST_F(NegativeShaderImageAccess, MultisampleMismatchWithPipeline) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler2DMS s;
         layout(location=0) out vec4 color;
@@ -275,7 +275,7 @@ TEST_F(NegativeShaderImageAccess, AliasImageMultisample) {
     TEST_DESCRIPTION("Same binding used for Multisampling and non-Multisampling");
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
 
@@ -334,7 +334,7 @@ TEST_F(NegativeShaderImageAccess, NonMultisampleMismatchWithPipeline) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler2D s;
         layout(location=0) out vec4 color;
@@ -416,7 +416,7 @@ TEST_F(NegativeShaderImageAccess, NonMultisampleMismatchWithPipelineArray) {
     descriptor_set.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         // mySampler[0] is good
         // mySampler[1] is bad
@@ -479,7 +479,7 @@ TEST_F(NegativeShaderImageAccess, MultipleFunctionCalls) {
     sampler_ci.compareEnable = VK_FALSE;
     vkt::Sampler sampler(*m_device, sampler_ci);
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout (set=0, binding=0) uniform sampler2D good_a;
         layout (set=0, binding=1) uniform sampler2D bad;
@@ -531,7 +531,7 @@ TEST_F(NegativeShaderImageAccess, AliasImageBinding) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7677");
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
 
@@ -585,7 +585,7 @@ TEST_F(NegativeShaderImageAccess, AliasImageBindingArrayType) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9553");
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         // This should be an GLSL error, if both of these are accessed (without PARTIALLY_BOUND), you need to satisfy both, which is impossible
         layout(set = 0, binding = 0) uniform sampler2D uPlanetTextures[2];
@@ -635,7 +635,7 @@ TEST_F(NegativeShaderImageAccess, SampledImageShareBinding) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 460
         layout (set = 0, binding = 0) uniform texture2D kTextures2D;
         layout (set = 0, binding = 1) uniform sampler kSamplers;
@@ -701,7 +701,7 @@ TEST_F(NegativeShaderImageAccess, SampledImageShareBindingArray) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 460
         layout (set = 0, binding = 0) uniform texture2D kTextures2D[2];
         layout (set = 0, binding = 1) uniform sampler kSamplers[2];
@@ -768,7 +768,7 @@ TEST_F(NegativeShaderImageAccess, SampledImageShareBindingArrayFunction) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 460
         layout (set = 0, binding = 0) uniform texture2D kTextures2D[2];
         layout (set = 0, binding = 1) uniform sampler kSamplers[2];
@@ -837,7 +837,7 @@ TEST_F(NegativeShaderImageAccess, DISABLED_FunctionDescriptorIndexing) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 460
         layout (set = 0, binding = 0) uniform sampler2D tex[3];
         layout (location=0) out vec4 color;

@@ -2,7 +2,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
  */
 
 #include <thread>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/external_memory_sync.h"
-#include "../framework/render_pass_helper.h"
-#include "../framework/sync_helper.h"
+#include "layer_validation_tests.h"
+#include "external_memory_sync.h"
+#include "render_pass_helper.h"
+#include "sync_helper.h"
 #include "containers/container_utils.h"
 
 #ifndef VK_USE_PLATFORM_WIN32_KHR
@@ -24,14 +24,14 @@
 
 class PositiveSyncObject : public SyncObjectTest {};
 
-TEST_F(PositiveSyncObject, Sync2OwnershipTranfersImage) {
+TEST_F(PositiveSyncObject, Sync2OwnershipTransfersImage) {
     TEST_DESCRIPTION("Valid image ownership transfers that shouldn't create errors");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::synchronization2);
     RETURN_IF_SKIP(Init());
 
-    vkt::Queue *no_gfx_queue = m_device->NonGraphicsQueue();
+    vkt::Queue* no_gfx_queue = m_device->NonGraphicsQueue();
     if (!no_gfx_queue) {
         GTEST_SKIP() << "Required queue not present (non-graphics capable required)";
     }
@@ -74,14 +74,14 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersImage) {
     ValidOwnershipTransfer(no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer, nullptr, &image_barrier);
 }
 
-TEST_F(PositiveSyncObject, Sync2OwnershipTranfersBuffer) {
+TEST_F(PositiveSyncObject, Sync2OwnershipTransfersBuffer) {
     TEST_DESCRIPTION("Valid buffer ownership transfers that shouldn't create errors");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::synchronization2);
     RETURN_IF_SKIP(Init());
 
-    vkt::Queue *no_gfx_queue = m_device->NonGraphicsQueue();
+    vkt::Queue* no_gfx_queue = m_device->NonGraphicsQueue();
     if (!no_gfx_queue) {
         GTEST_SKIP() << "Required queue not present (non-graphics capable required)";
     }
@@ -1109,77 +1109,6 @@ TEST_F(PositiveSyncObject, ExternalFenceSubmitCmdBuffer) {
     m_default_queue->Wait();
 }
 
-TEST_F(PositiveSyncObject, BasicSetAndWaitEvent) {
-    TEST_DESCRIPTION("Sets event and then wait for it using CmdSetEvent/CmdWaitEvents");
-    RETURN_IF_SKIP(Init());
-
-    const vkt::Event event(*m_device);
-
-    // Record time validation
-    m_command_buffer.Begin();
-    vk::CmdSetEvent(m_command_buffer, event, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
-    vk::CmdWaitEvents(m_command_buffer, 1, &event.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                      0, nullptr, 0, nullptr, 0, nullptr);
-    m_command_buffer.End();
-
-    // Also submit to the queue to test submit time validation
-    m_default_queue->Submit(m_command_buffer);
-    m_device->Wait();
-}
-
-TEST_F(PositiveSyncObject, BasicSetAndWaitEvent2) {
-    TEST_DESCRIPTION("Sets event and then wait for it using CmdSetEvent2/CmdWaitEvents2");
-    SetTargetApiVersion(VK_API_VERSION_1_3);
-    AddRequiredFeature(vkt::Feature::synchronization2);
-    RETURN_IF_SKIP(Init());
-
-    VkMemoryBarrier2 barrier = vku::InitStructHelper();
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = 0;
-    barrier.srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    barrier.dstStageMask = VK_PIPELINE_STAGE_NONE;
-
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.memoryBarrierCount = 1;
-    dependency_info.pMemoryBarriers = &barrier;
-
-    const vkt::Event event(*m_device);
-
-    // Record time validation
-    m_command_buffer.Begin();
-    vk::CmdSetEvent2(m_command_buffer, event, &dependency_info);
-    vk::CmdWaitEvents2(m_command_buffer, 1, &event.handle(), &dependency_info);
-    m_command_buffer.End();
-
-    // Also submit to the queue to test submit time validation
-    m_default_queue->Submit(m_command_buffer);
-    m_device->Wait();
-}
-
-TEST_F(PositiveSyncObject, WaitEvent2HostStage) {
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::synchronization2);
-    RETURN_IF_SKIP(Init());
-    InitRenderTarget();
-
-    vkt::Event event(*m_device);
-    VkEvent event_handle = event;
-
-    VkMemoryBarrier2 barrier = vku::InitStructHelper();
-    barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
-    barrier.srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;  // Ok to use if outside the renderpass
-    barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.memoryBarrierCount = 1;
-    dependency_info.pMemoryBarriers = &barrier;
-
-    m_command_buffer.Begin();
-    vk::CmdWaitEvents2KHR(m_command_buffer, 1, &event_handle, &dependency_info);
-    m_command_buffer.End();
-}
-
 TEST_F(PositiveSyncObject, DoubleLayoutTransition) {
     TEST_DESCRIPTION("Attempt vkCmdPipelineBarrier with 2 layout transitions of the same image.");
 
@@ -1201,8 +1130,8 @@ TEST_F(PositiveSyncObject, DoubleLayoutTransition) {
     m_command_buffer.Begin();
 
     {
-        VkImageMemoryBarrier image_barriers[] = {image.ImageMemoryBarrier(
-            0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, image_sub_range)};
+        VkImageMemoryBarrier image_barriers[] = {
+            image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, image_sub_range)};
 
         vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                                nullptr, 0, nullptr, 1, image_barriers);
@@ -1212,10 +1141,8 @@ TEST_F(PositiveSyncObject, DoubleLayoutTransition) {
     // Is it undefined behavior? Write a comment and provide references to the spec if that's allowed.
     {
         VkImageMemoryBarrier image_barriers[] = {
-            image.ImageMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, image_sub_range),
-            image.ImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
-                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, image_sub_range)};
+            image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, image_sub_range),
+            image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, image_sub_range)};
 
         vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                                nullptr, 0, nullptr, 2, image_barriers);
@@ -1322,13 +1249,13 @@ TEST_F(PositiveSyncObject, ResetQueryPoolFromDifferentCBWithFenceAfter) {
 struct FenceSemRaceData {
     VkDevice device{VK_NULL_HANDLE};
     VkSemaphore sem{VK_NULL_HANDLE};
-    std::atomic<bool> *bailout{nullptr};
+    std::atomic<bool>* bailout{nullptr};
     uint64_t wait_value{0};
     uint64_t timeout{kWaitTimeout};
-    uint32_t iterations{100000};
+    uint32_t iterations{5000};  // Initially 100000 for higher repro rate
 };
 
-void WaitTimelineSem(FenceSemRaceData *data) {
+void WaitTimelineSem(FenceSemRaceData* data) {
     uint64_t wait_value = data->wait_value;
     VkSemaphoreWaitInfo wait_info = vku::InitStructHelper();
     wait_info.semaphoreCount = 1;
@@ -1432,13 +1359,13 @@ TEST_F(PositiveSyncObject, SubmitFenceButWaitIdle) {
 }
 
 struct SemBufferRaceData {
-    SemBufferRaceData(vkt::Device &dev_) : dev(dev_), sem(dev_, VK_SEMAPHORE_TYPE_TIMELINE) {}
+    SemBufferRaceData(vkt::Device& dev_) : dev(dev_), sem(dev_, VK_SEMAPHORE_TYPE_TIMELINE) {}
 
-    vkt::Device &dev;
+    vkt::Device& dev;
     vkt::Semaphore sem;
     uint64_t start_wait_value{0};
     uint64_t timeout_ns{kWaitTimeout};
-    uint32_t iterations{10000};
+    uint32_t iterations{500};  // Initially 10000 for higher repro rate
     std::atomic<bool> bailout{false};
 
     std::unique_ptr<vkt::Buffer> thread_buffer;
@@ -1463,7 +1390,7 @@ struct SemBufferRaceData {
         }
     }
 
-    void Run(vkt::CommandPool &command_pool, ErrorMonitor &error_mon) {
+    void Run(vkt::CommandPool& command_pool, ErrorMonitor& error_mon) {
         uint64_t gpu_wait_value, gpu_signal_value;
         VkResult err;
         start_wait_value = 2;
@@ -1783,9 +1710,17 @@ TEST_F(PositiveSyncObject, BarrierAccessSyncMicroMap) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::synchronization2);
-    AddRequiredFeature(vkt::Feature::micromap);
-    RETURN_IF_SKIP(Init());
+    VkPhysicalDeviceOpacityMicromapFeaturesEXT ext_features = vku::InitStructHelper();
+    VkPhysicalDeviceSynchronization2Features sync_features = vku::InitStructHelper(&ext_features);
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&sync_features);
+    RETURN_IF_SKIP(InitFramework());
+    vk::GetPhysicalDeviceFeatures2(Gpu(), &features2);
+    if (!ext_features.micromap) {
+        GTEST_SKIP() << "micromap feature not supported";
+    }
+    ext_features.micromap = VK_TRUE;
+    sync_features.synchronization2 = VK_TRUE;
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     VkMemoryBarrier2 mem_barrier = vku::InitStructHelper();
     mem_barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
@@ -2044,7 +1979,7 @@ TEST_F(PositiveSyncObject, ImageOwnershipTransferNormalizeSubresourceRange) {
     AddRequiredFeature(vkt::Feature::synchronization2);
     RETURN_IF_SKIP(Init());
 
-    vkt::Queue *transfer_queue = m_device->TransferOnlyQueue();
+    vkt::Queue* transfer_queue = m_device->TransferOnlyQueue();
     if (!transfer_queue) {
         GTEST_SKIP() << "Transfer-only queue is not present";
     }
@@ -2364,7 +2299,7 @@ TEST_F(PositiveSyncObject, KhronosTimelineSemaphoreExample) {
         GTEST_SKIP() << "Two queues are needed";
     }
 
-    int N = 1000;
+    int N = 250; /* Initially 1000 */
 
     for (int i = 0; i < N; i++) {
         vkt::Semaphore timeline(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
@@ -2776,26 +2711,6 @@ TEST_F(PositiveSyncObject, Transition3dImageWithMipLevelsRemainingArrayLayers) {
     m_command_buffer.End();
 }
 
-TEST_F(PositiveSyncObject, SetEvent2Flags) {
-    SetTargetApiVersion(VK_API_VERSION_1_3);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance9);
-    AddRequiredFeature(vkt::Feature::synchronization2);
-    RETURN_IF_SKIP(Init());
-
-    m_command_buffer.Begin();
-
-    VkMemoryBarrier2 memory_barrier = vku::InitStructHelper();
-
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR;
-    dependency_info.memoryBarrierCount = 1u;
-    dependency_info.pMemoryBarriers = &memory_barrier;
-
-    vkt::Event event(*m_device);
-    vk::CmdSetEvent2(m_command_buffer, event, &dependency_info);
-}
-
 TEST_F(PositiveSyncObject, TimelineSemaphoreAndExportedCopyCooperation) {
     TEST_DESCRIPTION("Test that queue submission state is updated properly when using semaphores with shared payload");
 #ifdef VK_USE_PLATFORM_WIN32_KHR
@@ -2933,37 +2848,6 @@ TEST_F(PositiveSyncObject, ZeroInitializeLayoutSubresource) {
     m_command_buffer.Barrier(img_barrier);
 }
 
-TEST_F(PositiveSyncObject, AsymmetricWaitEvent2) {
-    SetTargetApiVersion(VK_API_VERSION_1_3);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance9);
-    AddRequiredFeature(vkt::Feature::synchronization2);
-    RETURN_IF_SKIP(Init());
-
-    VkMemoryBarrier2 barrier = vku::InitStructHelper();
-    barrier.srcStageMask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
-
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.dependencyFlags = VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR;
-    dependency_info.memoryBarrierCount = 1u;
-    dependency_info.pMemoryBarriers = &barrier;
-
-    const vkt::Event event(*m_device);
-
-    m_command_buffer.Begin();
-
-    vk::CmdSetEvent2(m_command_buffer, event, &dependency_info);
-
-    barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    vk::CmdWaitEvents2(m_command_buffer, 1, &event.handle(), &dependency_info);
-
-    m_command_buffer.End();
-
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
-}
-
 TEST_F(PositiveSyncObject, Maintenance9ImageBarriers) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10302");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -3015,4 +2899,105 @@ TEST_F(PositiveSyncObject, Maintenance9ImageBarriers) {
     layout_transition.subresourceRange.layerCount = 1;
     m_command_buffer.Barrier(layout_transition);
     m_command_buffer.End();
+}
+
+TEST_F(PositiveSyncObject, BufferOwnershipTransferWholeSize) {
+    TEST_DESCRIPTION("Use VK_WHOLE_SIZE for release and an explicit size for acquire");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Queue* transfer_queue = m_device->TransferOnlyQueue();
+    if (!transfer_queue) {
+        GTEST_SKIP() << "Transfer-only queue is not present";
+    }
+    vkt::CommandPool release_pool(*m_device, transfer_queue->family_index);
+    vkt::CommandBuffer release_cb(*m_device, release_pool);
+    vkt::CommandBuffer acquire_cb(*m_device, m_command_pool);
+
+    const VkDeviceSize buffer_size = 256;
+    vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    // Release with VK_WHOLE_SIZE
+    VkBufferMemoryBarrier2 release_barrier = vku::InitStructHelper();
+    release_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    release_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    release_barrier.srcQueueFamilyIndex = transfer_queue->family_index;
+    release_barrier.dstQueueFamilyIndex = m_default_queue->family_index;
+    release_barrier.buffer = buffer;
+    release_barrier.size = VK_WHOLE_SIZE;
+
+    release_cb.Begin();
+    release_cb.Barrier(release_barrier);
+    release_cb.End();
+
+    // Acquire with an explicit size
+    VkBufferMemoryBarrier2 acquire_barrier = vku::InitStructHelper();
+    acquire_barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT_KHR;
+    acquire_barrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+    acquire_barrier.srcQueueFamilyIndex = transfer_queue->family_index;
+    acquire_barrier.dstQueueFamilyIndex = m_default_queue->family_index;
+    acquire_barrier.buffer = buffer;
+    acquire_barrier.size = buffer_size;
+
+    acquire_cb.Begin();
+    acquire_cb.Barrier(acquire_barrier);
+    acquire_cb.End();
+
+    // Test for regression when VK_WHOLE_SIZE is not normalized
+    vkt::Semaphore semaphore(*m_device);
+    transfer_queue->Submit2(release_cb, vkt::Signal(semaphore));
+    m_default_queue->Submit2(acquire_cb, vkt::Wait(semaphore));
+    m_device->Wait();
+}
+
+TEST_F(PositiveSyncObject, BufferOwnershipTransferTimelineReordering) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4903#issuecomment-4587980554");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Queue* transfer_queue = m_device->TransferOnlyQueue();
+    if (!transfer_queue) {
+        GTEST_SKIP() << "Transfer-only queue is not present";
+    }
+    vkt::CommandPool release_pool(*m_device, transfer_queue->family_index);
+    vkt::CommandBuffer release_cb(*m_device, release_pool);
+    vkt::CommandBuffer acquire_cb(*m_device, m_command_pool);
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    // Release on the transfer queue
+    VkBufferMemoryBarrier2 release_barrier = vku::InitStructHelper();
+    release_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    release_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    release_barrier.srcQueueFamilyIndex = transfer_queue->family_index;
+    release_barrier.dstQueueFamilyIndex = m_default_queue->family_index;
+    release_barrier.buffer = buffer;
+    release_barrier.size = 256;
+
+    release_cb.Begin();
+    release_cb.Barrier(release_barrier);
+    release_cb.End();
+
+    // Acquire on the default queue
+    VkBufferMemoryBarrier2 acquire_barrier = vku::InitStructHelper();
+    acquire_barrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT_KHR;
+    acquire_barrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+    acquire_barrier.srcQueueFamilyIndex = transfer_queue->family_index;
+    acquire_barrier.dstQueueFamilyIndex = m_default_queue->family_index;
+    acquire_barrier.buffer = buffer;
+    acquire_barrier.size = 256;
+
+    acquire_cb.Begin();
+    acquire_cb.Barrier(acquire_barrier);
+    acquire_cb.End();
+
+    vkt::Semaphore timeline(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+
+    // Test that QFOT validation with wait-before-signal submission works correctly
+    m_default_queue->Submit2(acquire_cb, vkt::TimelineWait(timeline, 1));
+    transfer_queue->Submit2(release_cb, vkt::TimelineSignal(timeline, 1));
+    m_device->Wait();
 }

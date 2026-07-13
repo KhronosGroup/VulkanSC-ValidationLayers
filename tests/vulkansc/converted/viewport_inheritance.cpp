@@ -1,8 +1,8 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
 // See vksc_convert_tests.py for modifications
 
-/* Copyright (c) 2021-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 LunarG, Inc.
+/* Copyright (c) 2021-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 LunarG, Inc.
  * Copyright (c) 2021 NVIDIA Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +16,8 @@
 #include <cassert>
 #include <vector>
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 // Common data structures needed for tests.
 class ViewportInheritanceTestData {
@@ -252,19 +252,33 @@ class ViewportInheritanceTestData {
         m_device = p_device_obj->handle();
 
         PickColorFormat(physical_device);
-        if (m_failureReason) return;
+        if (m_failureReason) {
+            return;
+        }
         CreateRenderPass();
-        if (m_failureReason) return;
+        if (m_failureReason) {
+            return;
+        }
         CreateColorImageObj(*p_device_obj);
-        if (m_failureReason) return;
+        if (m_failureReason) {
+            return;
+        }
         CreateColorView();
-        if (m_failureReason) return;
+        if (m_failureReason) {
+            return;
+        }
         CreateFramebuffer();
-        if (m_failureReason) return;
+        if (m_failureReason) {
+            return;
+        }
         CreatePipelineLayout();
-        if (m_failureReason) return;
+        if (m_failureReason) {
+            return;
+        }
         CreateShaderStages();
-        if (m_failureReason) return;
+        if (m_failureReason) {
+            return;
+        }
     }
 
     ~ViewportInheritanceTestData() { Cleanup(); }

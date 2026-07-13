@@ -58,7 +58,7 @@ void DebugPrintfPass::CreateFunctionParams(uint32_t argument_id, const Type& arg
 
     switch (argument_type.spv_type_) {
         case SpvType::kVector: {
-            const uint32_t component_count = argument_type.inst_.Word(3);
+            const uint32_t component_count = argument_type.meta_.vector.component_count;
             const uint32_t component_type_id = argument_type.inst_.Word(2);
             const Type* component_type = type_manager_.FindTypeById(component_type_id);
             assert(component_type);
@@ -71,10 +71,10 @@ void DebugPrintfPass::CreateFunctionParams(uint32_t argument_id, const Type& arg
         }
 
         case SpvType::kInt: {
-            const uint32_t width = argument_type.inst_.Word(2);
+            const uint32_t width = argument_type.meta_.scalar.bit_width;
 
             // first thing is to get any signed to unsigned via bitcast
-            const bool is_signed = argument_type.inst_.Word(3) != 0;
+            const bool is_signed = argument_type.meta_.scalar.is_signed;
             uint32_t incoming_id = argument_id;
             if (is_signed) {
                 const uint32_t bitcast_id = module_.TakeNextId();
@@ -131,7 +131,7 @@ void DebugPrintfPass::CreateFunctionParams(uint32_t argument_id, const Type& arg
         }
 
         case SpvType::kFloat: {
-            const uint32_t width = argument_type.inst_.Word(2);
+            const uint32_t width = argument_type.meta_.scalar.bit_width;
             if (width == 16) {
                 const uint32_t float32_type_id = type_manager_.GetTypeFloat(32).Id();
                 const uint32_t fconvert_id = module_.TakeNextId();
@@ -156,7 +156,7 @@ void DebugPrintfPass::CreateFunctionParams(uint32_t argument_id, const Type& arg
                     p_meta.double_bitmask |= 1 << p_meta.expanded_parameter_count;
                 }
 
-                if (!module_.enabled_features_.shaderInt64) {
+                if (!module_.settings_.enabled_features->shaderInt64) {
                     module_.InternalError(
                         "DEBUG-PRINTF-INT64-SUPPORT",
                         "shaderInt64 feature is not supported, but is required to cast a 64-bit float to a 64-bit int "
@@ -239,21 +239,23 @@ void DebugPrintfPass::CreateFunctionCall(BasicBlock& block, InstructionIt* inst_
     // We know the first part, then build up the rest from the printf arguments
     // except a few slots, we place hold it with zero until we build up the params
     const size_t function_def_slot = 2;
-    const size_t double_bitmask_slot = 5;
-    const size_t signed_8_bitmask_slot = 6;
-    const size_t signed_16_bitmask_slot = 7;
-    std::vector<uint32_t> function_call_params = {void_type,
-                                                  function_result,
-                                                  0,  // function_def_slot
-                                                  inst_position_constant.Id(),
-                                                  string_id_constant.Id(),
-                                                  0,  // double_bitmask_slot,
-                                                  0,  // signed_8_bitmask_slot,
-                                                  0,  // signed_16_bitmask_slot,
-                                                  block_func.stage_info_x_id_,
-                                                  block_func.stage_info_y_id_,
-                                                  block_func.stage_info_z_id_,
-                                                  block_func.stage_info_w_id_};
+    const size_t double_bitmask_slot = 9;
+    const size_t signed_8_bitmask_slot = 10;
+    const size_t signed_16_bitmask_slot = 11;
+    std::vector<uint32_t> function_call_params = {
+        void_type,
+        function_result,
+        0,  // function_def_slot
+        inst_position_constant.Id(),
+        block_func.stage_info_x_id_,  // shader stage
+        block_func.stage_info_y_id_,
+        block_func.stage_info_z_id_,
+        block_func.stage_info_w_id_,
+        string_id_constant.Id(),
+        0,  // double_bitmask_slot,
+        0,  // signed_8_bitmask_slot,
+        0,  // signed_16_bitmask_slot,
+    };
 
     ParamMeta param_meta;
     // where we find the first arugment in OpExtInst instruction
@@ -353,9 +355,10 @@ void DebugPrintfPass::CreateBufferWriteFunction(uint32_t argument_count, uint32_
     //     }
     // }
 
-    // Need 1 byte to write the "how many bytes will there be"
-    // Need 1 byte for the shader stage (which we don't pass in as we know already)
-    const uint32_t byte_written = argument_count + 2;
+    // + 1 byte to write the "how many bytes will there be"
+    // + 1 byte for the shader stage (which we don't pass in as we know already)
+    // - 1 byte as we combine the instruction offset and stage type
+    const uint32_t byte_written = argument_count + 1;
 
     // Debug name is matching number of bytes written into the buffer
     std::string function_name = "inst_debug_printf_" + std::to_string(byte_written);
@@ -460,11 +463,38 @@ void DebugPrintfPass::CreateBufferWriteFunction(uint32_t argument_count, uint32_
         store_block.CreateInstruction(spv::OpStore, {access_chain_id, shader_id});
     }
 
-    // Write a 32-bit word to the output buffer for each argument
-    const uint32_t argument_id_offset = 2;
-    for (uint32_t i = 0; i < argument_count; i++) {
+    // Store Instruction Position Offset + Stage Type
+    {
+        const uint32_t two_id = type_manager_.GetConstantUInt32(2).Id();
         const uint32_t int_add_id = module_.TakeNextId();
-        const uint32_t offset_id = type_manager_.GetConstantUInt32(i + argument_id_offset).Id();
+        store_block.CreateInstruction(spv::OpIAdd, {uint32_type_id, int_add_id, atomic_add_id, two_id});
+
+        const uint32_t access_chain_id = module_.TakeNextId();
+        store_block.CreateInstruction(spv::OpAccessChain,
+                                      {pointer_type_id, access_chain_id, output_buffer_variable_id, one_id, int_add_id});
+
+        // Matches the code
+        //    error_payload.inst_offset | (stage_info.x << kStageId_Shift);
+        // found in log_error.comp
+        const uint32_t shift_id = type_manager_.GetConstantUInt32(glsl::kStageId_Shift).Id();
+        const uint32_t shift_left_id = module_.TakeNextId();
+        const uint32_t stage_info_x = function_param_ids[1];
+        store_block.CreateInstruction(spv::OpShiftLeftLogical, {uint32_type_id, shift_left_id, stage_info_x, shift_id});
+
+        const uint32_t bitwise_or_id = module_.TakeNextId();
+        const uint32_t instruction_position_offset = function_param_ids[0];
+        store_block.CreateInstruction(spv::OpBitwiseOr,
+                                      {uint32_type_id, bitwise_or_id, instruction_position_offset, shift_left_id});
+
+        store_block.CreateInstruction(spv::OpStore, {access_chain_id, bitwise_or_id});
+    }
+
+    // Write a 32-bit word to the output buffer for each argument.
+    // Skip [0] and [1] as they set above already
+    for (uint32_t i = 2; i < argument_count; i++) {
+        const uint32_t int_add_id = module_.TakeNextId();
+        // Offset by 1 such that the first in this loop is at [offset + 3]
+        const uint32_t offset_id = type_manager_.GetConstantUInt32(i + 1).Id();
         store_block.CreateInstruction(spv::OpIAdd, {uint32_type_id, int_add_id, atomic_add_id, offset_id});
 
         const uint32_t access_chain_id = module_.TakeNextId();
@@ -545,10 +575,10 @@ bool DebugPrintfPass::Instrument() {
             }
         }
     }
-    if (instrumentations_count_ == 0) {
-        return false;
-    }
+    return instrumentations_count_ != 0;
+}
 
+void DebugPrintfPass::PostProcess() {
     const uint32_t output_buffer_variable_id = CreateDescriptorSet();
 
     // Here we "link" the functions, but since it is all generated, no need to go through the LinkInfo flow
@@ -578,8 +608,6 @@ bool DebugPrintfPass::Instrument() {
             }
         }
     }
-
-    return true;
 }
 
 void DebugPrintfPass::PrintDebugInfo() const {
@@ -793,17 +821,7 @@ bool DebugPrintfPass::Validate(const Function& current_function, const Instructi
         const ParamInfo& param = param_infos[i];
         const uint32_t argument_id = meta.target_instruction->Word(first_argument_offset + i);
 
-        const Type* argument_type = nullptr;
-        if (const Constant* constant = type_manager_.FindConstantById(argument_id)) {
-            argument_type = &constant->type_;
-        } else {
-            const Instruction* inst = current_function.FindInstruction(argument_id);
-            if (!inst) {
-                module_.InternalWarning(tag, "Unable to find OpExtInst ID inside function block");
-                return true;  // possibily our error, so leave a warning
-            }
-            argument_type = type_manager_.FindTypeById(inst->TypeId());
-        }
+        const Type* argument_type = type_manager_.FindTypeGlobal(current_function, argument_id);
         if (!argument_type) {
             module_.InternalWarning(tag, "Unable find OpExtInst ID type");
             return true;  // possibily our error, so leave a warning

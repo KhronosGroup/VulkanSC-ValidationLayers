@@ -21,7 +21,7 @@
 
 namespace stateless {
 
-bool Device::ValidateCreateDataGraphPipelinesFlags(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const {
+bool Device::ValidateCreateDataGraphPipelinesFlags(const VkPipelineCreateFlags2 flags, const Location& flags_loc) const {
     bool skip = false;
 
     constexpr VkPipelineCreateFlags2 valid_flag_mask =
@@ -49,11 +49,11 @@ bool Device::ValidateCreateDataGraphPipelinesFlags(const VkPipelineCreateFlags2 
 
 bool Device::manual_PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
                                                                VkPipelineCache pipelineCache, uint32_t createInfoCount,
-                                                               const VkDataGraphPipelineCreateInfoARM *pCreateInfos,
-                                                               const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
-                                                               const Context &context) const {
+                                                               const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
+                                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                               const Context& context) const {
     bool skip = false;
-    const auto &error_obj = context.error_obj;
+    const auto& error_obj = context.error_obj;
 
     if (!enabled_features.dataGraph) {
         skip |= LogError("VUID-vkCreateDataGraphPipelinesARM-dataGraph-09760", device, error_obj.location,
@@ -66,9 +66,10 @@ bool Device::manual_PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, 
 
     for (uint32_t i = 0; i < createInfoCount; i++) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfos, i);
-        const VkDataGraphPipelineCreateInfoARM &create_info = pCreateInfos[i];
+        const VkDataGraphPipelineCreateInfoARM& create_info = pCreateInfos[i];
 
-        skip |= ValidateCreatePipelinesFlagsCommon(create_info.flags, create_info_loc.dot(Field::flags));
+        skip |= ValidateCreatePipelinesFlagsCommon(create_info.flags, create_info_loc.dot(Field::flags), pipelineCache,
+                                                   create_info.layout);
 
         if (deferredOperation != VK_NULL_HANDLE && (create_info.flags & VK_PIPELINE_CREATE_EARLY_RETURN_ON_FAILURE_BIT)) {
             skip |= LogError(

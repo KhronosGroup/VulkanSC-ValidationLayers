@@ -21,7 +21,7 @@
 
 namespace stateless {
 
-bool Device::ValidateTensorDescriptionARM(const VkTensorDescriptionARM &description, const Location &description_loc) const {
+bool Device::ValidateTensorDescriptionARM(const VkTensorDescriptionARM& description, const Location& description_loc) const {
     bool skip = false;
 
     if (description.format == VK_FORMAT_UNDEFINED) {
@@ -37,7 +37,7 @@ bool Device::ValidateTensorDescriptionARM(const VkTensorDescriptionARM &descript
     }
 
     // pStrides can be null
-    if (const auto *strides = description.pStrides) {
+    if (const auto* strides = description.pStrides) {
         if (description.tiling == VK_TENSOR_TILING_OPTIMAL_ARM) {
             skip |= LogError("VUID-VkTensorCreateInfoARM-pDescription-09720", device, description_loc.dot(Field::tiling),
                              "is VK_TENSOR_TILING_OPTIMAL_ARM, but pDescription::pStrides (%p) is not null", description.pStrides);
@@ -90,7 +90,7 @@ bool Device::ValidateTensorDescriptionARM(const VkTensorDescriptionARM &descript
                 }
                 i--;
             }
-            // if other errors above occured, i might be zero, but another error will be reported already
+            // if other errors above occurred, i might be zero, but another error will be reported already
             if (!is_packed && i > 0) {
                 skip |= LogError("VUID-VkTensorDescriptionARM-None-09740", device, description_loc,
                                  "does not define a packed tensor: pStrides[%" PRIi64 "] (%" PRIi64 ") != pStrides[%" PRIi64
@@ -110,7 +110,7 @@ bool Device::ValidateTensorDescriptionARM(const VkTensorDescriptionARM &descript
 
     {
         int64_t total_elements = 1;
-        auto *dims = description.pDimensions;
+        auto* dims = description.pDimensions;
         auto would_overflow = false;
         for (uint32_t i = 0; i < description.dimensionCount; i++) {
             if (INT64_MAX / total_elements >= dims[i]) {
@@ -130,8 +130,8 @@ bool Device::ValidateTensorDescriptionARM(const VkTensorDescriptionARM &descript
         }
         if (static_cast<uint64_t>(total_elements) > phys_dev_ext_props.tensor_properties.maxTensorElements || would_overflow) {
             skip |= LogError("VUID-VkTensorCreateInfoARM-tensorElements-09721", device, description_loc.dot(Field::pDimensions),
-                             "the total number of elements (%" PRIi64 ") is greater than maxTensorElements (%" PRIu64 ")", total_elements,
-                             phys_dev_ext_props.tensor_properties.maxTensorElements);
+                             "the total number of elements (%" PRIi64 ") is greater than maxTensorElements (%" PRIu64 ")",
+                             total_elements, phys_dev_ext_props.tensor_properties.maxTensorElements);
         }
     }
 
@@ -153,9 +153,9 @@ bool Device::ValidateTensorDescriptionARM(const VkTensorDescriptionARM &descript
     return skip;
 }
 
-bool Device::manual_PreCallValidateCreateTensorARM(VkDevice device, const VkTensorCreateInfoARM *pCreateInfo,
-                                                   const VkAllocationCallbacks *pAllocator, VkTensorARM *pTensor,
-                                                   const Context &context) const {
+bool Device::manual_PreCallValidateCreateTensorARM(VkDevice device, const VkTensorCreateInfoARM* pCreateInfo,
+                                                   const VkAllocationCallbacks* pAllocator, VkTensorARM* pTensor,
+                                                   const Context& context) const {
     bool skip = false;
 
     if (!enabled_features.tensors) {
@@ -170,9 +170,15 @@ bool Device::manual_PreCallValidateCreateTensorARM(VkDevice device, const VkTens
     skip |= ValidateTensorDescriptionARM(description, create_info_loc.dot(Field::pDescription));
 
     if (pCreateInfo->sharingMode == VK_SHARING_MODE_CONCURRENT) {
-        if (pCreateInfo->queueFamilyIndexCount <= 1) {
+        if (enabled_features.maintenance11) {
+            if (pCreateInfo->queueFamilyIndexCount == 0) {
+                skip |= LogError("VUID-VkTensorCreateInfoARM-maintenance11-13358", device, create_info_loc.dot(Field::sharingMode),
+                                 "is VK_SHARING_MODE_CONCURRENT, but queueFamilyIndexCount is 0 (needs to be at least 1).");
+            }
+        } else if (pCreateInfo->queueFamilyIndexCount <= 1) {
             skip |= LogError("VUID-VkTensorCreateInfoARM-sharingMode-09723", device, create_info_loc.dot(Field::sharingMode),
-                             "is VK_SHARING_MODE_CONCURRENT, but queueFamilyIndexCount is %" PRIu32 ".",
+                             "is VK_SHARING_MODE_CONCURRENT, but queueFamilyIndexCount is %" PRIu32
+                             " (needs to be at least 2)\nqueueFamilyIndexCount can be 1 if the maintenance11 feature is enabled.",
                              pCreateInfo->queueFamilyIndexCount);
         }
 

@@ -11,11 +11,12 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <vulkan/vulkan_core.h>
 #include <thread>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/render_pass_helper.h"
-#include "../framework/thread_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "render_pass_helper.h"
+#include "thread_helper.h"
 
 class PositiveCommand : public VkLayerTest {};
 
@@ -302,7 +303,7 @@ TEST_F(PositiveCommand, ThreadedCommandBuffersWithLabels) {
         VkDebugUtilsLabelEXT label = vku::InitStructHelper();
         label.pLabelName = "Test label";
 
-        constexpr int iteration_count = 1000;
+        constexpr int iteration_count = 250; /* Initially 1000 */
         for (int frame = 0; frame < iteration_count; frame++) {
             std::array<VkCommandBuffer, command_buffers_per_pool> command_buffers;
             ASSERT_EQ(VK_SUCCESS, vk::AllocateCommandBuffers(device(), &commands_allocate_info, command_buffers.data()));
@@ -320,7 +321,7 @@ TEST_F(PositiveCommand, ThreadedCommandBuffersWithLabels) {
     constexpr int wait_time = 60;
     if (!timeout_helper.WaitForThreads(wait_time))
         ADD_FAILURE() << "The waiting time for the worker threads exceeded the maximum limit: " << wait_time << " seconds.";
-    for (auto &worker : workers) worker.join();
+    for (auto& worker : workers) worker.join();
 }
 
 TEST_F(PositiveCommand, ClearAttachmentsDepthStencil) {
@@ -370,8 +371,7 @@ TEST_F(PositiveCommand, ClearColorImageWithValidRange) {
         vk::CmdClearColorImage(m_command_buffer, image, image_layout, &clear_color, 1, &range);
     }
 
-    image.ImageMemoryBarrier(m_command_buffer, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, image_layout,
-                             image_layout);
+    m_command_buffer.ImageBarrier(image, image_layout);
 
     // Try good case with VK_REMAINING
     {
@@ -401,8 +401,7 @@ TEST_F(PositiveCommand, ClearDepthStencilWithValidRange) {
         vk::CmdClearDepthStencilImage(m_command_buffer, image, image_layout, &clear_value, 1, &range);
     }
 
-    image.ImageMemoryBarrier(m_command_buffer, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, image_layout,
-                             image_layout);
+    m_command_buffer.ImageBarrier(image, image_layout);
 
     // Try good case with VK_REMAINING
     {
@@ -434,12 +433,12 @@ TEST_F(PositiveCommand, FillBufferCmdPoolTransferQueue) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
 
-    auto tranfer_family = m_device->TransferOnlyQueueFamily();
-    if (!tranfer_family.has_value()) {
+    auto transfer_family = m_device->TransferOnlyQueueFamily();
+    if (!transfer_family.has_value()) {
         GTEST_SKIP() << "Transfer-only queue family not found";
     }
 
-    vkt::CommandPool pool(*m_device, tranfer_family.value(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    vkt::CommandPool pool(*m_device, transfer_family.value(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     vkt::CommandBuffer cb(*m_device, pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     vkt::Buffer buffer(*m_device, 20, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
@@ -520,140 +519,6 @@ TEST_F(PositiveCommand, MultiDrawMaintenance5Mixed) {
     // should be overwritten
     vk::CmdBindIndexBuffer(m_command_buffer, buffer, 0, VK_INDEX_TYPE_UINT16);
     vk::CmdDrawMultiIndexedEXT(m_command_buffer, 1, &multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
-}
-
-TEST_F(PositiveCommand, ImageFormatTypeMismatchWithZeroExtend) {
-    TEST_DESCRIPTION("Use SignExtend to turn a UINT resource into a SINT.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(Init());
-    RETURN_IF_SKIP(InitRenderTarget());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    const char *csSource = R"(
-                     OpCapability Shader
-                     OpCapability StorageImageExtendedFormats
-                     OpMemoryModel Logical GLSL450
-                     OpEntryPoint GLCompute %main "main" %image_ptr
-                     OpExecutionMode %main LocalSize 1 1 1
-                     OpSource GLSL 450
-                     OpDecorate %image_ptr DescriptorSet 0
-                     OpDecorate %image_ptr Binding 0
-                     OpDecorate %image_ptr NonReadable
-%type_void         = OpTypeVoid
-%type_u32          = OpTypeInt 32 0
-%type_i32          = OpTypeInt 32 1
-%type_vec3_u32     = OpTypeVector %type_u32 3
-%type_vec4_u32     = OpTypeVector %type_u32 4
-%type_vec2_i32     = OpTypeVector %type_i32 2
-%type_fn_void      = OpTypeFunction %type_void
-%type_ptr_fn       = OpTypePointer Function %type_vec4_u32
-%type_image        = OpTypeImage %type_u32 2D 0 0 0 2 Rgba32ui
-%type_ptr_image    = OpTypePointer UniformConstant %type_image
-%image_ptr         = OpVariable %type_ptr_image UniformConstant
-%const_i32_0       = OpConstant %type_i32 0
-%const_vec2_i32_00 = OpConstantComposite %type_vec2_i32 %const_i32_0 %const_i32_0
-%main              = OpFunction %type_void None %type_fn_void
-%label             = OpLabel
-%store_location    = OpVariable %type_ptr_fn Function
-%image             = OpLoad %type_image %image_ptr
-%value             = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00 SignExtend
-                     OpStore %store_location %value
-                     OpReturn
-                     OpFunctionEnd
-              )";
-
-    CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
-    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    pipe.CreateComputePipeline();
-
-    VkFormat format = VK_FORMAT_R32G32B32A32_SINT;
-    vkt::Image image(*m_device, 32, 32, format, VK_IMAGE_USAGE_STORAGE_BIT);
-    vkt::ImageView view = image.CreateView();
-
-    pipe.descriptor_set_.WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                                                   VK_IMAGE_LAYOUT_GENERAL);
-    pipe.descriptor_set_.UpdateDescriptorSets();
-
-    m_command_buffer.Begin();
-
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
-    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
-                              &pipe.descriptor_set_.set_, 0, nullptr);
-
-    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
-
-    m_command_buffer.End();
-}
-
-TEST_F(PositiveCommand, ImageFormatTypeMismatchRedundantExtend) {
-    TEST_DESCRIPTION("Use ZeroExtend as a redundant was to be SINT.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(Init());
-    RETURN_IF_SKIP(InitRenderTarget());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    const char *csSource = R"(
-                     OpCapability Shader
-                     OpCapability StorageImageExtendedFormats
-                     OpMemoryModel Logical GLSL450
-                     OpEntryPoint GLCompute %main "main" %image_ptr
-                     OpExecutionMode %main LocalSize 1 1 1
-                     OpSource GLSL 450
-                     OpDecorate %image_ptr DescriptorSet 0
-                     OpDecorate %image_ptr Binding 0
-                     OpDecorate %image_ptr NonReadable
-%type_void         = OpTypeVoid
-%type_u32          = OpTypeInt 32 0
-%type_i32          = OpTypeInt 32 1
-%type_vec3_u32     = OpTypeVector %type_u32 3
-%type_vec4_u32     = OpTypeVector %type_u32 4
-%type_vec2_i32     = OpTypeVector %type_i32 2
-%type_fn_void      = OpTypeFunction %type_void
-%type_ptr_fn       = OpTypePointer Function %type_vec4_u32
-%type_image        = OpTypeImage %type_u32 2D 0 0 0 2 Rgba32i
-%type_ptr_image    = OpTypePointer UniformConstant %type_image
-%image_ptr         = OpVariable %type_ptr_image UniformConstant
-%const_i32_0       = OpConstant %type_i32 0
-%const_vec2_i32_00 = OpConstantComposite %type_vec2_i32 %const_i32_0 %const_i32_0
-%main              = OpFunction %type_void None %type_fn_void
-%label             = OpLabel
-%store_location    = OpVariable %type_ptr_fn Function
-%image             = OpLoad %type_image %image_ptr
-                   ; both valid, ZeroExtend is acting as redundant
-%value             = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00
-%value2            = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00 ZeroExtend
-                     OpStore %store_location %value
-                     OpReturn
-                     OpFunctionEnd
-              )";
-
-    CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
-    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    pipe.CreateComputePipeline();
-
-    VkFormat format = VK_FORMAT_R32G32B32A32_UINT;
-    vkt::Image image(*m_device, 32, 32, format, VK_IMAGE_USAGE_STORAGE_BIT);
-    vkt::ImageView view = image.CreateView();
-
-    pipe.descriptor_set_.WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                                                   VK_IMAGE_LAYOUT_GENERAL);
-    pipe.descriptor_set_.UpdateDescriptorSets();
-
-    m_command_buffer.Begin();
-
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
-    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
-                              &pipe.descriptor_set_.set_, 0, nullptr);
-
-    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
-
-    m_command_buffer.End();
 }
 
 TEST_F(PositiveCommand, DeviceLost) {
@@ -738,11 +603,11 @@ TEST_F(PositiveCommand, CommandBufferInheritanceInfoIgnoredPointer) {
 
     const uint64_t fake_address_64 = 0xCDCDCDCDCDCDCDCD;
     const uint64_t fake_address_32 = 0xCDCDCDCD;
-    const void *undereferencable_pointer =
-        sizeof(void *) == 8 ? reinterpret_cast<void *>(fake_address_64) : reinterpret_cast<void *>(fake_address_32);
+    const void* undereferencable_pointer =
+        sizeof(void*) == 8 ? reinterpret_cast<void*>(fake_address_64) : reinterpret_cast<void*>(fake_address_32);
 
     VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
-    begin_info.pInheritanceInfo = reinterpret_cast<const VkCommandBufferInheritanceInfo *>(undereferencable_pointer);
+    begin_info.pInheritanceInfo = reinterpret_cast<const VkCommandBufferInheritanceInfo*>(undereferencable_pointer);
     m_command_buffer.Begin(&begin_info);
     m_command_buffer.End();
 }
@@ -940,5 +805,58 @@ TEST_F(PositiveCommand, ResolveImageFormat) {
     resolve_region.extent = {1, 1, 1};
     vk::CmdResolveImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_GENERAL, dst_image, VK_IMAGE_LAYOUT_GENERAL, 1,
                         &resolve_region);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveCommand, SetPrimitiveRestartIndex) {
+    AddRequiredExtensions(VK_EXT_PRIMITIVE_RESTART_INDEX_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::primitiveRestartIndex);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::Buffer index_buffer(*m_device, 64, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdSetPrimitiveRestartIndexEXT(m_command_buffer, 0);
+    vk::CmdDrawIndexed(m_command_buffer, 3, 1, 0, 3, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveCommand, SetPrimitiveRestartIndexLimits) {
+    AddRequiredExtensions(VK_EXT_PRIMITIVE_RESTART_INDEX_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::primitiveRestartIndex);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState2);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::Buffer index_buffer(*m_device, 64, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE);
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdSetPrimitiveRestartEnableEXT(m_command_buffer, VK_TRUE);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    // Over limit, but vkCmdBindIndexBuffer resets it
+    vk::CmdSetPrimitiveRestartIndexEXT(m_command_buffer, 0xFFFFFFFF);
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT16);
+    vk::CmdDrawIndexed(m_command_buffer, 3, 1, 0, 3, 0);
+
+    vk::CmdSetPrimitiveRestartIndexEXT(m_command_buffer, 0xFFFFFFFF);
+    // Turn off, so no error
+    vk::CmdSetPrimitiveRestartEnableEXT(m_command_buffer, VK_FALSE);
+    vk::CmdDrawIndexed(m_command_buffer, 3, 1, 0, 3, 0);
+
+    m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }

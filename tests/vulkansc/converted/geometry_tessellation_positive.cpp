@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +15,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class PositiveGeometryTessellation : public VkLayerTest {};
 
@@ -34,7 +34,7 @@ TEST_F(PositiveGeometryTessellation, PointSizeGeomShaderDontWriteMaintenance5) {
     InitRenderTarget();
 
     // Create GS declaring PointSize and writing to it
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (points) out;
@@ -48,7 +48,7 @@ TEST_F(PositiveGeometryTessellation, PointSizeGeomShaderDontWriteMaintenance5) {
     VkShaderObj vs(*m_device, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
 
-    auto set_info = [&](CreatePipelineHelper &helper) {
+    auto set_info = [&](CreatePipelineHelper& helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
@@ -68,7 +68,7 @@ TEST_F(PositiveGeometryTessellation, IncompatibleDynamicPrimitiveTopology) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (triangle_strip) out;
@@ -107,7 +107,7 @@ TEST_F(PositiveGeometryTessellation, DrawDynamicPrimitiveTopology) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (triangle_strip) out;
@@ -191,7 +191,7 @@ TEST_F(PositiveGeometryTessellation, InterfaceComponents) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         layout(location = 0) out ivec4 a;
         void main() {
@@ -199,7 +199,7 @@ TEST_F(PositiveGeometryTessellation, InterfaceComponents) {
         }
     )glsl";
 
-    const char *geom_source = R"glsl(
+    const char* geom_source = R"glsl(
         #version 450
         layout(triangles) in;
         layout(triangle_strip) out;
@@ -224,7 +224,7 @@ TEST_F(PositiveGeometryTessellation, InterfaceComponents) {
         }
     )glsl";
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(location = 0) in vec4 b;
         layout(location = 0) out vec4 c;
@@ -250,7 +250,7 @@ TEST_F(PositiveGeometryTessellation, TessGeomPointPrimitiveTopology) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *tcsSource = R"asm(
+    const char* tcsSource = R"asm(
                OpCapability Tessellation
           %2 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -273,7 +273,7 @@ TEST_F(PositiveGeometryTessellation, TessGeomPointPrimitiveTopology) {
                OpReturn
                OpFunctionEnd
     )asm";
-    const char *tesSource = R"glsl(
+    const char* tesSource = R"glsl(
         #version 450
         layout(triangles, equal_spacing, cw) in;
         layout(location=0) patch in int x;
@@ -282,7 +282,7 @@ TEST_F(PositiveGeometryTessellation, TessGeomPointPrimitiveTopology) {
            gl_Position.w = x;
         }
     )glsl";
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (triangle_strip) out;

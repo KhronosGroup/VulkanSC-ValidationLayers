@@ -15,8 +15,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "descriptor_helper.h"
 #include "gtest/gtest.h"
 
 class NegativeBuffer : public VkLayerTest {};
@@ -149,7 +149,7 @@ TEST_F(NegativeBuffer, CreateBufferViewNoMemoryBoundToBuffer) {
 TEST_F(NegativeBuffer, BufferViewCreateInfoEntries) {
     TEST_DESCRIPTION("Attempt to create a buffer view with invalid create info.");
     RETURN_IF_SKIP(Init());
-    const VkPhysicalDeviceLimits &dev_limits = m_device->Physical().limits_;
+    const VkPhysicalDeviceLimits& dev_limits = m_device->Physical().limits_;
     const VkDeviceSize min_alignment = dev_limits.minTexelBufferOffsetAlignment;
     if (min_alignment == 1) {
         GTEST_SKIP() << "Test requires minTexelOffsetAlignment to not be equal to 1";
@@ -223,7 +223,7 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoFeatures) {
     TEST_DESCRIPTION("Attempt to create a buffer view with invalid create info.");
     RETURN_IF_SKIP(Init());
 
-    const VkPhysicalDeviceLimits &dev_limits = m_device->Physical().limits_;
+    const VkPhysicalDeviceLimits& dev_limits = m_device->Physical().limits_;
     const VkDeviceSize min_alignment = dev_limits.minTexelBufferOffsetAlignment;
     if (min_alignment == 1) {
         GTEST_SKIP() << "Test requires minTexelOffsetAlignment to not be equal to 1";
@@ -254,7 +254,7 @@ TEST_F(NegativeBuffer, BufferViewCreateInfoFeatures) {
 
 TEST_F(NegativeBuffer, BufferViewMaxTexelBufferElements) {
     RETURN_IF_SKIP(Init());
-    const VkPhysicalDeviceLimits &dev_limits = m_device->Physical().limits_;
+    const VkPhysicalDeviceLimits& dev_limits = m_device->Physical().limits_;
     // Create a new test buffer that is larger than VkPhysicalDeviceLimits::maxTexelBufferElements
     // The spec min max is just 64K, but some implementations support a much larger value than that.
     // Skip the test if the limit is very large to not allocate excessive amounts of memory.
@@ -977,4 +977,22 @@ TEST_F(NegativeBuffer, DISABLED_DescriptorHeapProtected) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkBufferUsageFlags2CreateInfo-usage-parameter");
         CreateBufferTest(buffer_create_info, "VUID-VkBufferCreateInfo-flags-11277");
     }
+}
+
+TEST_F(NegativeBuffer, ZeroQueueFamilyIndexCountMaintenance11) {
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_11_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance11);
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(Init());
+
+    uint32_t index = 0;
+    VkBufferCreateInfo buff_ci = vku::InitStructHelper();
+    buff_ci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buff_ci.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    buff_ci.queueFamilyIndexCount = 0;
+    buff_ci.pQueueFamilyIndices = &index;
+    buff_ci.size = 256u;
+    m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-maintenance11-13353");
+    vkt::Buffer buffer(*m_device, buff_ci, vkt::no_mem);
+    m_errorMonitor->VerifyFound();
 }

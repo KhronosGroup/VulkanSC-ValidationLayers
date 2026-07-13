@@ -18,10 +18,10 @@
 #include <cmath>
 #include "generated/vk_function_pointers.h"
 #include "utils/cast_utils.h"
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/render_pass_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
+#include "render_pass_helper.h"
 
 class NegativeCommand : public VkLayerTest {};
 
@@ -298,7 +298,7 @@ TEST_F(NegativeCommand, PushConstants) {
     // Check for invalid push constant ranges in pipeline layouts.
     struct PipelineLayoutTestCase {
         VkPushConstantRange const range;
-        const char *msg;
+        const char* msg;
     };
 
     const uint32_t too_big = m_device->Physical().limits_.maxPushConstantsSize + 0x4;
@@ -316,7 +316,7 @@ TEST_F(NegativeCommand, PushConstants) {
     }};
 
     // Check for invalid offset and size
-    for (const auto &iter : range_tests) {
+    for (const auto& iter : range_tests) {
         pc_range = iter.range;
         m_errorMonitor->SetDesiredError(iter.msg);
         vk::CreatePipelineLayout(device(), &pipeline_layout_ci, NULL, &pipeline_layout);
@@ -339,7 +339,7 @@ TEST_F(NegativeCommand, PushConstants) {
     const uint32_t ranges_per_test = 5;
     struct DuplicateStageFlagsTestCase {
         VkPushConstantRange const ranges[ranges_per_test];
-        std::vector<const char *> const msg;
+        std::vector<const char*> const msg;
     };
     // Overlapping ranges are OK, but a stage flag can appear only once.
     const std::array<DuplicateStageFlagsTestCase, 3> duplicate_stage_flags_tests = {
@@ -375,10 +375,10 @@ TEST_F(NegativeCommand, PushConstants) {
         },
     };
 
-    for (const auto &iter : duplicate_stage_flags_tests) {
+    for (const auto& iter : duplicate_stage_flags_tests) {
         pipeline_layout_ci.pPushConstantRanges = iter.ranges;
         pipeline_layout_ci.pushConstantRangeCount = ranges_per_test;
-        for (const auto &vuid : iter.msg) {
+        for (const auto& vuid : iter.msg) {
             m_errorMonitor->SetDesiredError(vuid);
         }
         vk::CreatePipelineLayout(device(), &pipeline_layout_ci, NULL, &pipeline_layout);
@@ -845,7 +845,7 @@ TEST_F(NegativeCommand, ExecuteCommandsPrimaryCB) {
 
 TEST_F(NegativeCommand, SimultaneousUseOneShot) {
     TEST_DESCRIPTION("Submit the same command buffer twice in one submit looking for simultaneous use and one time submit errors");
-    const char *simultaneous_use_message = "is already in use and is not marked for simultaneous use";
+    const char* simultaneous_use_message = "is already in use and is not marked for simultaneous use";
     RETURN_IF_SKIP(Init());
 
     VkCommandBuffer cmd_bufs[2];
@@ -894,7 +894,7 @@ TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipeline) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler3D s;
         layout(location=0) out vec4 color;
@@ -944,7 +944,7 @@ TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipelineFunction) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler3D s;
         layout(location=0) out vec4 color;
@@ -1002,7 +1002,7 @@ TEST_F(NegativeCommand, DrawTimeImageComponentTypeMismatchWithPipeline) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform isampler2D s;
         layout(location=0) out vec4 color;
@@ -1205,7 +1205,7 @@ TEST_F(NegativeCommand, ResolveImageLayoutMismatch) {
     subresource.levelCount = 1;
     src_image.SetLayout(m_command_buffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     vk::CmdClearColorImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1, &subresource);
-    src_image.TransitionLayout(m_command_buffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    m_command_buffer.TransitionLayout(src_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     dst_image.SetLayout(m_command_buffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkImageResolve resolve_region;
@@ -1266,7 +1266,7 @@ TEST_F(NegativeCommand, ResolveInvalidSubresource) {
     subresource.levelCount = 1;
     src_image.SetLayout(m_command_buffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     vk::CmdClearColorImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1, &subresource);
-    src_image.TransitionLayout(m_command_buffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    m_command_buffer.TransitionLayout(src_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     dstImage.SetLayout(m_command_buffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkImageResolve resolve_region;
@@ -2208,11 +2208,11 @@ TEST_F(NegativeCommand, ExclusiveScissorNV) {
 
         struct TestCase {
             uint32_t viewport_count;
-            VkViewport *viewports;
+            VkViewport* viewports;
             uint32_t scissor_count;
-            VkRect2D *scissors;
+            VkRect2D* scissors;
             uint32_t exclusive_scissor_count;
-            VkRect2D *exclusive_scissors;
+            VkRect2D* exclusive_scissors;
 
             std::vector<std::string> vuids;
         };
@@ -2238,10 +2238,10 @@ TEST_F(NegativeCommand, ExclusiveScissorNV) {
             {1, viewports, 1, scissors, 1, nullptr, {"VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04056"}},
         };
 
-        for (const auto &test_case : test_cases) {
+        for (const auto& test_case : test_cases) {
             VkPipelineViewportExclusiveScissorStateCreateInfoNV exc = vku::InitStructHelper();
 
-            const auto break_vp = [&test_case, &exc](CreatePipelineHelper &helper) {
+            const auto break_vp = [&test_case, &exc](CreatePipelineHelper& helper) {
                 helper.vp_state_ci_.viewportCount = test_case.viewport_count;
                 helper.vp_state_ci_.pViewports = test_case.viewports;
                 helper.vp_state_ci_.scissorCount = test_case.scissor_count;
@@ -2303,7 +2303,7 @@ TEST_F(NegativeCommand, ExclusiveScissorNV) {
             {{{0, vvl::kI32Max}, {16, 1}}, "VUID-vkCmdSetExclusiveScissorNV-offset-02039"},
             {{{0, 0}, {16, uint32_t{vvl::kI32Max} + 1}}, "VUID-vkCmdSetExclusiveScissorNV-offset-02039"}};
 
-        for (const auto &test_case : test_cases) {
+        for (const auto& test_case : test_cases) {
             m_errorMonitor->SetDesiredError(test_case.vuid.c_str());
             vk::CmdSetExclusiveScissorNV(m_command_buffer, 0, 1, &test_case.scissor);
             m_errorMonitor->VerifyFound();
@@ -2364,7 +2364,7 @@ TEST_F(NegativeCommand, ViewportWScalingNV) {
     vpci.scissorCount = vp_count;
     vpci.pScissors = sc.data();
 
-    const auto set_vpci = [&vpci](CreatePipelineHelper &helper) { helper.vp_state_ci_ = vpci; };
+    const auto set_vpci = [&vpci](CreatePipelineHelper& helper) { helper.vp_state_ci_ = vpci; };
 
     // Make sure no errors show up when creating the pipeline with w-scaling enabled
     CreatePipelineHelper::OneshotTest(*this, set_vpci, kErrorBit);
@@ -2579,7 +2579,7 @@ TEST_F(NegativeCommand, CmdUpdateBufferSize) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdUpdateBuffer-dataSize-00033");
     m_command_buffer.Begin();
-    vk::CmdUpdateBuffer(m_command_buffer, buffer, sizeof(uint32_t), data_size, (void *)update_data);
+    vk::CmdUpdateBuffer(m_command_buffer, buffer, sizeof(uint32_t), data_size, (void*)update_data);
     m_command_buffer.End();
     m_errorMonitor->VerifyFound();
 }
@@ -2594,7 +2594,7 @@ TEST_F(NegativeCommand, CmdUpdateBufferDstOffset) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdUpdateBuffer-dstOffset-00032");
     m_command_buffer.Begin();
-    vk::CmdUpdateBuffer(m_command_buffer, buffer, sizeof(uint32_t) * 8, data_size, (void *)update_data);
+    vk::CmdUpdateBuffer(m_command_buffer, buffer, sizeof(uint32_t) * 8, data_size, (void*)update_data);
     m_command_buffer.End();
     m_errorMonitor->VerifyFound();
 }
@@ -2852,7 +2852,7 @@ TEST_F(NegativeCommand, ResolveUsage) {
     TEST_DESCRIPTION("Resolve image with missing usage flags.");
 
     RETURN_IF_SKIP(Init());
-    const VkPhysicalDeviceLimits &dev_limits = m_device->Physical().limits_;
+    const VkPhysicalDeviceLimits& dev_limits = m_device->Physical().limits_;
     if ((dev_limits.sampledImageColorSampleCounts & VK_SAMPLE_COUNT_2_BIT) == 0) {
         GTEST_SKIP() << "Required VkSampleCountFlagBits are not supported; skipping";
     }
@@ -4035,8 +4035,8 @@ TEST_F(NegativeCommand, CommandBufferRecording) {
         vk::CmdClearAttachments(m_command_buffer, 1, &clear_attachment, 1, &clear_rect);
         m_errorMonitor->VerifyFound();
 
-        VkImageMemoryBarrier image_barrier = image.ImageMemoryBarrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-                                                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
+        VkImageMemoryBarrier image_barrier =
+            image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
         m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-commandBuffer-recording");
         vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                                nullptr, 0, nullptr, 1, &image_barrier);
@@ -4113,7 +4113,7 @@ TEST_F(NegativeCommand, CommandBufferRecording) {
 TEST_F(NegativeCommand, ManyInvalidatedObjects) {
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer SSBO_0 {
             vec4 a;
@@ -5198,5 +5198,70 @@ TEST_F(NegativeCommand, ResolveImage2StencilResolveMode) {
     resolve_info.srcImage = src_depth_image;
     m_errorMonitor->SetDesiredError("VUID-VkResolveImageInfo2-srcImage-10988");
     vk::CmdResolveImage2KHR(m_command_buffer, &resolve_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeCommand, SetPrimitiveRestartIndex) {
+    AddRequiredExtensions(VK_EXT_PRIMITIVE_RESTART_INDEX_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::primitiveRestartIndex);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::Buffer index_buffer(*m_device, 64, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.ia_ci_.primitiveRestartEnable = VK_TRUE;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT16);
+    vk::CmdSetPrimitiveRestartIndexEXT(m_command_buffer, 0xFFFFFFFF);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-primitiveRestartIndex-12401");
+    vk::CmdDrawIndexed(m_command_buffer, 3, 1, 0, 3, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+// See https://gitlab.khronos.org/vulkan/vulkan/-/issues/4793
+// You are not allowed to call reset on destroyed objects
+TEST_F(NegativeCommand, DeviceLostInUse) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+    if (!IsPlatformMockICD()) {
+        GTEST_SKIP() << "Test only supported by MockICD";
+    }
+
+    m_command_buffer.Begin();
+    m_command_buffer.End();
+
+    vkt::Fence fence(*m_device);
+
+    // Special way to force VK_ERROR_DEVICE_LOST with MockICD
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSubmitInfo-pNext-pNext");
+    VkExportFenceCreateInfo fault_injection = vku::InitStructHelper();
+
+    VkSubmitInfo submit_info = vku::InitStructHelper(&fault_injection);
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_command_buffer.handle();
+    VkResult result = vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, fence);
+
+    if (result != VK_ERROR_DEVICE_LOST) {
+        vk::QueueWaitIdle(m_default_queue->handle());
+        GTEST_SKIP() << "No device lost found";
+    }
+
+    m_errorMonitor->SetDesiredError("VUID-vkResetFences-pFences-01123");
+    fence.Reset();
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkResetCommandBuffer-commandBuffer-00045");
+    vk::ResetCommandBuffer(m_command_buffer, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkResetCommandPool-commandPool-00040");
+    vk::ResetCommandPool(*m_device, m_command_pool, 0);
     m_errorMonitor->VerifyFound();
 }

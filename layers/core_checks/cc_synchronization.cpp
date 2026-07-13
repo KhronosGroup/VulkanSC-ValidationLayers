@@ -24,7 +24,6 @@
 
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/utility/vk_format_utils.h>
-#include <vulkan/vulkan_core.h>
 #include "core_checks/cc_sync_vuid_maps.h"
 #include "core_checks/cc_synchronization.h"
 #include "core_checks/cc_state_tracker.h"
@@ -44,7 +43,7 @@
 #include "state_tracker/render_pass_state.h"
 #include "state_tracker/cmd_buffer_state.h"
 #include "state_tracker/wsi_state.h"
-#include "state_tracker/event_map.h"
+#include "state_tracker/event_state.h"
 #include "generated/dispatch_functions.h"
 #include "generated/sync_validation_types.h"
 #include "utils/assert_utils.h"
@@ -71,10 +70,10 @@ WriteLockGuard CoreChecks::WriteLock() {
     }
 }
 
-bool SemaphoreSubmitState::CanWaitBinary(const vvl::Semaphore &semaphore_state) const {
+bool SemaphoreSubmitState::CanWaitBinary(const vvl::Semaphore& semaphore_state) const {
     assert(semaphore_state.type == VK_SEMAPHORE_TYPE_BINARY);
     // Check if current submission has signaled or unsignaled the semaphore
-    if (const bool *signaling_state = vvl::Find(binary_signaling_state, semaphore_state.VkHandle())) {
+    if (const bool* signaling_state = vvl::Find(binary_signaling_state, semaphore_state.VkHandle())) {
         const bool signaled = *signaling_state;
         return signaled;  // signaled => can wait
     }
@@ -82,11 +81,11 @@ bool SemaphoreSubmitState::CanWaitBinary(const vvl::Semaphore &semaphore_state) 
     return semaphore_state.CanBinaryBeWaited();
 }
 
-bool SemaphoreSubmitState::CanSignalBinary(const vvl::Semaphore &semaphore_state, VkQueue &other_queue,
-                                           vvl::Func &other_acquire_command) const {
+bool SemaphoreSubmitState::CanSignalBinary(const vvl::Semaphore& semaphore_state, VkQueue& other_queue,
+                                           vvl::Func& other_acquire_command) const {
     assert(semaphore_state.type == VK_SEMAPHORE_TYPE_BINARY);
     // Check if current submission has signaled or unsignaled the semaphore
-    if (const bool *signaling_state = vvl::Find(binary_signaling_state, semaphore_state.VkHandle())) {
+    if (const bool* signaling_state = vvl::Find(binary_signaling_state, semaphore_state.VkHandle())) {
         const bool signaled = *signaling_state;
         if (!signaled) {
             return true;  // not signaled => can signal
@@ -103,7 +102,7 @@ bool SemaphoreSubmitState::CanSignalBinary(const vvl::Semaphore &semaphore_state
     return false;
 }
 
-VkQueue SemaphoreSubmitState::AnotherQueueWaits(const vvl::Semaphore &semaphore_state) const {
+VkQueue SemaphoreSubmitState::AnotherQueueWaits(const vvl::Semaphore& semaphore_state) const {
     // VUID-vkQueueSubmit-pWaitSemaphores-00068 (and similar VUs):
     // "When a semaphore wait operation referring to a binary semaphore defined
     //  by any element of the pWaitSemaphores member of any element of pSubmits
@@ -115,8 +114,8 @@ VkQueue SemaphoreSubmitState::AnotherQueueWaits(const vvl::Semaphore &semaphore_
     return VK_NULL_HANDLE;
 }
 
-std::optional<uint64_t> SemaphoreSubmitState::CheckTimelineMaxDiff(const vvl::Semaphore &semaphore_state, uint64_t value,
-                                                                   const char *&payload_type) {
+std::optional<uint64_t> SemaphoreSubmitState::CheckTimelineMaxDiff(const vvl::Semaphore& semaphore_state, uint64_t value,
+                                                                   const char*& payload_type) {
     const uint64_t max_diff = core.phys_dev_props_core12.maxTimelineSemaphoreValueDifference;
     auto current_signal = timeline_signals.find(semaphore_state.VkHandle());
     if (current_signal != timeline_signals.end()) {
@@ -135,8 +134,8 @@ std::optional<uint64_t> SemaphoreSubmitState::CheckTimelineMaxDiff(const vvl::Se
     return semaphore_state.CheckMaxDiffThreshold(value, payload_type);
 }
 
-std::optional<uint64_t> SemaphoreSubmitState::CheckTimelineSignalTooSmall(const vvl::Semaphore &semaphore_state, uint64_t value,
-                                                                          const char *&payload_type) {
+std::optional<uint64_t> SemaphoreSubmitState::CheckTimelineSignalTooSmall(const vvl::Semaphore& semaphore_state, uint64_t value,
+                                                                          const char*& payload_type) {
     if (auto it = timeline_signals.find(semaphore_state.VkHandle()); it != timeline_signals.end()) {
         const uint64_t current_submit_signal = it->second;
         if (value <= current_submit_signal) {
@@ -159,22 +158,22 @@ std::optional<uint64_t> SemaphoreSubmitState::CheckTimelineSignalTooSmall(const 
     return {};
 }
 
-bool SemaphoreSubmitState::ValidateBinaryWait(const Location &loc, const vvl::Semaphore &semaphore_state) {
+bool SemaphoreSubmitState::ValidateBinaryWait(const Location& loc, const vvl::Semaphore& semaphore_state) {
     bool skip = false;
     auto semaphore = semaphore_state.VkHandle();
     if ((semaphore_state.Scope() == vvl::Semaphore::kInternal || internal_semaphores.count(semaphore))) {
         if (VkQueue other_queue = AnotherQueueWaits(semaphore_state)) {
-            const auto &vuid = vvl::GetQueueSubmitVUID(loc, vvl::SubmitError::kOtherQueueWaiting);
+            const auto& vuid = vvl::GetQueueSubmitVUID(loc, vvl::SubmitError::kOtherQueueWaiting);
             const LogObjectList objlist(semaphore, queue, other_queue);
             skip |= core.LogError(vuid, objlist, loc, "queue (%s) is already waiting on semaphore (%s).",
                                   core.FormatHandle(other_queue).c_str(), core.FormatHandle(semaphore).c_str());
         } else if (!CanWaitBinary(semaphore_state)) {
-            const auto &vuid = GetQueueSubmitVUID(loc, vvl::SubmitError::kBinaryCannotBeSignalled);
+            const auto& vuid = GetQueueSubmitVUID(loc, vvl::SubmitError::kBinaryCannotBeSignalled);
             const LogObjectList objlist(semaphore, queue);
             skip |= core.LogError(vuid, objlist, loc, "queue (%s) is waiting on semaphore (%s) that has no way to be signaled.",
                                   core.FormatHandle(queue).c_str(), core.FormatHandle(semaphore).c_str());
         } else if (auto timeline_wait_info = semaphore_state.GetPendingBinarySignalTimelineDependency()) {
-            const auto &vuid = GetQueueSubmitVUID(loc, vvl::SubmitError::kBinaryCannotBeSignalled);
+            const auto& vuid = GetQueueSubmitVUID(loc, vvl::SubmitError::kBinaryCannotBeSignalled);
             const LogObjectList objlist(semaphore_state.Handle(), timeline_wait_info->semaphore->Handle(), queue);
             skip |= core.LogError(
                 vuid, objlist, loc,
@@ -191,22 +190,26 @@ bool SemaphoreSubmitState::ValidateBinaryWait(const Location &loc, const vvl::Se
     return skip;
 }
 
-bool SemaphoreSubmitState::ValidateTimelineWait(const Location &semaphore_loc, const vvl::Semaphore &semaphore_state,
+bool SemaphoreSubmitState::ValidateTimelineWait(const Location& semaphore_loc, const vvl::Semaphore& semaphore_state,
                                                 uint64_t value) {
     bool skip = false;
-    const char *payload_type = nullptr;
-    if (std::optional<uint64_t> far_away_payload = CheckTimelineMaxDiff(semaphore_state, value, payload_type)) {
-        const auto &vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kTimelineSemMaxDiff);
+    const char* payload_type = nullptr;
+    if (std::optional<uint64_t> payload = CheckTimelineMaxDiff(semaphore_state, value, payload_type)) {
+        const auto& vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kTimelineSemMaxDiff);
+        const uint64_t max_diff = core.phys_dev_props_core12.maxTimelineSemaphoreValueDifference;
+        const uint64_t diff = AbsDiff(value, *payload);
         skip |= core.LogError(vuid, semaphore_state.Handle(), semaphore_loc,
-                              "value (%" PRIu64 ") exceeds limit regarding %s semaphore %s value (%" PRIu64 ").", value,
-                              payload_type, core.FormatHandle(semaphore_state.Handle()).c_str(), *far_away_payload);
+                              "(%s) wait value is %" PRIu64 ", the %s semaphore value is %" PRIu64
+                              ", and the difference between them is %" PRIu64
+                              ", which is greater than maxTimelineSemaphoreValueDifference (%" PRIu64 ").",
+                              core.FormatHandle(semaphore_state.Handle()).c_str(), value, payload_type, *payload, diff, max_diff);
     } else {
         timeline_waits[semaphore_state.VkHandle()] = value;
     }
     return skip;
 }
 
-bool SemaphoreSubmitState::ValidateWaitSemaphore(const Location &wait_semaphore_loc, const vvl::Semaphore &semaphore_state,
+bool SemaphoreSubmitState::ValidateWaitSemaphore(const Location& wait_semaphore_loc, const vvl::Semaphore& semaphore_state,
                                                  uint64_t value) {
     bool skip = false;
     if (semaphore_state.type == VK_SEMAPHORE_TYPE_BINARY) {
@@ -218,16 +221,16 @@ bool SemaphoreSubmitState::ValidateWaitSemaphore(const Location &wait_semaphore_
     return skip;
 }
 
-static std::string GetSemaphoreInUseBySwapchainMessage(const vvl::Semaphore::SwapchainWaitInfo &swapchain_info,
-                                                       const vvl::Semaphore &semaphore_state, VkQueue queue,
-                                                       bool swapchain_fence_supported, const Logger &logger) {
+static std::string GetSemaphoreInUseBySwapchainMessage(const vvl::Semaphore::SwapchainWaitInfo& swapchain_info,
+                                                       const vvl::Semaphore& semaphore_state, VkQueue queue,
+                                                       bool swapchain_fence_supported, const Logger& logger) {
     std::ostringstream ss;
 
     const std::string semaphore_str = logger.FormatHandle(semaphore_state.Handle());
     const std::string queue_str = logger.FormatHandle(queue);
 
     if (swapchain_info.swapchain) {
-        const vvl::Swapchain &swapchain = *swapchain_info.swapchain;
+        const vvl::Swapchain& swapchain = *swapchain_info.swapchain;
 
         ss << "(" << semaphore_str << ") is being signaled by " << queue_str << ", but it may still be in use by "
            << logger.FormatHandle(swapchain.Handle()) << ".\n";
@@ -284,7 +287,7 @@ static std::string GetSemaphoreInUseBySwapchainMessage(const vvl::Semaphore::Swa
            << ", but it may still be in use by the swapchain since the corresponding swapchain image has not been "
               "re-acquired.\n";
     }
-    ss << "Vulkan insight: See https://docs.vulkan.org/guide/latest/swapchain_semaphore_reuse.html for details on swapchain "
+    ss << "Hint: See https://docs.vulkan.org/guide/latest/swapchain_semaphore_reuse.html for details on swapchain "
           "semaphore reuse. Examples of possible approaches:\n"
           "   a) Use a separate semaphore per swapchain image. Index these semaphores using the index of the acquired image.\n"
           "   b) Consider the VK_KHR_swapchain_maintenance1 extension. It allows using a VkFence with the presentation "
@@ -292,11 +295,11 @@ static std::string GetSemaphoreInUseBySwapchainMessage(const vvl::Semaphore::Swa
     return ss.str();
 }
 
-bool SemaphoreSubmitState::ValidateBinarySignal(const Location &semaphore_loc, const vvl::Semaphore &semaphore_state) {
+bool SemaphoreSubmitState::ValidateBinarySignal(const Location& semaphore_loc, const vvl::Semaphore& semaphore_state) {
     bool skip = false;
 
     // Detect use case when to disable present semaphore in-use check
-    auto is_shared_present_pre_maintenance1 = [this](const vvl::Semaphore::SwapchainWaitInfo &swapchain_wait_info) {
+    auto is_shared_present_pre_maintenance1 = [this](const vvl::Semaphore::SwapchainWaitInfo& swapchain_wait_info) {
         // Null swapchain is only in the case of multiple swapchains.
         // Assume it's not a shared present mode and proceed with reporting semaphore in-use error
         if (!swapchain_wait_info.swapchain) {
@@ -339,7 +342,7 @@ bool SemaphoreSubmitState::ValidateBinarySignal(const Location &semaphore_loc, c
             initiator << core.FormatHandle(other_queue);
             objlist.add(other_queue);
         }
-        const auto &vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kSemAlreadySignalled);
+        const auto& vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kSemAlreadySignalled);
         skip |= core.LogError(vuid, objlist, semaphore_loc,
                               "(%s) is being signaled by %s, but it was previously signaled by %s and has not since been waited on",
                               core.FormatHandle(semaphore).c_str(), core.FormatHandle(queue).c_str(), initiator.str().c_str());
@@ -349,7 +352,7 @@ bool SemaphoreSubmitState::ValidateBinarySignal(const Location &semaphore_loc, c
                                              IsExtEnabled(core.extensions.vk_ext_swapchain_maintenance1);
         const std::string error_message =
             GetSemaphoreInUseBySwapchainMessage(*swapchain_info, semaphore_state, queue, present_fence_supported, core);
-        const std::string &vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kSemAlreadySignalled);
+        const std::string& vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kSemAlreadySignalled);
         skip |= core.LogError(vuid, objlist, semaphore_loc, "%s", error_message.c_str());
     } else {
         binary_signaling_state[semaphore] = true;
@@ -357,31 +360,35 @@ bool SemaphoreSubmitState::ValidateBinarySignal(const Location &semaphore_loc, c
     return skip;
 }
 
-bool SemaphoreSubmitState::ValidateTimelineSignal(const Location &semaphore_loc, const vvl::Semaphore &semaphore_state,
+bool SemaphoreSubmitState::ValidateTimelineSignal(const Location& semaphore_loc, const vvl::Semaphore& semaphore_state,
                                                   uint64_t value) {
     bool skip = false;
-    const char *where = nullptr;
+    const char* payload_type = nullptr;
 
-    if (std::optional<uint64_t> larger_or_equal_payload = CheckTimelineSignalTooSmall(semaphore_state, value, where)) {
-        const auto &vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kTimelineSemSmallValue);
+    if (std::optional<uint64_t> larger_or_equal_payload = CheckTimelineSignalTooSmall(semaphore_state, value, payload_type)) {
+        const auto& vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kTimelineSemSmallValue);
         LogObjectList objlist(semaphore_state.Handle(), queue);
         skip |= core.LogError(vuid, objlist, semaphore_loc,
                               "signal value (%" PRIu64 ") in %s must be greater than %s timeline semaphore %s value (%" PRIu64 ")",
-                              value, core.FormatHandle(queue).c_str(), where, core.FormatHandle(semaphore_state.Handle()).c_str(),
-                              *larger_or_equal_payload);
-    } else if (std::optional<uint64_t> far_away_payload = CheckTimelineMaxDiff(semaphore_state, value, where)) {
-        const auto &vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kTimelineSemMaxDiff);
+                              value, core.FormatHandle(queue).c_str(), payload_type,
+                              core.FormatHandle(semaphore_state.Handle()).c_str(), *larger_or_equal_payload);
+    } else if (std::optional<uint64_t> payload = CheckTimelineMaxDiff(semaphore_state, value, payload_type)) {
+        const auto& vuid = GetQueueSubmitVUID(semaphore_loc, vvl::SubmitError::kTimelineSemMaxDiff);
+        const uint64_t max_diff = core.phys_dev_props_core12.maxTimelineSemaphoreValueDifference;
+        const uint64_t diff = AbsDiff(value, *payload);
         LogObjectList objlist(semaphore_state.Handle(), queue);
         skip |= core.LogError(vuid, objlist, semaphore_loc,
-                              "value (%" PRIu64 ") exceeds limit regarding %s semaphore %s value (%" PRIu64 ").", value, where,
-                              core.FormatHandle(semaphore_state.Handle()).c_str(), *far_away_payload);
+                              "(%s) signal value is %" PRIu64 ", the %s semaphore value is %" PRIu64
+                              ", and the difference between them is %" PRIu64
+                              ", which is greater than maxTimelineSemaphoreValueDifference (%" PRIu64 ").",
+                              core.FormatHandle(semaphore_state.Handle()).c_str(), value, payload_type, *payload, diff, max_diff);
     } else {
         timeline_signals[semaphore_state.VkHandle()] = value;
     }
     return skip;
 }
 
-bool SemaphoreSubmitState::ValidateSignalSemaphore(const Location &signal_semaphore_loc, const vvl::Semaphore &semaphore_state,
+bool SemaphoreSubmitState::ValidateSignalSemaphore(const Location& signal_semaphore_loc, const vvl::Semaphore& semaphore_state,
                                                    uint64_t value) {
     bool skip = false;
     if (semaphore_state.type == VK_SEMAPHORE_TYPE_BINARY) {
@@ -393,19 +400,208 @@ bool SemaphoreSubmitState::ValidateSignalSemaphore(const Location &signal_semaph
     return skip;
 }
 
-bool CoreChecks::ValidateStageMaskHost(const LogObjectList &objlist, const Location &stage_mask_loc,
+static bool ValidateEventQueueMismatch(const CoreChecks& core, const vvl::Queue& queue_state, const vvl::CommandBuffer& cb_state,
+                                       const vvl::Event& event_state, const EventSignalStateMap& local_signal_states,
+                                       const Location& loc) {
+    bool skip = false;
+
+    // Check if prior command buffers from this submit contain signaling operation.
+    // If yes, then everything is on the same queue
+    if (vvl::Contains(local_signal_states, event_state.VkHandle())) {
+        return skip;
+    }
+    // Check global event state
+    if (event_state.signaling_queue != VK_NULL_HANDLE && event_state.signaling_queue != queue_state.VkHandle()) {
+        const LogObjectList objlist(cb_state.Handle(), event_state.Handle(), event_state.signaling_queue, queue_state.Handle());
+        skip |= core.LogError("UNASSIGNED-SubmitValidation-WaitEvents-WrongQueue", objlist, loc,
+                              "waits for event %s on the queue %s but the event was signaled on a different queue %s",
+                              core.FormatHandle(event_state.Handle()).c_str(), core.FormatHandle(queue_state.Handle()).c_str(),
+                              core.FormatHandle(event_state.signaling_queue).c_str());
+    }
+    return skip;
+}
+
+bool WaitEventSubmitInfo::Validate(const CoreChecks& core, const vvl::Queue& queue_state, const vvl::CommandBuffer& cb_state,
+                                   EventSignalStateMap& local_signal_states, const Location& loc) const {
+    bool skip = false;
+
+    VkPipelineStageFlags signals_src_stage_mask = 0;
+    bool set_wait_version_mismatch = false;  // if version mismatch is detected some other validations make no sense
+    bool found_signals = false;
+
+    for (VkEvent event : wait_events) {
+        if (auto event_state = core.Get<vvl::Event>(event)) {
+            if (!vvl::Contains(signal_states, event)) {
+                skip |= ValidateEventQueueMismatch(core, queue_state, cb_state, *event_state, local_signal_states, loc);
+            }
+            const EventSignalState* local_signal_state = vvl::Find(local_signal_states, event);
+            const EventSignalState* cb_signal_state = vvl::Find(signal_states, event);
+            const EventSignalState resolved_state = ResolveEventSignal(*event_state, local_signal_state, cb_signal_state);
+
+            // Validate set-wait mismatch
+            if (IsValueIn(resolved_state.last_signaling_command, {vvl::Func::vkCmdSetEvent2, vvl::Func::vkCmdSetEvent2KHR})) {
+                set_wait_version_mismatch = true;
+                const LogObjectList objlist(cb_state.Handle(), event_state->Handle());
+                skip |= core.LogError("VUID-vkCmdWaitEvents-pEvents-03847", objlist, loc, "%s: %s was set by %s.",
+                                      vvl::String(wait_command), core.FormatHandle(event).c_str(),
+                                      vvl::String(resolved_state.last_signaling_command));
+            }
+            // Collect source stages from all signals
+            if (resolved_state.signaled) {
+                signals_src_stage_mask |= static_cast<VkPipelineStageFlags>(resolved_state.signal_src_stage_mask);
+                found_signals = true;
+            }
+        }
+    }
+
+    // Validate src stage mask
+    if (!set_wait_version_mismatch && wait_src_stage_mask != signals_src_stage_mask) {
+        std::ostringstream ss;
+        ss << "(" << core.FormatHandle(cb_state.Handle()) << ") contains vkCmdWaitEvents with srcStageMask "
+           << string_VkPipelineStageFlags(wait_src_stage_mask);
+
+        const VkPipelineStageFlags device_signals_src_stage_mask = signals_src_stage_mask & ~VK_PIPELINE_STAGE_HOST_BIT;
+        const VkPipelineStageFlags device_wait_src_stage_mask = wait_src_stage_mask & ~VK_PIPELINE_STAGE_HOST_BIT;
+        const bool host_wait = wait_src_stage_mask & VK_PIPELINE_STAGE_HOST_BIT;
+        const bool host_signal = signals_src_stage_mask & VK_PIPELINE_STAGE_HOST_BIT;
+
+        if (found_signals) {
+            if (device_wait_src_stage_mask != device_signals_src_stage_mask) {
+                if (signals_src_stage_mask != VK_PIPELINE_STAGE_HOST_BIT) {
+                    ss << ", but the bitwise OR of stageMask values from the most recent vkCmdSetEvent calls is "
+                       << string_VkPipelineStageFlags(device_signals_src_stage_mask);
+                } else if (host_wait) {
+                    // The host part of srcStageMask matches the host signal, but the device part has no signal
+                    ss << ". srcStageMask includes " << string_VkPipelineStageFlags(device_wait_src_stage_mask)
+                       << " which has no corresponding vkCmdSetEvent signal";
+                }
+            }
+            if (host_wait && !host_signal) {
+                ss << ". srcStageMask specifies VK_PIPELINE_STAGE_HOST_BIT but none of the waited events were set by vkSetEvent";
+            }
+        } else {
+            ss << ", but the waited events are known to be unsignaled at this point";
+            if (device_wait_src_stage_mask) {
+                ss << ". The wait does not have a corresponding vkCmdSetEvent signal";
+            }
+            if (host_wait) {
+                ss << ". srcStageMask specifies VK_PIPELINE_STAGE_HOST_BIT but none of the waited events were set by vkSetEvent";
+            }
+        }
+        if (host_signal && !host_wait) {
+            ss << ". At least one waited event was set by vkSetEvent, so srcStageMask must also include "
+                  "VK_PIPELINE_STAGE_HOST_BIT";
+        }
+        skip |= core.LogError("VUID-vkCmdWaitEvents-srcStageMask-01158", cb_state.Handle(), loc, "%s", ss.str().c_str());
+    }
+    return skip;
+}
+
+bool WaitEvent2SubmitInfo::Validate(const CoreChecks& core, const vvl::Queue& queue_state, const vvl::CommandBuffer& cb_state,
+                                    EventSignalStateMap& local_signal_states, const Location& loc) const {
+    bool skip = false;
+
+    auto event_state = core.Get<vvl::Event>(wait_event);
+    if (!event_state) {
+        return skip;
+    }
+
+    skip |= ValidateEventQueueMismatch(core, queue_state, cb_state, *event_state, local_signal_states, loc);
+
+    const EventSignalState* local_signal_state = vvl::Find(local_signal_states, wait_event);
+    const EventSignalState* cb_signal_state = signal_state.has_value() ? &*signal_state : nullptr;
+    const EventSignalState resolved_state = ResolveEventSignal(*event_state, local_signal_state, cb_signal_state);
+
+    const VkPipelineStageFlags2 union_src_stage_mask = sync_utils::GetExecScopes(*wait_dependency_info.ptr()).src;
+
+    if (union_src_stage_mask == VK_PIPELINE_STAGE_2_HOST_BIT && !resolved_state.signaled) {
+        const LogObjectList objlist(cb_state.Handle(), event_state->Handle());
+        skip |= core.LogError("VUID-vkCmdWaitEvents2-pEvents-03840", objlist, loc,
+                              "contains %s and the first synchronization scope specified by pDependencyInfos is "
+                              "VK_PIPELINE_STAGE_2_HOST_BIT but %s is not signaled",
+                              vvl::String(wait_command), core.FormatHandle(event_state->Handle()).c_str());
+    } else if (resolved_state.last_signaling_command == vvl::Func::vkSetEvent) {
+        if ((union_src_stage_mask & VK_PIPELINE_STAGE_2_HOST_BIT) == 0) {
+            const LogObjectList objlist(cb_state.Handle(), event_state->Handle());
+            skip |= core.LogError("VUID-vkCmdWaitEvents2-pEvents-03839", objlist, loc,
+                                  "contains %s and %s was signaled by vkSetEvent, but the first synchronization scope specified "
+                                  "by pDependencyInfos does not include VK_PIPELINE_STAGE_2_HOST_BIT",
+                                  vvl::String(wait_command), core.FormatHandle(event_state->Handle()).c_str());
+        } else if (union_src_stage_mask != VK_PIPELINE_STAGE_2_HOST_BIT) {
+            const LogObjectList objlist(cb_state.Handle(), event_state->Handle());
+            skip |= core.LogError("VUID-vkCmdWaitEvents2-pEvents-03839", objlist, loc,
+                                  "contains %s and %s was signaled by vkSetEvent, but the first synchronization scope specified "
+                                  "by pDependencyInfos includes other stages than VK_PIPELINE_STAGE_2_HOST_BIT: %s",
+                                  vvl::String(wait_command), core.FormatHandle(event_state->Handle()).c_str(),
+                                  string_VkPipelineStageFlags2(union_src_stage_mask).c_str());
+        }
+    } else if (resolved_state.last_signaling_command == vvl::Func::vkCmdSetEvent) {
+        const LogObjectList objlist(cb_state.Handle(), event_state->Handle());
+        skip |=
+            core.LogError("VUID-vkCmdWaitEvents2-pEvents-03837", objlist, loc, "%s: %s was set by %s.", vvl::String(wait_command),
+                          core.FormatHandle(event_state->Handle()).c_str(), vvl::String(resolved_state.last_signaling_command));
+    } else if (!IsValueIn(resolved_state.last_signaling_command, {vvl::Func::vkCmdSetEvent2, vvl::Func::vkCmdSetEvent2KHR})) {
+        if ((union_src_stage_mask & VK_PIPELINE_STAGE_2_HOST_BIT) == 0) {
+            const LogObjectList objlist(cb_state.Handle(), event_state->Handle());
+            skip |= core.LogError("VUID-vkCmdWaitEvents2-pEvents-03841", objlist, loc,
+                                  "contains %s but %s was not set by vkCmdSetEvent2.", vvl::String(wait_command),
+                                  core.FormatHandle(wait_event).c_str());
+        }
+    }
+
+    const std::optional<vku::safe_VkDependencyInfo>& signal_dependency_info = resolved_state.signal_dependency_info;
+    if (signal_dependency_info.has_value()) {
+        const bool signal_has_asymmetric = (signal_dependency_info->dependencyFlags & VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR) != 0;
+        const bool wait_has_asymmetric = (wait_dependency_info.dependencyFlags & VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR) != 0;
+
+        if (!wait_has_asymmetric) {
+            if (!CompareDependencyInfo(*signal_dependency_info.value().ptr(), *wait_dependency_info.ptr())) {
+                const LogObjectList objlist(cb_state.Handle(), event_state->Handle());
+                skip |= core.LogError(
+                    "VUID-vkCmdWaitEvents2-pEvents-10788", objlist, loc,
+                    "event %s is being waited on without VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR and was "
+                    "signaled by vkCmdSetEvent2, but %s.",
+                    core.FormatHandle(wait_event).c_str(),
+                    string_VkDependencyInfo(core, *signal_dependency_info.value().ptr(), *wait_dependency_info.ptr()).c_str());
+            }
+        }
+
+        if (wait_has_asymmetric && !signal_has_asymmetric) {
+            const LogObjectList objlist(cb_state.Handle(), wait_event);
+            skip |= core.LogError(
+                "VUID-vkCmdWaitEvents2-pEvents-10789", objlist, loc,
+                "event %s is being waited on with VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR, but was signaled without it.",
+                core.FormatHandle(wait_event).c_str());
+        }
+
+        if (wait_has_asymmetric && signal_dependency_info->memoryBarrierCount && signal_dependency_info->pMemoryBarriers) {
+            if (union_src_stage_mask != signal_dependency_info->pMemoryBarriers[0].srcStageMask) {
+                const LogObjectList objlist(cb_state.Handle(), wait_event);
+                skip |=
+                    core.LogError("VUID-vkCmdWaitEvents2-pEvents-10790", objlist, loc,
+                                  "union of all srcStageMask members is %s, but event was set with "
+                                  "pDependencyInfos->pMemoryBarriers[0].srcStageMask %s.",
+                                  string_VkPipelineStageFlags2(union_src_stage_mask).c_str(),
+                                  string_VkPipelineStageFlags2(signal_dependency_info->pMemoryBarriers[0].srcStageMask).c_str());
+            }
+        }
+    }
+    return skip;
+}
+
+bool CoreChecks::ValidateStageMaskHost(const LogObjectList& objlist, const Location& stage_mask_loc,
                                        VkPipelineStageFlags2KHR stageMask) const {
     bool skip = false;
     if ((stageMask & VK_PIPELINE_STAGE_HOST_BIT) != 0) {
-        const auto &vuid = GetQueueSubmitVUID(stage_mask_loc, vvl::SubmitError::kHostStageMask);
+        const auto& vuid = GetQueueSubmitVUID(stage_mask_loc, vvl::SubmitError::kHostStageMask);
         skip |= LogError(vuid, objlist, stage_mask_loc,
                          "must not include VK_PIPELINE_STAGE_HOST_BIT as the stage can't be invoked inside a command buffer.");
     }
     return skip;
 }
 
-bool CoreChecks::ValidateFenceForSubmit(const vvl::Fence &fence_state, const char *inflight_vuid, const char *retired_vuid,
-                                        const LogObjectList &objlist, const Location &loc) const {
+bool CoreChecks::ValidateFenceForSubmit(const vvl::Fence& fence_state, const char* inflight_vuid, const char* retired_vuid,
+                                        const LogObjectList& objlist, const Location& loc) const {
     bool skip = false;
 
     if (fence_state.Scope() == vvl::Fence::kInternal) {
@@ -427,8 +623,8 @@ bool CoreChecks::ValidateFenceForSubmit(const vvl::Fence &fence_state, const cha
     return skip;
 }
 
-bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState &state, const VkSubmitInfo &submit,
-                                             const Location &submit_loc) const {
+bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState& state, const VkSubmitInfo& submit,
+                                             const Location& submit_loc) const {
     bool skip = false;
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     if (const auto d3d12_fence_submit_info = vku::FindStructInPNextChain<VkD3D12FenceSubmitInfoKHR>(submit.pNext)) {
@@ -448,7 +644,7 @@ bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState &state, const 
         }
     }
 #endif
-    auto *timeline_semaphore_submit_info = vku::FindStructInPNextChain<VkTimelineSemaphoreSubmitInfo>(submit.pNext);
+    auto* timeline_semaphore_submit_info = vku::FindStructInPNextChain<VkTimelineSemaphoreSubmitInfo>(submit.pNext);
     for (uint32_t i = 0; i < submit.waitSemaphoreCount; ++i) {
         uint64_t value = 0;
         VkSemaphore semaphore = submit.pWaitSemaphores[i];
@@ -519,11 +715,11 @@ bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState &state, const 
     return skip;
 }
 
-bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState &state, const VkSubmitInfo2 &submit,
-                                             const Location &submit_loc) const {
+bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState& state, const VkSubmitInfo2& submit,
+                                             const Location& submit_loc) const {
     bool skip = false;
     for (uint32_t i = 0; i < submit.waitSemaphoreInfoCount; ++i) {
-        const auto &wait_info = submit.pWaitSemaphoreInfos[i];
+        const auto& wait_info = submit.pWaitSemaphoreInfos[i];
         Location wait_info_loc = submit_loc.dot(Field::pWaitSemaphoreInfos, i);
         const LogObjectList objlist(wait_info.semaphore, state.queue);
         skip |= ValidatePipelineStage(objlist, wait_info_loc.dot(Field::stageMask), state.queue_flags, wait_info.stageMask);
@@ -535,7 +731,7 @@ bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState &state, const 
         skip |= state.ValidateWaitSemaphore(wait_info_loc.dot(Field::semaphore), *semaphore_state, wait_info.value);
         if (semaphore_state->type == VK_SEMAPHORE_TYPE_TIMELINE) {
             for (uint32_t sig_index = 0; sig_index < submit.signalSemaphoreInfoCount; sig_index++) {
-                const auto &sig_info = submit.pSignalSemaphoreInfos[sig_index];
+                const auto& sig_info = submit.pSignalSemaphoreInfos[sig_index];
                 if (wait_info.semaphore == sig_info.semaphore && wait_info.value >= sig_info.value) {
                     Location sig_loc = submit_loc.dot(Field::pSignalSemaphoreInfos, sig_index);
                     skip |= LogError("VUID-VkSubmitInfo2-semaphore-03881", objlist, wait_info_loc.dot(Field::value),
@@ -546,7 +742,7 @@ bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState &state, const 
         }
     }
     for (uint32_t i = 0; i < submit.signalSemaphoreInfoCount; ++i) {
-        const auto &sem_info = submit.pSignalSemaphoreInfos[i];
+        const auto& sem_info = submit.pSignalSemaphoreInfos[i];
         auto signal_info_loc = submit_loc.dot(Field::pSignalSemaphoreInfos, i);
         const LogObjectList objlist(sem_info.semaphore, state.queue);
         skip |= ValidatePipelineStage(objlist, signal_info_loc.dot(Field::stageMask), state.queue_flags, sem_info.stageMask);
@@ -558,10 +754,10 @@ bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState &state, const 
     return skip;
 }
 
-bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState &state, const VkBindSparseInfo &submit,
-                                             const Location &submit_loc) const {
+bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState& state, const VkBindSparseInfo& submit,
+                                             const Location& submit_loc) const {
     bool skip = false;
-    auto *timeline_semaphore_submit_info = vku::FindStructInPNextChain<VkTimelineSemaphoreSubmitInfo>(submit.pNext);
+    auto* timeline_semaphore_submit_info = vku::FindStructInPNextChain<VkTimelineSemaphoreSubmitInfo>(submit.pNext);
     for (uint32_t i = 0; i < submit.waitSemaphoreCount; ++i) {
         uint64_t value = 0;
         VkSemaphore semaphore = submit.pWaitSemaphores[i];
@@ -628,9 +824,9 @@ bool CoreChecks::ValidateSemaphoresForSubmit(SemaphoreSubmitState &state, const 
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCreateFence(VkDevice device, const VkFenceCreateInfo *pCreateInfo,
-                                            const VkAllocationCallbacks *pAllocator, VkFence *pFence,
-                                            const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateCreateFence(VkDevice device, const VkFenceCreateInfo* pCreateInfo,
+                                            const VkAllocationCallbacks* pAllocator, VkFence* pFence,
+                                            const ErrorObject& error_obj) const {
     bool skip = false;
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
     auto fence_export_info = vku::FindStructInPNextChain<VkExportFenceCreateInfo>(pCreateInfo->pNext);
@@ -665,9 +861,9 @@ bool CoreChecks::PreCallValidateCreateFence(VkDevice device, const VkFenceCreate
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo *pCreateInfo,
-                                                const VkAllocationCallbacks *pAllocator, VkSemaphore *pSemaphore,
-                                                const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateCreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo,
+                                                const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore,
+                                                const ErrorObject& error_obj) const {
     bool skip = false;
     auto sem_type_create_info = vku::FindStructInPNextChain<VkSemaphoreTypeCreateInfo>(pCreateInfo->pNext);
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -719,13 +915,33 @@ bool CoreChecks::PreCallValidateCreateSemaphore(VkDevice device, const VkSemapho
     return skip;
 }
 
-bool CoreChecks::PreCallValidateWaitSemaphoresKHR(VkDevice device, const VkSemaphoreWaitInfo *pWaitInfo, uint64_t timeout,
-                                                  const ErrorObject &error_obj) const {
+void CoreChecks::PostCallRecordCreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo,
+                                               const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore,
+                                               const RecordObject& record_obj) {
+    if (record_obj.result != VK_SUCCESS) {
+        return;
+    }
+    auto semaphore_state = Get<vvl::Semaphore>(*pSemaphore);
+    if (semaphore_state && semaphore_state->type == VK_SEMAPHORE_TYPE_TIMELINE) {
+        submit_time_tracker.OnCreateTimelineSemaphore(*pSemaphore, semaphore_state->initial_value);
+    }
+}
+
+void CoreChecks::PreCallRecordDestroySemaphore(VkDevice device, VkSemaphore semaphore, const VkAllocationCallbacks* pAllocator,
+                                               const RecordObject& record_obj) {
+    auto semaphore_state = Get<vvl::Semaphore>(semaphore);
+    if (semaphore_state && semaphore_state->type == VK_SEMAPHORE_TYPE_TIMELINE) {
+        submit_time_tracker.OnDestroyTimelineSemaphore(semaphore);
+    }
+}
+
+bool CoreChecks::PreCallValidateWaitSemaphoresKHR(VkDevice device, const VkSemaphoreWaitInfo* pWaitInfo, uint64_t timeout,
+                                                  const ErrorObject& error_obj) const {
     return PreCallValidateWaitSemaphores(device, pWaitInfo, timeout, error_obj);
 }
 
-bool CoreChecks::PreCallValidateWaitSemaphores(VkDevice device, const VkSemaphoreWaitInfo *pWaitInfo, uint64_t timeout,
-                                               const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateWaitSemaphores(VkDevice device, const VkSemaphoreWaitInfo* pWaitInfo, uint64_t timeout,
+                                               const ErrorObject& error_obj) const {
     bool skip = false;
 
     for (uint32_t i = 0; i < pWaitInfo->semaphoreCount; i++) {
@@ -741,8 +957,8 @@ bool CoreChecks::PreCallValidateWaitSemaphores(VkDevice device, const VkSemaphor
     return skip;
 }
 
-bool CoreChecks::PreCallValidateDestroyFence(VkDevice device, VkFence fence, const VkAllocationCallbacks *pAllocator,
-                                             const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateDestroyFence(VkDevice device, VkFence fence, const VkAllocationCallbacks* pAllocator,
+                                             const ErrorObject& error_obj) const {
     bool skip = false;
     auto fence_state = Get<vvl::Fence>(fence);
     if (fence_state && fence_state->Scope() == vvl::Fence::kInternal && fence_state->State() == vvl::Fence::kInflight) {
@@ -751,22 +967,23 @@ bool CoreChecks::PreCallValidateDestroyFence(VkDevice device, VkFence fence, con
     return skip;
 }
 
-bool CoreChecks::PreCallValidateResetFences(VkDevice device, uint32_t fenceCount, const VkFence *pFences,
-                                            const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateResetFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences,
+                                            const ErrorObject& error_obj) const {
     bool skip = false;
     for (uint32_t i = 0; i < fenceCount; ++i) {
         auto fence_state = Get<vvl::Fence>(pFences[i]);
         ASSERT_AND_CONTINUE(fence_state);
         if (fence_state->Scope() == vvl::Fence::kInternal && fence_state->State() == vvl::Fence::kInflight) {
             skip |= LogError("VUID-vkResetFences-pFences-01123", pFences[i], error_obj.location.dot(Field::pFences, i),
-                             "(%s) is in use.", FormatHandle(pFences[i]).c_str());
+                             "(%s) is in use.%s", FormatHandle(pFences[i]).c_str(),
+                             is_device_lost ? "\n(a VK_ERROR_DEVICE_LOST has occurred, the fence must be destroyed)" : "");
         }
     }
     return skip;
 }
 
-bool CoreChecks::PreCallValidateDestroySemaphore(VkDevice device, VkSemaphore semaphore, const VkAllocationCallbacks *pAllocator,
-                                                 const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateDestroySemaphore(VkDevice device, VkSemaphore semaphore, const VkAllocationCallbacks* pAllocator,
+                                                 const ErrorObject& error_obj) const {
     bool skip = false;
     if (auto sema_node = Get<vvl::Semaphore>(semaphore)) {
         skip |= ValidateObjectNotInUse(sema_node.get(), error_obj.location, "VUID-vkDestroySemaphore-semaphore-05149");
@@ -774,8 +991,8 @@ bool CoreChecks::PreCallValidateDestroySemaphore(VkDevice device, VkSemaphore se
     return skip;
 }
 
-bool CoreChecks::PreCallValidateDestroyEvent(VkDevice device, VkEvent event, const VkAllocationCallbacks *pAllocator,
-                                             const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateDestroyEvent(VkDevice device, VkEvent event, const VkAllocationCallbacks* pAllocator,
+                                             const ErrorObject& error_obj) const {
     bool skip = false;
     if (auto event_state = Get<vvl::Event>(event)) {
         skip |= ValidateObjectNotInUse(event_state.get(), error_obj.location.dot(Field::event), "VUID-vkDestroyEvent-event-01145");
@@ -783,8 +1000,8 @@ bool CoreChecks::PreCallValidateDestroyEvent(VkDevice device, VkEvent event, con
     return skip;
 }
 
-bool CoreChecks::PreCallValidateDestroySampler(VkDevice device, VkSampler sampler, const VkAllocationCallbacks *pAllocator,
-                                               const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateDestroySampler(VkDevice device, VkSampler sampler, const VkAllocationCallbacks* pAllocator,
+                                               const ErrorObject& error_obj) const {
     bool skip = false;
     if (auto sampler_state = Get<vvl::Sampler>(sampler)) {
         skip |= ValidateObjectNotInUse(sampler_state.get(), error_obj.location.dot(Field::sampler),
@@ -794,7 +1011,7 @@ bool CoreChecks::PreCallValidateDestroySampler(VkDevice device, VkSampler sample
 }
 
 bool CoreChecks::PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
-                                            const ErrorObject &error_obj) const {
+                                            const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
     skip |= ValidateCmd(*cb_state, error_obj.location);
@@ -805,8 +1022,8 @@ bool CoreChecks::PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEve
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfo *pDependencyInfo,
-                                             const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event, const VkDependencyInfo* pDependencyInfo,
+                                             const ErrorObject& error_obj) const {
     const LogObjectList objlist(commandBuffer, event);
 
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
@@ -853,12 +1070,12 @@ bool CoreChecks::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEv
 }
 
 bool CoreChecks::PreCallValidateCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
-                                                const VkDependencyInfoKHR *pDependencyInfo, const ErrorObject &error_obj) const {
+                                                const VkDependencyInfoKHR* pDependencyInfo, const ErrorObject& error_obj) const {
     return PreCallValidateCmdSetEvent2(commandBuffer, event, pDependencyInfo, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
-                                              const ErrorObject &error_obj) const {
+                                              const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     const LogObjectList objlist(commandBuffer);
     const Location stage_mask_loc = error_obj.location.dot(Field::stageMask);
@@ -867,11 +1084,12 @@ bool CoreChecks::PreCallValidateCmdResetEvent(VkCommandBuffer commandBuffer, VkE
     skip |= ValidateCmd(*cb_state, error_obj.location);
     skip |= ValidatePipelineStage(objlist, stage_mask_loc, cb_state->GetQueueFlags(), stageMask);
     skip |= ValidateStageMaskHost(objlist, stage_mask_loc, stageMask);
+    skip |= ValidateResetVsWaitRace(*cb_state, event, stageMask, error_obj.location);
     return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
-                                               const ErrorObject &error_obj) const {
+                                               const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     const LogObjectList objlist(commandBuffer);
     const Location stage_mask_loc = error_obj.location.dot(Field::stageMask);
@@ -884,28 +1102,52 @@ bool CoreChecks::PreCallValidateCmdResetEvent2(VkCommandBuffer commandBuffer, Vk
     skip |= ValidateCmd(*cb_state, error_obj.location);
     skip |= ValidatePipelineStage(objlist, stage_mask_loc, cb_state->GetQueueFlags(), stageMask);
     skip |= ValidateStageMaskHost(objlist, stage_mask_loc, stageMask);
+    skip |= ValidateResetVsWaitRace(*cb_state, event, stageMask, error_obj.location);
     return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2KHR stageMask,
-                                                  const ErrorObject &error_obj) const {
+                                                  const ErrorObject& error_obj) const {
     return PreCallValidateCmdResetEvent2(commandBuffer, event, stageMask, error_obj);
+}
+
+bool CoreChecks::ValidateResetVsWaitRace(const vvl::CommandBuffer& cb_state, VkEvent event, VkPipelineStageFlags2 reset_stage_mask,
+                                         const Location& loc) const {
+    bool skip = false;
+    const auto& cb_sub_state = core::SubState(cb_state);
+    if (const EventWaitBarrierState* state = vvl::Find(cb_sub_state.event_wait_barriers, event)) {
+        VkPipelineStageFlags2 reset_exec_scope = sync_utils::ExpandPipelineStages(reset_stage_mask, cb_state.GetQueueFlags());
+        reset_exec_scope = sync_utils::AddEarlierPipelineStages(reset_exec_scope);
+        const bool has_barrier = (reset_stage_mask & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT) ||
+                                 (state->barriers & reset_exec_scope) || (state->barriers & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+        if (!has_barrier) {
+            const char* vuid = loc.function == vvl::Func::vkCmdResetEvent
+                                   ? (state->last_wait_command == vvl::Func::vkCmdWaitEvents ? "VUID-vkCmdResetEvent-event-03834"
+                                                                                             : "VUID-vkCmdResetEvent-event-03835")
+                                   : (state->last_wait_command == vvl::Func::vkCmdWaitEvents ? "VUID-vkCmdResetEvent2-event-03831"
+                                                                                             : "VUID-vkCmdResetEvent2-event-03832");
+            const LogObjectList objlist(cb_state.Handle(), event);
+            skip |= LogError(vuid, objlist, loc, "does not create an execution dependency with the previous %s for %s.",
+                             vvl::String(state->last_wait_command), FormatHandle(event).c_str());
+        }
+    }
+    return skip;
 }
 
 struct RenderPassDepState {
     using Field = vvl::Field;
 
-    const CoreChecks &core;
+    const CoreChecks& core;
     const std::string vuid;
     uint32_t active_subpass;
     const VkRenderPass rp_handle;
     const VkPipelineStageFlags2KHR disabled_features;
-    const std::vector<uint32_t> &self_dependencies;
-    const vku::safe_VkSubpassDependency2 *dependencies;
+    const std::vector<uint32_t>& self_dependencies;
+    const vku::safe_VkSubpassDependency2* dependencies;
 
-    RenderPassDepState(const CoreChecks &c, const std::string &v, uint32_t subpass, const VkRenderPass handle,
-                       const DeviceFeatures &features, const DeviceExtensions &device_extensions,
-                       const std::vector<uint32_t> &self_deps, const vku::safe_VkSubpassDependency2 *deps)
+    RenderPassDepState(const CoreChecks& c, const std::string& v, uint32_t subpass, const VkRenderPass handle,
+                       const DeviceFeatures& features, const DeviceExtensions& device_extensions,
+                       const std::vector<uint32_t>& self_deps, const vku::safe_VkSubpassDependency2* deps)
         : core(c),
           vuid(v),
           active_subpass(subpass),
@@ -914,7 +1156,7 @@ struct RenderPassDepState {
           self_dependencies(self_deps),
           dependencies(deps) {}
 
-    VkMemoryBarrier2 GetSubPassDepBarrier(const vku::safe_VkSubpassDependency2 &dep) const {
+    VkMemoryBarrier2 GetSubPassDepBarrier(const vku::safe_VkSubpassDependency2& dep) const {
         // "If a VkMemoryBarrier2 is included in the pNext chain, srcStageMask, dstStageMask,
         // srcAccessMask, and dstAccessMask parameters are ignored. The synchronization and
         // access scopes instead are defined by the parameters of VkMemoryBarrier2."
@@ -930,7 +1172,7 @@ struct RenderPassDepState {
         return barrier;
     }
 
-    bool ValidateStage(const Location &barrier_loc, VkPipelineStageFlags2 src_stage_mask,
+    bool ValidateStage(const Location& barrier_loc, VkPipelineStageFlags2 src_stage_mask,
                        VkPipelineStageFlags2 dst_stage_mask) const {
         // Look for srcStageMask + dstStageMask superset in any self-dependency
         for (const auto self_dep_index : self_dependencies) {
@@ -956,7 +1198,7 @@ struct RenderPassDepState {
                              core.FormatHandle(rp_handle).c_str());
     }
 
-    bool ValidateAccess(const Location &barrier_loc, VkAccessFlags2 src_access_mask, VkAccessFlags2 dst_access_mask) const {
+    bool ValidateAccess(const Location& barrier_loc, VkAccessFlags2 src_access_mask, VkAccessFlags2 dst_access_mask) const {
         // Look for srcAccessMask + dstAccessMask superset in any self-dependency
         for (const auto self_dep_index : self_dependencies) {
             const auto subpass_dep = GetSubPassDepBarrier(dependencies[self_dep_index]);
@@ -971,9 +1213,9 @@ struct RenderPassDepState {
                              active_subpass, core.FormatHandle(rp_handle).c_str());
     }
 
-    bool ValidateDependencyFlag(const Location &dep_flags_loc, VkDependencyFlags dependency_flags) const {
+    bool ValidateDependencyFlag(const Location& dep_flags_loc, VkDependencyFlags dependency_flags) const {
         for (const auto self_dep_index : self_dependencies) {
-            const auto &subpass_dep = dependencies[self_dep_index];
+            const auto& subpass_dep = dependencies[self_dep_index];
             const bool match = subpass_dep.dependencyFlags == dependency_flags;
             if (match) return false;  // match is found, return skip value (false)
         }
@@ -986,7 +1228,7 @@ struct RenderPassDepState {
 };
 
 // If inside a renderpass, validate
-bool CoreChecks::ValidateRenderPassPipelineStage(VkRenderPass render_pass, const Location &loc,
+bool CoreChecks::ValidateRenderPassPipelineStage(VkRenderPass render_pass, const Location& loc,
                                                  VkPipelineStageFlags2 src_stage_mask, VkPipelineStageFlags2 dst_stage_mask) const {
     bool skip = false;
     const VkPipelineStageFlags2 graphics_stages = syncAllCommandStagesByQueueFlags().at(VK_QUEUE_GRAPHICS_BIT);
@@ -995,13 +1237,13 @@ bool CoreChecks::ValidateRenderPassPipelineStage(VkRenderPass render_pass, const
     const VkPipelineStageFlags2 dst_diff =
         sync_utils::ExpandPipelineStages(dst_stage_mask, VK_QUEUE_GRAPHICS_BIT) & ~graphics_stages;
     if (src_diff != 0) {
-        const char *vuid = loc.function == Func::vkCmdPipelineBarrier ? "VUID-vkCmdPipelineBarrier-None-07892"
+        const char* vuid = loc.function == Func::vkCmdPipelineBarrier ? "VUID-vkCmdPipelineBarrier-None-07892"
                                                                       : "VUID-vkCmdPipelineBarrier2-None-07892";
         skip |= LogError(vuid, render_pass, loc.dot(Field::srcStageMask), "contains non graphics stage %s.",
                          string_VkPipelineStageFlags2(src_diff).c_str());
     }
     if (dst_diff != 0) {
-        const char *vuid = loc.function == Func::vkCmdPipelineBarrier ? "VUID-vkCmdPipelineBarrier-None-07892"
+        const char* vuid = loc.function == Func::vkCmdPipelineBarrier ? "VUID-vkCmdPipelineBarrier-None-07892"
                                                                       : "VUID-vkCmdPipelineBarrier2-None-07892";
         skip |= LogError(vuid, render_pass, loc.dot(Field::dstStageMask), "contains non graphics stage %s.",
                          string_VkPipelineStageFlags2(dst_diff).c_str());
@@ -1009,11 +1251,11 @@ bool CoreChecks::ValidateRenderPassPipelineStage(VkRenderPass render_pass, const
     return skip;
 }
 
-bool CoreChecks::ValidateRenderPassInstanceNoLayoutChange(const LogObjectList &objlist, const Location &barrier_loc,
+bool CoreChecks::ValidateRenderPassInstanceNoLayoutChange(const LogObjectList& objlist, const Location& barrier_loc,
                                                           VkImageLayout old_layout, VkImageLayout new_layout) const {
     bool skip = false;
     if (old_layout != new_layout) {
-        const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassInstanceLayoutChange);
+        const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassInstanceLayoutChange);
         skip |= LogError(
             vuid, objlist, barrier_loc,
             "defines image layout transition (oldLayout = %s, newLayout = %s) within a render pass instance, which is not allowed.",
@@ -1024,14 +1266,14 @@ bool CoreChecks::ValidateRenderPassInstanceNoLayoutChange(const LogObjectList &o
 
 // Validate VUs for Pipeline Barriers that are within a renderPass
 // Pre: cb_state->active_render_pass must be a pointer to valid renderPass state
-bool CoreChecks::ValidateRenderPassBarriers(const Location &outer_loc, const vvl::CommandBuffer &cb_state,
+bool CoreChecks::ValidateRenderPassBarriers(const Location& outer_loc, const vvl::CommandBuffer& cb_state,
                                             VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
                                             VkDependencyFlags dependency_flags, uint32_t mem_barrier_count,
-                                            const VkMemoryBarrier *mem_barriers, uint32_t buffer_mem_barrier_count,
-                                            const VkBufferMemoryBarrier *buffer_mem_barriers, uint32_t image_mem_barrier_count,
-                                            const VkImageMemoryBarrier *image_barriers) const {
+                                            const VkMemoryBarrier* mem_barriers, uint32_t buffer_mem_barrier_count,
+                                            const VkBufferMemoryBarrier* buffer_mem_barriers, uint32_t image_mem_barrier_count,
+                                            const VkImageMemoryBarrier* image_barriers) const {
     bool skip = false;
-    const vvl::RenderPass *rp_state = cb_state.active_render_pass.get();
+    const vvl::RenderPass* rp_state = cb_state.active_render_pass.get();
     ASSERT_AND_RETURN_SKIP(rp_state);
     RenderPassDepState state(*this, "VUID-vkCmdPipelineBarrier-None-07889", cb_state.GetActiveSubpass(), rp_state->VkHandle(),
                              enabled_features, extensions, rp_state->self_dependencies[cb_state.GetActiveSubpass()],
@@ -1044,7 +1286,7 @@ bool CoreChecks::ValidateRenderPassBarriers(const Location &outer_loc, const vvl
         return skip;
     }
     // Grab ref to current subpassDescription up-front for use below
-    const auto &sub_desc = rp_state->create_info.pSubpasses[state.active_subpass];
+    const auto& sub_desc = rp_state->create_info.pSubpasses[state.active_subpass];
     skip |= state.ValidateStage(outer_loc, src_stage_mask, dst_stage_mask);
     skip |= ValidateRenderPassPipelineStage(state.rp_handle, outer_loc, src_stage_mask, dst_stage_mask);
 
@@ -1055,7 +1297,7 @@ bool CoreChecks::ValidateRenderPassBarriers(const Location &outer_loc, const vvl
                          buffer_mem_barrier_count, state.active_subpass, FormatHandle(rp_state->Handle()).c_str());
     }
     for (uint32_t i = 0; i < mem_barrier_count; ++i) {
-        const auto &mem_barrier = mem_barriers[i];
+        const auto& mem_barrier = mem_barriers[i];
         const Location barrier_loc = outer_loc.dot(Struct::VkMemoryBarrier, Field::pMemoryBarriers, i);
         skip |= state.ValidateAccess(barrier_loc, mem_barrier.srcAccessMask, mem_barrier.dstAccessMask);
     }
@@ -1080,7 +1322,7 @@ bool CoreChecks::ValidateRenderPassBarriers(const Location &outer_loc, const vvl
         }
     }
 
-    if (GetBitSetCount(sub_desc.viewMask) > 1 && ((dependency_flags & VK_DEPENDENCY_VIEW_LOCAL_BIT) == 0)) {
+    if (CountSetBits(sub_desc.viewMask) > 1 && ((dependency_flags & VK_DEPENDENCY_VIEW_LOCAL_BIT) == 0)) {
         const LogObjectList objlist(cb_state.Handle(), state.rp_handle);
         skip |= LogError("VUID-vkCmdPipelineBarrier-None-07893", objlist, outer_loc.dot(Field::dependencyFlags),
                          "%s is missing VK_DEPENDENCY_VIEW_LOCAL_BIT and subpass %" PRIu32 " has viewMasks 0x%" PRIx32 ".",
@@ -1091,10 +1333,10 @@ bool CoreChecks::ValidateRenderPassBarriers(const Location &outer_loc, const vvl
     return skip;
 }
 
-bool CoreChecks::ValidateRenderPassBarriers(const Location &outer_loc, const vvl::CommandBuffer &cb_state,
-                                            const VkDependencyInfo &dep_info) const {
+bool CoreChecks::ValidateRenderPassBarriers(const Location& outer_loc, const vvl::CommandBuffer& cb_state,
+                                            const VkDependencyInfo& dep_info) const {
     bool skip = false;
-    const vvl::RenderPass *rp_state = cb_state.active_render_pass.get();
+    const vvl::RenderPass* rp_state = cb_state.active_render_pass.get();
     if (!rp_state || rp_state->UsesDynamicRendering()) {
         return skip;
     }
@@ -1110,9 +1352,9 @@ bool CoreChecks::ValidateRenderPassBarriers(const Location &outer_loc, const vvl
         return skip;
     }
     // Grab ref to current subpassDescription up-front for use below
-    const auto &sub_desc = rp_state->create_info.pSubpasses[state.active_subpass];
+    const auto& sub_desc = rp_state->create_info.pSubpasses[state.active_subpass];
     for (uint32_t i = 0; i < dep_info.memoryBarrierCount; ++i) {
-        const auto &mem_barrier = dep_info.pMemoryBarriers[i];
+        const auto& mem_barrier = dep_info.pMemoryBarriers[i];
         const Location barrier_loc = outer_loc.dot(Struct::VkMemoryBarrier2, Field::pMemoryBarriers, i);
         skip |= state.ValidateStage(barrier_loc, mem_barrier.srcStageMask, mem_barrier.dstStageMask);
         skip |= state.ValidateAccess(barrier_loc, mem_barrier.srcAccessMask, mem_barrier.dstAccessMask);
@@ -1148,7 +1390,7 @@ bool CoreChecks::ValidateRenderPassBarriers(const Location &outer_loc, const vvl
         }
     }
 
-    if (GetBitSetCount(sub_desc.viewMask) > 1 && ((dep_info.dependencyFlags & VK_DEPENDENCY_VIEW_LOCAL_BIT) == 0)) {
+    if (CountSetBits(sub_desc.viewMask) > 1 && ((dep_info.dependencyFlags & VK_DEPENDENCY_VIEW_LOCAL_BIT) == 0)) {
         const LogObjectList objlist(cb_state.Handle(), state.rp_handle);
         skip |= LogError("VUID-vkCmdPipelineBarrier2-None-07893", objlist, outer_loc.dot(Field::dependencyFlags),
                          "%s is missing VK_DEPENDENCY_VIEW_LOCAL_BIT and subpass %" PRIu32 " has viewMasks 0x%" PRIx32 ".",
@@ -1159,7 +1401,7 @@ bool CoreChecks::ValidateRenderPassBarriers(const Location &outer_loc, const vvl
     return skip;
 }
 
-bool CoreChecks::ValidateStageMasksAgainstQueueCapabilities(const LogObjectList &objlist, const Location &stage_mask_loc,
+bool CoreChecks::ValidateStageMasksAgainstQueueCapabilities(const LogObjectList& objlist, const Location& stage_mask_loc,
                                                             VkQueueFlags queue_flags, VkPipelineStageFlags2KHR stage_mask) const {
     bool skip = false;
     // these are always allowed by queues, calls that restrict them have dedicated VUs.
@@ -1176,9 +1418,9 @@ bool CoreChecks::ValidateStageMasksAgainstQueueCapabilities(const LogObjectList 
          {VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT, VK_QUEUE_GRAPHICS_BIT},
          {VK_PIPELINE_STAGE_2_DATA_GRAPH_BIT_ARM, VK_QUEUE_DATA_GRAPH_BIT_ARM}}};
 
-    for (const auto &entry : metaFlags) {
+    for (const auto& entry : metaFlags) {
         if (((entry.first & stage_mask) != 0) && ((entry.second & queue_flags) == 0)) {
-            const auto &vuid = vvl::GetStageQueueCapVUID(stage_mask_loc, entry.first);
+            const auto& vuid = vvl::GetStageQueueCapVUID(stage_mask_loc, entry.first);
             skip |= LogError(vuid, objlist, stage_mask_loc,
                              "(%s) is not compatible with the queue family properties (%s) of this command buffer.",
                              sync_utils::StringPipelineStageFlags(entry.first).c_str(), string_VkQueueFlags(queue_flags).c_str());
@@ -1197,7 +1439,7 @@ bool CoreChecks::ValidateStageMasksAgainstQueueCapabilities(const LogObjectList 
     for (size_t i = 0; i < sizeof(bad_flags) * 8; i++) {
         VkPipelineStageFlags2KHR bit = (1ULL << i) & bad_flags;
         if (bit) {
-            const auto &vuid = vvl::GetStageQueueCapVUID(stage_mask_loc, bit);
+            const auto& vuid = vvl::GetStageQueueCapVUID(stage_mask_loc, bit);
             skip |= LogError(vuid, objlist, stage_mask_loc,
                              "(%s) is not compatible with the queue family properties (%s) of this command buffer.",
                              sync_utils::StringPipelineStageFlags(bit).c_str(), string_VkQueueFlags(queue_flags).c_str());
@@ -1206,11 +1448,11 @@ bool CoreChecks::ValidateStageMasksAgainstQueueCapabilities(const LogObjectList 
     return skip;
 }
 
-bool CoreChecks::ValidatePipelineStageFeatureEnables(const LogObjectList &objlist, const Location &stage_mask_loc,
+bool CoreChecks::ValidatePipelineStageFeatureEnables(const LogObjectList& objlist, const Location& stage_mask_loc,
                                                      VkPipelineStageFlags2 stage_mask) const {
     bool skip = false;
     if (!enabled_features.synchronization2 && stage_mask == VK_PIPELINE_STAGE_2_NONE) {
-        const auto &vuid = vvl::GetBadFeatureVUID(stage_mask_loc, 0, extensions);
+        const auto& vuid = vvl::GetBadFeatureVUID(stage_mask_loc, 0, extensions);
         skip |= LogError(vuid, objlist, stage_mask_loc, "must not be 0 unless synchronization2 is enabled.");
     }
 
@@ -1222,8 +1464,8 @@ bool CoreChecks::ValidatePipelineStageFeatureEnables(const LogObjectList &objlis
     for (size_t i = 0; i < sizeof(bad_bits) * 8; i++) {
         VkPipelineStageFlags2 bit = 1ULL << i;
         if (bit & bad_bits) {
-            const auto &vuid = vvl::GetBadFeatureVUID(stage_mask_loc, bit, extensions);
-            const auto &feature_names = vvl::GetFeatureNameMap();
+            const auto& vuid = vvl::GetBadFeatureVUID(stage_mask_loc, bit, extensions);
+            const auto& feature_names = vvl::GetFeatureNameMap();
             auto feature_it = feature_names.find(bit);
 
             // If hit this assert just ensure that features in DisabledPipelineStages() match features in GetFeatureNameMap()
@@ -1238,7 +1480,7 @@ bool CoreChecks::ValidatePipelineStageFeatureEnables(const LogObjectList &objlis
     return skip;
 }
 
-bool CoreChecks::ValidatePipelineStage(const LogObjectList &objlist, const Location &stage_mask_loc, VkQueueFlags queue_flags,
+bool CoreChecks::ValidatePipelineStage(const LogObjectList& objlist, const Location& stage_mask_loc, VkQueueFlags queue_flags,
                                        VkPipelineStageFlags2KHR stage_mask) const {
     bool skip = false;
     skip |= ValidateStageMasksAgainstQueueCapabilities(objlist, stage_mask_loc, queue_flags, stage_mask);
@@ -1246,21 +1488,29 @@ bool CoreChecks::ValidatePipelineStage(const LogObjectList &objlist, const Locat
     return skip;
 }
 
-bool CoreChecks::ValidateAccessMask(const LogObjectList &objlist, const Location &access_mask_loc, const Location &stage_mask_loc,
+bool CoreChecks::ValidateAccessMask(const LogObjectList& objlist, const Location& access_mask_loc, const Location& stage_mask_loc,
                                     VkQueueFlags queue_flags, VkAccessFlags2 access_mask, VkPipelineStageFlags2 stage_mask) const {
     bool skip = false;
 
     const VkPipelineStageFlags2 expanded_pipeline_stages = sync_utils::ExpandPipelineStages(stage_mask, queue_flags);
 
     if (!enabled_features.rayQuery && (access_mask & VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR)) {
-        const VkPipelineStageFlags2 illegal_pipeline_stages =
-            AllVkPipelineShaderStageBits2 & ~VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
-        if (stage_mask & illegal_pipeline_stages) {
-            // Select right vuid based on enabled extensions
-            const auto &vuid = vvl::GetAccessMaskRayQueryVUIDSelector(access_mask_loc, extensions);
-            skip |= LogError(vuid, objlist, stage_mask_loc, "contains pipeline stages %s.",
-                             sync_utils::StringPipelineStageFlags(stage_mask).c_str());
+        const bool is_sync2 = IsValueIn(stage_mask_loc.structure, {Struct::VkMemoryBarrier2, Struct::VkBufferMemoryBarrier2,
+                                                                   Struct::VkImageMemoryBarrier2, Struct::VkMemoryRangeBarrierKHR});
+        VkPipelineStageFlags2 must_include_stages = VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR |
+                                                    VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR |
+                                                    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        if (is_sync2) {
+            must_include_stages |= VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_COPY_BIT_KHR;
         }
+        if ((stage_mask & must_include_stages) == 0) {
+            // Select right vuid based on enabled extensions
+            const auto& vuid = vvl::GetAccessMaskRayQueryVUIDSelector(access_mask_loc, extensions);
+            skip |= LogError(vuid, objlist, stage_mask_loc,
+                             "(%s) is missing a required stage for VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR in %s.",
+                             sync_utils::StringPipelineStageFlags(stage_mask).c_str(), access_mask_loc.Fields().c_str());
+        }
+        access_mask &= ~VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR;
     }
 
     // or if only generic memory accesses are specified (or we got a 0 mask)
@@ -1278,7 +1528,7 @@ bool CoreChecks::ValidateAccessMask(const LogObjectList &objlist, const Location
     for (size_t i = 0; i < sizeof(bad_accesses) * 8; i++) {
         VkAccessFlags2 bit = (1ULL << i);
         if (bad_accesses & bit) {
-            const auto &vuid = vvl::GetBadAccessFlagsVUID(access_mask_loc, bit);
+            const auto& vuid = vvl::GetBadAccessFlagsVUID(access_mask_loc, bit);
 
             std::ostringstream ss;
             ss << "(" << sync_utils::StringAccessFlags(bit) << ") is not supported by stage mask ("
@@ -1296,117 +1546,24 @@ bool CoreChecks::ValidateAccessMask(const LogObjectList &objlist, const Location
     return skip;
 }
 
-bool CoreChecks::ValidateWaitEventsAtSubmit(const vvl::CommandBuffer &cb_state, size_t eventCount, size_t firstEventIndex,
-                                            VkPipelineStageFlags2 sourceStageMask, vku::safe_VkDependencyInfo dependency_info,
-                                            const EventMap &local_event_signal_info, VkQueue waiting_queue, const Location &loc) {
-    bool skip = false;
-    const vvl::DeviceState &state_data = cb_state.dev_data;
-    VkPipelineStageFlags2KHR stage_mask = 0;
-    const auto max_event = std::min((firstEventIndex + eventCount), cb_state.events.size());
-    bool any_event2 = false;
-    for (size_t event_index = firstEventIndex; event_index < max_event; ++event_index) {
-        auto event = cb_state.events[event_index];
-
-        // The event signal map tracks src_stage from the last SetEvent within the
-        // *current* queue submission. If the current submission does not have
-        // SetEvent before WaitEvents then we need to find the last SetEvent (if any)
-        // in the previous submissions to the same queue. This information is
-        // conveniently stored in the vvl::Event object itself (after each queue
-        // submit, vvl::CommandBuffer::Submit() updates vvl::Event, so it contains
-        // the last src_stage from that submission).
-        vku::safe_VkDependencyInfo set_dependency_info = {};
-        if (const auto *event_info = vvl::Find(local_event_signal_info, event)) {
-            stage_mask |= event_info->src_stage_mask;
-            set_dependency_info = event_info->dependency_info;
-            // The "set event" is found in the current submission (the same queue); there can't be inter-queue usage errors
-        } else {
-            auto event_state = state_data.Get<vvl::Event>(event);
-            if (!event_state) continue;
-            stage_mask |= event_state->signal_src_stage_mask;
-            set_dependency_info = event_state->dependency_info;
-
-            if (event_state->signaling_queue != VK_NULL_HANDLE && event_state->signaling_queue != waiting_queue) {
-                const LogObjectList objlist(cb_state.Handle(), event, event_state->signaling_queue, waiting_queue);
-                skip |= state_data.LogError("UNASSIGNED-SubmitValidation-WaitEvents-WrongQueue", objlist, loc,
-                                            "waits for event %s on the queue %s but the event was signaled on a different queue %s",
-                                            state_data.FormatHandle(event).c_str(), state_data.FormatHandle(waiting_queue).c_str(),
-                                            state_data.FormatHandle(event_state->signaling_queue).c_str());
-            }
-        }
-
-        bool event2 = set_dependency_info.sType == VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        any_event2 |= event2;
-
-        if ((dependency_info.dependencyFlags & VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR) == 0) {
-            if (event2 && !CompareDependencyInfo(*set_dependency_info.ptr(), *dependency_info.ptr())) {
-                const LogObjectList objlist(cb_state.Handle(), event);
-                // This could be moved to record time, if both vkCmdWaitEvents2 and vkSetEvents2 are in the same command buffer
-                skip |= state_data.LogError(
-                    "VUID-vkCmdWaitEvents2-pEvents-10788", objlist, loc,
-                    "event %s is being waited on without VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR and was "
-                    "signaled by vkCmdSetEvent2, but %s.",
-                    state_data.FormatHandle(event).c_str(),
-                    string_VkDependencyInfo(state_data, *set_dependency_info.ptr(), *dependency_info.ptr()).c_str());
-            }
-        } else {
-            if ((set_dependency_info.dependencyFlags & VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR) == 0) {
-                const LogObjectList objlist(cb_state.Handle(), event);
-                skip |= state_data.LogError(
-                    "VUID-vkCmdWaitEvents2-pEvents-10789", objlist, loc,
-                    "event %s is being waited on with VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR, but was signaled without it.",
-                    state_data.FormatHandle(event).c_str());
-            }
-            VkPipelineStageFlags2 union_src_stage_mask = 0u;
-            for (uint32_t i = 0; i < dependency_info.memoryBarrierCount; ++i) {
-                union_src_stage_mask |= dependency_info.pMemoryBarriers[i].srcStageMask;
-            }
-            for (uint32_t i = 0; i < dependency_info.bufferMemoryBarrierCount; ++i) {
-                union_src_stage_mask |= dependency_info.pBufferMemoryBarriers[i].srcStageMask;
-            }
-            for (uint32_t i = 0; i < dependency_info.imageMemoryBarrierCount; ++i) {
-                union_src_stage_mask |= dependency_info.pImageMemoryBarriers[i].srcStageMask;
-            }
-            if (union_src_stage_mask != set_dependency_info.pMemoryBarriers[0].srcStageMask) {
-                const LogObjectList objlist(cb_state.Handle(), event);
-                skip |=
-                    state_data.LogError("VUID-vkCmdWaitEvents2-pEvents-10790", objlist, loc,
-                                        "union of all srcStageMask members is %s, but event was set with "
-                                        "pDependencyInfos->pMemoryBarriers[0].srcStageMask %s.",
-                                        string_VkPipelineStageFlags2(union_src_stage_mask).c_str(),
-                                        string_VkPipelineStageFlags2(set_dependency_info.pMemoryBarriers[0].srcStageMask).c_str());
-            }
-        }
-    }
-    // TODO: Need to validate that host_bit is only set if set event is called
-    // but set event can be called at any time.
-    if (!any_event2 && sourceStageMask != stage_mask && sourceStageMask != (stage_mask | VK_PIPELINE_STAGE_HOST_BIT)) {
-        skip |= state_data.LogError(
-            "VUID-vkCmdWaitEvents-srcStageMask-parameter", cb_state.Handle(), loc,
-            "Submitting cmdbuffer with call to VkCmdWaitEvents using srcStageMask %s which must be the bitwise OR of the stageMask "
-            "parameters used in calls to vkCmdSetEvent and VK_PIPELINE_STAGE_HOST_BIT if used with vkSetEvent but instead is %s.",
-            string_VkPipelineStageFlags2(sourceStageMask).c_str(), string_VkPipelineStageFlags2(stage_mask).c_str());
-    }
-    return skip;
-}
-
-bool CoreChecks::PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
+bool CoreChecks::PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
                                               VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
-                                              uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers,
-                                              uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier *pBufferMemoryBarriers,
-                                              uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier *pImageMemoryBarriers,
-                                              const ErrorObject &error_obj) const {
+                                              uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
+                                              uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
+                                              uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers,
+                                              const ErrorObject& error_obj) const {
     bool skip = false;
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
 
     auto queue_flags = cb_state->GetQueueFlags();
-    const LogObjectList objlist(commandBuffer);
-
-    skip |= ValidatePipelineStage(objlist, error_obj.location.dot(Field::srcStageMask), queue_flags, srcStageMask);
-    skip |= ValidatePipelineStage(objlist, error_obj.location.dot(Field::dstStageMask), queue_flags, dstStageMask);
+    const LogObjectList objlist(cb_state->Handle());
 
     skip |= ValidateCmd(*cb_state, error_obj.location);
+    skip |= ValidatePipelineStage(objlist, error_obj.location.dot(Field::srcStageMask), queue_flags, srcStageMask);
+    skip |= ValidatePipelineStage(objlist, error_obj.location.dot(Field::dstStageMask), queue_flags, dstStageMask);
     skip |= ValidateBarriers(error_obj.location, *cb_state, srcStageMask, dstStageMask, memoryBarrierCount, pMemoryBarriers,
                              bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+
     for (uint32_t i = 0; i < bufferMemoryBarrierCount; ++i) {
         if (pBufferMemoryBarriers[i].srcQueueFamilyIndex != pBufferMemoryBarriers[i].dstQueueFamilyIndex) {
             skip |= LogError("VUID-vkCmdWaitEvents-srcQueueFamilyIndex-02803", objlist,
@@ -1422,67 +1579,155 @@ bool CoreChecks::PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, uin
                              "has different srcQueueFamilyIndex (%" PRIu32 ") and dstQueueFamilyIndex (%" PRIu32 ").",
                              pImageMemoryBarriers[i].srcQueueFamilyIndex, pImageMemoryBarriers[i].dstQueueFamilyIndex);
         }
+        if (cb_state->active_render_pass) {
+            const ImageBarrier barrier(pImageMemoryBarriers[i], srcStageMask, dstStageMask);
+            const Location barrier_loc = error_obj.location.dot(Field::pImageMemoryBarriers, i);
+            skip |= ValidateRenderPassInstanceNoLayoutChange(objlist, barrier_loc, barrier.oldLayout, barrier.newLayout);
+        }
     }
 
     if (cb_state->active_render_pass && ((srcStageMask & VK_PIPELINE_STAGE_HOST_BIT) != 0)) {
         skip |= LogError("VUID-vkCmdWaitEvents-srcStageMask-07308", objlist, error_obj.location.dot(Field::srcStageMask), "is %s.",
                          sync_utils::StringPipelineStageFlags(srcStageMask).c_str());
     }
+
+    if (cb_state->per_tile_execution_model_enabled) {
+        skip |= LogError("VUID-vkCmdWaitEvents-None-10655", objlist, error_obj.location,
+                         "the per-tile execution model has been enabled in this command buffer. "
+                         "(Don't call vkCmdBeginPerTileExecutionQCOM before vkCmdWaitEvents)");
+    }
+
+    if (pEvents) {
+        auto& cb_sub_state = core::SubState(*cb_state);
+        bool can_validate_stage_mask = true;  // whether record-time validation is possible
+        bool set_wait_version_mismatch = false;
+        bool found_signals = false;
+
+        VkPipelineStageFlags signals_src_stage_mask = VK_PIPELINE_STAGE_NONE;
+        for (uint32_t i = 0; i < eventCount; i++) {
+            const EventSignalState* signal_state = vvl::Find(cb_sub_state.event_signal_states, pEvents[i]);
+            if (signal_state && signal_state->HasKnownEffect()) {
+                if (IsValueIn(signal_state->last_signaling_command, {vvl::Func::vkCmdSetEvent2, vvl::Func::vkCmdSetEvent2KHR})) {
+                    skip |= LogError("VUID-vkCmdWaitEvents-pEvents-03847", pEvents[i], error_obj.location, "%s was set by %s.",
+                                     FormatHandle(pEvents[i]).c_str(), vvl::String(signal_state->last_signaling_command));
+                    set_wait_version_mismatch = true;
+                }
+                if (signal_state->signaled) {
+                    signals_src_stage_mask |= static_cast<VkPipelineStageFlags>(signal_state->signal_src_stage_mask);
+                    found_signals = true;
+                }
+            } else {
+                can_validate_stage_mask = false;
+            }
+        }
+        if (!set_wait_version_mismatch && can_validate_stage_mask && srcStageMask != signals_src_stage_mask) {
+            if (found_signals) {
+                skip |= LogError("VUID-vkCmdWaitEvents-srcStageMask-01158", objlist, error_obj.location.dot(Field::srcStageMask),
+                                 "is %s, but the bitwise OR of stageMask values from the most recent vkCmdSetEvent call for each "
+                                 "waited event is %s.",
+                                 string_VkPipelineStageFlags(srcStageMask).c_str(),
+                                 string_VkPipelineStageFlags(signals_src_stage_mask).c_str());
+            } else {
+                skip |= LogError("VUID-vkCmdWaitEvents-srcStageMask-01158", objlist, error_obj.location.dot(Field::srcStageMask),
+                                 "is %s, but the waited events are known to be unsignaled at this point. The wait does not have a "
+                                 "corresponding vkCmdSetEvent signal.",
+                                 string_VkPipelineStageFlags(srcStageMask).c_str());
+            }
+        }
+    }
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
-                                               const VkDependencyInfo *pDependencyInfos, const ErrorObject &error_obj) const {
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-
+bool CoreChecks::ValidateWaitEventDependencyFlags(VkDependencyFlags dependency_flags, const LogObjectList& objlist,
+                                                  const Location& dep_info_loc) const {
     bool skip = false;
+
+    const VkDependencyFlags forbidden_flags = VK_DEPENDENCY_BY_REGION_BIT | VK_DEPENDENCY_DEVICE_GROUP_BIT |
+                                              VK_DEPENDENCY_VIEW_LOCAL_BIT | VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT;
+
+    const VkDependencyFlags included_forbidden_flags = dependency_flags & forbidden_flags;
+    if (included_forbidden_flags) {
+        skip |= LogError("VUID-vkCmdWaitEvents2-dependencyFlags-10394", objlist, dep_info_loc.dot(Field::dependencyFlags),
+                         "(%s) includes %s.", string_VkDependencyFlags(dependency_flags).c_str(),
+                         string_VkDependencyFlags(included_forbidden_flags).c_str());
+    }
+    if (!enabled_features.maintenance8) {
+        if (dependency_flags & VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR) {
+            skip |= LogError("VUID-vkCmdWaitEvents2-maintenance8-10205", objlist, dep_info_loc.dot(Field::dependencyFlags),
+                             "(%s) includes VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR, but the "
+                             "maintenance8 feature is not enabled.",
+                             string_VkDependencyFlags(dependency_flags).c_str());
+        }
+    }
+    return skip;
+}
+
+bool CoreChecks::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
+                                               const VkDependencyInfo* pDependencyInfos, const ErrorObject& error_obj) const {
+    bool skip = false;
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
+    auto& cb_sub_state = core::SubState(*cb_state);
+
+    skip |= ValidateCmd(*cb_state, error_obj.location);
     if (!enabled_features.synchronization2) {
         skip |= LogError("VUID-vkCmdWaitEvents2-synchronization2-03836", commandBuffer, error_obj.location,
                          "the synchronization2 feature was not enabled.");
     }
-    for (uint32_t i = 0; (i < eventCount) && !skip; i++) {
+    if (cb_state->per_tile_execution_model_enabled) {
+        skip |= LogError("VUID-vkCmdWaitEvents2-None-10654", commandBuffer, error_obj.location,
+                         "the per-tile execution model has been enabled in this command buffer. "
+                         "(Don't call vkCmdBeginPerTileExecutionQCOM before vkCmdWaitEvents2)");
+    }
+    for (uint32_t i = 0; i < eventCount && !skip; i++) {
         const LogObjectList objlist(commandBuffer, pEvents[i]);
         const Location dep_info_loc = error_obj.location.dot(Field::pDependencyInfos, i);
+        const VkDependencyInfo& dep_info = pDependencyInfos[i];
 
-        const VkDependencyFlags dependency_flags = pDependencyInfos[i].dependencyFlags;
-        const VkDependencyFlags allowed_flags = VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR;
-        if ((dependency_flags & ~allowed_flags) != 0) {
-            const bool is_transfer_use_all_only =
-                dependency_flags == VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR;
+        skip |= ValidateDependencyInfo(objlist, dep_info_loc, *cb_state, dep_info);
+        skip |= ValidateWaitEventDependencyFlags(dep_info.dependencyFlags, objlist, dep_info_loc);
 
-            if (!enabled_features.maintenance8) {
-                skip |= LogError("VUID-vkCmdWaitEvents2-dependencyFlags-10394", objlist, dep_info_loc.dot(Field::dependencyFlags),
-                                 "is (%s).%s", string_VkDependencyFlags(pDependencyInfos[i].dependencyFlags).c_str(),
-                                 is_transfer_use_all_only
-                                     ? " To use VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR, the "
-                                       "maintenance8 feature must be enabled."
-                                     : "");
-            } else if (!is_transfer_use_all_only) {
-                skip |= LogError("VUID-vkCmdWaitEvents2-maintenance8-10205", objlist, dep_info_loc.dot(Field::dependencyFlags),
-                                "(%s) but only VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR and "
-                                "VK_DEPENDENCY_ASYMMETRIC_EVENT_BIT_KHR are allowed.",
-                                string_VkDependencyFlags(pDependencyInfos[i].dependencyFlags).c_str());
+        if (cb_state->active_render_pass) {
+            for (uint32_t barrier_index = 0; barrier_index < dep_info.imageMemoryBarrierCount; barrier_index++) {
+                const ImageBarrier barrier(dep_info.pImageMemoryBarriers[barrier_index]);
+                const Location barrier_loc = dep_info_loc.dot(Field::pImageMemoryBarriers, barrier_index);
+                skip |= ValidateRenderPassInstanceNoLayoutChange(objlist, barrier_loc, barrier.oldLayout, barrier.newLayout);
             }
-        } else if ((pDependencyInfos[i].dependencyFlags & ~allowed_flags) != 0) {
-            skip |= LogError("VUID-vkCmdWaitEvents2-dependencyFlags-10394", objlist, dep_info_loc.dot(Field::dependencyFlags),
-                             "is (%s).", string_VkDependencyFlags(pDependencyInfos[i].dependencyFlags).c_str());
         }
-        skip |= ValidateDependencyInfo(objlist, dep_info_loc, *cb_state, pDependencyInfos[i]);
+        const EventSignalState* signal_state = vvl::Find(cb_sub_state.event_signal_states, pEvents[i]);
+        if (signal_state && signal_state->HasKnownEffect()) {
+            const VkPipelineStageFlags2 union_src_stage_mask = sync_utils::GetExecScopes(dep_info).src;
+            if (signal_state->last_signaling_command == vvl::Func::vkCmdSetEvent) {
+                skip |= LogError("VUID-vkCmdWaitEvents2-pEvents-03837", objlist, error_obj.location, "%s was set by %s.",
+                                 FormatHandle(pEvents[i]).c_str(), vvl::String(signal_state->last_signaling_command));
+            } else if ((union_src_stage_mask & VK_PIPELINE_STAGE_2_HOST_BIT) == 0 &&
+                       !IsValueIn(signal_state->last_signaling_command,
+                                  {vvl::Func::vkCmdSetEvent2, vvl::Func::vkCmdSetEvent2KHR})) {
+                skip |= LogError("VUID-vkCmdWaitEvents2-pEvents-03841", objlist, error_obj.location,
+                                 "%s was not set by vkCmdSetEvent2.", FormatHandle(pEvents[i]).c_str());
+            }
+            if (union_src_stage_mask == VK_PIPELINE_STAGE_2_HOST_BIT && !signal_state->signaled) {
+                skip |=
+                    LogError("VUID-vkCmdWaitEvents2-pEvents-03840", objlist, error_obj.location,
+                             "pEvents[%" PRIu32
+                             "] (%s) is not signaled, but the first synchronization scope specified by pDependencyInfos[%" PRIu32
+                             "] includes only host operations",
+                             i, FormatHandle(pEvents[i]).c_str(), i);
+            }
+        }
     }
-    skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
-                                                  const VkDependencyInfoKHR *pDependencyInfos, const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
+                                                  const VkDependencyInfoKHR* pDependencyInfos, const ErrorObject& error_obj) const {
     return PreCallValidateCmdWaitEvents2(commandBuffer, eventCount, pEvents, pDependencyInfos, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdPipelineBarrier(
     VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
-    VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers,
-    uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier *pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
-    const VkImageMemoryBarrier *pImageMemoryBarriers, const ErrorObject &error_obj) const {
+    VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
+    uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
+    const VkImageMemoryBarrier* pImageMemoryBarriers, const ErrorObject& error_obj) const {
     bool skip = false;
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     const LogObjectList objlist(commandBuffer);
@@ -1491,8 +1736,8 @@ bool CoreChecks::PreCallValidateCmdPipelineBarrier(
     if (!enabled_features.maintenance8 &&
         (dependencyFlags & VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR)) {
         skip |= LogError("VUID-vkCmdPipelineBarrier-maintenance8-10206", objlist, error_obj.location.dot(Field::dependencyFlags),
-                        "VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR is used, but maintenance8 feature "
-                        "was not enabled.");
+                         "VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR is used, but maintenance8 feature "
+                         "was not enabled.");
     }
 
     skip |= ValidatePipelineStage(objlist, error_obj.location.dot(Field::srcStageMask), queue_flags, srcStageMask);
@@ -1520,8 +1765,8 @@ bool CoreChecks::PreCallValidateCmdPipelineBarrier(
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo *pDependencyInfo,
-                                                    const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
+                                                    const ErrorObject& error_obj) const {
     bool skip = false;
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     const LogObjectList objlist(commandBuffer);
@@ -1548,17 +1793,18 @@ bool CoreChecks::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer commandBuffe
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdPipelineBarrier2KHR(VkCommandBuffer commandBuffer, const VkDependencyInfoKHR *pDependencyInfo,
-                                                       const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateCmdPipelineBarrier2KHR(VkCommandBuffer commandBuffer, const VkDependencyInfoKHR* pDependencyInfo,
+                                                       const ErrorObject& error_obj) const {
     return PreCallValidateCmdPipelineBarrier2(commandBuffer, pDependencyInfo, error_obj);
 }
 
-bool CoreChecks::PreCallValidateSetEvent(VkDevice device, VkEvent event, const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateSetEvent(VkDevice device, VkEvent event, const ErrorObject& error_obj) const {
     bool skip = false;
     if (auto event_state = Get<vvl::Event>(event)) {
         if (event_state->InUse()) {
             skip |= LogError("VUID-vkSetEvent-event-09543", event, error_obj.location.dot(Field::event),
-                             "(%s) that is already in use by a command buffer.", FormatHandle(event).c_str());
+                             "(%s) that is already in use by a command buffer.%s", FormatHandle(event).c_str(),
+                             is_device_lost ? "\n(a VK_ERROR_DEVICE_LOST has occurred, the event must be destroyed)" : "");
         }
         if (event_state->flags & VK_EVENT_CREATE_DEVICE_ONLY_BIT) {
             skip |= LogError("VUID-vkSetEvent-event-03941", event, error_obj.location.dot(Field::event),
@@ -1568,18 +1814,31 @@ bool CoreChecks::PreCallValidateSetEvent(VkDevice device, VkEvent event, const E
     return skip;
 }
 
-bool CoreChecks::PreCallValidateResetEvent(VkDevice device, VkEvent event, const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateResetEvent(VkDevice device, VkEvent event, const ErrorObject& error_obj) const {
     bool skip = false;
     if (auto event_state = Get<vvl::Event>(event)) {
         if (event_state->flags & VK_EVENT_CREATE_DEVICE_ONLY_BIT) {
             skip |= LogError("VUID-vkResetEvent-event-03823", event, error_obj.location.dot(Field::event),
                              "(%s) was created with VK_EVENT_CREATE_DEVICE_ONLY_BIT.", FormatHandle(event).c_str());
         }
+
+        vvl::Func pending_wait_command = vvl::Func::Empty;
+        AnyOf<vvl::Queue>([event, &pending_wait_command](const vvl::Queue& queue_state) {
+            pending_wait_command = queue_state.GetPendingEventWaitCommand(event);
+            return pending_wait_command != vvl::Func::Empty;
+        });
+        if (pending_wait_command != vvl::Func::Empty) {
+            const char* vuid = (pending_wait_command == vvl::Func::vkCmdWaitEvents) ? "VUID-vkResetEvent-event-03821"
+                                                                                    : "VUID-vkResetEvent-event-03822";
+            skip |= LogError(vuid, event, error_obj.location,
+                             "%s was reset on the host, but a previously submitted %s command is still pending.",
+                             FormatHandle(event).c_str(), vvl::String(pending_wait_command));
+        }
     }
     return skip;
 }
 
-bool CoreChecks::PreCallValidateGetEventStatus(VkDevice device, VkEvent event, const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateGetEventStatus(VkDevice device, VkEvent event, const ErrorObject& error_obj) const {
     bool skip = false;
     if (auto event_state = Get<vvl::Event>(event)) {
         if (event_state->flags & VK_EVENT_CREATE_DEVICE_ONLY_BIT) {
@@ -1589,8 +1848,8 @@ bool CoreChecks::PreCallValidateGetEventStatus(VkDevice device, VkEvent event, c
     }
     return skip;
 }
-bool CoreChecks::PreCallValidateSignalSemaphore(VkDevice device, const VkSemaphoreSignalInfo *pSignalInfo,
-                                                const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateSignalSemaphore(VkDevice device, const VkSemaphoreSignalInfo* pSignalInfo,
+                                                const ErrorObject& error_obj) const {
     bool skip = false;
     const Location signal_loc = error_obj.location.dot(Field::pSignalInfo);
     auto semaphore_state = Get<vvl::Semaphore>(pSignalInfo->semaphore);
@@ -1619,24 +1878,34 @@ bool CoreChecks::PreCallValidateSignalSemaphore(VkDevice device, const VkSemapho
         return skip;
     }
 
-    const char *payload_type = nullptr;
-    if (auto far_away_payload = semaphore_state->CheckMaxDiffThreshold(pSignalInfo->value, payload_type)) {
+    const char* payload_type = nullptr;
+    if (auto payload = semaphore_state->CheckMaxDiffThreshold(pSignalInfo->value, payload_type)) {
         const Location loc = error_obj.location.dot(Struct::VkSemaphoreSignalInfo, Field::value);
-        const auto &vuid = GetQueueSubmitVUID(loc, vvl::SubmitError::kTimelineSemMaxDiff);
+        const auto& vuid = GetQueueSubmitVUID(loc, vvl::SubmitError::kTimelineSemMaxDiff);
+        const uint64_t max_diff = phys_dev_props_core12.maxTimelineSemaphoreValueDifference;
+        const uint64_t diff = AbsDiff(pSignalInfo->value, *payload);
         skip |= LogError(vuid, semaphore_state->Handle(), loc,
-                         "(%" PRIu64 ") exceeds limit regarding %s semaphore %s payload (%" PRIu64 ").", pSignalInfo->value,
-                         FormatHandle(*semaphore_state).c_str(), payload_type, *far_away_payload);
+                         "of signal is %" PRIu64 ", the %s semaphore payload is %" PRIu64
+                         ", and the difference between them is %" PRIu64
+                         ", which is greater than maxTimelineSemaphoreValueDifference (%" PRIu64 ").",
+                         pSignalInfo->value, payload_type, *payload, diff, max_diff);
+    }
+
+    // Run submit time validation only if skip is not set. This is mostly for vvl testing,
+    // some tests expect that submit state is not updated if regular validation fails
+    if (!skip) {
+        skip |= submit_time_tracker.ProcessSignalSemaphore(*pSignalInfo);
     }
     return skip;
 }
 
-bool CoreChecks::PreCallValidateSignalSemaphoreKHR(VkDevice device, const VkSemaphoreSignalInfo *pSignalInfo,
-                                                   const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateSignalSemaphoreKHR(VkDevice device, const VkSemaphoreSignalInfo* pSignalInfo,
+                                                   const ErrorObject& error_obj) const {
     return PreCallValidateSignalSemaphore(device, pSignalInfo, error_obj);
 }
 
-bool CoreChecks::PreCallValidateGetSemaphoreCounterValue(VkDevice device, VkSemaphore semaphore, uint64_t *pValue,
-                                                         const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateGetSemaphoreCounterValue(VkDevice device, VkSemaphore semaphore, uint64_t* pValue,
+                                                         const ErrorObject& error_obj) const {
     bool skip = false;
     auto semaphore_state = Get<vvl::Semaphore>(semaphore);
     ASSERT_AND_RETURN_SKIP(semaphore_state);
@@ -1647,8 +1916,8 @@ bool CoreChecks::PreCallValidateGetSemaphoreCounterValue(VkDevice device, VkSema
     return skip;
 }
 
-bool CoreChecks::PreCallValidateGetSemaphoreCounterValueKHR(VkDevice device, VkSemaphore semaphore, uint64_t *pValue,
-                                                            const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateGetSemaphoreCounterValueKHR(VkDevice device, VkSemaphore semaphore, uint64_t* pValue,
+                                                            const ErrorObject& error_obj) const {
     return PreCallValidateGetSemaphoreCounterValue(device, semaphore, pValue, error_obj);
 }
 
@@ -1659,7 +1928,7 @@ static inline VkQueueFlags SubpassToQueueFlags(uint32_t subpass) {
     return subpass == VK_SUBPASS_EXTERNAL ? kAllQueueTypes : static_cast<VkQueueFlags>(VK_QUEUE_GRAPHICS_BIT);
 }
 
-bool CoreChecks::ValidateSubpassDependency(const Location &loc, const VkSubpassDependency2 &dependency) const {
+bool CoreChecks::ValidateSubpassDependency(const Location& loc, const VkSubpassDependency2& dependency) const {
     bool skip = false;
 
     if (dependency.dependencyFlags & VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR) {
@@ -1670,7 +1939,7 @@ bool CoreChecks::ValidateSubpassDependency(const Location &loc, const VkSubpassD
     }
 
     VkMemoryBarrier2 converted_barrier;
-    const auto *mem_barrier = vku::FindStructInPNextChain<VkMemoryBarrier2>(dependency.pNext);
+    const auto* mem_barrier = vku::FindStructInPNextChain<VkMemoryBarrier2>(dependency.pNext);
     const Location barrier_loc = mem_barrier ? loc.dot(Field::pNext) : loc;
 
     if (mem_barrier) {
@@ -1697,7 +1966,7 @@ bool CoreChecks::ValidateSubpassDependency(const Location &loc, const VkSubpassD
 
 // Verify an image barrier's old/new layouts are compatible with the image's usage flags.
 bool CoreChecks::ValidateImageLayoutAgainstImageUsage(const Location &layout_loc, VkImage image, VkImageLayout layout,
-                                                      VkImageUsageFlags usage_flags) const {
+                                                      VkImageUsageFlags2KHR usage_flags) const {
     bool skip = false;
     bool is_error = false;
     switch (layout) {
@@ -1787,25 +2056,24 @@ bool CoreChecks::ValidateImageLayoutAgainstImageUsage(const Location &layout_loc
     }
 
     if (is_error) {
-        const auto &vuid = vvl::GetBadImageLayoutVUID(layout_loc, layout);
+        const auto& vuid = vvl::GetBadImageLayoutVUID(layout_loc, layout);
         skip |= LogError(vuid, image, layout_loc, "(%s) is not compatible with %s usage flags %s.", string_VkImageLayout(layout),
-                         FormatHandle(image).c_str(), string_VkImageUsageFlags(usage_flags).c_str());
+                         FormatHandle(image).c_str(), string_VkImageUsageFlags2KHR(usage_flags).c_str());
     }
     return skip;
 }
 
 // Verify image barrier is compatible with the image it references.
-bool CoreChecks::ValidateImageBarrierAgainstImage(const vvl::CommandBuffer &cb_state, const ImageBarrier &barrier,
-                                                  const Location &barrier_loc, const vvl::Image &image_state,
-                                                  ImageLayoutRegistry &local_layout_registry) const {
+bool CoreChecks::ValidateImageBarrierAgainstImage(const vvl::CommandBuffer& cb_state, const ImageBarrier& barrier,
+                                                  const Location& barrier_loc, const vvl::Image& image_state,
+                                                  ImageLayoutRegistry& local_layout_registry) const {
     bool skip = false;
 
     const VkImage image = image_state.VkHandle();
     assert(image == barrier.image);
 
-    const VkImageCreateInfo &image_ci = image_state.create_info;
     const Location image_loc = barrier_loc.dot(Field::image);
-    const VkFormat image_format = image_ci.format;
+    const VkFormat image_format = image_state.GetFormat();
     const VkImageLayout old_layout = barrier.oldLayout;
     const VkImageLayout new_layout = barrier.newLayout;
 
@@ -1814,17 +2082,16 @@ bool CoreChecks::ValidateImageBarrierAgainstImage(const vvl::CommandBuffer &cb_s
     const bool has_stencil_aspect = (barrier_aspect_mask & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
 
     skip |= ValidateBarrierQueueFamilies(cb_state.Handle(), barrier_loc, image_loc, barrier, image_state.Handle(),
-                                         image_ci.sharingMode, cb_state.command_pool->queueFamilyIndex);
-    const auto &vuid_aspect = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kAspectMask);
-    skip |= ValidateImageAspectMask(image_state.VkHandle(), image_ci.format, barrier.subresourceRange.aspectMask,
+                                         image_state.GetSharingMode(), cb_state.command_pool.queueFamilyIndex);
+    const auto& vuid_aspect = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kAspectMask);
+    skip |= ValidateImageAspectMask(image_state.VkHandle(), image_state.GetFormat(), barrier.subresourceRange.aspectMask,
                                     image_state.disjoint, image_loc, vuid_aspect.c_str());
-    skip |= ValidateImageBarrierSubresourceRange(image_ci, barrier.subresourceRange, image_state, cb_state.Handle(),
+    skip |= ValidateImageBarrierSubresourceRange(barrier.subresourceRange, image_state, cb_state.Handle(),
                                                  barrier_loc.dot(Field::subresourceRange));
 
     if ((barrier.srcQueueFamilyIndex != barrier.dstQueueFamilyIndex) || (old_layout != new_layout)) {
-        const VkImageUsageFlags usage_flags = image_ci.usage;
-        skip |= ValidateImageLayoutAgainstImageUsage(barrier_loc.dot(Field::oldLayout), image, old_layout, usage_flags);
-        skip |= ValidateImageLayoutAgainstImageUsage(barrier_loc.dot(Field::newLayout), image, new_layout, usage_flags);
+        skip |= ValidateImageLayoutAgainstImageUsage(barrier_loc.dot(Field::oldLayout), image, old_layout, image_state.usage);
+        skip |= ValidateImageLayoutAgainstImageUsage(barrier_loc.dot(Field::newLayout), image, new_layout, image_state.usage);
     }
 
     // Make sure layout is able to be transitioned, currently only presented shared presentable images are locked
@@ -1904,7 +2171,7 @@ bool CoreChecks::ValidateImageBarrierAgainstImage(const vvl::CommandBuffer &cb_s
         skip |= ValidateImageBarrierLayouts(cb_state, image_state, image_loc, barrier, local_layout_registry);
     }
 
-    const vvl::RenderPass *rp_state = cb_state.active_render_pass.get();
+    const vvl::RenderPass* rp_state = cb_state.active_render_pass.get();
     if (rp_state && rp_state->UsesDynamicRendering()) {
         skip |= VerifyDynamicRenderingImageBarrierLayouts(cb_state, image_state,
                                                           *rp_state->dynamic_rendering_begin_rendering_info.ptr(), barrier_loc);
@@ -1915,13 +2182,13 @@ bool CoreChecks::ValidateImageBarrierAgainstImage(const vvl::CommandBuffer &cb_s
     if (vkuFormatIsColor(image_format) && (barrier_aspect_mask != VK_IMAGE_ASPECT_COLOR_BIT)) {
         if (!vkuFormatIsMultiplane(image_format)) {
             const LogObjectList objlist(cb_state.Handle(), image);
-            const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kNotColorAspectSinglePlane);
+            const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kNotColorAspectSinglePlane);
             skip |= LogError(vuid, objlist, image_loc, "(%s) has color format %s, but its aspectMask is %s.",
                              FormatHandle(image).c_str(), string_VkFormat(image_format),
                              string_VkImageAspectFlags(barrier_aspect_mask).c_str());
         } else if (!image_state.disjoint) {
             const LogObjectList objlist(cb_state.Handle(), image);
-            const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kNotColorAspectNonDisjoint);
+            const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kNotColorAspectNonDisjoint);
             skip |= LogError(vuid, objlist, image_loc, "(%s) has color format %s, but its aspectMask is %s.",
                              FormatHandle(image).c_str(), string_VkFormat(image_format),
                              string_VkImageAspectFlags(barrier_aspect_mask).c_str());
@@ -1930,7 +2197,7 @@ bool CoreChecks::ValidateImageBarrierAgainstImage(const vvl::CommandBuffer &cb_s
     if ((vkuFormatIsMultiplane(image_format)) && (image_state.disjoint == true)) {
         if (!IsValidPlaneAspect(image_format, barrier_aspect_mask) && ((barrier_aspect_mask & VK_IMAGE_ASPECT_COLOR_BIT) == 0)) {
             const LogObjectList objlist(cb_state.Handle(), image);
-            const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadMultiplanarAspect);
+            const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadMultiplanarAspect);
             skip |= LogError(vuid, objlist, image_loc, "(%s) has Multiplane format %s, but its aspectMask is %s.",
                              FormatHandle(image).c_str(), string_VkFormat(image_format),
                              string_VkImageAspectFlags(barrier_aspect_mask).c_str());
@@ -1940,11 +2207,11 @@ bool CoreChecks::ValidateImageBarrierAgainstImage(const vvl::CommandBuffer &cb_s
     return skip;
 }
 
-bool CoreChecks::ValidateImageBarrierZeroInitializedSubresourceRange(const VkImageSubresourceRange &subresource_range,
-                                                                     const vvl::Image &image_state, const LogObjectList &objlist,
-                                                                     const Location &barrier_or_transition_loc) const {
+bool CoreChecks::ValidateImageBarrierZeroInitializedSubresourceRange(const VkImageSubresourceRange& subresource_range,
+                                                                     const vvl::Image& image_state, const LogObjectList& objlist,
+                                                                     const Location& barrier_or_transition_loc) const {
     bool skip = false;
-    const auto &vuid = GetImageBarrierVUID(barrier_or_transition_loc, vvl::ImageError::kZeroInitializeSubresource);
+    const auto& vuid = GetImageBarrierVUID(barrier_or_transition_loc, vvl::ImageError::kZeroInitializeSubresource);
     const Location subresource_range_loc = barrier_or_transition_loc.dot(Field::subresourceRange);
 
     if (subresource_range.baseArrayLayer != 0) {
@@ -1956,27 +2223,27 @@ bool CoreChecks::ValidateImageBarrierZeroInitializedSubresourceRange(const VkIma
                          "(%" PRIu32 ") is not zero, but you need to zero initialize the entire image resource at once.",
                          subresource_range.baseMipLevel);
     } else if (subresource_range.layerCount != VK_REMAINING_ARRAY_LAYERS &&
-               subresource_range.layerCount != image_state.create_info.arrayLayers) {
+               subresource_range.layerCount != image_state.GetArrayLayers()) {
         skip |= LogError(vuid, objlist, subresource_range_loc.dot(Field::layerCount),
                          "(%" PRIu32 ") is not the same as VkImageCreateInfo::arrayLayers (%" PRIu32
                          "), but you need to zero initialize the entire image resource at once.",
-                         subresource_range.layerCount, image_state.create_info.arrayLayers);
+                         subresource_range.layerCount, image_state.GetArrayLayers());
     } else if (subresource_range.levelCount != VK_REMAINING_MIP_LEVELS &&
-               subresource_range.levelCount != image_state.create_info.mipLevels) {
+               subresource_range.levelCount != image_state.GetMipLevels()) {
         skip |= LogError(vuid, objlist, subresource_range_loc.dot(Field::levelCount),
                          "(%" PRIu32 ") is not the same as VkImageCreateInfo::mipLevels (%" PRIu32
                          "), but you need to zero initialize the entire image resource at once.",
-                         subresource_range.levelCount, image_state.create_info.mipLevels);
+                         subresource_range.levelCount, image_state.GetMipLevels());
     }
 
     return skip;
 }
 
 // Verify image barrier image state and that the image is consistent with FB image
-bool CoreChecks::ValidateImageBarrierAttachment(const Location &barrier_loc, const vvl::CommandBuffer &cb_state,
-                                                const vvl::Framebuffer &fb_state, uint32_t active_subpass,
-                                                const vku::safe_VkSubpassDescription2 &sub_desc, const VkRenderPass rp_handle,
-                                                const ImageBarrier &img_barrier, const vvl::CommandBuffer *primary_cb_state) const {
+bool CoreChecks::ValidateImageBarrierAttachment(const Location& barrier_loc, const vvl::CommandBuffer& cb_state,
+                                                const vvl::Framebuffer& fb_state, uint32_t active_subpass,
+                                                const vku::safe_VkSubpassDescription2& sub_desc, const VkRenderPass rp_handle,
+                                                const ImageBarrier& img_barrier, const vvl::CommandBuffer* primary_cb_state) const {
     bool skip = false;
     const auto img_bar_image = img_barrier.image;
     bool image_match = false;
@@ -2003,7 +2270,7 @@ bool CoreChecks::ValidateImageBarrierAttachment(const Location &barrier_loc, con
             sub_image_found = true;
         }
         if (!sub_image_found) {
-            const auto *resolve = vku::FindStructInPNextChain<VkSubpassDescriptionDepthStencilResolve>(sub_desc.pNext);
+            const auto* resolve = vku::FindStructInPNextChain<VkSubpassDescriptionDepthStencilResolve>(sub_desc.pNext);
             if (resolve && resolve->pDepthStencilResolveAttachment &&
                 resolve->pDepthStencilResolveAttachment->attachment == attach_index) {
                 sub_image_layout = resolve->pDepthStencilResolveAttachment->layout;
@@ -2024,13 +2291,13 @@ bool CoreChecks::ValidateImageBarrierAttachment(const Location &barrier_loc, con
                     sub_image_found = true;
                     if (image_ahb_format == 0) {
                         const LogObjectList objlist(cb_state.Handle(), rp_handle, fb_state.Handle(), img_bar_image);
-                        const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassMismatchAhbZero);
+                        const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassMismatchAhbZero);
                         skip |= LogError(vuid, objlist, image_loc,
                                          "(%s) for subpass %" PRIu32 " was not created with an externalFormat.",
                                          FormatHandle(img_bar_image).c_str(), active_subpass);
                     } else if (sub_desc.pColorAttachments && sub_desc.pColorAttachments[0].attachment != VK_ATTACHMENT_UNUSED) {
                         const LogObjectList objlist(cb_state.Handle(), rp_handle, fb_state.Handle(), img_bar_image);
-                        const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassMismatchColorUnused);
+                        const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassMismatchColorUnused);
                         skip |=
                             LogError(vuid, objlist, image_loc,
                                      "(%s) for subpass %" PRIu32 " the pColorAttachments[0].attachment is %" PRIu32
@@ -2042,7 +2309,7 @@ bool CoreChecks::ValidateImageBarrierAttachment(const Location &barrier_loc, con
             }
         }
         if (!sub_image_found) {
-            const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassMismatch);
+            const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassMismatch);
             const LogObjectList objlist(cb_state.Handle(), rp_handle, fb_state.Handle(), img_bar_image);
             skip |= LogError(vuid, objlist, image_loc,
                              "(%s) is not referenced by the VkSubpassDescription for active subpass (%" PRIu32 ") of current %s.",
@@ -2051,7 +2318,7 @@ bool CoreChecks::ValidateImageBarrierAttachment(const Location &barrier_loc, con
 
     } else {  // !image_match
         const LogObjectList objlist(cb_state.Handle(), rp_handle, fb_state.Handle(), img_bar_image);
-        const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassMismatch);
+        const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kRenderPassMismatch);
         skip |= LogError(vuid, objlist, image_loc, "(%s) does not match an image from the current %s.",
                          FormatHandle(img_bar_image).c_str(), FormatHandle(fb_state.Handle()).c_str());
     }
@@ -2070,21 +2337,21 @@ bool CoreChecks::ValidateImageBarrierAttachment(const Location &barrier_loc, con
     return skip;
 }
 
-void CoreChecks::EnqueueValidateImageBarrierAttachment(const Location &loc, core::CommandBufferSubState &cb_sub_state,
-                                                       const ImageBarrier &barrier) {
+void CoreChecks::EnqueueValidateImageBarrierAttachment(const Location& loc, core::CommandBufferSubState& cb_sub_state,
+                                                       const ImageBarrier& barrier) {
     // Secondary CBs can have null framebuffer so queue up validation in that case 'til FB is known
-    const vvl::RenderPass *rp_state = cb_sub_state.base.active_render_pass.get();
+    const vvl::RenderPass* rp_state = cb_sub_state.base.active_render_pass.get();
     if (rp_state && (VK_NULL_HANDLE == cb_sub_state.base.active_framebuffer) && cb_sub_state.base.IsSecondary()) {
         const auto active_subpass = cb_sub_state.base.GetActiveSubpass();
         if (active_subpass < rp_state->create_info.subpassCount) {
-            const auto &sub_desc = rp_state->create_info.pSubpasses[active_subpass];
+            const auto& sub_desc = rp_state->create_info.pSubpasses[active_subpass];
             // Secondary CB case w/o FB specified delay validation
-            auto *this_ptr = this;  // Required for older compilers with c++20 compatibility
+            auto* this_ptr = this;  // Required for older compilers with c++20 compatibility
             vvl::LocationCapture loc_capture(loc);
             const VkRenderPass render_pass = rp_state->VkHandle();
             cb_sub_state.cmd_execute_commands_functions.emplace_back(
                 [this_ptr, loc_capture, active_subpass, sub_desc, render_pass, barrier](
-                    const vvl::CommandBuffer &secondary_cb, const vvl::CommandBuffer *primary_cb, const vvl::Framebuffer *fb) {
+                    const vvl::CommandBuffer& secondary_cb, const vvl::CommandBuffer* primary_cb, const vvl::Framebuffer* fb) {
                     if (!fb) return false;
                     return this_ptr->ValidateImageBarrierAttachment(loc_capture.Get(), secondary_cb, *fb, active_subpass, sub_desc,
                                                                     render_pass, barrier, primary_cb);
@@ -2093,7 +2360,7 @@ void CoreChecks::EnqueueValidateImageBarrierAttachment(const Location &loc, core
     }
 }
 
-static bool IsQueueFamilyValid(const vvl::DeviceState &device_data, uint32_t queue_family) {
+static bool IsQueueFamilyValid(const vvl::DeviceState& device_data, uint32_t queue_family) {
     return (queue_family < static_cast<uint32_t>(device_data.physical_device_state->queue_family_properties.size()));
 }
 
@@ -2101,7 +2368,7 @@ static bool IsQueueFamilySpecial(uint32_t queue_family) {
     return IsQueueFamilyExternal(queue_family) || (queue_family == VK_QUEUE_FAMILY_IGNORED);
 }
 
-static const char *GetFamilyAnnotation(const vvl::DeviceState &device_data, uint32_t family) {
+static const char* GetFamilyAnnotation(const vvl::DeviceState& device_data, uint32_t family) {
     switch (family) {
         case VK_QUEUE_FAMILY_EXTERNAL:
             return " (VK_QUEUE_FAMILY_EXTERNAL)";
@@ -2117,8 +2384,8 @@ static const char *GetFamilyAnnotation(const vvl::DeviceState &device_data, uint
     }
 }
 
-bool CoreChecks::ValidateHostStage(const LogObjectList &objlist, const Location &barrier_loc,
-                                   const OwnershipTransferBarrier &barrier) const {
+bool CoreChecks::ValidateHostStage(const LogObjectList& objlist, const Location& barrier_loc,
+                                   const OwnershipTransferBarrier& barrier) const {
     bool skip = false;
     // src/dst queue families should be equal if HOST_BIT is used
     if (barrier.srcQueueFamilyIndex != barrier.dstQueueFamilyIndex) {
@@ -2131,7 +2398,7 @@ bool CoreChecks::ValidateHostStage(const LogObjectList &objlist, const Location 
             stage_field = vvl::Field::dstStageMask;
         }
         if (stage_field != vvl::Field::Empty) {
-            const auto &vuid = GetBarrierQueueVUID(barrier_loc, vvl::QueueError::kHostStage);
+            const auto& vuid = GetBarrierQueueVUID(barrier_loc, vvl::QueueError::kHostStage);
             const Location stage_loc = is_sync2 ? barrier_loc.dot(stage_field) : Location(barrier_loc.function, stage_field);
             skip |= LogError(vuid, objlist, stage_loc,
                              "is %s but srcQueueFamilyIndex (%" PRIu32 ") != dstQueueFamilyIndex (%" PRIu32 ").",
@@ -2142,21 +2409,32 @@ bool CoreChecks::ValidateHostStage(const LogObjectList &objlist, const Location 
     return skip;
 }
 
-void CoreChecks::RecordBarrierValidationInfo(const Location &barrier_loc, vvl::CommandBuffer &cb_state,
-                                             const BufferBarrier &barrier,
-                                             QFOTransferBarrierSets<QFOBufferTransferBarrier> &barrier_sets) {
+void CoreChecks::RecordBarrierValidationInfo(const Location& barrier_loc, vvl::CommandBuffer& cb_state,
+                                             const BufferBarrier& barrier,
+                                             QFOTransferBarrierSets<QFOBufferTransferBarrier>& barrier_sets) {
     if (IsOwnershipTransfer(barrier)) {
+        BufferBarrier adjusted_barrier = barrier;
+        if (adjusted_barrier.size == VK_WHOLE_SIZE) {
+            if (auto buffer_state = Get<vvl::Buffer>(barrier.buffer)) {
+                if (buffer_state->GetSize() >= barrier.offset) {
+                    adjusted_barrier.size = buffer_state->GetSize() - barrier.offset;
+                } else {
+                    adjusted_barrier.size = 0;  // Invalid offset, should be reported elsewhere
+                }
+            }
+        }
+
         if (cb_state.IsReleaseOp(barrier) && !IsQueueFamilyExternal(barrier.dstQueueFamilyIndex)) {
-            barrier_sets.release.emplace(barrier);
+            barrier_sets.release.emplace(adjusted_barrier);
         } else if (cb_state.IsAcquireOp(barrier) && !IsQueueFamilyExternal(barrier.srcQueueFamilyIndex)) {
-            barrier_sets.acquire.emplace(barrier);
+            barrier_sets.acquire.emplace(adjusted_barrier);
         }
     }
 }
 
-void CoreChecks::RecordBarrierValidationInfo(const Location &barrier_loc, vvl::CommandBuffer &cb_state, const ImageBarrier &barrier,
-                                             const vvl::Image &image_state,
-                                             QFOTransferBarrierSets<QFOImageTransferBarrier> &barrier_sets) {
+void CoreChecks::RecordBarrierValidationInfo(const Location& barrier_loc, vvl::CommandBuffer& cb_state, const ImageBarrier& barrier,
+                                             const vvl::Image& image_state,
+                                             QFOTransferBarrierSets<QFOImageTransferBarrier>& barrier_sets) {
     if (IsOwnershipTransfer(barrier)) {
         ImageBarrier adjusted_barrier = barrier;
         adjusted_barrier.subresourceRange = image_state.NormalizeSubresourceRange(barrier.subresourceRange);
@@ -2170,23 +2448,22 @@ void CoreChecks::RecordBarrierValidationInfo(const Location &barrier_loc, vvl::C
 }
 
 template <typename TransferBarrier>
-bool CoreChecks::ValidateQueuedQFOTransferBarriers(const core::CommandBufferSubState &cb_sub_state,
-                                                   QFOTransferCBScoreboards<TransferBarrier> *scoreboards,
-                                                   const GlobalQFOTransferBarrierMap<TransferBarrier> &global_release_barriers,
-                                                   const Location &loc) const {
+bool CoreChecks::ValidateQueuedQFOTransferBarriers(const core::CommandBufferSubState& cb_sub_state,
+                                                   const GlobalQFOTransferBarrierMap<TransferBarrier>& global_release_barriers,
+                                                   const Location& loc) const {
     bool skip = false;
-    const auto &cb_barriers = cb_sub_state.GetQFOBarrierSets(TransferBarrier());
+    const auto& cb_barriers = cb_sub_state.GetQFOBarrierSets(TransferBarrier());
 
     // Each acquire must have a matching release (ERROR)
-    for (const auto &acquire : cb_barriers.acquire) {
+    for (const auto& acquire : cb_barriers.acquire) {
         const auto set_it = global_release_barriers.find(acquire.handle);
         bool matching_release_found = false;
         if (set_it != global_release_barriers.cend()) {
-            const QFOTransferBarrierSet<TransferBarrier> &set_for_handle = set_it->second;
+            const QFOTransferBarrierSet<TransferBarrier>& set_for_handle = set_it->second;
             matching_release_found = set_for_handle.find(acquire) != set_for_handle.cend();
         }
         if (!matching_release_found) {
-            const char *vuid = (loc.function == vvl::Func::vkQueueSubmit) ? "VUID-vkQueueSubmit-pSubmits-02207"
+            const char* vuid = (loc.function == vvl::Func::vkQueueSubmit) ? "VUID-vkQueueSubmit-pSubmits-02207"
                                                                           : "VUID-vkQueueSubmit2-commandBuffer-03879";
             skip |= LogError(vuid, cb_sub_state.Handle(), loc,
                              "contains a %s that acquires ownership of %s for destination queue family %" PRIu32
@@ -2198,24 +2475,19 @@ bool CoreChecks::ValidateQueuedQFOTransferBarriers(const core::CommandBufferSubS
     return skip;
 }
 
-bool CoreChecks::ValidateQueuedQFOTransfers(const vvl::CommandBuffer &cb_state,
-                                            QFOTransferCBScoreboards<QFOImageTransferBarrier> *qfo_image_scoreboards,
-                                            QFOTransferCBScoreboards<QFOBufferTransferBarrier> *qfo_buffer_scoreboards,
-                                            const Location &loc) const {
+bool CoreChecks::ValidateQueuedQFOTransfers(const vvl::CommandBuffer& cb_state, const Location& loc) const {
     bool skip = false;
-    auto &cb_sub_state = core::SubState(cb_state);
-    skip |= ValidateQueuedQFOTransferBarriers<QFOImageTransferBarrier>(cb_sub_state, qfo_image_scoreboards,
-                                                                       qfo_release_image_barrier_map, loc);
-    skip |= ValidateQueuedQFOTransferBarriers<QFOBufferTransferBarrier>(cb_sub_state, qfo_buffer_scoreboards,
-                                                                        qfo_release_buffer_barrier_map, loc);
+    auto& cb_sub_state = core::SubState(cb_state);
+    skip |= ValidateQueuedQFOTransferBarriers<QFOImageTransferBarrier>(cb_sub_state, qfo_release_image_barrier_map, loc);
+    skip |= ValidateQueuedQFOTransferBarriers<QFOBufferTransferBarrier>(cb_sub_state, qfo_release_buffer_barrier_map, loc);
     return skip;
 }
 
 template <typename TransferBarrier>
-void RecordQueuedQFOTransferBarriers(QFOTransferBarrierSets<TransferBarrier> &cb_barriers,
-                                     GlobalQFOTransferBarrierMap<TransferBarrier> &global_release_barriers) {
+void RecordQueuedQFOTransferBarriers(QFOTransferBarrierSets<TransferBarrier>& cb_barriers,
+                                     GlobalQFOTransferBarrierMap<TransferBarrier>& global_release_barriers) {
     // Add release barriers from this submit to the global map
-    for (const auto &release : cb_barriers.release) {
+    for (const auto& release : cb_barriers.release) {
         // the global barrier list is mapped by resource handle to allow cleanup on resource destruction
         // NOTE: vvl::concurrent_ordered_map::find() makes a thread safe copy of the result, so we must
         // copy back after updating.
@@ -2225,11 +2497,11 @@ void RecordQueuedQFOTransferBarriers(QFOTransferBarrierSets<TransferBarrier> &cb
     }
 
     // Erase acquired barriers from this submit from the global map -- essentially marking releases as consumed
-    for (const auto &acquire : cb_barriers.acquire) {
+    for (const auto& acquire : cb_barriers.acquire) {
         // NOTE: We're not using [] because we don't want to create entries for missing releases
         auto set_it = global_release_barriers.find(acquire.handle);
         if (set_it != global_release_barriers.end()) {
-            QFOTransferBarrierSet<TransferBarrier> &set_for_handle = set_it->second;
+            QFOTransferBarrierSet<TransferBarrier>& set_for_handle = set_it->second;
             set_for_handle.erase(acquire);
             if (set_for_handle.empty()) {  // Clean up empty sets
                 global_release_barriers.erase(acquire.handle);
@@ -2242,23 +2514,23 @@ void RecordQueuedQFOTransferBarriers(QFOTransferBarrierSets<TransferBarrier> &cb
     }
 }
 
-void CoreChecks::RecordQueuedQFOTransfers(vvl::CommandBuffer &cb_state) {
-    auto &cb_sub_state = core::SubState(cb_state);
+void CoreChecks::RecordQueuedQFOTransfers(vvl::CommandBuffer& cb_state) {
+    auto& cb_sub_state = core::SubState(cb_state);
     RecordQueuedQFOTransferBarriers<QFOImageTransferBarrier>(cb_sub_state.qfo_transfer_image_barriers,
                                                              qfo_release_image_barrier_map);
     RecordQueuedQFOTransferBarriers<QFOBufferTransferBarrier>(cb_sub_state.qfo_transfer_buffer_barriers,
                                                               qfo_release_buffer_barrier_map);
 }
 
-bool CoreChecks::ValidateBarrierQueueFamilies(const LogObjectList &objects, const Location &barrier_loc, const Location &field_loc,
-                                              const OwnershipTransferBarrier &barrier, const VulkanTypedHandle &resource_handle,
+bool CoreChecks::ValidateBarrierQueueFamilies(const LogObjectList& objects, const Location& barrier_loc, const Location& field_loc,
+                                              const OwnershipTransferBarrier& barrier, const VulkanTypedHandle& resource_handle,
                                               VkSharingMode sharing_mode, uint32_t command_pool_queue_family) const {
     bool skip = false;
 
     auto log_queue_family_error = [sharing_mode, resource_handle, &barrier_loc, &field_loc, device_data_ = device_state,
-                                   objects_ = objects](vvl::QueueError vu_index, uint32_t family, const char *param_name) -> bool {
-        const std::string &vuid = GetBarrierQueueVUID(field_loc, vu_index);
-        const char *annotation = GetFamilyAnnotation(*device_data_, family);
+                                   objects_ = objects](vvl::QueueError vu_index, uint32_t family, const char* param_name) -> bool {
+        const std::string& vuid = GetBarrierQueueVUID(field_loc, vu_index);
+        const char* annotation = GetFamilyAnnotation(*device_data_, family);
         return device_data_->LogError(vuid, objects_, barrier_loc,
                                       "barrier using %s created with sharingMode %s, has %s %" PRIu32 "%s. %s",
                                       device_data_->FormatHandle(resource_handle).c_str(), string_VkSharingMode(sharing_mode),
@@ -2307,9 +2579,9 @@ bool CoreChecks::ValidateBarrierQueueFamilies(const LogObjectList &objects, cons
         } else if (dst_queue_family != VK_QUEUE_FAMILY_IGNORED && dst_queue_family != VK_QUEUE_FAMILY_EXTERNAL) {
             skip |= log_queue_family_error(vvl::QueueError::kSync1ConcurrentDst, dst_queue_family, "dstQueueFamilyIndex");
         } else if (src_queue_family != VK_QUEUE_FAMILY_IGNORED && dst_queue_family != VK_QUEUE_FAMILY_IGNORED) {
-            const std::string &vuid = GetBarrierQueueVUID(field_loc, vvl::QueueError::kSync1ConcurrentNoIgnored);
-            const char *src_annotation = GetFamilyAnnotation(*device_state, src_queue_family);
-            const char *dst_annotation = GetFamilyAnnotation(*device_state, dst_queue_family);
+            const std::string& vuid = GetBarrierQueueVUID(field_loc, vvl::QueueError::kSync1ConcurrentNoIgnored);
+            const char* src_annotation = GetFamilyAnnotation(*device_state, src_queue_family);
+            const char* dst_annotation = GetFamilyAnnotation(*device_state, dst_queue_family);
             // Log both src and dst queue families
             skip |= LogError(vuid, objects, barrier_loc,
                              "barrier using %s created with sharingMode %s, has srcQueueFamilyIndex %" PRIu32
@@ -2323,8 +2595,8 @@ bool CoreChecks::ValidateBarrierQueueFamilies(const LogObjectList &objects, cons
     if (sharing_mode == VK_SHARING_MODE_EXCLUSIVE && IsOwnershipTransfer(barrier)) {
         if (src_queue_family != command_pool_queue_family && dst_queue_family != command_pool_queue_family) {
             const std::string vuid = GetBarrierQueueVUID(barrier_loc, vvl::QueueError::kSubmitQueueMustMatchSrcOrDst);
-            const char *src_annotation = GetFamilyAnnotation(*device_state, src_queue_family);
-            const char *dst_annotation = GetFamilyAnnotation(*device_state, dst_queue_family);
+            const char* src_annotation = GetFamilyAnnotation(*device_state, src_queue_family);
+            const char* dst_annotation = GetFamilyAnnotation(*device_state, dst_queue_family);
             skip |= LogError(
                 vuid, objects, barrier_loc,
                 "has srcQueueFamilyIndex %" PRIu32 "%s and dstQueueFamilyIndex %" PRIu32
@@ -2338,29 +2610,33 @@ bool CoreChecks::ValidateBarrierQueueFamilies(const LogObjectList &objects, cons
     return skip;
 }
 
-bool CoreChecks::ValidateBufferBarrier(const LogObjectList &objects, const Location &barrier_loc,
-                                       const vvl::CommandBuffer &cb_state, const BufferBarrier &mem_barrier) const {
+bool CoreChecks::ValidateBufferBarrier(const LogObjectList& objects, const Location& barrier_loc,
+                                       const vvl::CommandBuffer& cb_state, const BufferBarrier& mem_barrier) const {
     bool skip = false;
+
+    const bool is_memory_range = barrier_loc.structure == vvl::Struct::VkMemoryRangeBarrierKHR;
 
     // Validate buffer barrier queue family indices
     if (auto buffer_state = Get<vvl::Buffer>(mem_barrier.buffer)) {
         auto buf_loc = barrier_loc.dot(Field::buffer);
-        const auto &mem_vuid = GetBufferBarrierVUID(buf_loc, vvl::BufferError::kNoMemory);
-        skip |= ValidateMemoryIsBoundToBuffer(cb_state.VkHandle(), *buffer_state, buf_loc, mem_vuid.c_str());
+        if (!is_memory_range) {
+            const auto& mem_vuid = GetBufferBarrierVUID(buf_loc, vvl::BufferError::kNoMemory);
+            skip |= ValidateMemoryIsBoundToBuffer(cb_state.VkHandle(), *buffer_state, buf_loc, mem_vuid.c_str());
+        }
 
         skip |= ValidateBarrierQueueFamilies(objects, barrier_loc, buf_loc, mem_barrier, buffer_state->Handle(),
-                                             buffer_state->create_info.sharingMode, cb_state.command_pool->queueFamilyIndex);
+                                             buffer_state->GetSharingMode(), cb_state.command_pool.queueFamilyIndex);
 
-        auto buffer_size = buffer_state->create_info.size;
+        auto buffer_size = buffer_state->GetSize();
         if (mem_barrier.offset >= buffer_size) {
             auto offset_loc = barrier_loc.dot(Field::offset);
-            const auto &vuid = GetBufferBarrierVUID(offset_loc, vvl::BufferError::kOffsetTooBig);
+            const auto& vuid = GetBufferBarrierVUID(offset_loc, vvl::BufferError::kOffsetTooBig);
             skip |=
                 LogError(vuid, objects, offset_loc, "%s has offset 0x%" PRIx64 " which is not less than total size 0x%" PRIx64 ".",
                          FormatHandle(mem_barrier.buffer).c_str(), HandleToUint64(mem_barrier.offset), HandleToUint64(buffer_size));
-        } else if (mem_barrier.size != VK_WHOLE_SIZE && (mem_barrier.offset + mem_barrier.size > buffer_size)) {
+        } else if (!is_memory_range && mem_barrier.size != VK_WHOLE_SIZE && (mem_barrier.offset + mem_barrier.size > buffer_size)) {
             auto size_loc = barrier_loc.dot(Field::size);
-            const auto &vuid = GetBufferBarrierVUID(size_loc, vvl::BufferError::kSizeOutOfRange);
+            const auto& vuid = GetBufferBarrierVUID(size_loc, vvl::BufferError::kSizeOutOfRange);
             skip |=
                 LogError(vuid, objects, size_loc,
                          "%s has offset 0x%" PRIx64 " and size 0x%" PRIx64 " whose sum is greater than total size 0x%" PRIx64 ".",
@@ -2369,15 +2645,15 @@ bool CoreChecks::ValidateBufferBarrier(const LogObjectList &objects, const Locat
         }
         if (mem_barrier.size == 0) {
             auto size_loc = barrier_loc.dot(Field::size);
-            const auto &vuid = GetBufferBarrierVUID(size_loc, vvl::BufferError::kSizeZero);
+            const auto& vuid = GetBufferBarrierVUID(size_loc, vvl::BufferError::kSizeZero);
             skip |= LogError(vuid, objects, barrier_loc, "%s has a size of 0.", FormatHandle(mem_barrier.buffer).c_str());
         }
     }
     return skip;
 }
 
-bool CoreChecks::ValidateImageBarrier(const LogObjectList &objlist, const vvl::CommandBuffer &cb_state, const ImageBarrier &barrier,
-                                      const Location &barrier_loc, ImageLayoutRegistry &local_layout_registry) const {
+bool CoreChecks::ValidateImageBarrier(const LogObjectList& objlist, const vvl::CommandBuffer& cb_state, const ImageBarrier& barrier,
+                                      const Location& barrier_loc, ImageLayoutRegistry& local_layout_registry) const {
     bool skip = false;
 
     const VkImageLayout old_layout = barrier.oldLayout;
@@ -2388,12 +2664,12 @@ bool CoreChecks::ValidateImageBarrier(const LogObjectList &objlist, const vvl::C
         is_image_layout_transition = old_layout != new_layout;
     } else {
         if (IsValueIn(old_layout, {VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL})) {
-            const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadSync2OldLayout);
+            const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadSync2OldLayout);
             skip |= LogError(vuid, objlist, barrier_loc.dot(Field::oldLayout),
                              "is %s, but the synchronization2 feature was not enabled.", string_VkImageLayout(old_layout));
         }
         if (IsValueIn(new_layout, {VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL})) {
-            const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadSync2NewLayout);
+            const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadSync2NewLayout);
             skip |= LogError(vuid, objlist, barrier_loc.dot(Field::newLayout),
                              "is %s, but the synchronization2 feature was not enabled.", string_VkImageLayout(new_layout));
         }
@@ -2402,20 +2678,20 @@ bool CoreChecks::ValidateImageBarrier(const LogObjectList &objlist, const vvl::C
     if (is_image_layout_transition) {
         if (IsValueIn(new_layout,
                       {VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT})) {
-            const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadLayout);
+            const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadLayout);
             skip |= LogError(vuid, objlist, barrier_loc.dot(Field::newLayout), "is %s.", string_VkImageLayout(new_layout));
         }
     }
 
     if (old_layout == VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT && !enabled_features.zeroInitializeDeviceMemory) {
-        const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadZeroInitializeOldLayout);
+        const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadZeroInitializeOldLayout);
         skip |= LogError(vuid, objlist, barrier_loc.dot(Field::oldLayout),
                          "is %s, but the zeroInitializeDeviceMemory feature was not enabled.", string_VkImageLayout(old_layout));
     }
 
     if (new_layout == VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT) {
         if (!enabled_features.attachmentFeedbackLoopLayout) {
-            const auto &vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadAttFeedbackLoopLayout);
+            const auto& vuid = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kBadAttFeedbackLoopLayout);
             skip |= LogError(vuid, objlist, barrier_loc.dot(Field::newLayout),
                              "is VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT, but the attachmentFeedbackLoopLayout "
                              "feature was not enabled.");
@@ -2423,7 +2699,7 @@ bool CoreChecks::ValidateImageBarrier(const LogObjectList &objlist, const vvl::C
     }
 
     if (auto image_state = Get<vvl::Image>(barrier.image)) {
-        const auto &vuid_no_memory = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kNoMemory);
+        const auto& vuid_no_memory = GetImageBarrierVUID(barrier_loc, vvl::ImageError::kNoMemory);
         skip |=
             ValidateMemoryIsBoundToImage(cb_state.Handle(), *image_state, barrier_loc.dot(Field::image), vuid_no_memory.c_str());
         skip |= ValidateImageBarrierAgainstImage(cb_state, barrier, barrier_loc, *image_state, local_layout_registry);
@@ -2437,11 +2713,11 @@ bool CoreChecks::ValidateImageBarrier(const LogObjectList &objlist, const vvl::C
     return skip;
 }
 
-bool CoreChecks::ValidateBarriers(const Location &outer_loc, const vvl::CommandBuffer &cb_state,
+bool CoreChecks::ValidateBarriers(const Location& outer_loc, const vvl::CommandBuffer& cb_state,
                                   VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
-                                  uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers, uint32_t bufferBarrierCount,
-                                  const VkBufferMemoryBarrier *pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
-                                  const VkImageMemoryBarrier *pImageMemoryBarriers) const {
+                                  uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferBarrierCount,
+                                  const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
+                                  const VkImageMemoryBarrier* pImageMemoryBarriers) const {
     bool skip = false;
     LogObjectList objects(cb_state.Handle());
 
@@ -2457,22 +2733,22 @@ bool CoreChecks::ValidateBarriers(const Location &outer_loc, const vvl::CommandB
     for (uint32_t i = 0; i < imageMemoryBarrierCount; ++i) {
         const Location barrier_loc = outer_loc.dot(Struct::VkImageMemoryBarrier, Field::pImageMemoryBarriers, i);
         const ImageBarrier barrier(pImageMemoryBarriers[i], src_stage_mask, dst_stage_mask);
-        const OwnershipTransferOp transfer_op = barrier.TransferOp(cb_state.command_pool->queueFamilyIndex);
+        const OwnershipTransferOp transfer_op = barrier.TransferOp(cb_state.command_pool.queueFamilyIndex);
         skip |= ValidateMemoryBarrier(objects, barrier_loc, cb_state, barrier, transfer_op);
         skip |= ValidateImageBarrier(objects, cb_state, barrier, barrier_loc, local_layout_registry);
     }
     for (uint32_t i = 0; i < bufferBarrierCount; ++i) {
         const Location barrier_loc = outer_loc.dot(Struct::VkBufferMemoryBarrier, Field::pBufferMemoryBarriers, i);
         const BufferBarrier barrier(pBufferMemoryBarriers[i], src_stage_mask, dst_stage_mask);
-        const OwnershipTransferOp transfer_op = barrier.TransferOp(cb_state.command_pool->queueFamilyIndex);
+        const OwnershipTransferOp transfer_op = barrier.TransferOp(cb_state.command_pool.queueFamilyIndex);
         skip |= ValidateMemoryBarrier(objects, barrier_loc, cb_state, barrier, transfer_op);
         skip |= ValidateBufferBarrier(objects, barrier_loc, cb_state, barrier);
     }
     return skip;
 }
 
-bool CoreChecks::ValidateDependencyInfo(const LogObjectList &objects, const Location &dep_info_loc,
-                                        const vvl::CommandBuffer &cb_state, const VkDependencyInfo &dep_info) const {
+bool CoreChecks::ValidateDependencyInfo(const LogObjectList& objects, const Location& dep_info_loc,
+                                        const vvl::CommandBuffer& cb_state, const VkDependencyInfo& dep_info) const {
     bool skip = false;
 
     // Tracks duplicate layout transition for image barriers.
@@ -2487,14 +2763,14 @@ bool CoreChecks::ValidateDependencyInfo(const LogObjectList &objects, const Loca
     for (uint32_t i = 0; i < dep_info.imageMemoryBarrierCount; ++i) {
         const Location barrier_loc = dep_info_loc.dot(Struct::VkImageMemoryBarrier2, Field::pImageMemoryBarriers, i);
         const ImageBarrier barrier(dep_info.pImageMemoryBarriers[i]);
-        const OwnershipTransferOp transfer_op = barrier.TransferOp(cb_state.command_pool->queueFamilyIndex);
+        const OwnershipTransferOp transfer_op = barrier.TransferOp(cb_state.command_pool.queueFamilyIndex);
         skip |= ValidateMemoryBarrier(objects, barrier_loc, cb_state, barrier, transfer_op, dep_info.dependencyFlags);
         skip |= ValidateImageBarrier(objects, cb_state, barrier, barrier_loc, local_layout_registry);
     }
     for (uint32_t i = 0; i < dep_info.bufferMemoryBarrierCount; ++i) {
         const Location barrier_loc = dep_info_loc.dot(Struct::VkBufferMemoryBarrier2, Field::pBufferMemoryBarriers, i);
         const BufferBarrier barrier(dep_info.pBufferMemoryBarriers[i]);
-        const OwnershipTransferOp transfer_op = barrier.TransferOp(cb_state.command_pool->queueFamilyIndex);
+        const OwnershipTransferOp transfer_op = barrier.TransferOp(cb_state.command_pool.queueFamilyIndex);
         skip |= ValidateMemoryBarrier(objects, barrier_loc, cb_state, barrier, transfer_op, dep_info.dependencyFlags);
         skip |= ValidateBufferBarrier(objects, barrier_loc, cb_state, barrier);
     }
@@ -2507,14 +2783,36 @@ bool CoreChecks::ValidateDependencyInfo(const LogObjectList &objects, const Loca
         }
     }
 
+    const VkMemoryRangeBarriersInfoKHR* memory_range_barriers_info =
+        vku::FindStructInPNextChain<VkMemoryRangeBarriersInfoKHR>(dep_info.pNext);
+    if (memory_range_barriers_info) {
+        for (uint32_t i = 0; i < memory_range_barriers_info->memoryRangeBarrierCount; ++i) {
+            const Location barrier_loc = dep_info_loc.dot(Struct::VkMemoryRangeBarrierKHR, Field::pMemoryRangeBarriers, i);
+            const VkMemoryRangeBarrierKHR& memory_range_barrier = memory_range_barriers_info->pMemoryRangeBarriers[i];
+
+            skip |= ValidateDeviceAddressCommands(cb_state.VkHandle(), memory_range_barrier.addressRange.address,
+                                                  memory_range_barrier.addressRange.size, memory_range_barrier.addressFlags,
+                                                  barrier_loc.dot(Field::addressRange));
+
+            // TODO - This not ideal, we should redo BufferBarrier to handle a memory range
+            const auto buffer_states = GetBuffersByAddress(memory_range_barrier.addressRange.address);
+            for (const auto buffer_state : buffer_states) {
+                const BufferBarrier barrier(memory_range_barrier, *buffer_state);
+                const OwnershipTransferOp transfer_op = barrier.TransferOp(cb_state.command_pool.queueFamilyIndex);
+                skip |= ValidateMemoryBarrier(objects, barrier_loc, cb_state, barrier, transfer_op, dep_info.dependencyFlags);
+                skip |= ValidateBufferBarrier(objects, barrier_loc, cb_state, barrier);
+            }
+        }
+    }
+
     return skip;
 }
 
-bool CoreChecks::ValidateDynamicRenderingPipelineStage(const LogObjectList &objlist, const Location &loc,
+bool CoreChecks::ValidateDynamicRenderingPipelineStage(const LogObjectList& objlist, const Location& loc,
                                                        VkPipelineStageFlags2 stage_mask, VkDependencyFlags dependency_flags) const {
     bool skip = false;
     if (HasNonFramebufferStagePipelineStageFlags(stage_mask)) {
-        const auto &vuid = GetDynamicRenderingBarrierVUID(loc, vvl::DynamicRenderingBarrierError::kFramebufferSpace);
+        const auto& vuid = GetDynamicRenderingBarrierVUID(loc, vvl::DynamicRenderingBarrierError::kFramebufferSpace);
 
         skip |= LogError(vuid, objlist, loc, "(%s) is restricted to framebuffer space stages (%s).",
                          sync_utils::StringPipelineStageFlags(stage_mask).c_str(),
@@ -2522,19 +2820,19 @@ bool CoreChecks::ValidateDynamicRenderingPipelineStage(const LogObjectList &objl
     }
     if (HasFramebufferStagePipelineStageFlags(stage_mask) && loc.field == Field::srcStageMask &&
         (dependency_flags & VK_DEPENDENCY_BY_REGION_BIT) != VK_DEPENDENCY_BY_REGION_BIT) {
-        const auto &vuid = GetDynamicRenderingBarrierVUID(loc, vvl::DynamicRenderingBarrierError::kDependencyFlags);
+        const auto& vuid = GetDynamicRenderingBarrierVUID(loc, vvl::DynamicRenderingBarrierError::kDependencyFlags);
         skip |= LogError(vuid, objlist, loc.prev->dot(Field::dependencyFlags), "must contain VK_DEPENDENCY_BY_REGION_BIT.");
     }
     return skip;
 }
 
-bool CoreChecks::ValidateDynamicRenderingImageBarrierLayoutMismatch(const vvl::CommandBuffer &cb_state,
-                                                                    const VkImageMemoryBarrier &image_barrier,
-                                                                    const Location &image_loc) const {
+bool CoreChecks::ValidateDynamicRenderingImageBarrierLayoutMismatch(const vvl::CommandBuffer& cb_state,
+                                                                    const VkImageMemoryBarrier& image_barrier,
+                                                                    const Location& image_loc) const {
     bool skip = false;
-    const VkRenderingInfo &rendering_info = *cb_state.active_render_pass->dynamic_rendering_begin_rendering_info.ptr();
+    const VkRenderingInfo& rendering_info = *cb_state.active_render_pass->dynamic_rendering_begin_rendering_info.ptr();
     for (uint32_t i = 0; i < rendering_info.colorAttachmentCount; i++) {
-        const AttachmentInfo &attachment = cb_state.active_attachments[cb_state.GetDynamicRenderingColorAttachmentIndex(i)];
+        const AttachmentInfo& attachment = cb_state.active_attachments[cb_state.GetDynamicRenderingColorAttachmentIndex(i)];
         if (attachment.image_view && attachment.image_view->image_state->VkHandle() == image_barrier.image) {
             if (rendering_info.pColorAttachments[i].imageLayout != image_barrier.oldLayout) {
                 const LogObjectList objlist(cb_state.Handle(), attachment.image_view->image_state->Handle());
@@ -2548,7 +2846,7 @@ bool CoreChecks::ValidateDynamicRenderingImageBarrierLayoutMismatch(const vvl::C
         }
     }
     if (rendering_info.pDepthAttachment) {
-        const AttachmentInfo &attachment =
+        const AttachmentInfo& attachment =
             cb_state.active_attachments[cb_state.GetDynamicRenderingAttachmentIndex(AttachmentInfo::Type::Depth)];
         if (attachment.image_view && attachment.image_view->image_state->VkHandle() == image_barrier.image) {
             if (rendering_info.pDepthAttachment->imageLayout != image_barrier.oldLayout) {
@@ -2563,7 +2861,7 @@ bool CoreChecks::ValidateDynamicRenderingImageBarrierLayoutMismatch(const vvl::C
         }
     }
     if (rendering_info.pStencilAttachment) {
-        const AttachmentInfo &attachment =
+        const AttachmentInfo& attachment =
             cb_state.active_attachments[cb_state.GetDynamicRenderingAttachmentIndex(AttachmentInfo::Type::Stencil)];
         if (attachment.image_view && attachment.image_view->image_state->VkHandle() == image_barrier.image) {
             if (rendering_info.pStencilAttachment->imageLayout != image_barrier.oldLayout) {
@@ -2580,7 +2878,7 @@ bool CoreChecks::ValidateDynamicRenderingImageBarrierLayoutMismatch(const vvl::C
     return skip;
 }
 
-bool CoreChecks::IsDynamicRenderingImageUsageValid(VkImageUsageFlags image_usage) const {
+bool CoreChecks::IsDynamicRenderingImageUsageValid(VkImageUsageFlags2KHR image_usage) const {
     bool valid = false;
 
     valid |= ((image_usage & VK_IMAGE_USAGE_STORAGE_BIT) != 0);
@@ -2590,15 +2888,15 @@ bool CoreChecks::IsDynamicRenderingImageUsageValid(VkImageUsageFlags image_usage
     return valid;
 }
 
-bool CoreChecks::ValidateDynamicRenderingBarriers(const LogObjectList &objlist, const Location &outer_loc,
-                                                  const VkDependencyInfo &dep_info) const {
+bool CoreChecks::ValidateDynamicRenderingBarriers(const LogObjectList& objlist, const Location& outer_loc,
+                                                  const VkDependencyInfo& dep_info) const {
     bool skip = false;
     skip |= ValidateDynamicRenderingBarriersCommon(objlist, outer_loc, dep_info.dependencyFlags, dep_info.bufferMemoryBarrierCount,
                                                    dep_info.imageMemoryBarrierCount);
 
     for (uint32_t i = 0; i < dep_info.memoryBarrierCount; ++i) {
         const Location loc = outer_loc.dot(Struct::VkMemoryBarrier2, Field::pMemoryBarriers, i);
-        const auto &mem_barrier = dep_info.pMemoryBarriers[i];
+        const auto& mem_barrier = dep_info.pMemoryBarriers[i];
         skip |= ValidateDynamicRenderingPipelineStage(objlist, loc.dot(Field::srcStageMask), mem_barrier.srcStageMask,
                                                       dep_info.dependencyFlags);
         skip |= ValidateDynamicRenderingPipelineStage(objlist, loc.dot(Field::dstStageMask), mem_barrier.dstStageMask,
@@ -2614,11 +2912,11 @@ bool CoreChecks::ValidateDynamicRenderingBarriers(const LogObjectList &objlist, 
     return skip;
 }
 
-bool CoreChecks::ValidateDynamicRenderingBarriers(const LogObjectList &objlist, const Location &outer_loc,
-                                                  const vvl::CommandBuffer &cb_state, VkDependencyFlags dependency_flags,
-                                                  uint32_t memory_barrier_count, const VkMemoryBarrier *memory_barriers,
+bool CoreChecks::ValidateDynamicRenderingBarriers(const LogObjectList& objlist, const Location& outer_loc,
+                                                  const vvl::CommandBuffer& cb_state, VkDependencyFlags dependency_flags,
+                                                  uint32_t memory_barrier_count, const VkMemoryBarrier* memory_barriers,
                                                   uint32_t buffer_barrier_count, uint32_t image_barrier_count,
-                                                  const VkImageMemoryBarrier *image_barriers, VkPipelineStageFlags src_stage_mask,
+                                                  const VkImageMemoryBarrier* image_barriers, VkPipelineStageFlags src_stage_mask,
                                                   VkPipelineStageFlags dst_stage_mask) const {
     bool skip = false;
     skip |= ValidateDynamicRenderingBarriersCommon(objlist, outer_loc, dependency_flags, buffer_barrier_count, image_barrier_count);
@@ -2639,7 +2937,7 @@ bool CoreChecks::ValidateDynamicRenderingBarriers(const LogObjectList &objlist, 
     return skip;
 }
 
-bool CoreChecks::ValidateDynamicRenderingBarriersCommon(const LogObjectList &objlist, const Location &outer_loc,
+bool CoreChecks::ValidateDynamicRenderingBarriersCommon(const LogObjectList& objlist, const Location& outer_loc,
                                                         VkDependencyFlags dependency_flags, uint32_t buffer_barrier_count,
                                                         uint32_t image_barrier_count) const {
     bool skip = false;
@@ -2648,7 +2946,7 @@ bool CoreChecks::ValidateDynamicRenderingBarriersCommon(const LogObjectList &obj
     const bool features_enabled = enabled_features.shaderTileImageColorReadAccess ||
                                   enabled_features.shaderTileImageDepthReadAccess || enabled_features.dynamicRenderingLocalRead;
     if (!features_enabled) {
-        const auto &feature_error_vuid =
+        const auto& feature_error_vuid =
             GetDynamicRenderingBarrierVUID(outer_loc, vvl::DynamicRenderingBarrierError::kFeatureError);
         skip |= LogError(feature_error_vuid, objlist, outer_loc,
                          "can not be called inside a dynamic rendering instance. This can be fixed by enabling the "
@@ -2657,7 +2955,7 @@ bool CoreChecks::ValidateDynamicRenderingBarriersCommon(const LogObjectList &obj
 
     if (!enabled_features.dynamicRenderingLocalRead) {
         if (buffer_barrier_count != 0 || image_barrier_count != 0) {
-            const auto &buf_img_vuid =
+            const auto& buf_img_vuid =
                 GetDynamicRenderingBarrierVUID(outer_loc, vvl::DynamicRenderingBarrierError::kNoBuffersOrImages);
             skip |= LogError(buf_img_vuid, objlist, outer_loc,
                              "can only include memory barriers, while application specify image barrier count %" PRIu32
@@ -2669,13 +2967,13 @@ bool CoreChecks::ValidateDynamicRenderingBarriersCommon(const LogObjectList &obj
     return skip;
 }
 
-bool CoreChecks::ValidateMemoryBarrier(const LogObjectList &objects, const Location &barrier_loc,
-                                       const vvl::CommandBuffer &cb_state, const SyncMemoryBarrier &barrier,
+bool CoreChecks::ValidateMemoryBarrier(const LogObjectList& objects, const Location& barrier_loc,
+                                       const vvl::CommandBuffer& cb_state, const SyncMemoryBarrier& barrier,
                                        OwnershipTransferOp ownership_transfer_op, VkDependencyFlags dependency_flags) const {
     bool skip = false;
     const VkQueueFlags queue_flags = cb_state.GetQueueFlags();
-    const bool is_sync2 =
-        IsValueIn(barrier_loc.structure, {Struct::VkMemoryBarrier2, Struct::VkBufferMemoryBarrier2, Struct::VkImageMemoryBarrier2});
+    const bool is_sync2 = IsValueIn(barrier_loc.structure, {Struct::VkMemoryBarrier2, Struct::VkBufferMemoryBarrier2,
+                                                            Struct::VkImageMemoryBarrier2, Struct::VkMemoryRangeBarrierKHR});
 
     // Validate Sync2 stages in this function because they are defined per barrier structure.
     // Sync1 stages are shared by all barriers (vkCmdPipelineBarrier api) and are validated once per barrier command call.
@@ -2720,8 +3018,8 @@ bool CoreChecks::ValidateMemoryBarrier(const LogObjectList &objects, const Locat
     return skip;
 }
 
-bool CoreChecks::ValidateTensorQueueFamilyIndex(uint32_t src_q, uint32_t dst_q, const LogObjectList &objlist,
-                                                const vvl::Tensor &tensor_state, const Location &loc) const {
+bool CoreChecks::ValidateTensorQueueFamilyIndex(uint32_t src_q, uint32_t dst_q, const LogObjectList& objlist,
+                                                const vvl::Tensor& tensor_state, const Location& loc) const {
     bool skip = false;
     if (VK_SHARING_MODE_EXCLUSIVE == tensor_state.create_info.sharingMode) {
         if (VK_QUEUE_FAMILY_IGNORED != src_q) {
@@ -2743,12 +3041,12 @@ bool CoreChecks::ValidateTensorQueueFamilyIndex(uint32_t src_q, uint32_t dst_q, 
     return skip;
 }
 
-bool CoreChecks::ValidateTensorBarrier(const LogObjectList &objlist, const Location &barrier_loc,
-                                       const vvl::CommandBuffer &cb_state, const TensorBarrier &barrier) const {
+bool CoreChecks::ValidateTensorBarrier(const LogObjectList& objlist, const Location& barrier_loc,
+                                       const vvl::CommandBuffer& cb_state, const TensorBarrier& barrier) const {
     bool skip = false;
     auto tensor_state_ptr = Get<vvl::Tensor>(barrier.tensor);
     ASSERT_AND_RETURN_SKIP(tensor_state_ptr);
-    const auto &tensor_state = *tensor_state_ptr;
+    const auto& tensor_state = *tensor_state_ptr;
     skip |= ValidateMemoryIsBoundToTensor(objlist, tensor_state, barrier_loc, "VUID-VkTensorMemoryBarrierARM-tensor-09758");
     skip |= ValidateTensorQueueFamilyIndex(barrier.srcQueueFamilyIndex, barrier.dstQueueFamilyIndex, objlist, tensor_state,
                                            barrier_loc);

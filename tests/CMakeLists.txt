@@ -34,15 +34,16 @@ else()
     add_executable(vk_layer_validation_tests)
 endif()
 target_sources(vk_layer_validation_tests PRIVATE
-    unit/amd_best_practices.cpp
     unit/android_hardware_buffer.cpp
     unit/android_hardware_buffer_positive.cpp
     unit/android_external_resolve.cpp
     unit/android_external_resolve_positive.cpp
-    unit/arm_best_practices.cpp
     unit/atomics.cpp
     unit/atomics_positive.cpp
     unit/best_practices.cpp
+    unit/best_practices_amd.cpp
+    unit/best_practices_arm.cpp
+    unit/best_practices_nvidia.cpp
     unit/best_practices_positive.cpp
     unit/buffer.cpp
     unit/buffer_positive.cpp
@@ -52,6 +53,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/copy_buffer_image_positive.cpp
     unit/data_graph.cpp
     unit/data_graph_positive.cpp
+    unit/tile_shading.cpp
+    unit/tile_shading_positive.cpp
     unit/debug_extensions.cpp
     unit/debug_extensions_positive.cpp
     unit/debug_printf.cpp
@@ -63,10 +66,17 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/descriptor_buffer_positive.cpp
     unit/descriptor_heap.cpp
     unit/descriptor_heap_positive.cpp
+    unit/descriptor_heap_untyped.cpp
+    unit/descriptor_heap_untyped_positive.cpp
     unit/descriptor_indexing.cpp
     unit/descriptor_indexing_positive.cpp
     unit/descriptors.cpp
     unit/descriptors_positive.cpp
+    unit/device_address.cpp
+    unit/device_address_positive.cpp
+    unit/device_address_commands.cpp
+    unit/device_address_commands_positive.cpp
+    unit/device_address_commands_sync.cpp
     unit/device_feature_property.cpp
     unit/device_feature_property_positive.cpp
     unit/device_generated_commands.cpp
@@ -79,6 +89,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/dynamic_rendering_local_read_positive.cpp
     unit/dynamic_state.cpp
     unit/dynamic_state_positive.cpp
+    unit/event.cpp
+    unit/event_positive.cpp
     unit/external_memory_metal.cpp
     unit/external_memory_sync.cpp
     unit/external_memory_sync_positive.cpp
@@ -96,6 +108,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_copy_memory_indirect.cpp
     unit/gpu_av_copy_memory_indirect_positive.cpp
     unit/gpu_av_debug_printf.cpp
+    unit/gpu_av_descriptor_buffer.cpp
     unit/gpu_av_descriptor_buffer_positive.cpp
     unit/gpu_av_descriptor_class_general_buffer.cpp
     unit/gpu_av_descriptor_class_general_buffer_positive.cpp
@@ -103,6 +116,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_descriptor_class_general_buffer_coop_mat_positive.cpp
     unit/gpu_av_descriptor_class_texel_buffer.cpp
     unit/gpu_av_descriptor_class_texel_buffer_positive.cpp
+    unit/gpu_av_descriptor_heap.cpp
+    unit/gpu_av_descriptor_heap_positive.cpp
     unit/gpu_av_descriptor_indexing.cpp
     unit/gpu_av_descriptor_indexing_positive.cpp
     unit/gpu_av_descriptor_post_process.cpp
@@ -118,6 +133,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_shader_debug_info.cpp
     unit/gpu_av_shader_sanitizer.cpp
     unit/gpu_av_shader_sanitizer_positive.cpp
+    unit/gpu_av_shared_memory_data_race.cpp
+    unit/gpu_av_shared_memory_data_race_positive.cpp
     unit/gpu_av_spirv.cpp
     unit/gpu_av_spirv_positive.cpp
     unit/gpu_av_ray_query.cpp
@@ -128,6 +145,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_ray_tracing_positive.cpp
     unit/gpu_av_vertex_attribute_fetch.cpp
     unit/gpu_av_vertex_attribute_fetch_positive.cpp
+    unit/gpu_dump.cpp
     unit/graphics_library.cpp
     unit/graphics_library_positive.cpp
     unit/host_image_copy.cpp
@@ -151,7 +169,6 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/mesh_positive.cpp
     unit/multiview.cpp
     unit/multiview_positive.cpp
-    unit/nvidia_best_practices.cpp
     unit/object_lifetime.cpp
     unit/object_lifetime_positive.cpp
     unit/other_positive.cpp
@@ -176,6 +193,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/query_positive.cpp
     unit/ray_tracing.cpp
     unit/ray_tracing_nv.cpp
+    unit/ray_tracing_micromap.cpp
+    unit/ray_tracing_micromap_positive.cpp
     unit/ray_tracing_pipeline.cpp
     unit/ray_tracing_pipeline_positive.cpp
     unit/ray_tracing_pipeline_nv.cpp
@@ -273,6 +292,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/video_encode_h265_positive.cpp
     unit/video_encode_intra_refresh.cpp
     unit/video_encode_intra_refresh_positive.cpp
+    unit/video_encode_feedback2.cpp
+    unit/video_encode_feedback2_positive.cpp
     unit/video_encode_quantization_map.cpp
     unit/video_encode_quantization_map_positive.cpp
     unit/viewport_inheritance.cpp
@@ -284,6 +305,10 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/ray_tracing_spheres_positive.cpp
     vvl_utils/small_vector.cpp
     vvl_utils/pnext_chain_extraction.cpp
+)
+
+target_include_directories(vk_layer_validation_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
 get_target_property(TEST_SOURCES vk_layer_validation_tests SOURCES)

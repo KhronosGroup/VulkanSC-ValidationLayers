@@ -2,8 +2,8 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/shader_helper.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/data_graph_objects.h"
+#include "layer_validation_tests.h"
+#include "shader_helper.h"
+#include "pipeline_helper.h"
+#include "data_graph_objects.h"
 
 namespace {
 VKAPI_ATTR VkBool32 VKAPI_CALL EmptyDebugReportCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t,
-                                                        int32_t, const char *, const char *, void *) {
+                                                        int32_t, const char*, const char*, void*) {
     return VK_FALSE;
 }
 }  // namespace
@@ -344,7 +344,7 @@ TEST_F(NegativeParent, Instance_Surface) {
     swapchain_ci.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_ci.imageFormat = m_surface_formats[0].format;
     swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
-    swapchain_ci.imageExtent = m_surface_capabilities.minImageExtent;
+    swapchain_ci.imageExtent = GetSwapchainExtent(m_surface_capabilities);
     swapchain_ci.imageArrayLayers = 1;
     swapchain_ci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     swapchain_ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -391,7 +391,7 @@ TEST_F(NegativeParent, Device_OldSwapchain) {
     swapchain_ci.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_ci.imageFormat = m_surface_formats[0].format;
     swapchain_ci.imageColorSpace = m_surface_formats[0].colorSpace;
-    swapchain_ci.imageExtent = m_surface_capabilities.minImageExtent;
+    swapchain_ci.imageExtent = GetSwapchainExtent(m_surface_capabilities);
     swapchain_ci.imageArrayLayers = 1;
     swapchain_ci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     swapchain_ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -435,7 +435,7 @@ TEST_F(NegativeParent, Instance_DebugUtilsMessenger) {
     RETURN_IF_SKIP(Init());
     vkt::Instance instance2(GetInstanceCreateInfo());
 
-    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *, DebugUtilsLabelCheckData *) {};
+    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT*, DebugUtilsLabelCheckData*) {};
     DebugUtilsLabelCheckData callback_data{};
     callback_data.callback = empty_callback;
 
@@ -823,7 +823,7 @@ TEST_F(NegativeParent, FlushInvalidateMemory) {
     memory_range.offset = 0;
     memory_range.size = VK_WHOLE_SIZE;
 
-    void *pData;
+    void* pData;
     vk::MapMemory(device(), device_memory, 0, VK_WHOLE_SIZE, 0, &pData);
 
     m_errorMonitor->SetDesiredError("UNASSIGNED-VkMappedMemoryRange-memory-device");
@@ -879,8 +879,8 @@ TEST_F(NegativeParent, CmdPipelineBarrier) {
     vkt::Image image(*m_second_device, image_ci, vkt::set_layout);
 
     VkImageSubresourceRange image_sub_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    VkImageMemoryBarrier image_barriers[] = {image.ImageMemoryBarrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-                                                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, image_sub_range)};
+    VkImageMemoryBarrier image_barriers[] = {
+        image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, image_sub_range)};
 
     m_errorMonitor->SetDesiredError("UNASSIGNED-vkCmdPipelineBarrier-commandBuffer-commonparent");
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
@@ -945,9 +945,9 @@ TEST_F(NegativeParent, MapMemory2) {
     map_info.offset = 0;
     map_info.size = memory_info.allocationSize;
 
-    uint32_t *pData = nullptr;
+    uint32_t* pData = nullptr;
     m_errorMonitor->SetDesiredError("UNASSIGNED-VkMemoryMapInfo-memory-parent");
-    vk::MapMemory2KHR(device(), &map_info, (void **)&pData);
+    vk::MapMemory2KHR(device(), &map_info, (void**)&pData);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1007,7 +1007,7 @@ TEST_F(NegativeParent, DataGraphPipelineSessionBindPointRequirements) {
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline.Handle();
 
-    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    vkt::DataGraphPipelineSession session(*m_device, session_ci, vkt::no_mem);
 
     VkDataGraphPipelineSessionBindPointRequirementsInfoARM req_info = vku::InitStructHelper();
     req_info.session = session.handle();
@@ -1042,7 +1042,7 @@ TEST_F(NegativeParent, DataGraphPipelineSessionMemoryRequirements) {
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
     session_ci.dataGraphPipeline = pipeline.Handle();
 
-    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    vkt::DataGraphPipelineSession session(*m_device, session_ci, vkt::no_mem);
 
     VkDataGraphPipelineSessionMemoryRequirementsInfoARM req_info = vku::InitStructHelper();
     req_info.session = session.handle();

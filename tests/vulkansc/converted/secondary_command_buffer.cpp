@@ -5,7 +5,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2022,2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +16,11 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/render_pass_helper.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "descriptor_helper.h"
+#include "pipeline_helper.h"
+#include "render_pass_helper.h"
+#include "pipeline_helper.h"
 
 class NegativeSecondaryCommandBuffer : public VkLayerTest {};
 
@@ -219,7 +219,7 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteCommandsTo) {
 TEST_F(NegativeSecondaryCommandBuffer, SimultaneousUseTwoExecutes) {
     RETURN_IF_SKIP(Init());
 
-    const char *simultaneous_use_message = "VUID-vkCmdExecuteCommands-pCommandBuffers-00092";
+    const char* simultaneous_use_message = "VUID-vkCmdExecuteCommands-pCommandBuffers-00092";
 
     vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
@@ -243,7 +243,7 @@ TEST_F(NegativeSecondaryCommandBuffer, SimultaneousUseSingleExecute) {
     // variation on previous test executing the same CB twice in the same
     // CmdExecuteCommands call
 
-    const char *simultaneous_use_message = "VUID-vkCmdExecuteCommands-pCommandBuffers-00093";
+    const char* simultaneous_use_message = "VUID-vkCmdExecuteCommands-pCommandBuffers-00093";
 
     vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
@@ -340,9 +340,9 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteWithLayoutMismatch) {
     VkImageSubresourceRange image_sub_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     VkImageMemoryBarrier image_barrier =
-        image.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
+        image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
 
-    auto pipeline = [&image_barrier](const vkt::CommandBuffer &cb, VkImageLayout old_layout, VkImageLayout new_layout) {
+    auto pipeline = [&image_barrier](const vkt::CommandBuffer& cb, VkImageLayout old_layout, VkImageLayout new_layout) {
         image_barrier.oldLayout = old_layout;
         image_barrier.newLayout = new_layout;
         vk::CmdPipelineBarrier(cb, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
@@ -399,7 +399,7 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteWithLayoutMismatchUseGenericLayout
     descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                             VK_IMAGE_LAYOUT_GENERAL);
     descriptor_set.UpdateDescriptorSets();
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler2D color_image;
         void main() {
@@ -1556,8 +1556,8 @@ TEST_F(NegativeSecondaryCommandBuffer, InheritanceDescriptorHeapInfo) {
     VkCommandBufferInheritanceDescriptorHeapInfoEXT inheritance_descriptor_heap_info = vku::InitStructHelper();
     VkBindHeapInfoEXT resource_heap_bind_info = vku::InitStructHelper();
     VkBindHeapInfoEXT sampler_heap_bind_info = vku::InitStructHelper();
-    resource_heap_bind_info.heapRange = {resource_buffer.Address(), resource_buffer.CreateInfo().size};
-    sampler_heap_bind_info.heapRange = {resource_buffer.Address(), resource_buffer.CreateInfo().size};
+    resource_heap_bind_info.heapRange = resource_buffer.AddressRange();
+    sampler_heap_bind_info.heapRange = resource_buffer.AddressRange();
     inheritance_descriptor_heap_info.pResourceHeapBindInfo = &resource_heap_bind_info;
     inheritance_descriptor_heap_info.pSamplerHeapBindInfo = &sampler_heap_bind_info;
 
@@ -1605,8 +1605,8 @@ TEST_F(NegativeSecondaryCommandBuffer, InheritanceDescriptorHeapInfo_1_4) {
     VkCommandBufferInheritanceDescriptorHeapInfoEXT inheritance_descriptor_heap_info = vku::InitStructHelper();
     VkBindHeapInfoEXT resource_heap_bind_info = vku::InitStructHelper();
     VkBindHeapInfoEXT sampler_heap_bind_info = vku::InitStructHelper();
-    resource_heap_bind_info.heapRange = {resource_buffer.Address(), resource_buffer.CreateInfo().size};
-    sampler_heap_bind_info.heapRange = {resource_buffer.Address(), resource_buffer.CreateInfo().size};
+    resource_heap_bind_info.heapRange = resource_buffer.AddressRange();
+    sampler_heap_bind_info.heapRange = resource_buffer.AddressRange();
     inheritance_descriptor_heap_info.pResourceHeapBindInfo = &resource_heap_bind_info;
     inheritance_descriptor_heap_info.pSamplerHeapBindInfo = &sampler_heap_bind_info;
 

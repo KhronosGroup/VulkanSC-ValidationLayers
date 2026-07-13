@@ -170,7 +170,7 @@ bool BufferDeviceAddressPass::RequiresInstrumentation(const Function& function, 
     // This might be an OpTypeStruct, even if some compilers are smart enough (know Mesa is) to detect only the first part of a
     // struct is loaded, we have to assume the entire struct is loaded and the entire memory is accessed (see
     // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8089)
-    meta.access_size = type_manager_.TypeLength(*accessed_type);
+    meta.access_size = type_manager_.GetTypeBytesSize(*accessed_type);
     // Will mark this is a struct acess to inform the user
     meta.type_is_struct = accessed_type->spv_type_ == SpvType::kStruct;
 
@@ -212,13 +212,14 @@ bool BufferDeviceAddressPass::Instrument() {
                     if (!meta.pointer_inst->IsAccessChain()) {
                         continue;
                     }
-                    // OpAccesschain -> OpLoad/OpBitcast -> OpTypePointer (PSB) -> OpTypeStruct
+                    // OpTypeStruct -> OpTypePointer (PSB) -> OpLoad/OpBitcast -> OpAccesschain
                     std::vector<const Instruction*> access_chain_insts;
 
                     const Instruction* next_inst = meta.pointer_inst;
                     // First walk back to the outer most access chain
                     while (next_inst && next_inst->IsAccessChain()) {
-                        access_chain_insts.push_back(next_inst);
+                        access_chain_insts.insert(access_chain_insts.begin(), next_inst);
+
                         const uint32_t access_chain_base_id = next_inst->Operand(0);
                         next_inst = function.FindInstruction(access_chain_base_id);
                     }
@@ -235,7 +236,7 @@ bool BufferDeviceAddressPass::Instrument() {
 
                             // GLSL/HLSL will only ever a struct, but for Slang, we might have the first access be the pointer and
                             // we actually need that outer struct, which "looks" an OpTypePointer with an ArrayStride attached to it
-                            const Instruction* last_access = access_chain_insts.back();
+                            const Instruction* last_access = access_chain_insts.front();
                             if (!last_access->IsNonPtrAccessChain() && last_access->TypeId() == load_type_pointer->Id()) {
                                 root_struct_id = load_type_pointer->Id();
                             }
@@ -267,8 +268,8 @@ bool BufferDeviceAddressPass::Instrument() {
                     continue;
                 }
 
-                if (IsMaxInstrumentationsCount()) {
-                    continue;
+                if (MaxInstrumentationsCountReached()) {
+                    return instrumentations_count_ != 0;
                 }
                 instrumentations_count_++;
 

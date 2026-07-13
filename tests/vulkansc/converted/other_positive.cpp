@@ -14,12 +14,12 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 #include <cstdlib>
 
-class VkPositiveLayerTest : public VkLayerTest {};
+class PositiveOther : public VkLayerTest {};
 
-TEST_F(VkPositiveLayerTest, StatelessValidationDisable) {
+TEST_F(PositiveOther, StatelessValidationDisable) {
     TEST_DESCRIPTION("Specify a non-zero value for a reserved parameter with stateless validation disabled");
 
     VkValidationFeatureDisableEXT disables[] = {VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS_EXT};
@@ -36,7 +36,7 @@ TEST_F(VkPositiveLayerTest, StatelessValidationDisable) {
     vkt::Event event(*m_device, event_info);
 }
 
-TEST_F(VkPositiveLayerTest, Maintenance1Tests) {
+TEST_F(PositiveOther, Maintenance1Tests) {
     TEST_DESCRIPTION("Validate various special cases for the Maintenance1_KHR extension");
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
@@ -49,7 +49,7 @@ TEST_F(VkPositiveLayerTest, Maintenance1Tests) {
     cmd_buf.End();
 }
 
-TEST_F(VkPositiveLayerTest, ValidStructPNext) {
+TEST_F(PositiveOther, ValidStructPNext) {
     TEST_DESCRIPTION("Verify that a valid pNext value is handled correctly");
 
     // Positive test to check parameter_validation and unique_objects support for NV_dedicated_allocation
@@ -81,7 +81,7 @@ TEST_F(VkPositiveLayerTest, ValidStructPNext) {
     vk::BindBufferMemory(device(), buffer, buffer_memory, 0);
 }
 
-TEST_F(VkPositiveLayerTest, DeviceIDPropertiesExtensions) {
+TEST_F(PositiveOther, DeviceIDPropertiesExtensions) {
     TEST_DESCRIPTION("VkPhysicalDeviceIDProperties can be enabled from 1 of 3 extensions");
 
     SetTargetApiVersion(VK_API_VERSION_1_0);
@@ -98,7 +98,7 @@ TEST_F(VkPositiveLayerTest, DeviceIDPropertiesExtensions) {
     vk::GetPhysicalDeviceProperties2KHR(Gpu(), &props2);
 }
 
-TEST_F(VkPositiveLayerTest, ParameterLayerFeatures2Capture) {
+TEST_F(PositiveOther, ParameterLayerFeatures2Capture) {
     TEST_DESCRIPTION("Ensure parameter_validation_layer correctly captures physical device features");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
@@ -167,13 +167,13 @@ TEST_F(VkPositiveLayerTest, ParameterLayerFeatures2Capture) {
     vk::DestroyDevice(device, nullptr);
 }
 
-TEST_F(VkPositiveLayerTest, ApiVersionZero) {
+TEST_F(PositiveOther, ApiVersionZero) {
     TEST_DESCRIPTION("Check that apiVersion = 0 is valid.");
     app_info_.apiVersion = 0U;
     RETURN_IF_SKIP(InitFramework());
 }
 
-TEST_F(VkPositiveLayerTest, ModifyPnext) {
+TEST_F(PositiveOther, ModifyPnext) {
     TEST_DESCRIPTION("Make sure invalid values in pNext structures are ignored at query time");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -188,7 +188,7 @@ TEST_F(VkPositiveLayerTest, ModifyPnext) {
     vk::GetPhysicalDeviceProperties2(Gpu(), &props);
 }
 
-TEST_F(VkPositiveLayerTest, UseFirstQueueUnqueried) {
+TEST_F(PositiveOther, UseFirstQueueUnqueried) {
     TEST_DESCRIPTION("Use first queue family and one queue without first querying with vkGetPhysicalDeviceQueueFamilyProperties");
 
     RETURN_IF_SKIP(InitFramework());
@@ -211,7 +211,7 @@ TEST_F(VkPositiveLayerTest, UseFirstQueueUnqueried) {
 
 // Android loader returns an error in this case
 #if !defined(VK_USE_PLATFORM_ANDROID_KHR)
-TEST_F(VkPositiveLayerTest, GetDevProcAddrNullPtr) {
+TEST_F(PositiveOther, GetDevProcAddrNullPtr) {
     TEST_DESCRIPTION("Call GetDeviceProcAddr on an enabled instance extension expecting nullptr");
     AddRequiredExtensions(VK_KHR_SURFACE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
@@ -223,7 +223,7 @@ TEST_F(VkPositiveLayerTest, GetDevProcAddrNullPtr) {
 }
 
 // Not supported in Vulkan SC: vkTrimCommandBuffer
-TEST_F(VkPositiveLayerTest, DISABLED_GetDevProcAddrExtensions) {
+TEST_F(PositiveOther, DISABLED_GetDevProcAddrExtensions) {
     TEST_DESCRIPTION("Call GetDeviceProcAddr with and without extension enabled");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
@@ -232,7 +232,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_GetDevProcAddrExtensions) {
     if (nullptr == vkTrimCommandPool) m_errorMonitor->SetError("Unexpected null pointer");
     if (nullptr != vkTrimCommandPoolKHR) m_errorMonitor->SetError("Didn't receive expected null pointer");
 
-    const char *const extension = {VK_KHR_MAINTENANCE_1_EXTENSION_NAME};
+    const char* const extension = {VK_KHR_MAINTENANCE_1_EXTENSION_NAME};
     const float q_priority[] = {1.0f};
     VkDeviceQueueCreateInfo queue_ci = vku::InitStructHelper();
     queue_ci.queueFamilyIndex = 0;
@@ -255,7 +255,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_GetDevProcAddrExtensions) {
 #endif
 
 // Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
-TEST_F(VkPositiveLayerTest, DISABLED_Vulkan12FeaturesBufferDeviceAddress) {
+TEST_F(PositiveOther, DISABLED_Vulkan12FeaturesBufferDeviceAddress) {
     TEST_DESCRIPTION("Enable bufferDeviceAddress feature via Vulkan12features struct");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitFramework());
@@ -282,7 +282,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_Vulkan12FeaturesBufferDeviceAddress) {
     if (nullptr != vkGetBufferDeviceAddressKHR) m_errorMonitor->SetError("Didn't receive expected null pointer");
 }
 
-TEST_F(VkPositiveLayerTest, EnumeratePhysicalDeviceGroups) {
+TEST_F(PositiveOther, EnumeratePhysicalDeviceGroups) {
     TEST_DESCRIPTION("Test using VkPhysicalDevice handles obtained with vkEnumeratePhysicalDeviceGroups");
 
 #ifdef __linux__
@@ -306,7 +306,7 @@ TEST_F(VkPositiveLayerTest, EnumeratePhysicalDeviceGroups) {
 
     VkInstance test_instance = VK_NULL_HANDLE;
     ASSERT_EQ(VK_SUCCESS, vk::CreateInstance(&ici, nullptr, &test_instance));
-    for (const char *instance_ext_name : m_instance_extension_names) {
+    for (const char* instance_ext_name : m_instance_extension_names) {
         vk::InitInstanceExtension(test_instance, instance_ext_name);
     }
 
@@ -330,7 +330,7 @@ TEST_F(VkPositiveLayerTest, EnumeratePhysicalDeviceGroups) {
     vk::DestroyInstance(test_instance, nullptr);
 }
 
-TEST_F(VkPositiveLayerTest, ExtensionXmlDependsLogic) {
+TEST_F(PositiveOther, ExtensionXmlDependsLogic) {
     TEST_DESCRIPTION("Make sure the OR in 'depends' from XML is observed correctly");
     // VK_KHR_buffer_device_address requires
     // (VK_KHR_get_physical_device_properties2 AND VK_KHR_device_group) OR VK_VERSION_1_1
@@ -354,7 +354,7 @@ TEST_F(VkPositiveLayerTest, ExtensionXmlDependsLogic) {
     RETURN_IF_SKIP(InitState());
 }
 
-TEST_F(VkPositiveLayerTest, FormatProperties3FromProfiles) {
+TEST_F(PositiveOther, FormatProperties3FromProfiles) {
     // https://github.com/KhronosGroup/Vulkan-Profiles/pull/392
     TEST_DESCRIPTION("Make sure VkFormatProperties3 is overwritten correctly in Profiles layer");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -366,7 +366,7 @@ TEST_F(VkPositiveLayerTest, FormatProperties3FromProfiles) {
     vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);
 }
 
-TEST_F(VkPositiveLayerTest, GDPAWithMultiCmdExt) {
+TEST_F(PositiveOther, GDPAWithMultiCmdExt) {
     TEST_DESCRIPTION("Use GetDeviceProcAddr on a function which is provided by multiple extensions");
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
@@ -374,7 +374,7 @@ TEST_F(VkPositiveLayerTest, GDPAWithMultiCmdExt) {
     ASSERT_NE(vkCmdSetColorBlendAdvancedEXT, nullptr);
 }
 
-TEST_F(VkPositiveLayerTest, UseInteractionApi1) {
+TEST_F(PositiveOther, UseInteractionApi1) {
     TEST_DESCRIPTION("Use an API that is provided by multiple extensions (part 1)");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -391,7 +391,7 @@ TEST_F(VkPositiveLayerTest, UseInteractionApi1) {
 }
 
 // Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
-TEST_F(VkPositiveLayerTest, DISABLED_UseInteractionApi2) {
+TEST_F(PositiveOther, DISABLED_UseInteractionApi2) {
     TEST_DESCRIPTION("Use an API that is provided by multiple extensions (part 2)");
     SetTargetApiVersion(VK_API_VERSION_1_0);
     AddRequiredExtensions(VK_KHR_SURFACE_EXTENSION_NAME);
@@ -408,7 +408,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_UseInteractionApi2) {
     vk::GetDeviceGroupPresentCapabilitiesKHR(device(), &device_group_present_caps);
 }
 
-TEST_F(VkPositiveLayerTest, ExtensionExpressions) {
+TEST_F(PositiveOther, ExtensionExpressions) {
     TEST_DESCRIPTION(
         "Enable an extension (e.g., VK_KHR_fragment_shading_rate) that depends on multiple core versions _or_ regular extensions");
 
@@ -426,7 +426,7 @@ TEST_F(VkPositiveLayerTest, ExtensionExpressions) {
     m_command_buffer.End();
 }
 
-TEST_F(VkPositiveLayerTest, AllowedDuplicateStype) {
+TEST_F(PositiveOther, AllowedDuplicateStype) {
     TEST_DESCRIPTION("Pass duplicate structs to whose vk.xml definition contains allowduplicate=true");
 
     VkInstance instance;
@@ -444,8 +444,8 @@ TEST_F(VkPositiveLayerTest, AllowedDuplicateStype) {
     ASSERT_NO_FATAL_FAILURE(vk::DestroyInstance(instance, nullptr));
 }
 
-// This test case are not relevant for Vulkan SC
-TEST_F(VkPositiveLayerTest, DISABLED_ExtensionsInCreateInstance) {
+// These test cases are not relevant for Vulkan SC
+TEST_F(PositiveOther, DISABLED_ExtensionsInCreateInstance) {
     TEST_DESCRIPTION("Test to see if instance extensions are called during CreateInstance.");
     // See https://github.com/KhronosGroup/Vulkan-Loader/issues/537 for more details.
     // This is specifically meant to ensure a crash encountered in profiles does not occur, but also to
@@ -466,7 +466,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_ExtensionsInCreateInstance) {
     RETURN_IF_SKIP(InitFramework());
 }
 
-TEST_F(VkPositiveLayerTest, ExclusiveScissorVersionCount) {
+TEST_F(PositiveOther, ExclusiveScissorVersionCount) {
     TEST_DESCRIPTION("Test using vkCmdSetExclusiveScissorEnableNV.");
 
     AddRequiredExtensions(VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME);
@@ -476,7 +476,7 @@ TEST_F(VkPositiveLayerTest, ExclusiveScissorVersionCount) {
     std::vector<VkExtensionProperties> properties(propertyCount);
     vk::EnumerateDeviceExtensionProperties(gpu_, nullptr, &propertyCount, properties.data());
     bool exclusiveScissor2 = false;
-    for (const auto &prop : properties) {
+    for (const auto& prop : properties) {
         if (strcmp(prop.extensionName, VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME) == 0) {
             if (prop.specVersion >= 2) {
                 exclusiveScissor2 = true;
@@ -495,7 +495,7 @@ TEST_F(VkPositiveLayerTest, ExclusiveScissorVersionCount) {
     m_command_buffer.End();
 }
 
-TEST_F(VkPositiveLayerTest, GetCalibratedTimestamps) {
+TEST_F(PositiveOther, GetCalibratedTimestamps) {
     TEST_DESCRIPTION("Basic usage of vkGetCalibratedTimestampsEXT.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
@@ -520,7 +520,7 @@ TEST_F(VkPositiveLayerTest, GetCalibratedTimestamps) {
     vk::GetCalibratedTimestampsEXT(device(), 2, timestamp_infos, timestamps, &max_deviation);
 }
 
-TEST_F(VkPositiveLayerTest, GetCalibratedTimestampsKHR) {
+TEST_F(PositiveOther, GetCalibratedTimestampsKHR) {
     TEST_DESCRIPTION("Basic usage of vkGetCalibratedTimestampsKHR.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
@@ -545,7 +545,7 @@ TEST_F(VkPositiveLayerTest, GetCalibratedTimestampsKHR) {
     vk::GetCalibratedTimestampsKHR(device(), 2, timestamp_infos, timestamps, &max_deviation);
 }
 
-TEST_F(VkPositiveLayerTest, ExtensionPhysicalDeviceFeatureEXT) {
+TEST_F(PositiveOther, ExtensionPhysicalDeviceFeatureEXT) {
     TEST_DESCRIPTION("VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR has an EXT and KHR extension that can enable it");
     AddRequiredExtensions(VK_EXT_GLOBAL_PRIORITY_QUERY_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
@@ -554,7 +554,7 @@ TEST_F(VkPositiveLayerTest, ExtensionPhysicalDeviceFeatureEXT) {
     RETURN_IF_SKIP(InitState(nullptr, &query_feature));
 }
 
-TEST_F(VkPositiveLayerTest, ExtensionPhysicalDeviceFeatureKHR) {
+TEST_F(PositiveOther, ExtensionPhysicalDeviceFeatureKHR) {
     TEST_DESCRIPTION("VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR has an EXT and KHR extension that can enable it");
     AddRequiredExtensions(VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
@@ -563,7 +563,7 @@ TEST_F(VkPositiveLayerTest, ExtensionPhysicalDeviceFeatureKHR) {
     RETURN_IF_SKIP(InitState(nullptr, &query_feature));
 }
 
-TEST_F(VkPositiveLayerTest, NoExtensionFromInstanceFunction) {
+TEST_F(PositiveOther, NoExtensionFromInstanceFunction) {
     TEST_DESCRIPTION("Valid because we instance functions don't know which device it needs");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     // Required to pass in various memory flags without querying for corresponding extensions.
@@ -574,7 +574,7 @@ TEST_F(VkPositiveLayerTest, NoExtensionFromInstanceFunction) {
     vk::GetPhysicalDeviceFormatProperties(Gpu(), VK_FORMAT_B16G16R16G16_422_UNORM, &format_properties);
 }
 
-TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct0) {
+TEST_F(PositiveOther, InstanceExtensionsCallingDeviceStruct0) {
     TEST_DESCRIPTION(
         "Use VkImageFormatListCreateInfo with VkPhysicalDeviceImageFormatInfo2 if VK_KHR_image_format_list is available");
     SetTargetApiVersion(VK_API_VERSION_1_0);
@@ -601,7 +601,7 @@ TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct0) {
     vk::GetPhysicalDeviceImageFormatProperties2KHR(Gpu(), &image_format_info, &image_format_properties);
 }
 
-TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct1) {
+TEST_F(PositiveOther, InstanceExtensionsCallingDeviceStruct1) {
     TEST_DESCRIPTION(
         "Use VkBufferUsageFlags2CreateInfo with VkPhysicalDeviceExternalBufferInfo if VK_KHR_maintenance5 is available");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -628,7 +628,7 @@ TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct1) {
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10208
-TEST_F(VkPositiveLayerTest, TimelineSemaphoreWithVulkan11) {
+TEST_F(PositiveOther, TimelineSemaphoreWithVulkan11) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8308");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_NV_LOW_LATENCY_2_EXTENSION_NAME);
@@ -637,7 +637,7 @@ TEST_F(VkPositiveLayerTest, TimelineSemaphoreWithVulkan11) {
     RETURN_IF_SKIP(Init());
 }
 
-TEST_F(VkPositiveLayerTest, UnrecognizedEnumOutOfRange) {
+TEST_F(PositiveOther, UnrecognizedEnumOutOfRange) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8367");
     RETURN_IF_SKIP(Init());
     if (!DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
@@ -648,7 +648,7 @@ TEST_F(VkPositiveLayerTest, UnrecognizedEnumOutOfRange) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkPositiveLayerTest, UnrecognizedEnumOutOfRange2) {
+TEST_F(PositiveOther, UnrecognizedEnumOutOfRange2) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8367");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
@@ -659,7 +659,7 @@ TEST_F(VkPositiveLayerTest, UnrecognizedEnumOutOfRange2) {
     vk::GetPhysicalDeviceFormatProperties2(Gpu(), static_cast<VkFormat>(8000), &format_properties);
 }
 
-TEST_F(VkPositiveLayerTest, UnrecognizedFlagOutOfRange) {
+TEST_F(PositiveOther, UnrecognizedFlagOutOfRange) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8367");
     RETURN_IF_SKIP(Init());
     if (!DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
@@ -671,7 +671,7 @@ TEST_F(VkPositiveLayerTest, UnrecognizedFlagOutOfRange) {
                                                static_cast<VkImageUsageFlags>(0xffffffff), 0, &format_properties);
 }
 
-TEST_F(VkPositiveLayerTest, UnrecognizedFlagOutOfRange2) {
+TEST_F(PositiveOther, UnrecognizedFlagOutOfRange2) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8367");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
@@ -689,7 +689,7 @@ TEST_F(VkPositiveLayerTest, UnrecognizedFlagOutOfRange2) {
     vk::GetPhysicalDeviceImageFormatProperties2(Gpu(), &format_info, &format_properties);
 }
 
-TEST_F(VkPositiveLayerTest, PhysicalDeviceLayeredApiVulkanProperties) {
+TEST_F(PositiveOther, PhysicalDeviceLayeredApiVulkanProperties) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitFramework());
     // Don't enable maintenance7 because we are doing this at an instance level
@@ -708,11 +708,30 @@ TEST_F(VkPositiveLayerTest, PhysicalDeviceLayeredApiVulkanProperties) {
     vk::GetPhysicalDeviceProperties2(Gpu(), &phys_dev_props_2);
 }
 
-TEST_F(VkPositiveLayerTest, HeapWithoutUntypedPointers) {
+TEST_F(PositiveOther, HeapWithoutUntypedPointers) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
     if (DeviceExtensionSupported(VK_KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME))
         GTEST_SKIP() << "Need VK_KHR_shader_untyped_pointers not supported";
     InitState();
+}
+
+TEST_F(PositiveOther, GetDeviceFaultReportsWithoutTimeout) {
+    AddRequiredExtensions(VK_KHR_DEVICE_FAULT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::deviceFault);
+    RETURN_IF_SKIP(Init());
+    uint32_t fault_counts = 0;
+    VkResult result = vk::GetDeviceFaultReportsKHR(device(), 0, &fault_counts, nullptr);
+    ASSERT_EQ(VK_SUCCESS, result);
+    ASSERT_EQ(fault_counts, 0);
+}
+
+TEST_F(PositiveOther, GetDeviceFaultReportsWithTimeout) {
+    AddRequiredExtensions(VK_KHR_DEVICE_FAULT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::deviceFault);
+    RETURN_IF_SKIP(Init());
+    uint32_t fault_counts = 0;
+    VkResult result = vk::GetDeviceFaultReportsKHR(device(), 1000u, &fault_counts, nullptr);
+    ASSERT_EQ(VK_TIMEOUT, result);
 }

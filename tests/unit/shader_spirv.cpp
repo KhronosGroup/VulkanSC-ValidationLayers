@@ -13,8 +13,9 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "shader_helper.h"
 
 struct icd_spv_header {
     uint32_t magic = 0x07230203;
@@ -47,7 +48,7 @@ TEST_F(NegativeShaderSpirv, CodeSize) {
         VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
 
         constexpr icd_spv_header spv = {};
-        module_create_info.pCode = reinterpret_cast<const uint32_t *>(&spv);
+        module_create_info.pCode = reinterpret_cast<const uint32_t*>(&spv);
         module_create_info.codeSize = 4;
 
         m_errorMonitor->SetDesiredError("Invalid SPIR-V header");
@@ -149,7 +150,7 @@ TEST_F(NegativeShaderSpirv, Magic) {
     constexpr uint32_t bad_magic = 4175232508U;
     constexpr icd_spv_header spv = {bad_magic};
 
-    module_create_info.pCode = reinterpret_cast<const uint32_t *>(&spv);
+    module_create_info.pCode = reinterpret_cast<const uint32_t*>(&spv);
     module_create_info.codeSize = sizeof(spv);
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08738");
@@ -169,7 +170,7 @@ TEST_F(NegativeShaderSpirv, MagicMaintenance5) {
     constexpr icd_spv_header spv = {bad_magic};
 
     VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
-    module_create_info.pCode = reinterpret_cast<const uint32_t *>(&spv);
+    module_create_info.pCode = reinterpret_cast<const uint32_t*>(&spv);
     module_create_info.codeSize = sizeof(spv);
 
     VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper(&module_create_info);
@@ -197,7 +198,7 @@ TEST_F(NegativeShaderSpirv, MagicMaintenance5Compute) {
     constexpr icd_spv_header spv = {bad_magic};
 
     VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
-    module_create_info.pCode = reinterpret_cast<const uint32_t *>(&spv);
+    module_create_info.pCode = reinterpret_cast<const uint32_t*>(&spv);
     module_create_info.codeSize = sizeof(spv);
 
     VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper(&module_create_info);
@@ -360,7 +361,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
     // storageBuffer8BitAccess
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_8bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -373,12 +374,12 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer8BitAccess-06328");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);     // Int8
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
     // uniformAndStorageBuffer8BitAccess
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_8bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -391,13 +392,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-uniformAndStorageBuffer8BitAccess-06329");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);               // Int8
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
     }
 
     // storagePushConstant8
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_8bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -410,13 +411,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storagePushConstant8-06330");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);  // Int8
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
     }
 
     // storageBuffer16BitAccess - Float
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -428,13 +429,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
         )glsl";
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-11161");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);      // Int8
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
 
     // uniformAndStorageBuffer16BitAccess - Float
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -447,13 +448,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-uniformAndStorageBuffer16BitAccess-06332");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);                // Int8
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
     }
 
     // storagePushConstant16 - Float
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -466,13 +467,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storagePushConstant16-06333");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);   // Int8
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
 
     // storageInputOutput16 - Float
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -485,11 +486,11 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);  // Int8
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
 
         // Need to match in/out
-        const char *fsSource = R"glsl(
+        const char* fsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_float16: enable
@@ -502,13 +503,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");     // Int8
-        VkShaderObj const fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
+        VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
     }
 
     // storageBuffer16BitAccess - Int
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -521,13 +522,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageBuffer16BitAccess-11161");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);      // Int16 and StorageBuffer16BitAccess
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
 
     // uniformAndStorageBuffer16BitAccess - Int
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -541,13 +542,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-uniformAndStorageBuffer16BitAccess-06332");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740",
                                         2);  // Int16 and UniformAndStorageBuffer16BitAccess
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
     }
 
     // storagePushConstant16 - Int
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -560,13 +561,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storagePushConstant16-06333");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);   // Int16 and StoragePushConstant16
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
 
     // storageInputOutput16 - Int
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -579,11 +580,11 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);  // Int16 and StorageInputOutput16
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
 
         // Need to match in/out
-        const char *fsSource = R"glsl(
+        const char* fsSource = R"glsl(
             #version 450
             #extension GL_EXT_shader_16bit_storage: enable
             #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -596,7 +597,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-storageInputOutput16-11162");  // feature
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");     // StorageInputOutput16
-        VkShaderObj const fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
+        VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -608,7 +609,7 @@ TEST_F(NegativeShaderSpirv, InputOutput8Bit) {
     AddRequiredFeature(vkt::Feature::shaderInt8);
     RETURN_IF_SKIP(Init());
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 450
         #extension GL_EXT_shader_8bit_storage: enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -619,10 +620,10 @@ TEST_F(NegativeShaderSpirv, InputOutput8Bit) {
     )glsl";
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10980");
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0);
     m_errorMonitor->VerifyFound();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         #extension GL_EXT_shader_8bit_storage: enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -633,7 +634,7 @@ TEST_F(NegativeShaderSpirv, InputOutput8Bit) {
     )glsl";
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-10980");
-    VkShaderObj const fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
     m_errorMonitor->VerifyFound();
 }
 
@@ -649,7 +650,7 @@ TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 450
         #extension GL_EXT_shader_8bit_storage: enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -763,7 +764,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
     if (float16Int8.shaderInt8 == VK_TRUE) {
         // storageBuffer8BitAccess
         {
-            const char *spv_source = R"(
+            const char* spv_source = R"(
                OpCapability Shader
                OpCapability Int8
                OpExtension "SPV_KHR_8bit_storage"
@@ -793,7 +794,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 
         // uniformAndStorageBuffer8BitAccess
         {
-            const char *spv_source = R"(
+            const char* spv_source = R"(
                OpCapability Shader
                OpCapability Int8
                OpExtension "SPV_KHR_8bit_storage"
@@ -822,7 +823,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 
         // storagePushConstant8
         {
-            const char *spv_source = R"(
+            const char* spv_source = R"(
                OpCapability Shader
                OpCapability Int8
                OpExtension "SPV_KHR_8bit_storage"
@@ -852,7 +853,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
     if (float16Int8.shaderFloat16 == VK_TRUE) {
         // storageBuffer16BitAccess - float
         {
-            const char *spv_source = R"(
+            const char* spv_source = R"(
                OpCapability Shader
                OpCapability Float16
                OpExtension "SPV_KHR_16bit_storage"
@@ -882,7 +883,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 
         // uniformAndStorageBuffer16BitAccess - float
         {
-            const char *spv_source = R"(
+            const char* spv_source = R"(
                OpCapability Shader
                OpCapability Float16
                OpExtension "SPV_KHR_16bit_storage"
@@ -911,7 +912,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 
         // storagePushConstant16 - float
         {
-            const char *spv_source = R"(
+            const char* spv_source = R"(
                OpCapability Shader
                OpCapability Float16
                OpExtension "SPV_KHR_16bit_storage"
@@ -939,7 +940,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 
         // storageInputOutput16 - float
         {
-            const char *vs_source = R"(
+            const char* vs_source = R"(
                OpCapability Shader
                OpCapability Float16
                OpExtension "SPV_KHR_16bit_storage"
@@ -962,7 +963,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
             auto vs = VkShaderObj::CreateFromASM(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
             m_errorMonitor->VerifyFound();
 
-            const char *fs_source = R"(
+            const char* fs_source = R"(
                OpCapability Shader
                OpCapability Float16
                OpExtension "SPV_KHR_16bit_storage"
@@ -996,7 +997,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
     if (features2.features.shaderInt16 == VK_TRUE) {
         // storageBuffer16BitAccess - int
         {
-            const char *spv_source = R"(
+            const char* spv_source = R"(
                OpCapability Shader
                OpCapability Int16
                OpExtension "SPV_KHR_16bit_storage"
@@ -1026,7 +1027,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 
         // uniformAndStorageBuffer16BitAccess - int
         {
-            const char *spv_source = R"(
+            const char* spv_source = R"(
                OpCapability Shader
                OpCapability Int16
                OpExtension "SPV_KHR_16bit_storage"
@@ -1055,7 +1056,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 
         // storagePushConstant16 - int
         {
-            const char *spv_source = R"(
+            const char* spv_source = R"(
                OpCapability Shader
                OpCapability Int16
                OpExtension "SPV_KHR_16bit_storage"
@@ -1083,7 +1084,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 
         // storageInputOutput16 - int
         {
-            const char *vs_source = R"(
+            const char* vs_source = R"(
                OpCapability Shader
                OpCapability Int16
                OpExtension "SPV_KHR_16bit_storage"
@@ -1105,7 +1106,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
             auto vs = VkShaderObj::CreateFromASM(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
             m_errorMonitor->VerifyFound();
 
-            const char *fs_source = R"(
+            const char* fs_source = R"(
                OpCapability Shader
                OpCapability Int16
                OpExtension "SPV_KHR_16bit_storage"
@@ -1147,7 +1148,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
         //   X b;
         //   uint8_t c;
         // } Data;
-        const char *spv_source = R"(
+        const char* spv_source = R"(
                OpCapability Shader
                OpCapability Int8
                OpCapability Int16
@@ -1196,7 +1197,7 @@ TEST_F(NegativeShaderSpirv, ReadShaderClock) {
     InitRenderTarget();
 
     // Device scope using GL_EXT_shader_realtime_clock
-    const char *vsSourceDevice = R"glsl(
+    const char* vsSourceDevice = R"glsl(
         #version 450
         #extension GL_EXT_shader_realtime_clock: enable
         void main(){
@@ -1209,7 +1210,7 @@ TEST_F(NegativeShaderSpirv, ReadShaderClock) {
     m_errorMonitor->VerifyFound();
 
     // Subgroup scope using ARB_shader_clock
-    const char *vsSourceScope = R"glsl(
+    const char* vsSourceScope = R"glsl(
         #version 450
         #extension GL_ARB_shader_clock: enable
         void main(){
@@ -1230,7 +1231,7 @@ TEST_F(NegativeShaderSpirv, SpecializationApplied) {
     InitRenderTarget();
 
     // Size an array using a specialization constant of default value equal to 1.
-    const char *fs_src = R"(
+    const char* fs_src = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -1274,7 +1275,7 @@ TEST_F(NegativeShaderSpirv, SpecializationApplied) {
         &data,
     };
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         helper.shader_stages_[1].pSpecializationInfo = &specialization_info;
     };
@@ -1287,7 +1288,7 @@ TEST_F(NegativeShaderSpirv, SpecializationOffsetOutOfBounds) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const float r = 0.0f;
         layout(location = 0) out vec4 uFragColor;
@@ -1308,7 +1309,7 @@ TEST_F(NegativeShaderSpirv, SpecializationOffsetOutOfBounds) {
         &data,
     };
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         helper.shader_stages_[1].pSpecializationInfo = &specialization_info;
     };
@@ -1324,7 +1325,7 @@ TEST_F(NegativeShaderSpirv, SpecializationOffsetOutOfBoundsWithIdentifier) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         layout (constant_id = 0) const float x = 0.0f;
         void main(){
@@ -1371,7 +1372,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeOutOfBounds) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const float r = 0.0f;
         layout(location = 0) out vec4 uFragColor;
@@ -1392,7 +1393,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeOutOfBounds) {
         &data,
     };
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         helper.shader_stages_[1].pSpecializationInfo = &specialization_info;
     };
@@ -1405,7 +1406,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeZero) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *cs_src = R"glsl(
+    const char* cs_src = R"glsl(
         #version 450
         layout (constant_id = 0) const int c = 3;
         layout (local_size_x = 1) in;
@@ -1452,7 +1453,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
     // layout (constant_id = 2) const float c = 3.0f;
     // layout (constant_id = 3) const bool d = true;
     // layout (constant_id = 4) const bool f = false;
-    const char *cs_src = R"(
+    const char* cs_src = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main"
@@ -1498,7 +1499,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
     };
 
     VkShaderObj cs;
-    const auto set_info = [&cs](CreateComputePipelineHelper &helper) { helper.cs_ = std::move(cs); };
+    const auto set_info = [&cs](CreateComputePipelineHelper& helper) { helper.cs_ = std::move(cs); };
 
     // Sanity check
     cs = VkShaderObj::CreateFromASM(this, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, &specialization_info);
@@ -1574,12 +1575,12 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatchInt8) {
     };
 
     VkShaderObj cs;
-    const auto set_info = [&cs](CreateComputePipelineHelper &helper) { helper.cs_ = std::move(cs); };
+    const auto set_info = [&cs](CreateComputePipelineHelper& helper) { helper.cs_ = std::move(cs); };
 
     // #extension GL_EXT_shader_explicit_arithmetic_types_int8 : enable
     // layout (constant_id = 0) const int8_t a = int8_t(3);
     // layout (constant_id = 1) const uint8_t b = uint8_t(3);
-    const char *cs_int8 = R"(
+    const char* cs_int8 = R"(
             OpCapability Shader
             OpCapability Int8
             OpMemoryModel Logical GLSL450
@@ -1658,11 +1659,11 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatchFloat64) {
     };
 
     VkShaderObj cs;
-    const auto set_info = [&cs](CreateComputePipelineHelper &helper) { helper.cs_ = std::move(cs); };
+    const auto set_info = [&cs](CreateComputePipelineHelper& helper) { helper.cs_ = std::move(cs); };
 
     // #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
     // layout (constant_id = 0) const float64_t a = 3.0f;
-    const char *cs_float64 = R"(
+    const char* cs_float64 = R"(
             OpCapability Shader
             OpCapability Float64
             OpMemoryModel Logical GLSL450
@@ -1712,7 +1713,7 @@ TEST_F(NegativeShaderSpirv, DuplicatedSpecializationConstantID) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const float r = 0.0f;
         layout(location = 0) out vec4 uFragColor;
@@ -1737,7 +1738,7 @@ TEST_F(NegativeShaderSpirv, DuplicatedSpecializationConstantID) {
     specialization_info.dataSize = sizeof(uint32_t);
     specialization_info.pData = &data;
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         helper.shader_stages_[1].pSpecializationInfo = &specialization_info;
     };
@@ -1751,7 +1752,7 @@ TEST_F(NegativeShaderSpirv, ShaderModuleCheckCapability) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                   OpCapability ImageRect
                   OpEntryPoint Vertex %main "main"
           %main = OpFunction %void None %3
@@ -1771,7 +1772,7 @@ TEST_F(NegativeShaderSpirv, ShaderNotEnabled) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 color;
         void main(){
@@ -1789,7 +1790,7 @@ TEST_F(NegativeShaderSpirv, ShaderImageFootprintEnabled) {
     AddRequiredExtensions(VK_NV_SHADER_IMAGE_FOOTPRINT_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         #extension GL_NV_shader_texture_footprint  : require
         layout(set=0, binding=0) uniform sampler2D s;
@@ -1815,7 +1816,7 @@ TEST_F(NegativeShaderSpirv, FragmentShaderBarycentricEnabled) {
     AddRequiredExtensions(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         #extension GL_NV_fragment_shader_barycentric : require
         layout(location=0) out float value;
@@ -1835,7 +1836,7 @@ TEST_F(NegativeShaderSpirv, ComputeShaderDerivativesEnabled) {
     AddRequiredExtensions(VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         #extension GL_NV_compute_shader_derivatives : require
         layout(local_size_x=2, local_size_y=4) in;
@@ -1859,7 +1860,7 @@ TEST_F(NegativeShaderSpirv, FragmentShaderInterlockEnabled) {
     AddRequiredExtensions(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         #extension GL_ARB_fragment_shader_interlock : require
         layout(sample_interlock_ordered) in;
@@ -1878,7 +1879,7 @@ TEST_F(NegativeShaderSpirv, DemoteToHelperInvocation) {
     AddRequiredExtensions(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         #extension GL_EXT_demote_to_helper_invocation : require
         void main(){
@@ -1902,7 +1903,7 @@ TEST_F(NegativeShaderSpirv, NoUniformBufferStandardLayout10) {
     // layout(std430, set = 0, binding = 0) uniform ubo430 {
     //     float floatArray430[8];
     // };
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -1943,7 +1944,7 @@ TEST_F(NegativeShaderSpirv, NoUniformBufferStandardLayout12) {
     // layout(std430, set = 0, binding = 0) uniform ubo430 {
     //     float floatArray430[8];
     // };
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -1989,7 +1990,7 @@ TEST_F(NegativeShaderSpirv, NoScalarBlockLayout10) {
     //
     // Note: using BufferBlock for Vulkan 1.0
     // Note: Relaxed Block Layout would also make this valid if enabled
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -2027,7 +2028,7 @@ TEST_F(NegativeShaderSpirv, NoScalarBlockLayout12) {
     //     layout(offset = 0) vec3 a;
     //     layout(offset = 12) vec2 b;
     // };
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -2065,7 +2066,7 @@ TEST_F(NegativeShaderSpirv, SubgroupRotate) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *source = R"glsl(
+    const char* source = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_rotate: enable
         layout(binding = 0) buffer Buffers { vec4  x; } data;
@@ -2087,7 +2088,7 @@ TEST_F(NegativeShaderSpirv, SubgroupRotateClustered) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *source = R"glsl(
+    const char* source = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_rotate: enable
         layout(binding = 0) buffer Buffers { vec4  x; } data;
@@ -2109,7 +2110,7 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0) buffer ssbo { uint y; };
@@ -2131,7 +2132,7 @@ TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         #extension GL_KHR_memory_scope_semantics : enable
         layout(set = 0, binding = 0) buffer ssbo { uint y; };
@@ -2151,7 +2152,7 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScopeDebugInfo) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"(
+    const char* csSource = R"(
                OpCapability Shader
           %2 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -2302,102 +2303,12 @@ TEST_F(NegativeShaderSpirv, DynamicUniformIndex) {
     }
 }
 
-// TODO - This logic is illegal, but should be done in SPIRV-Tools
-// see https://github.com/KhronosGroup/SPIRV-Tools/pull/4748
-TEST_F(NegativeShaderSpirv, DISABLED_ImageFormatTypeMismatchWithZeroExtend) {
-    TEST_DESCRIPTION("Use ZeroExtend to turn a SINT resource into a UINT, but only for some of the accesses.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(Init());
-    RETURN_IF_SKIP(InitRenderTarget());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    const char *csSource = R"(
-                     OpCapability Shader
-                     OpCapability StorageImageExtendedFormats
-                     OpMemoryModel Logical GLSL450
-                     OpEntryPoint GLCompute %main "main" %image_ptr
-                     OpExecutionMode %main LocalSize 1 1 1
-                     OpSource GLSL 450
-                     OpDecorate %image_ptr DescriptorSet 0
-                     OpDecorate %image_ptr Binding 0
-                     OpDecorate %image_ptr NonReadable
-%type_void         = OpTypeVoid
-%type_u32          = OpTypeInt 32 0
-%type_i32          = OpTypeInt 32 1
-%type_vec3_u32     = OpTypeVector %type_u32 3
-%type_vec4_u32     = OpTypeVector %type_u32 4
-%type_vec2_i32     = OpTypeVector %type_i32 2
-%type_fn_void      = OpTypeFunction %type_void
-%type_ptr_fn       = OpTypePointer Function %type_vec4_u32
-%type_image        = OpTypeImage %type_u32 2D 0 0 0 2 Rgba32ui
-%type_ptr_image    = OpTypePointer UniformConstant %type_image
-%image_ptr         = OpVariable %type_ptr_image UniformConstant
-%const_i32_0       = OpConstant %type_i32 0
-%const_vec2_i32_00 = OpConstantComposite %type_vec2_i32 %const_i32_0 %const_i32_0
-%main              = OpFunction %type_void None %type_fn_void
-%label             = OpLabel
-%store_location    = OpVariable %type_ptr_fn Function
-%image             = OpLoad %type_image %image_ptr
-                   ; Is accessing a SINT, no error
-%value             = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00 SignExtend
-                   ; But this will still be accessing a UINT, so errors
-%value2            = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00
-                     OpStore %store_location %value
-                     OpReturn
-                     OpFunctionEnd
-              )";
-
-    m_errorMonitor->SetDesiredError("VUID-StandaloneSpirv-Image-04965");
-    CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
-    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
-    pipe.CreateComputePipeline();
-    m_errorMonitor->VerifyFound();
-}
-
-// TODO - https://github.com/KhronosGroup/SPIRV-Tools/issues/5468
-TEST_F(NegativeShaderSpirv, DISABLED_SpecConstantTextureIndex) {
-    TEST_DESCRIPTION("Apply spec constant to lower array size and detect array being oob");
-    RETURN_IF_SKIP(Init());
-    InitRenderTarget();
-
-    const char *fragment_source = R"glsl(
-        #version 400
-        #extension GL_ARB_separate_shader_objects : enable
-        #extension GL_ARB_shading_language_420pack : enable
-
-        layout (location = 0) out vec4 out_color;
-
-        layout (constant_id = 0) const int num_textures = 3;
-        layout (binding = 0) uniform sampler2D textures[num_textures];
-
-        void main() {
-            out_color = texture(textures[2], vec2(0.0));
-        }
-    )glsl";
-
-    uint32_t data = 2;  // will make textures[2] OOB
-    VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
-    VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
-
-    m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-pSpecializationInfo-06849");
-    CreatePipelineHelper pipe(*this);
-    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr}};
-    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.CreateGraphicsPipeline();
-    m_errorMonitor->VerifyFound();
-}
-
 TEST_F(NegativeShaderSpirv, SpecConstantArraySize) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/SPIRV-Tools/issues/5921");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fragment_source = R"glsl(
+    const char* fragment_source = R"glsl(
         #version 450
         layout (constant_id = 0) const int array_size = 4;
         layout(set = 0, binding = 0, std430) buffer foo {
@@ -2413,8 +2324,8 @@ TEST_F(NegativeShaderSpirv, SpecConstantArraySize) {
     uint32_t new_array_size = 6;
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &new_array_size};
-    const VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
+                   &specialization_info);
 
     m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-pSpecializationInfo-06849");
     CreatePipelineHelper pipe(*this);
@@ -2428,7 +2339,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountConstant) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (set = 0, binding = 0) uniform sampler2D tex[3];
         layout (location = 0) out vec4 out_color;
@@ -2436,7 +2347,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountConstant) {
             out_color = textureLodOffset(tex[1], vec2(0), 0, ivec2(0));
         }
     )glsl";
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -2450,7 +2361,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountSpecConstant) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const int index = 2;
         layout (set = 0, binding = 0) uniform sampler2D tex[index];
@@ -2463,8 +2374,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountSpecConstant) {
     uint32_t data = 4;  // over VkDescriptorSetLayoutBinding::descriptorCount
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -2478,7 +2388,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountSpecConstantOp) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const int index = 2;
         // The length is now a OpSpecConstantOp
@@ -2492,8 +2402,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountSpecConstantOp) {
     uint32_t data = 4;  // over VkDescriptorSetLayoutBinding::descriptorCount
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -2511,7 +2420,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountConstantRuntimeArray) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 460
         #extension GL_EXT_nonuniform_qualifier : enable
         layout (set = 0, binding = 0) uniform sampler2D tex[];
@@ -2521,7 +2430,7 @@ TEST_F(NegativeShaderSpirv, DescriptorCountConstantRuntimeArray) {
             out_color = textureLodOffset(tex[index], vec2(0), 0, ivec2(0));
         }
     )glsl";
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -2540,7 +2449,7 @@ TEST_F(NegativeShaderSpirv, InvalidExtension) {
 
     InitRenderTarget();
 
-    const char *vertex_source = R"spirv(
+    const char* vertex_source = R"spirv(
                OpCapability Shader
                OpExtension "GL_EXT_scalar_block_layout"
           %1 = OpExtInstImport "GLSL.std.450"
@@ -2575,7 +2484,7 @@ TEST_F(NegativeShaderSpirv, FPFastMathDefault) {
     }
 
     // Missing NotNaN
-    const char *spv_source = R"(
+    const char* spv_source = R"(
         OpCapability Shader
         OpCapability FloatControls2
         OpExtension "SPV_KHR_float_controls2"
@@ -2621,7 +2530,7 @@ TEST_F(NegativeShaderSpirv, FPFastMathMode) {
     }
 
     // Missing NotNaN
-    const char *spv_source = R"(
+    const char* spv_source = R"(
         OpCapability Shader
         OpCapability FloatControls2
         OpExtension "SPV_KHR_float_controls2"
@@ -2660,7 +2569,7 @@ TEST_F(NegativeShaderSpirv, ScalarBlockLayoutShaderCache) {
     RETURN_IF_SKIP(Init());
 
     // Matches glsl from other ScalarBlockLayoutShaderCache test
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         #extension GL_EXT_buffer_reference : require
         #extension GL_EXT_scalar_block_layout : require
@@ -2694,7 +2603,7 @@ TEST_F(NegativeShaderSpirv, ImageGatherOffsetMaintenance8) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
                OpCapability ImageGatherExtended
                OpMemoryModel Logical GLSL450
@@ -2726,7 +2635,7 @@ TEST_F(NegativeShaderSpirv, ImageGatherOffsetMaintenance8) {
     )";
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Offset-10213");
-    VkShaderObj const fs(*m_device, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(*m_device, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2788,7 +2697,7 @@ TEST_F(NegativeShaderSpirv, ShaderViewportIndexLayerEXT) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_ARB_shader_viewport_layer_array : enable
         void main() {
@@ -2811,7 +2720,7 @@ TEST_F(NegativeShaderSpirv, ShaderRelaxedExtendedInstruction) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_physical_storage_buffer"
@@ -2879,7 +2788,7 @@ TEST_F(NegativeShaderSpirv, Bitwise32bitMaintenance9) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
     RETURN_IF_SKIP(Init());  // missing maintenance9
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_explicit_arithmetic_types_int64 : enable
         void main() {
@@ -2900,7 +2809,7 @@ TEST_F(NegativeShaderSpirv, ShaderFma32) {
     AddRequiredFeature(vkt::Feature::shaderFloat64);
     RETURN_IF_SKIP(Init());
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
                OpCapability FMAKHR
                OpExtension "SPV_KHR_fma"
@@ -2954,7 +2863,7 @@ TEST_F(NegativeShaderSpirv, ShaderFmaNon32) {
     AddRequiredFeature(vkt::Feature::shaderFloat16);
     RETURN_IF_SKIP(Init());
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
                OpCapability Float16
                OpCapability Float64
@@ -3033,7 +2942,7 @@ TEST_F(NegativeShaderSpirv, ShaderUniformBufferUnsizedArray) {
     // Missing shaderUniformBufferUnsizedArray
     RETURN_IF_SKIP(Init());
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main" %_ %__0
@@ -3133,6 +3042,209 @@ TEST_F(NegativeShaderSpirv, LongVectorDotProductSpecConstant) {
     pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
     // VUID-VkPipelineShaderStageCreateInfo-pSpecializationInfo-06849
     m_errorMonitor->SetDesiredError("'Vector 1' is 4 components but 'Vector 2' is 5 components");
+    pipe.CreateComputePipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, UntypedPointerInHeapsWithNoFeature) {
+    TEST_DESCRIPTION("https://gitlab.khronos.org/vulkan/vulkan/-/issues/4666");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    RETURN_IF_SKIP(Init());
+
+    const char* source = R"(
+        OpCapability Shader
+        OpCapability DescriptorHeapEXT
+        OpExtension "SPV_EXT_descriptor_heap"
+        OpMemoryModel Logical GLSL450
+        OpEntryPoint GLCompute %main "main"
+        OpExecutionMode %main LocalSize 1 1 1
+        %void = OpTypeVoid
+        %void_fn = OpTypeFunction %void
+
+        ; An actual use of untyped pointers functionality
+        %ptr = OpTypeUntypedPointerKHR StorageBuffer
+        %ptr2 = OpTypeUntypedPointerKHR StorageBuffer
+        %ptr3 = OpTypeUntypedPointerKHR StorageBuffer
+
+        %main = OpFunction %void None %void_fn
+        %entry = OpLabel
+        OpReturn
+        OpFunctionEnd
+    )";
+
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+    VkShaderObj vs(*m_device, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, SpecializationConstantMismatchLength) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_CONSTANT_DATA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderConstantData);
+    RETURN_IF_SKIP(Init());
+    const char* cs_src = R"(
+               OpCapability Shader
+               OpCapability ConstantDataKHR
+               OpExtension "SPV_KHR_constant_data"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %length SpecId 1
+               OpDecorate %data SpecId 2
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+     %length = OpSpecConstant %uint 2
+ %array_length = OpTypeArray %uint %length
+       %data = OpSpecConstantDataKHR %array_length 1 2
+  %void_func = OpTypeFunction %void
+       %main = OpFunction %void None %void_func
+ %main_label = OpLabel
+               OpReturn
+               OpFunctionEnd
+        )";
+
+    uint32_t data[10] = {
+        3,                         // length (too small)
+        6, 6, 8, 8, 9, 1, 2, 3, 4  // data
+    };
+
+    // {id, offset, size}
+    VkSpecializationMapEntry entries[2] = {
+        {1, 0, 4},   // length
+        {2, 4, 16},  // data
+    };
+
+    // int32_t data = 0;
+    VkSpecializationInfo specialization_info = {2, entries, 40, data};
+
+    {
+        // This is caught by spirv-val also
+        m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-pSpecializationInfo-06849");
+        m_errorMonitor->SetDesiredError("VUID-VkSpecializationMapEntry-constantID-00776");
+        CreateComputePipelineHelper pipe(*this);
+        pipe.cs_ =
+            VkShaderObj(*m_device, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, &specialization_info);
+        pipe.CreateComputePipeline();
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        // make length too large
+        data[0] = 8;
+        m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-pSpecializationInfo-06849");
+        m_errorMonitor->SetDesiredError("VUID-VkSpecializationMapEntry-constantID-00776");
+        CreateComputePipelineHelper pipe(*this);
+        pipe.cs_ =
+            VkShaderObj(*m_device, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, &specialization_info);
+        pipe.CreateComputePipeline();
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeShaderSpirv, SpecializationConstantInt8) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_CONSTANT_DATA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderConstantData);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    RETURN_IF_SKIP(Init());
+    const char* cs_src = R"(
+               OpCapability Shader
+               OpCapability Int8
+               OpCapability ConstantDataKHR
+               OpExtension "SPV_KHR_constant_data"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %length SpecId 1
+               OpDecorate %data SpecId 2
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+       %char = OpTypeInt 8 0
+     %length = OpSpecConstant %uint 1
+ %array_length = OpTypeArray %char %length
+       %data = OpSpecConstantDataKHR %array_length 0
+  %void_func = OpTypeFunction %void
+       %main = OpFunction %void None %void_func
+ %main_label = OpLabel
+               OpReturn
+               OpFunctionEnd
+        )";
+
+    uint32_t data[3] = {
+        5,           // length (to small)
+        0x01020304,  // data
+        0x05060708,  // data
+    };
+
+    // {id, offset, size}
+    VkSpecializationMapEntry entries[2] = {
+        {1, 0, 4},  // length
+        {2, 4, 6},  // data
+    };
+
+    VkSpecializationInfo specialization_info = {2, entries, 12, data};
+
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkSpecializationMapEntry-constantID-00776");
+        CreateComputePipelineHelper pipe(*this);
+        pipe.cs_ =
+            VkShaderObj(*m_device, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, &specialization_info);
+        pipe.CreateComputePipeline();
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        data[0] = 8;  // to large
+        m_errorMonitor->SetDesiredError("VUID-VkSpecializationMapEntry-constantID-00776");
+        CreateComputePipelineHelper pipe(*this);
+        pipe.cs_ =
+            VkShaderObj(*m_device, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, &specialization_info);
+        pipe.CreateComputePipeline();
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeShaderSpirv, SpecializationConstantInt8Default) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_CONSTANT_DATA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderConstantData);
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    RETURN_IF_SKIP(Init());
+    const char* cs_src = R"(
+               OpCapability Shader
+               OpCapability Int8
+               OpCapability ConstantDataKHR
+               OpExtension "SPV_KHR_constant_data"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %length SpecId 1
+               OpDecorate %data SpecId 2
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+       %char = OpTypeInt 8 0
+     %length = OpSpecConstant %uint 5 ; default is wrong
+ %array_length = OpTypeArray %char %length
+       %data = OpSpecConstantDataKHR %array_length 0
+  %void_func = OpTypeFunction %void
+       %main = OpFunction %void None %void_func
+ %main_label = OpLabel
+               OpReturn
+               OpFunctionEnd
+        )";
+
+    uint8_t data[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+
+    VkSpecializationMapEntry entry = {2, 0, 8};
+
+    VkSpecializationInfo specialization_info = {1, &entry, 8, data};
+
+    m_errorMonitor->SetDesiredError("VUID-VkSpecializationMapEntry-constantID-00776");
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ =
+        VkShaderObj(*m_device, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, &specialization_info);
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
 }

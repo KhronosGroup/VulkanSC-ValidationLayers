@@ -16,10 +16,14 @@
  */
 #pragma once
 
-#include "error_message/logging.h"
 #include <vulkan/vk_enum_string_helper.h>
 #include <sstream>
 #include <string>
+
+class Logger;
+namespace vvl {
+class DeviceState;
+}
 
 [[maybe_unused]] static std::string string_Attachment(uint32_t attachment) {
     if (attachment == VK_ATTACHMENT_UNUSED) {
@@ -79,11 +83,11 @@
     return ss.str();
 }
 
-[[maybe_unused]] static std::string string_LevelCount(const VkImageCreateInfo &ci, VkImageSubresourceRange const &range) {
+[[maybe_unused]] static std::string string_LevelCount(uint32_t mipLevels, VkImageSubresourceRange const &range) {
     std::ostringstream ss;
     if (range.levelCount == VK_REMAINING_MIP_LEVELS) {
-        const uint32_t level_count = ci.mipLevels - range.baseMipLevel;
-        ss << "VK_REMAINING_MIP_LEVELS [mipLevels (" << ci.mipLevels << ") - baseMipLevel (" << range.baseMipLevel
+        const uint32_t level_count = mipLevels - range.baseMipLevel;
+        ss << "VK_REMAINING_MIP_LEVELS [mipLevels (" << mipLevels << ") - baseMipLevel (" << range.baseMipLevel
            << ") = " << level_count << "]";
     } else {
         ss << range.levelCount;
@@ -91,11 +95,11 @@
     return ss.str();
 }
 
-[[maybe_unused]] static std::string string_LayerCount(const VkImageCreateInfo &ci, VkImageSubresourceRange const &range) {
+[[maybe_unused]] static std::string string_LayerCount(uint32_t arrayLayers, VkImageSubresourceRange const &range) {
     std::ostringstream ss;
     if (range.layerCount == VK_REMAINING_ARRAY_LAYERS) {
-        const uint32_t layer_count = ci.arrayLayers - range.baseArrayLayer;
-        ss << "VK_REMAINING_ARRAY_LAYERS [arrayLayers (" << ci.arrayLayers << ") - baseArrayLayer (" << range.baseArrayLayer
+        const uint32_t layer_count = arrayLayers - range.baseArrayLayer;
+        ss << "VK_REMAINING_ARRAY_LAYERS [arrayLayers (" << arrayLayers << ") - baseArrayLayer (" << range.baseArrayLayer
            << ") = " << layer_count << "]";
     } else {
         ss << range.layerCount;
@@ -103,11 +107,11 @@
     return ss.str();
 }
 
-[[maybe_unused]] static std::string string_LayerCount(const VkImageCreateInfo &ci, VkImageSubresourceLayers const &resource) {
+[[maybe_unused]] static std::string string_LayerCount(uint32_t arrayLayers, VkImageSubresourceLayers const &resource) {
     std::ostringstream ss;
     if (resource.layerCount == VK_REMAINING_ARRAY_LAYERS) {
-        const uint32_t layer_count = ci.arrayLayers - resource.baseArrayLayer;
-        ss << "VK_REMAINING_ARRAY_LAYERS [arrayLayers (" << ci.arrayLayers << ") - baseArrayLayer (" << resource.baseArrayLayer
+        const uint32_t layer_count = arrayLayers - resource.baseArrayLayer;
+        ss << "VK_REMAINING_ARRAY_LAYERS [arrayLayers (" << arrayLayers << ") - baseArrayLayer (" << resource.baseArrayLayer
            << ") = " << layer_count << "]";
     } else {
         ss << resource.layerCount;
@@ -157,24 +161,19 @@
 [[maybe_unused]] static std::string string_VkBool32(VkBool32 value) { return value ? "VK_TRUE" : "VK_FALSE"; }
 
 // Some VUs use the subset in VkPhysicalDeviceImageFormatInfo2 to refer to an VkImageCreateInfo
-[[maybe_unused]] static std::string string_VkPhysicalDeviceImageFormatInfo2(VkPhysicalDeviceImageFormatInfo2 info) {
-    std::ostringstream ss;
-    ss << "format (" << string_VkFormat(info.format) << ")\n";
-    ss << "type (" << string_VkImageType(info.type) << ")\n";
-    ss << "tiling (" << string_VkImageTiling(info.tiling) << ")\n";
-    ss << "usage (" << string_VkImageUsageFlags(info.usage) << ")\n";
-    ss << "flags (" << string_VkImageCreateFlags(info.flags) << ")\n";
-    return ss.str();
-}
+std::string string_VkPhysicalDeviceImageFormatInfo2(VkPhysicalDeviceImageFormatInfo2 info);
 
 // Same thing as VkPhysicalDeviceImageFormatInfo2 but given the actual VkImageCreateInfo
-[[maybe_unused]] static std::string string_VkPhysicalDeviceImageFormatInfo2(VkImageCreateInfo info) {
+[[maybe_unused]] static std::string string_VkPhysicalDeviceImageFormatInfo2(VkImageCreateFlags2KHR flags,
+                                                                            VkImageUsageFlags2KHR usage,
+                                                                            VkFormat format, VkImageType imageType,
+                                                                            VkImageTiling tiling) {
     std::ostringstream ss;
-    ss << "format (" << string_VkFormat(info.format) << ")\n";
-    ss << "type (" << string_VkImageType(info.imageType) << ")\n";
-    ss << "tiling (" << string_VkImageTiling(info.tiling) << ")\n";
-    ss << "usage (" << string_VkImageUsageFlags(info.usage) << ")\n";
-    ss << "flags (" << string_VkImageCreateFlags(info.flags) << ")\n";
+    ss << "format (" << string_VkFormat(format) << ")\n";
+    ss << "type (" << string_VkImageType(imageType) << ")\n";
+    ss << "tiling (" << string_VkImageTiling(tiling) << ")\n";
+    ss << "usage (" << string_VkImageUsageFlags2KHR(usage) << ")\n";
+    ss << "flags (" << string_VkImageCreateFlags2KHR(flags) << ")\n";
     return ss.str();
 }
 
@@ -190,200 +189,7 @@
     return ss.str();
 }
 
-[[maybe_unused]] static std::string string_VkDependencyInfo(const Logger &logger, VkDependencyInfo set_dependency_info,
-                                                            VkDependencyInfo dependency_info) {
-    std::ostringstream set;
-    std::ostringstream wait;
-    if (set_dependency_info.dependencyFlags != dependency_info.dependencyFlags) {
-        set << std::string(string_VkDependencyFlags(set_dependency_info.dependencyFlags));
-        wait << std::string(string_VkDependencyFlags(dependency_info.dependencyFlags));
-    } else if (set_dependency_info.memoryBarrierCount != dependency_info.memoryBarrierCount) {
-        set << "memoryBarrierCount " << set_dependency_info.memoryBarrierCount;
-        wait << "memoryBarrierCount " << dependency_info.memoryBarrierCount;
-    } else if (set_dependency_info.bufferMemoryBarrierCount != dependency_info.bufferMemoryBarrierCount) {
-        set << "bufferMemoryBarrierCount " << set_dependency_info.bufferMemoryBarrierCount;
-        wait << "bufferMemoryBarrierCount " << dependency_info.bufferMemoryBarrierCount;
-    } else if (set_dependency_info.imageMemoryBarrierCount != dependency_info.imageMemoryBarrierCount) {
-        set << "imageMemoryBarrierCount " << set_dependency_info.imageMemoryBarrierCount;
-        wait << "imageMemoryBarrierCount " << dependency_info.imageMemoryBarrierCount;
-    } else {
-        for (uint32_t i = 0; i < dependency_info.memoryBarrierCount; ++i) {
-            bool found = true;
-            if (dependency_info.pMemoryBarriers[i].srcStageMask != set_dependency_info.pMemoryBarriers[i].srcStageMask) {
-                set << "pMemoryBarriers[" << i << "].srcStageMask "
-                    << string_VkPipelineStageFlags2(set_dependency_info.pMemoryBarriers[i].srcStageMask);
-                wait << "pMemoryBarriers[" << i << "].srcStageMask "
-                     << string_VkPipelineStageFlags2(dependency_info.pMemoryBarriers[i].srcStageMask);
-            } else if (dependency_info.pMemoryBarriers[i].srcAccessMask != set_dependency_info.pMemoryBarriers[i].srcAccessMask) {
-                set << "pMemoryBarriers[" << i << "].srcAccessMask "
-                    << string_VkAccessFlags2(set_dependency_info.pMemoryBarriers[i].srcAccessMask);
-                wait << "pMemoryBarriers[" << i << "].srcAccessMask "
-                     << string_VkAccessFlags2(dependency_info.pMemoryBarriers[i].srcAccessMask);
-            } else if (dependency_info.pMemoryBarriers[i].dstStageMask != set_dependency_info.pMemoryBarriers[i].dstStageMask) {
-                set << "pMemoryBarriers[" << i << "].dstStageMask "
-                    << string_VkPipelineStageFlags2(set_dependency_info.pMemoryBarriers[i].dstStageMask);
-                wait << "pMemoryBarriers[" << i << "].dstStageMask "
-                     << string_VkPipelineStageFlags2(dependency_info.pMemoryBarriers[i].dstStageMask);
-            } else if (dependency_info.pMemoryBarriers[i].dstAccessMask != set_dependency_info.pMemoryBarriers[i].dstAccessMask) {
-                set << "pMemoryBarriers[" << i << "].dstAccessMask "
-                    << string_VkAccessFlags2(set_dependency_info.pMemoryBarriers[i].dstAccessMask);
-                wait << "pMemoryBarriers[" << i << "].dstAccessMask "
-                     << string_VkAccessFlags2(dependency_info.pMemoryBarriers[i].dstAccessMask);
-            } else {
-                found = false;
-            }
-            if (found) {
-                break;
-            }
-        }
-        for (uint32_t i = 0; i < dependency_info.bufferMemoryBarrierCount; ++i) {
-            bool found = true;
-            if (dependency_info.pBufferMemoryBarriers[i].srcStageMask !=
-                set_dependency_info.pBufferMemoryBarriers[i].srcStageMask) {
-                set << "pBufferMemoryBarriers[" << i << "].srcStageMask "
-                    << string_VkPipelineStageFlags2(set_dependency_info.pBufferMemoryBarriers[i].srcStageMask);
-                wait << "pBufferMemoryBarriers[" << i << "].srcStageMask "
-                     << string_VkPipelineStageFlags2(dependency_info.pBufferMemoryBarriers[i].srcStageMask);
-            } else if (dependency_info.pBufferMemoryBarriers[i].srcAccessMask !=
-                       set_dependency_info.pBufferMemoryBarriers[i].srcAccessMask) {
-                set << "pBufferMemoryBarriers[" << i << "].srcAccessMask "
-                    << string_VkAccessFlags2(set_dependency_info.pBufferMemoryBarriers[i].srcAccessMask);
-                wait << "pBufferMemoryBarriers[" << i << "].srcAccessMask "
-                     << string_VkAccessFlags2(dependency_info.pBufferMemoryBarriers[i].srcAccessMask);
-            } else if (dependency_info.pBufferMemoryBarriers[i].dstStageMask !=
-                       set_dependency_info.pBufferMemoryBarriers[i].dstStageMask) {
-                set << "pBufferMemoryBarriers[" << i << "].dstStageMask "
-                    << string_VkPipelineStageFlags2(set_dependency_info.pBufferMemoryBarriers[i].dstStageMask);
-                wait << "pBufferMemoryBarriers[" << i << "].dstStageMask "
-                     << string_VkPipelineStageFlags2(dependency_info.pBufferMemoryBarriers[i].dstStageMask);
-            } else if (dependency_info.pBufferMemoryBarriers[i].dstAccessMask !=
-                       set_dependency_info.pBufferMemoryBarriers[i].dstAccessMask) {
-                set << "pBufferMemoryBarriers[" << i << "].dstAccessMask "
-                    << string_VkAccessFlags2(set_dependency_info.pBufferMemoryBarriers[i].dstAccessMask);
-                wait << "pBufferMemoryBarriers[" << i << "].dstAccessMask "
-                     << string_VkAccessFlags2(dependency_info.pBufferMemoryBarriers[i].dstAccessMask);
-            } else if (dependency_info.pBufferMemoryBarriers[i].srcQueueFamilyIndex !=
-                       set_dependency_info.pBufferMemoryBarriers[i].srcQueueFamilyIndex) {
-                set << "pBufferMemoryBarriers[" << i << "].srcQueueFamilyIndex "
-                    << set_dependency_info.pBufferMemoryBarriers[i].srcQueueFamilyIndex;
-                wait << "pBufferMemoryBarriers[" << i << "].srcQueueFamilyIndex "
-                     << dependency_info.pBufferMemoryBarriers[i].srcQueueFamilyIndex;
-            } else if (dependency_info.pBufferMemoryBarriers[i].dstQueueFamilyIndex !=
-                       set_dependency_info.pBufferMemoryBarriers[i].dstQueueFamilyIndex) {
-                set << "pBufferMemoryBarriers[" << i << "].dstQueueFamilyIndex "
-                    << set_dependency_info.pBufferMemoryBarriers[i].dstQueueFamilyIndex;
-                wait << "pBufferMemoryBarriers[" << i << "].dstQueueFamilyIndex "
-                     << dependency_info.pBufferMemoryBarriers[i].dstQueueFamilyIndex;
-            } else if (dependency_info.pBufferMemoryBarriers[i].buffer != set_dependency_info.pBufferMemoryBarriers[i].buffer) {
-                set << "pBufferMemoryBarriers[" << i << "].buffer "
-                    << logger.FormatHandle(set_dependency_info.pBufferMemoryBarriers[i].buffer);
-                wait << "pBufferMemoryBarriers[" << i << "].buffer "
-                     << logger.FormatHandle(dependency_info.pBufferMemoryBarriers[i].buffer);
-            } else if (dependency_info.pBufferMemoryBarriers[i].offset != set_dependency_info.pBufferMemoryBarriers[i].offset) {
-                set << "pBufferMemoryBarriers[" << i << "].offset " << set_dependency_info.pBufferMemoryBarriers[i].offset;
-                wait << "pBufferMemoryBarriers[" << i << "].offset " << dependency_info.pBufferMemoryBarriers[i].offset;
-            } else if (dependency_info.pBufferMemoryBarriers[i].size != set_dependency_info.pBufferMemoryBarriers[i].size) {
-                set << "pBufferMemoryBarriers[" << i << "].size " << set_dependency_info.pBufferMemoryBarriers[i].size;
-                wait << "pBufferMemoryBarriers[" << i << "].size " << dependency_info.pBufferMemoryBarriers[i].size;
-            } else {
-                found = false;
-            }
-            if (found) {
-                break;
-            }
-        }
-        for (uint32_t i = 0; i < dependency_info.imageMemoryBarrierCount; ++i) {
-            bool found = true;
-            if (dependency_info.pImageMemoryBarriers[i].srcStageMask != set_dependency_info.pImageMemoryBarriers[i].srcStageMask) {
-                set << "pImageMemoryBarriers[" << i << "].srcStageMask "
-                    << string_VkPipelineStageFlags2(set_dependency_info.pImageMemoryBarriers[i].srcStageMask);
-                wait << "pImageMemoryBarriers[" << i << "].srcStageMask "
-                     << string_VkPipelineStageFlags2(dependency_info.pImageMemoryBarriers[i].srcStageMask);
-            } else if (dependency_info.pImageMemoryBarriers[i].srcAccessMask !=
-                       set_dependency_info.pImageMemoryBarriers[i].srcAccessMask) {
-                set << "pImageMemoryBarriers[" << i << "].srcAccessMask "
-                    << string_VkAccessFlags2(set_dependency_info.pImageMemoryBarriers[i].srcAccessMask);
-                wait << "pImageMemoryBarriers[" << i << "].srcAccessMask "
-                     << string_VkAccessFlags2(dependency_info.pImageMemoryBarriers[i].srcAccessMask);
-            } else if (dependency_info.pImageMemoryBarriers[i].dstStageMask !=
-                       set_dependency_info.pImageMemoryBarriers[i].dstStageMask) {
-                set << "pImageMemoryBarriers[" << i << "].dstStageMask "
-                    << string_VkPipelineStageFlags2(set_dependency_info.pImageMemoryBarriers[i].dstStageMask);
-                wait << "pImageMemoryBarriers[" << i << "].dstStageMask "
-                     << string_VkPipelineStageFlags2(dependency_info.pImageMemoryBarriers[i].dstStageMask);
-            } else if (dependency_info.pImageMemoryBarriers[i].dstAccessMask !=
-                       set_dependency_info.pImageMemoryBarriers[i].dstAccessMask) {
-                set << "pImageMemoryBarriers[" << i << "].dstAccessMask "
-                    << string_VkAccessFlags2(set_dependency_info.pImageMemoryBarriers[i].dstAccessMask);
-                wait << "pImageMemoryBarriers[" << i << "].dstAccessMask "
-                     << string_VkAccessFlags2(dependency_info.pImageMemoryBarriers[i].dstAccessMask);
-            } else if (dependency_info.pImageMemoryBarriers[i].oldLayout != set_dependency_info.pImageMemoryBarriers[i].oldLayout) {
-                set << "pImageMemoryBarriers[" << i << "].oldLayout "
-                    << string_VkAccessFlags2(set_dependency_info.pImageMemoryBarriers[i].oldLayout);
-                wait << "pImageMemoryBarriers[" << i << "].oldLayout "
-                     << string_VkAccessFlags2(dependency_info.pImageMemoryBarriers[i].oldLayout);
-            } else if (dependency_info.pImageMemoryBarriers[i].newLayout != set_dependency_info.pImageMemoryBarriers[i].newLayout) {
-                set << "pImageMemoryBarriers[" << i << "].newLayout "
-                    << string_VkAccessFlags2(set_dependency_info.pImageMemoryBarriers[i].newLayout);
-                wait << "pImageMemoryBarriers[" << i << "].newLayout "
-                     << string_VkAccessFlags2(dependency_info.pImageMemoryBarriers[i].newLayout);
-            } else if (dependency_info.pImageMemoryBarriers[i].srcQueueFamilyIndex !=
-                       set_dependency_info.pImageMemoryBarriers[i].srcQueueFamilyIndex) {
-                set << "pImageMemoryBarriers[" << i << "].srcQueueFamilyIndex "
-                    << set_dependency_info.pImageMemoryBarriers[i].srcQueueFamilyIndex;
-                wait << "pImageMemoryBarriers[" << i << "].srcQueueFamilyIndex "
-                     << dependency_info.pImageMemoryBarriers[i].srcQueueFamilyIndex;
-            } else if (dependency_info.pImageMemoryBarriers[i].dstQueueFamilyIndex !=
-                       set_dependency_info.pImageMemoryBarriers[i].dstQueueFamilyIndex) {
-                set << "pImageMemoryBarriers[" << i << "].dstQueueFamilyIndex "
-                    << set_dependency_info.pImageMemoryBarriers[i].dstQueueFamilyIndex;
-                wait << "pImageMemoryBarriers[" << i << "].dstQueueFamilyIndex "
-                     << dependency_info.pImageMemoryBarriers[i].dstQueueFamilyIndex;
-            } else if (dependency_info.pImageMemoryBarriers[i].image != set_dependency_info.pImageMemoryBarriers[i].image) {
-                set << "pImageMemoryBarriers[" << i << "].image "
-                    << logger.FormatHandle(set_dependency_info.pImageMemoryBarriers[i].image);
-                wait << "pImageMemoryBarriers[" << i << "].image "
-                     << logger.FormatHandle(dependency_info.pImageMemoryBarriers[i].image);
-            } else if (dependency_info.pImageMemoryBarriers[i].subresourceRange.aspectMask !=
-                       set_dependency_info.pImageMemoryBarriers[i].subresourceRange.aspectMask) {
-                set << "pImageMemoryBarriers[" << i << "].subresourceRange.aspectMask "
-                    << string_VkImageAspectFlags(set_dependency_info.pImageMemoryBarriers[i].subresourceRange.aspectMask);
-                wait << "pImageMemoryBarriers[" << i << "].subresourceRange.aspectMask "
-                     << string_VkImageAspectFlags(dependency_info.pImageMemoryBarriers[i].subresourceRange.aspectMask);
-            } else if (dependency_info.pImageMemoryBarriers[i].subresourceRange.baseMipLevel !=
-                       set_dependency_info.pImageMemoryBarriers[i].subresourceRange.baseMipLevel) {
-                set << "pImageMemoryBarriers[" << i << "].subresourceRange.baseMipLevel "
-                    << set_dependency_info.pImageMemoryBarriers[i].subresourceRange.baseMipLevel;
-                wait << "pImageMemoryBarriers[" << i << "].subresourceRange.baseMipLevel "
-                     << dependency_info.pImageMemoryBarriers[i].subresourceRange.baseMipLevel;
-            } else if (dependency_info.pImageMemoryBarriers[i].subresourceRange.levelCount !=
-                       set_dependency_info.pImageMemoryBarriers[i].subresourceRange.levelCount) {
-                set << "pImageMemoryBarriers[" << i << "].subresourceRange.levelCount "
-                    << set_dependency_info.pImageMemoryBarriers[i].subresourceRange.levelCount;
-                wait << "pImageMemoryBarriers[" << i << "].subresourceRange.levelCount "
-                     << dependency_info.pImageMemoryBarriers[i].subresourceRange.levelCount;
-            } else if (dependency_info.pImageMemoryBarriers[i].subresourceRange.baseArrayLayer !=
-                       set_dependency_info.pImageMemoryBarriers[i].subresourceRange.baseArrayLayer) {
-                set << "pImageMemoryBarriers[" << i << "].subresourceRange.baseArrayLayer "
-                    << set_dependency_info.pImageMemoryBarriers[i].subresourceRange.baseArrayLayer;
-                wait << "pImageMemoryBarriers[" << i << "].subresourceRange.baseArrayLayer "
-                     << dependency_info.pImageMemoryBarriers[i].subresourceRange.baseArrayLayer;
-            } else if (dependency_info.pImageMemoryBarriers[i].subresourceRange.layerCount !=
-                       set_dependency_info.pImageMemoryBarriers[i].subresourceRange.layerCount) {
-                set << "pImageMemoryBarriers[" << i << "].subresourceRange.layerCount "
-                    << set_dependency_info.pImageMemoryBarriers[i].subresourceRange.layerCount;
-                wait << "pImageMemoryBarriers[" << i << "].subresourceRange.layerCount "
-                     << dependency_info.pImageMemoryBarriers[i].subresourceRange.layerCount;
-            } else {
-                found = false;
-            }
-            if (found) {
-                break;
-            }
-        }
-    }
-    return "event was set with " + set.str() + " and is being waited on with " + wait.str();
-}
+std::string string_VkDependencyInfo(const Logger& logger, VkDependencyInfo set_dependency_info, VkDependencyInfo dependency_info);
 
 [[maybe_unused]] static std::string string_VkDataGraphPipelineResourceInfoARM(VkDataGraphPipelineResourceInfoARM resource) {
     std::ostringstream ss;
@@ -393,10 +199,36 @@
     return ss.str();
 }
 
-[[maybe_unused]] static std::string string_VkBindHeapInfoEXT(VkBindHeapInfoEXT info) {
+[[maybe_unused]] static std::string string_VkPhysicalDeviceDataGraphProcessingEngineARM(
+    const VkPhysicalDeviceDataGraphProcessingEngineARM& engine) {
     std::stringstream ss;
-    ss << "heapRange = { address = " << info.heapRange.address << ", size = " << info.heapRange.size << " }, ";
-    ss << "reservedRangeOffset = " << info.reservedRangeOffset << ", ";
-    ss << "reservedRangeSize = " << info.reservedRangeSize << "";
+    ss << "{ type: " << string_VkPhysicalDeviceDataGraphProcessingEngineTypeARM(engine.type)
+       << ", isForeign: " << string_VkBool32(engine.isForeign) << " }";
     return ss.str();
 }
+
+[[maybe_unused]] static std::string string_VkPhysicalDeviceDataGraphOperationSupportARM(
+    const VkPhysicalDeviceDataGraphOperationSupportARM& operation) {
+    std::stringstream ss;
+    ss << "{ type: " << string_VkPhysicalDeviceDataGraphOperationTypeARM(operation.operationType) << ", name: \"" << operation.name
+       << "\", version: " << operation.version << "}";
+    return ss.str();
+}
+
+[[maybe_unused]] static std::string string_VkQueueFamilyDataGraphPropertiesARM(
+    const VkQueueFamilyDataGraphPropertiesARM& property) {
+    std::stringstream ss;
+    ss << "{\n  engine: " << string_VkPhysicalDeviceDataGraphProcessingEngineARM(property.engine)
+       << ",\n  operation: " << string_VkPhysicalDeviceDataGraphOperationSupportARM(property.operation) << "\n}\n";
+    return ss.str();
+}
+
+std::string string_BuffersFromAddress(const vvl::DeviceState &device, VkDeviceAddress address);
+
+std::string string_VkAccelerationStructureBuildGeometryInfoKHR(const Logger &logger,
+                                                               const VkAccelerationStructureBuildGeometryInfoKHR &info);
+std::string string_VkAccelerationStructureGeometryTrianglesDataKHR(
+    const vvl::DeviceState &device_state, const VkAccelerationStructureGeometryTrianglesDataKHR &triangles);
+std::string string_VkAccelerationStructureGeometryAabbsDataKHR(const vvl::DeviceState &device_state,
+                                                               const VkAccelerationStructureGeometryAabbsDataKHR aabb);
+std::string string_VkAccelerationStructureBuildRangeInfoKHR(const VkAccelerationStructureBuildRangeInfoKHR &bri);

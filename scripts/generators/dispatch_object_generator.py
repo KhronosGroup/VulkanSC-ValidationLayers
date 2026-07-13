@@ -128,7 +128,8 @@ class APISpecific:
                             settings.enabled[best_practices] ||
                             settings.enabled[gpu_validation] ||
                             settings.enabled[debug_printf_validation] ||
-                            settings.enabled[sync_validation]
+                            settings.enabled[sync_validation] ||
+                            settings.enabled[gpu_dump]
                         '''
                     },
                     {
@@ -158,7 +159,14 @@ class APISpecific:
                         'instance': 'syncval::Instance',
                         'type': 'LayerObjectTypeSyncValidation',
                         'enabled': 'settings.enabled[sync_validation]'
-                    }
+                    },
+                    {
+                        'include': 'gpu_dump/gpu_dump.h',
+                        'device': 'gpudump::GpuDump',
+                        'instance': 'gpudump::Instance',
+                        'type': 'LayerObjectTypeGpuDump',
+                        'enabled': 'settings.enabled[gpu_dump]'
+                    },
                 ]
 
 
@@ -237,7 +245,7 @@ class DispatchObjectGenerator(BaseGenerator):
             'vkFreeCommandBuffers',
             'vkDestroyCommandPool',
             'vkBeginCommandBuffer',
-            # Currently we don't properly generate a Wrap and will accidently unwrap the VkDisplayKHR handle
+            # Currently we don't properly generate a Wrap and will accidentally unwrap the VkDisplayKHR handle
             'vkGetPhysicalDeviceDisplayPropertiesKHR',
             'vkGetPhysicalDeviceDisplayProperties2KHR',
             'vkGetPhysicalDeviceDisplayPlanePropertiesKHR',
@@ -355,7 +363,7 @@ class DispatchObjectGenerator(BaseGenerator):
     def generateDeviceMethods(self):
         out = []
         out.append('''
-            // This file contains methods for class vvl::dispatch::Device and it is designed to ONLY be
+            // This file contains methods for class DispatchDevice and it is designed to ONLY be
             // included into dispatch_object.h.
 
             #pragma once
@@ -367,7 +375,7 @@ class DispatchObjectGenerator(BaseGenerator):
     def generateInstanceMethods(self):
         out = []
         out.append('''
-            // This file contains methods for class vvl::dispatch::Instance  and it is designed to ONLY be
+            // This file contains methods for class DispatchInstance  and it is designed to ONLY be
             // included into dispatch_object.h.
 
             #pragma once
@@ -404,7 +412,10 @@ class DispatchObjectGenerator(BaseGenerator):
             prototype = prototype.replace(');', f'{proto_extra}) {{')
             out.extend(guard_helper.add_guard(command.protect))
             out.append(f'\n{prototype}\n')
-            out.append(f'auto dispatch = vvl::dispatch::GetData({command.params[0].name});\n')
+            if command.instance:
+                out.append(f'auto dispatch = vvl::GetDispatchInstance({command.params[0].name});\n')
+            else:
+                out.append(f'auto dispatch = vvl::GetDispatchDevice({command.params[0].name});\n')
             returnResult = 'return ' if (command.returnType != 'void') else ''
             paramsList = ', '.join([param.name for param in command.params])
             out.append(f'{returnResult}{command.name.replace("vk", "dispatch->")}({paramsList}{call_extra});\n')
@@ -452,10 +463,10 @@ class DispatchObjectGenerator(BaseGenerator):
             #define DISPATCH_MAX_STACK_ALLOCATIONS 32
 
             namespace vvl {
-            namespace dispatch {
 
-            void Instance::InitValidationObjects() {
+            void DispatchInstance::InitValidationObjects() {
                  // Note that this DEFINES THE ORDER IN WHICH THE LAYER VALIDATION OBJECTS ARE CALLED
+                 // Anyone using state tracking (LayerObjectTypeStateTracker) must be called after and enable it
              ''')
         for layer in APISpecific.getValidationLayerList(self.targetApiName):
              classname = layer['instance']
@@ -467,8 +478,9 @@ class DispatchObjectGenerator(BaseGenerator):
         out.append('\n')
         out.append('}\n')
         out.append('''
-            void Device::InitValidationObjects() {
+            void DispatchDevice::InitValidationObjects() {
                  // Note that this DEFINES THE ORDER IN WHICH THE LAYER VALIDATION OBJECTS ARE CALLED
+                 // Anyone using state tracking (LayerObjectTypeStateTracker) must be called after and enable it
              ''')
         for layer in APISpecific.getValidationLayerList(self.targetApiName):
              classname = layer['device']
@@ -587,7 +599,7 @@ class DispatchObjectGenerator(BaseGenerator):
 
             prototype = command.cPrototype[:-1]
             prototype = prototype.replace('VKAPI_ATTR ', '')
-            prototype = prototype.replace('VKAPI_CALL vk', 'Instance::' if command.instance else 'Device::')
+            prototype = prototype.replace('VKAPI_CALL vk', 'DispatchInstance::' if command.instance else 'DispatchDevice::')
             out.append(f'\n{prototype} {{\n')\
 
             # Pull out the text for each of the parameters, separate them by commas in a list
@@ -633,7 +645,6 @@ class DispatchObjectGenerator(BaseGenerator):
                 out.append('return result;\n')
             out.append('}\n')
         out.extend(guard_helper.add_guard(None))
-        out.append('} // namespace dispatch\n')
         out.append('} // namespace vvl\n')
 
         self.write("".join(out))

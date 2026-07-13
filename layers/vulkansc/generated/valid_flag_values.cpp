@@ -180,6 +180,12 @@ vvl::Extensions stateless::Context::IsValidFlagValue(vvl::FlagBitmask flag_bitma
                             vvl::Extension::_VK_EXT_fragment_density_map_offset};
                 }
             }
+            if (value & (VK_IMAGE_CREATE_ALIAS_SINGLE_LAYER_DESCRIPTOR_BIT_KHR)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_maintenance11)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_maintenance11))) {
+                    return {vvl::Extension::_VK_KHR_maintenance11};
+                }
+            }
             return {};
         case vvl::FlagBitmask::VkImageUsageFlagBits:
             if (value & (VK_IMAGE_USAGE_HOST_TRANSFER_BIT)) {
@@ -753,24 +759,34 @@ vvl::Extensions stateless::Context::IsValidFlagValue(vvl::FlagBitmask flag_bitma
                     return {vvl::Extension::_VK_EXT_attachment_feedback_loop_layout};
                 }
             }
-            if (value & (VK_PIPELINE_CREATE_RAY_TRACING_OPACITY_MICROMAP_BIT_EXT)) {
-                if ((instance_function && !IsExtSupported(extensions.vk_ext_opacity_micromap)) ||
-                    (!instance_function && !IsExtEnabled(extensions.vk_ext_opacity_micromap))) {
-                    return {vvl::Extension::_VK_EXT_opacity_micromap};
-                }
-            }
             if (value & (VK_PIPELINE_CREATE_RAY_TRACING_DISPLACEMENT_MICROMAP_BIT_NV)) {
                 if ((instance_function && !IsExtSupported(extensions.vk_nv_displacement_micromap)) ||
                     (!instance_function && !IsExtEnabled(extensions.vk_nv_displacement_micromap))) {
                     return {vvl::Extension::_VK_NV_displacement_micromap};
                 }
             }
+            if (value & (VK_PIPELINE_CREATE_RAY_TRACING_OPACITY_MICROMAP_BIT_KHR)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_opacity_micromap) &&
+                     !IsExtSupported(extensions.vk_ext_opacity_micromap)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_opacity_micromap) &&
+                     !IsExtEnabled(extensions.vk_ext_opacity_micromap))) {
+                    return {vvl::Extension::_VK_KHR_opacity_micromap, vvl::Extension::_VK_EXT_opacity_micromap};
+                }
+            }
             return {};
         case vvl::FlagBitmask::VkPipelineLayoutCreateFlagBits:
             if (value & (VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT)) {
-                if ((instance_function && !IsExtSupported(extensions.vk_ext_graphics_pipeline_library)) ||
-                    (!instance_function && !IsExtEnabled(extensions.vk_ext_graphics_pipeline_library))) {
-                    return {vvl::Extension::_VK_EXT_graphics_pipeline_library};
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_maintenance11) &&
+                     !IsExtSupported(extensions.vk_ext_graphics_pipeline_library)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_maintenance11) &&
+                     !IsExtEnabled(extensions.vk_ext_graphics_pipeline_library))) {
+                    return {vvl::Extension::_VK_KHR_maintenance11, vvl::Extension::_VK_EXT_graphics_pipeline_library};
+                }
+            }
+            if (value & (VK_PIPELINE_LAYOUT_CREATE_NO_TASK_SHADER_BIT_KHR)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_maintenance11)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_maintenance11))) {
+                    return {vvl::Extension::_VK_KHR_maintenance11};
                 }
             }
             return {};
@@ -1135,6 +1151,12 @@ vvl::Extensions stateless::Context::IsValidFlagValue(vvl::FlagBitmask flag_bitma
                     return {vvl::Extension::_VK_KHR_swapchain_maintenance1, vvl::Extension::_VK_EXT_swapchain_maintenance1};
                 }
             }
+            if (value & (VK_SWAPCHAIN_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_ext_multisampled_render_to_swapchain)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_ext_multisampled_render_to_swapchain))) {
+                    return {vvl::Extension::_VK_EXT_multisampled_render_to_swapchain};
+                }
+            }
             return {};
         case vvl::FlagBitmask::VkVideoSessionCreateFlagBitsKHR:
             if (value & (VK_VIDEO_SESSION_CREATE_ALLOW_ENCODE_PARAMETER_OPTIMIZATIONS_BIT_KHR)) {
@@ -1194,6 +1216,31 @@ vvl::Extensions stateless::Context::IsValidFlagValue(vvl::FlagBitmask flag_bitma
                 }
             }
             return {};
+        case vvl::FlagBitmask::VkVideoEncodeFeedbackFlagBitsKHR:
+            if (value & (VK_VIDEO_ENCODE_FEEDBACK_AVERAGE_QUANTIZATION_BIT_KHR | VK_VIDEO_ENCODE_FEEDBACK_MIN_QUANTIZATION_BIT_KHR |
+                         VK_VIDEO_ENCODE_FEEDBACK_MAX_QUANTIZATION_BIT_KHR | VK_VIDEO_ENCODE_FEEDBACK_INTRA_PIXELS_BIT_KHR |
+                         VK_VIDEO_ENCODE_FEEDBACK_INTER_PIXELS_BIT_KHR | VK_VIDEO_ENCODE_FEEDBACK_SKIPPED_PIXELS_BIT_KHR |
+                         VK_VIDEO_ENCODE_FEEDBACK_PICTURE_PARTITION_COUNT_BIT_KHR)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_video_encode_feedback2)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_video_encode_feedback2))) {
+                    return {vvl::Extension::_VK_KHR_video_encode_feedback2};
+                }
+            }
+            return {};
+        case vvl::FlagBitmask::VkAccelerationStructureCreateFlagBitsKHR:
+            if (value & (VK_ACCELERATION_STRUCTURE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_ext_descriptor_buffer)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_ext_descriptor_buffer))) {
+                    return {vvl::Extension::_VK_EXT_descriptor_buffer};
+                }
+            }
+            if (value & (VK_ACCELERATION_STRUCTURE_CREATE_MOTION_BIT_NV)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_nv_ray_tracing_motion_blur)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_nv_ray_tracing_motion_blur))) {
+                    return {vvl::Extension::_VK_NV_ray_tracing_motion_blur};
+                }
+            }
+            return {};
         case vvl::FlagBitmask::VkDebugUtilsMessageTypeFlagBitsEXT:
             if (value & (VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)) {
                 if ((instance_function && !IsExtSupported(extensions.vk_ext_device_address_binding_report)) ||
@@ -1203,11 +1250,13 @@ vvl::Extensions stateless::Context::IsValidFlagValue(vvl::FlagBitmask flag_bitma
             }
             return {};
         case vvl::FlagBitmask::VkGeometryInstanceFlagBitsKHR:
-            if (value & (VK_GEOMETRY_INSTANCE_FORCE_OPACITY_MICROMAP_2_STATE_BIT_EXT |
-                         VK_GEOMETRY_INSTANCE_DISABLE_OPACITY_MICROMAPS_BIT_EXT)) {
-                if ((instance_function && !IsExtSupported(extensions.vk_ext_opacity_micromap)) ||
-                    (!instance_function && !IsExtEnabled(extensions.vk_ext_opacity_micromap))) {
-                    return {vvl::Extension::_VK_EXT_opacity_micromap};
+            if (value & (VK_GEOMETRY_INSTANCE_FORCE_OPACITY_MICROMAP_2_STATE_BIT_KHR |
+                         VK_GEOMETRY_INSTANCE_DISABLE_OPACITY_MICROMAPS_BIT_KHR)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_opacity_micromap) &&
+                     !IsExtSupported(extensions.vk_ext_opacity_micromap)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_opacity_micromap) &&
+                     !IsExtEnabled(extensions.vk_ext_opacity_micromap))) {
+                    return {vvl::Extension::_VK_KHR_opacity_micromap, vvl::Extension::_VK_EXT_opacity_micromap};
                 }
             }
             return {};
@@ -1218,9 +1267,7 @@ vvl::Extensions stateless::Context::IsValidFlagValue(vvl::FlagBitmask flag_bitma
                     return {vvl::Extension::_VK_NV_ray_tracing_motion_blur};
                 }
             }
-            if (value & (VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_OPACITY_MICROMAP_UPDATE_BIT_EXT |
-                         VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DISABLE_OPACITY_MICROMAPS_BIT_EXT |
-                         VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_OPACITY_MICROMAP_DATA_UPDATE_BIT_EXT)) {
+            if (value & (VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_OPACITY_MICROMAP_DATA_UPDATE_BIT_EXT)) {
                 if ((instance_function && !IsExtSupported(extensions.vk_ext_opacity_micromap)) ||
                     (!instance_function && !IsExtEnabled(extensions.vk_ext_opacity_micromap))) {
                     return {vvl::Extension::_VK_EXT_opacity_micromap};
@@ -1244,6 +1291,21 @@ vvl::Extensions stateless::Context::IsValidFlagValue(vvl::FlagBitmask flag_bitma
                     return {vvl::Extension::_VK_NV_cluster_acceleration_structure};
                 }
             }
+            if (value & (VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_OPACITY_MICROMAP_UPDATE_BIT_KHR |
+                         VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DISABLE_OPACITY_MICROMAPS_BIT_KHR)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_opacity_micromap) &&
+                     !IsExtSupported(extensions.vk_ext_opacity_micromap)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_opacity_micromap) &&
+                     !IsExtEnabled(extensions.vk_ext_opacity_micromap))) {
+                    return {vvl::Extension::_VK_KHR_opacity_micromap, vvl::Extension::_VK_EXT_opacity_micromap};
+                }
+            }
+            if (value & (VK_BUILD_ACCELERATION_STRUCTURE_MICROMAP_LOSSY_BIT_KHR)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_opacity_micromap)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_opacity_micromap))) {
+                    return {vvl::Extension::_VK_KHR_opacity_micromap};
+                }
+            }
             return {};
         case vvl::FlagBitmask::VkShaderCreateFlagBitsEXT:
             if (value & (VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT)) {
@@ -1252,10 +1314,24 @@ vvl::Extensions stateless::Context::IsValidFlagValue(vvl::FlagBitmask flag_bitma
                     return {vvl::Extension::_VK_EXT_descriptor_heap};
                 }
             }
+            if (value & (VK_SHADER_CREATE_INSTRUMENT_SHADER_BIT_ARM)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_maintenance5) &&
+                     !IsExtSupported(extensions.vk_arm_shader_instrumentation)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_maintenance5) &&
+                     !IsExtEnabled(extensions.vk_arm_shader_instrumentation))) {
+                    return {vvl::Extension::_VK_KHR_maintenance5, vvl::Extension::_VK_ARM_shader_instrumentation};
+                }
+            }
             if (value & (VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT)) {
                 if ((instance_function && !IsExtSupported(extensions.vk_ext_device_generated_commands)) ||
                     (!instance_function && !IsExtEnabled(extensions.vk_ext_device_generated_commands))) {
                     return {vvl::Extension::_VK_EXT_device_generated_commands};
+                }
+            }
+            if (value & (VK_SHADER_CREATE_OPACITY_MICROMAP_DISALLOW_MIXED_SPECIAL_INDEX_BIT_EXT)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_opacity_micromap)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_opacity_micromap))) {
+                    return {vvl::Extension::_VK_KHR_opacity_micromap};
                 }
             }
             if (value & (VK_SHADER_CREATE_64_BIT_INDEXING_BIT_EXT)) {
@@ -1264,18 +1340,10 @@ vvl::Extensions stateless::Context::IsValidFlagValue(vvl::FlagBitmask flag_bitma
                     return {vvl::Extension::_VK_EXT_shader_64bit_indexing};
                 }
             }
-            return {};
-        case vvl::FlagBitmask::VkAccelerationStructureCreateFlagBitsKHR:
-            if (value & (VK_ACCELERATION_STRUCTURE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)) {
-                if ((instance_function && !IsExtSupported(extensions.vk_ext_descriptor_buffer)) ||
-                    (!instance_function && !IsExtEnabled(extensions.vk_ext_descriptor_buffer))) {
-                    return {vvl::Extension::_VK_EXT_descriptor_buffer};
-                }
-            }
-            if (value & (VK_ACCELERATION_STRUCTURE_CREATE_MOTION_BIT_NV)) {
-                if ((instance_function && !IsExtSupported(extensions.vk_nv_ray_tracing_motion_blur)) ||
-                    (!instance_function && !IsExtEnabled(extensions.vk_nv_ray_tracing_motion_blur))) {
-                    return {vvl::Extension::_VK_NV_ray_tracing_motion_blur};
+            if (value & (VK_SHADER_CREATE_INDEPENDENT_SETS_BIT_KHR)) {
+                if ((instance_function && !IsExtSupported(extensions.vk_khr_maintenance11)) ||
+                    (!instance_function && !IsExtEnabled(extensions.vk_khr_maintenance11))) {
+                    return {vvl::Extension::_VK_KHR_maintenance11};
                 }
             }
             return {};
@@ -1417,6 +1485,11 @@ vvl::Extensions stateless::Context::IsValidFlag64Value(vvl::FlagBitmask flag_bit
                     return {vvl::Extension::_VK_EXT_descriptor_heap};
                 }
             }
+            if (value & (VK_BUFFER_USAGE_2_MICROMAP_BUILD_INPUT_READ_ONLY_BIT_EXT | VK_BUFFER_USAGE_2_MICROMAP_STORAGE_BIT_EXT)) {
+                if (!IsExtEnabled(extensions.vk_ext_opacity_micromap)) {
+                    return {vvl::Extension::_VK_EXT_opacity_micromap};
+                }
+            }
             if (value & (VK_BUFFER_USAGE_2_COMPRESSED_DATA_DGF1_BIT_AMDX)) {
                 if (!IsExtEnabled(extensions.vk_amdx_dense_geometry_format)) {
                     return {vvl::Extension::_VK_AMDX_dense_geometry_format};
@@ -1474,6 +1547,11 @@ vvl::Extensions stateless::Context::IsValidFlag64Value(vvl::FlagBitmask flag_bit
                     return {vvl::Extension::_VK_ARM_pipeline_opacity_micromap};
                 }
             }
+            if (value & (VK_PIPELINE_CREATE_2_INSTRUMENT_SHADERS_BIT_ARM)) {
+                if (!IsExtEnabled(extensions.vk_arm_shader_instrumentation)) {
+                    return {vvl::Extension::_VK_ARM_shader_instrumentation};
+                }
+            }
             if (value & (VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR)) {
                 if (!IsExtEnabled(extensions.vk_khr_pipeline_binary)) {
                     return {vvl::Extension::_VK_KHR_pipeline_binary};
@@ -1489,9 +1567,26 @@ vvl::Extensions stateless::Context::IsValidFlag64Value(vvl::FlagBitmask flag_bit
                     return {vvl::Extension::_VK_VALVE_fragment_density_map_layered};
                 }
             }
+            if (value & (VK_PIPELINE_CREATE_2_RAY_TRACING_OPACITY_MICROMAP_BIT_KHR)) {
+                if (!IsExtEnabled(extensions.vk_khr_opacity_micromap) && !IsExtEnabled(extensions.vk_ext_opacity_micromap)) {
+                    return {vvl::Extension::_VK_KHR_opacity_micromap, vvl::Extension::_VK_EXT_opacity_micromap};
+                }
+            }
+            if (value & (VK_PIPELINE_CREATE_2_OPACITY_MICROMAP_DISALLOW_MIXED_SPECIAL_INDEX_BIT_KHR)) {
+                if (!IsExtEnabled(extensions.vk_khr_opacity_micromap)) {
+                    return {vvl::Extension::_VK_KHR_opacity_micromap};
+                }
+            }
             if (value & (VK_PIPELINE_CREATE_2_64_BIT_INDEXING_BIT_EXT)) {
                 if (!IsExtEnabled(extensions.vk_ext_shader_64bit_indexing)) {
                     return {vvl::Extension::_VK_EXT_shader_64bit_indexing};
+                }
+            }
+            return {};
+        case vvl::FlagBitmask::VkImageCreateFlagBits2KHR:
+            if (value & (VK_IMAGE_CREATE_2_ALIAS_SINGLE_LAYER_DESCRIPTOR_BIT_KHR)) {
+                if (!IsExtEnabled(extensions.vk_khr_maintenance11)) {
+                    return {vvl::Extension::_VK_KHR_maintenance11};
                 }
             }
             return {};
@@ -1506,6 +1601,13 @@ vvl::Extensions stateless::Context::IsValidFlag64Value(vvl::FlagBitmask flag_bit
             if (value & (VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM)) {
                 if (!IsExtEnabled(extensions.vk_arm_data_graph)) {
                     return {vvl::Extension::_VK_ARM_data_graph};
+                }
+            }
+            return {};
+        case vvl::FlagBitmask::VkDataGraphPipelineSessionCreateFlagBitsARM:
+            if (value & (VK_DATA_GRAPH_PIPELINE_SESSION_CREATE_OPTICAL_FLOW_CACHE_BIT_ARM)) {
+                if (!IsExtEnabled(extensions.vk_arm_data_graph_optical_flow)) {
+                    return {vvl::Extension::_VK_ARM_data_graph_optical_flow};
                 }
             }
             return {};
@@ -1660,6 +1762,12 @@ std::string stateless::Context::DescribeFlagBitmaskValue(vvl::FlagBitmask flag_b
             return string_VkVideoEncodeUsageFlagsKHR(value);
         case vvl::FlagBitmask::VkVideoEncodeContentFlagBitsKHR:
             return string_VkVideoEncodeContentFlagsKHR(value);
+        case vvl::FlagBitmask::VkAddressCommandFlagBitsKHR:
+            return string_VkAddressCommandFlagsKHR(value);
+        case vvl::FlagBitmask::VkConditionalRenderingFlagBitsEXT:
+            return string_VkConditionalRenderingFlagsEXT(value);
+        case vvl::FlagBitmask::VkAccelerationStructureCreateFlagBitsKHR:
+            return string_VkAccelerationStructureCreateFlagsKHR(value);
         case vvl::FlagBitmask::VkPresentScalingFlagBitsKHR:
             return string_VkPresentScalingFlagsKHR(value);
         case vvl::FlagBitmask::VkPresentGravityFlagBitsKHR:
@@ -1670,6 +1778,8 @@ std::string stateless::Context::DescribeFlagBitmaskValue(vvl::FlagBitmask flag_b
             return string_VkAddressCopyFlagsKHR(value);
         case vvl::FlagBitmask::VkVideoEncodeIntraRefreshModeFlagBitsKHR:
             return string_VkVideoEncodeIntraRefreshModeFlagsKHR(value);
+        case vvl::FlagBitmask::VkVideoEncodePerPartitionFeedbackFlagBitsKHR:
+            return string_VkVideoEncodePerPartitionFeedbackFlagsKHR(value);
         case vvl::FlagBitmask::VkRenderingAttachmentFlagBitsKHR:
             return string_VkRenderingAttachmentFlagsKHR(value);
         case vvl::FlagBitmask::VkResolveImageFlagBitsKHR:
@@ -1678,14 +1788,14 @@ std::string stateless::Context::DescribeFlagBitmaskValue(vvl::FlagBitmask flag_b
             return string_VkDebugReportFlagsEXT(value);
         case vvl::FlagBitmask::VkExternalMemoryHandleTypeFlagBitsNV:
             return string_VkExternalMemoryHandleTypeFlagsNV(value);
-        case vvl::FlagBitmask::VkConditionalRenderingFlagBitsEXT:
-            return string_VkConditionalRenderingFlagsEXT(value);
         case vvl::FlagBitmask::VkSurfaceCounterFlagBitsEXT:
             return string_VkSurfaceCounterFlagsEXT(value);
         case vvl::FlagBitmask::VkDebugUtilsMessageSeverityFlagBitsEXT:
             return string_VkDebugUtilsMessageSeverityFlagsEXT(value);
         case vvl::FlagBitmask::VkDebugUtilsMessageTypeFlagBitsEXT:
             return string_VkDebugUtilsMessageTypeFlagsEXT(value);
+        case vvl::FlagBitmask::VkGpaSqShaderStageFlagBitsAMD:
+            return string_VkGpaSqShaderStageFlagsAMD(value);
         case vvl::FlagBitmask::VkSpirvResourceTypeFlagBitsEXT:
             return string_VkSpirvResourceTypeFlagsEXT(value);
         case vvl::FlagBitmask::VkGeometryFlagBitsKHR:
@@ -1756,8 +1866,14 @@ std::string stateless::Context::DescribeFlagBitmaskValue(vvl::FlagBitmask flag_b
             return string_VkIndirectCommandsInputModeFlagsEXT(value);
         case vvl::FlagBitmask::VkIndirectCommandsLayoutUsageFlagBitsEXT:
             return string_VkIndirectCommandsLayoutUsageFlagsEXT(value);
-        case vvl::FlagBitmask::VkAccelerationStructureCreateFlagBitsKHR:
-            return string_VkAccelerationStructureCreateFlagsKHR(value);
+        case vvl::FlagBitmask::VkDataGraphOpticalFlowGridSizeFlagBitsARM:
+            return string_VkDataGraphOpticalFlowGridSizeFlagsARM(value);
+        case vvl::FlagBitmask::VkDataGraphOpticalFlowCreateFlagBitsARM:
+            return string_VkDataGraphOpticalFlowCreateFlagsARM(value);
+        case vvl::FlagBitmask::VkDataGraphOpticalFlowImageUsageFlagBitsARM:
+            return string_VkDataGraphOpticalFlowImageUsageFlagsARM(value);
+        case vvl::FlagBitmask::VkDataGraphOpticalFlowExecuteFlagBitsARM:
+            return string_VkDataGraphOpticalFlowExecuteFlagsARM(value);
 
         default:
             std::ostringstream ss;
@@ -1778,6 +1894,10 @@ std::string stateless::Context::DescribeFlagBitmaskValue64(vvl::FlagBitmask flag
             return string_VkPipelineCreateFlags2(value);
         case vvl::FlagBitmask::VkAccessFlagBits3KHR:
             return string_VkAccessFlags3KHR(value);
+        case vvl::FlagBitmask::VkImageUsageFlagBits2KHR:
+            return string_VkImageUsageFlags2KHR(value);
+        case vvl::FlagBitmask::VkImageCreateFlagBits2KHR:
+            return string_VkImageCreateFlags2KHR(value);
         case vvl::FlagBitmask::VkTensorViewCreateFlagBitsARM:
             return string_VkTensorViewCreateFlagsARM(value);
         case vvl::FlagBitmask::VkMemoryDecompressionMethodFlagBitsEXT:

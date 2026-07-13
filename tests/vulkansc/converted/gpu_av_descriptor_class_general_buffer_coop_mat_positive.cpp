@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2020-2025 The Khronos Group Inc.
- * Copyright (c) 2020-2025 Valve Corporation
- * Copyright (c) 2020-2025 LunarG, Inc.
- * Copyright (c) 2020-2025 Google, Inc.
+ * Copyright (c) 2020-2026 The Khronos Group Inc.
+ * Copyright (c) 2020-2026 Valve Corporation
+ * Copyright (c) 2020-2026 LunarG, Inc.
+ * Copyright (c) 2020-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 #include "cooperative_matrix_helper.h"
 
 class PositiveGpuAVDescriptorClassGeneralBufferCoopMat : public GpuAVDescriptorClassGeneralBufferCoopMat {};
@@ -33,8 +33,8 @@ void GpuAVDescriptorClassGeneralBufferCoopMat::InitCooperativeMatrixKHR(bool saf
     RETURN_IF_SKIP(InitState());
 }
 
-void GpuAVDescriptorClassGeneralBufferCoopMat::BasicComputeTest(const char *shader, int source_type, VkDeviceSize buffer_size,
-                                                                const char *expected_error, uint32_t error_count) {
+void GpuAVDescriptorClassGeneralBufferCoopMat::BasicComputeTest(const char* shader, int source_type, VkDeviceSize buffer_size,
+                                                                const char* expected_error, uint32_t error_count) {
     const bool safe_mode = expected_error != nullptr;
     RETURN_IF_SKIP(InitCooperativeMatrixKHR(safe_mode));
     CooperativeMatrixHelper helper(*this);
@@ -73,7 +73,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBufferCoopMat, Basic) {
         GTEST_SKIP() << "16x16 Uint Property not found";
     }
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
          #version 450 core
          #pragma use_vulkan_memory_model
          #extension GL_KHR_memory_scope_semantics : enable
@@ -138,7 +138,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBufferCoopMat, BDA) {
         GTEST_SKIP() << "16x16 Uint Property not found";
     }
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
          #version 450 core
          #pragma use_vulkan_memory_model
          #extension GL_KHR_memory_scope_semantics : enable
@@ -175,7 +175,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBufferCoopMat, BDA) {
     descriptor_set.UpdateDescriptorSets();
 
     vkt::Buffer payload(*m_device, 512, 0, vkt::device_address);
-    auto *ssbo_ptr = static_cast<VkDeviceAddress *>(ssbo.Memory().Map());
+    auto* ssbo_ptr = static_cast<VkDeviceAddress*>(ssbo.Memory().Map());
     ssbo_ptr[0] = payload.Address();
 
     m_command_buffer.Begin();
@@ -194,7 +194,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBufferCoopMat, UnsafeOptimization) {
     AddRequiredFeature(vkt::Feature::shaderInt8);
     AddRequiredFeature(vkt::Feature::storageBuffer8BitAccess);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
          #version 450 core
          #pragma use_vulkan_memory_model
          #extension GL_KHR_memory_scope_semantics : enable
@@ -240,7 +240,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBufferCoopMat, Robustness) {
     AddRequiredFeature(vkt::Feature::storageBuffer8BitAccess);
     AddRequiredFeature(vkt::Feature::cooperativeMatrixRobustBufferAccess);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
          #version 450 core
          #pragma use_vulkan_memory_model
          #extension GL_KHR_memory_scope_semantics : enable
@@ -284,7 +284,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBufferCoopMat, RobustnessForced) {
         GTEST_SKIP() << "16x16 Uint Property not found";
     }
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
          #version 450 core
          #pragma use_vulkan_memory_model
          #extension GL_KHR_memory_scope_semantics : enable
@@ -329,7 +329,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBufferCoopMat, DynamicStrideAndElement
         GTEST_SKIP() << "16x16 Uint Property not found";
     }
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
          #version 450 core
          #pragma use_vulkan_memory_model
          #extension GL_KHR_memory_scope_semantics : enable
@@ -358,7 +358,7 @@ TEST_F(PositiveGpuAVDescriptorClassGeneralBufferCoopMat, DynamicStrideAndElement
     pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipe.descriptor_set_.UpdateDescriptorSets();
 
-    uint32_t *buffer_ptr = (uint32_t *)in_buffer.Memory().Map();
+    uint32_t* buffer_ptr = (uint32_t*)in_buffer.Memory().Map();
     buffer_ptr[0] = 16;  // stride
     buffer_ptr[1] = 4;   // element
 

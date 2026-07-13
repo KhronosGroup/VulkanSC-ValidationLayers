@@ -20,7 +20,7 @@
 
 namespace vvl {
 
-const std::string &GetPipelineBinaryInfoVUID(const Location &loc, PipelineBinaryInfoError error) {
+const std::string& GetPipelineBinaryInfoVUID(const Location& loc, PipelineBinaryInfoError error) {
     static const std::map<PipelineBinaryInfoError, std::array<Entry, 5>> errors{
         {PipelineBinaryInfoError::PNext_09616,
          {{
@@ -29,14 +29,6 @@ const std::string &GetPipelineBinaryInfoVUID(const Location &loc, PipelineBinary
              {Key(Func::vkCreateRayTracingPipelinesKHR), "VUID-vkCreateRayTracingPipelinesKHR-pNext-09616"},
              {Key(Func::vkCreateExecutionGraphPipelinesAMDX), "VUID-vkCreateExecutionGraphPipelinesAMDX-pNext-09616"},
              {Key(Func::vkCreateComputePipelines), "VUID-vkCreateComputePipelines-pNext-09616"},
-         }}},
-        {PipelineBinaryInfoError::PNext_09617,
-         {{
-             {Key(Func::vkCreateGraphicsPipelines), "VUID-vkCreateGraphicsPipelines-pNext-09617"},
-             {Key(Func::vkCreateRayTracingPipelinesNV), "VUID-vkCreateRayTracingPipelinesNV-pNext-09617"},
-             {Key(Func::vkCreateRayTracingPipelinesKHR), "VUID-vkCreateRayTracingPipelinesKHR-pNext-09617"},
-             {Key(Func::vkCreateExecutionGraphPipelinesAMDX), "VUID-vkCreateExecutionGraphPipelinesAMDX-pNext-09617"},
-             {Key(Func::vkCreateComputePipelines), "VUID-vkCreateComputePipelines-pNext-09617"},
          }}},
         {PipelineBinaryInfoError::BinaryCount_09620,
          {{
@@ -62,25 +54,9 @@ const std::string &GetPipelineBinaryInfoVUID(const Location &loc, PipelineBinary
              {Key(Func::vkCreateExecutionGraphPipelinesAMDX), "VUID-vkCreateExecutionGraphPipelinesAMDX-binaryCount-09622"},
              {Key(Func::vkCreateComputePipelines), "VUID-vkCreateComputePipelines-binaryCount-09622"},
          }}},
-        {PipelineBinaryInfoError::Flags_11311,
-         {{
-             {Key(Func::vkCreateGraphicsPipelines), "VUID-VkGraphicsPipelineCreateInfo-flags-11311"},
-             {Key(Func::vkCreateRayTracingPipelinesNV), "VUID-VkRayTracingPipelineCreateInfoNV-flags-11311"},
-             {Key(Func::vkCreateRayTracingPipelinesKHR), "VUID-VkRayTracingPipelineCreateInfoKHR-flags-11311"},
-             {Key(Func::vkCreateExecutionGraphPipelinesAMDX), "VUID-VkExecutionGraphPipelineCreateInfoAMDX-flags-11311"},
-             {Key(Func::vkCreateComputePipelines), "VUID-VkComputePipelineCreateInfo-flags-11311"},
-         }}},
-        {PipelineBinaryInfoError::Flags_11367,
-         {{
-             {Key(Func::vkCreateGraphicsPipelines), "UNASSIGNED"},  // not used
-             {Key(Func::vkCreateRayTracingPipelinesNV), "VUID-VkRayTracingPipelineCreateInfoNV-None-11368"},
-             {Key(Func::vkCreateRayTracingPipelinesKHR), "VUID-VkRayTracingPipelineCreateInfoKHR-None-11369"},
-             {Key(Func::vkCreateExecutionGraphPipelinesAMDX), "VUID-VkExecutionGraphPipelineCreateInfoAMDX-None-11363"},
-             {Key(Func::vkCreateComputePipelines), "VUID-VkComputePipelineCreateInfo-None-11367"},
-         }}},
     };
 
-    const auto &result = FindVUID(error, loc, errors);
+    const auto& result = FindVUID(error, loc, errors);
     assert(!result.empty());
     if (result.empty()) {
         static const std::string unhandled("UNASSIGNED-Stateless-unhandled-pipelinebinaryinfo-error");
@@ -124,9 +100,128 @@ const char *GetPipelineCreateFlagVUID(const Location &loc, PipelineCreateFlagErr
                 loc.function == Func::vkCreateRayTracingPipelinesNV   ? "VUID-VkRayTracingPipelineCreateInfoNV-flags-07369" :
                 loc.function == Func::vkCreateDataGraphPipelinesARM   ? "VUID-VkDataGraphPipelineCreateInfoARM-flags-09773" :
                 kVUIDUndefined;
+        case PipelineCreateFlagError::PNext_09617:
+            return
+                loc.function == Func::vkCreateGraphicsPipelines       ? "VUID-vkCreateGraphicsPipelines-pNext-09617" :
+                loc.function == Func::vkCreateComputePipelines        ? "VUID-vkCreateComputePipelines-pNext-09617" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR  ? "VUID-vkCreateRayTracingPipelinesKHR-pNext-09617" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV   ? "VUID-vkCreateRayTracingPipelinesNV-pNext-09617" :
+                kVUIDUndefined;
+        case PipelineCreateFlagError::Flags_11311:
+            return
+                loc.function == Func::vkCreateGraphicsPipelines       ? "VUID-VkGraphicsPipelineCreateInfo-flags-11311" :
+                loc.function == Func::vkCreateComputePipelines        ? "VUID-VkComputePipelineCreateInfo-flags-11311" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR  ? "VUID-VkRayTracingPipelineCreateInfoKHR-flags-11311" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV   ? "VUID-VkRayTracingPipelineCreateInfoNV-flags-11311" :
+                kVUIDUndefined;
+        case PipelineCreateFlagError::Flags_11367:
+            return
+                // vkCreateGraphicsPipelines not used
+                loc.function == Func::vkCreateComputePipelines        ? "VUID-VkComputePipelineCreateInfo-None-11367" :
+                loc.function == Func::vkCreateRayTracingPipelinesKHR  ? "VUID-VkRayTracingPipelineCreateInfoKHR-None-11369" :
+                loc.function == Func::vkCreateRayTracingPipelinesNV   ? "VUID-VkRayTracingPipelineCreateInfoNV-None-11368" :
+                kVUIDUndefined;
     }
     return "UNASSIGNED-CoreChecks-unhandled-pipeline-create-flags";
 }
 // clang-format on
+
+const char* GetAddressFlagVUID(const Location& loc, AddressFlagError error) {
+    if (error == AddressFlagError::AliasesStorageBuffer_13100) {
+        switch (loc.function) {
+            case Func::vkCreateAccelerationStructure2KHR:
+                return "VUID-VkAccelerationStructureCreateInfo2KHR-addressFlags-13100";
+            case Func::vkCmdBindIndexBuffer3KHR:
+                return "VUID-VkBindIndexBuffer3InfoKHR-addressFlags-13100";
+            case Func::vkCmdBindVertexBuffers3KHR:
+                return "VUID-VkBindVertexBuffer3InfoKHR-addressFlags-13100";
+            case Func::vkCmdBindTransformFeedbackBuffers2EXT:
+            case Func::vkCmdBeginTransformFeedback2EXT:
+            case Func::vkCmdEndTransformFeedback2EXT:
+            case Func::vkCmdDrawIndirectByteCount2EXT:
+                return "VUID-VkBindTransformFeedbackBuffer2InfoEXT-addressFlags-13100";
+            case Func::vkCmdBeginConditionalRendering2EXT:
+                return "VUID-VkConditionalRenderingBeginInfo2EXT-addressFlags-13100";
+            case Func::vkCmdCopyMemoryToImageKHR:
+            case Func::vkCmdCopyImageToMemoryKHR:
+                return "VUID-VkDeviceMemoryImageCopyKHR-addressFlags-13100";
+            case Func::vkCmdDispatchIndirect2KHR:
+                return "VUID-VkDispatchIndirect2InfoKHR-addressFlags-13100";
+            case Func::vkCmdWriteMarkerToMemoryAMD:
+                return "VUID-VkMemoryMarkerInfoAMD-dstFlags-13100";
+            case Func::vkCmdCopyQueryPoolResultsToMemoryKHR:
+                return "VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-dstFlags-13100";
+            case Func::vkCmdFillMemoryKHR:
+                return "VUID-vkCmdFillMemoryKHR-dstFlags-13100";
+            case Func::vkCmdUpdateMemoryKHR:
+                return "VUID-vkCmdUpdateMemoryKHR-dstFlags-13100";
+            case Func::vkCmdDrawIndirect2KHR:
+            case Func::vkCmdDrawIndexedIndirect2KHR:
+            case Func::vkCmdDrawMeshTasksIndirect2EXT:
+                return "VUID-VkDrawIndirect2InfoKHR-addressFlags-13100";
+            case Func::vkCmdDrawIndirectCount2KHR:
+            case Func::vkCmdDrawIndexedIndirectCount2KHR:
+            case Func::vkCmdDrawMeshTasksIndirectCount2EXT:
+                return (loc.field == Field::addressFlags) ? "VUID-VkDrawIndirectCount2InfoKHR-addressFlags-13100"
+                                                          : "VUID-VkDrawIndirectCount2InfoKHR-countAddressFlags-13100";
+            case Func::vkCmdPipelineBarrier2KHR:
+            case Func::vkCmdPipelineBarrier2:
+                return "VUID-VkMemoryRangeBarrierKHR-addressFlags-13100";
+            case Func::vkCmdCopyMemoryKHR:
+                return (loc.field == Field::srcFlags) ? "VUID-VkDeviceMemoryCopyKHR-srcFlags-13100"
+                                                      : "VUID-VkDeviceMemoryCopyKHR-dstFlags-13100";
+            default:
+                break;
+        }
+    } else if (error == AddressFlagError::AliasesTransformFeedback_13101) {
+        switch (loc.function) {
+            case Func::vkCreateAccelerationStructure2KHR:
+                return "VUID-VkAccelerationStructureCreateInfo2KHR-addressFlags-13101";
+            case Func::vkCmdBindIndexBuffer3KHR:
+                return "VUID-VkBindIndexBuffer3InfoKHR-addressFlags-13101";
+            case Func::vkCmdBindVertexBuffers3KHR:
+                return "VUID-VkBindVertexBuffer3InfoKHR-addressFlags-13101";
+            case Func::vkCmdBindTransformFeedbackBuffers2EXT:
+            case Func::vkCmdBeginTransformFeedback2EXT:
+            case Func::vkCmdEndTransformFeedback2EXT:
+            case Func::vkCmdDrawIndirectByteCount2EXT:
+                return "VUID-VkBindTransformFeedbackBuffer2InfoEXT-addressFlags-13101";
+            case Func::vkCmdBeginConditionalRendering2EXT:
+                return "VUID-VkConditionalRenderingBeginInfo2EXT-addressFlags-13101";
+            case Func::vkCmdCopyMemoryToImageKHR:
+            case Func::vkCmdCopyImageToMemoryKHR:
+                return "VUID-VkDeviceMemoryImageCopyKHR-addressFlags-13101";
+            case Func::vkCmdDispatchIndirect2KHR:
+                return "VUID-VkDispatchIndirect2InfoKHR-addressFlags-13101";
+            case Func::vkCmdWriteMarkerToMemoryAMD:
+                return "VUID-VkMemoryMarkerInfoAMD-dstFlags-13101";
+            case Func::vkCmdCopyQueryPoolResultsToMemoryKHR:
+                return "VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-dstFlags-13101";
+            case Func::vkCmdFillMemoryKHR:
+                return "VUID-vkCmdFillMemoryKHR-dstFlags-13101";
+            case Func::vkCmdUpdateMemoryKHR:
+                return "VUID-vkCmdUpdateMemoryKHR-dstFlags-13101";
+            case Func::vkCmdDrawIndirect2KHR:
+            case Func::vkCmdDrawIndexedIndirect2KHR:
+            case Func::vkCmdDrawMeshTasksIndirect2EXT:
+                return "VUID-VkDrawIndirect2InfoKHR-addressFlags-13101";
+            case Func::vkCmdDrawIndirectCount2KHR:
+            case Func::vkCmdDrawIndexedIndirectCount2KHR:
+            case Func::vkCmdDrawMeshTasksIndirectCount2EXT:
+                return (loc.field == Field::addressFlags) ? "VUID-VkDrawIndirectCount2InfoKHR-addressFlags-13101"
+                                                          : "VUID-VkDrawIndirectCount2InfoKHR-countAddressFlags-13101";
+            case Func::vkCmdPipelineBarrier2KHR:
+            case Func::vkCmdPipelineBarrier2:
+                return "VUID-VkMemoryRangeBarrierKHR-addressFlags-13101";
+            case Func::vkCmdCopyMemoryKHR:
+                return (loc.field == Field::srcFlags) ? "VUID-VkDeviceMemoryCopyKHR-srcFlags-13101"
+                                                      : "VUID-VkDeviceMemoryCopyKHR-dstFlags-13101";
+            default:
+                break;
+        }
+    }
+    assert(false);
+    return "UNASSIGNED-Stateless-unhandled-addressFlags";
+}
 
 }  // namespace vvl

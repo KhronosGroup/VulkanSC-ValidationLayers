@@ -3,6 +3,7 @@
  * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (C) 2015-2025 Google Inc.
  * Copyright (C) 2025 Arm Limited.
+ * Copyright (C) 2026 Qualcomm Technologies, Inc.
  * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -296,6 +297,8 @@ class Context {
                             uint32_t count, const VkFlags *array, bool count_required, const char *count_required_vuid,
                             const char *array_required_vuid) const;
 
+    bool ValidateDeviceAddressFlags(const Location& loc, const VkAddressCommandFlagsKHR flags) const;
+
     template <typename T>
     ValidValue IsValidEnumValue(T value) const;
     template <typename T>
@@ -312,8 +315,7 @@ class Context {
     std::string DescribeFlagBitmaskValue64(vvl::FlagBitmask flag_bitmask, VkFlags64 value) const;
 };
 
-class Instance : public vvl::base::Instance {
-    using BaseClass = vvl::base::Instance;
+class Instance : public vvl::BaseInstance {
     using Func = vvl::Func;
     using Struct = vvl::Struct;
     using Field = vvl::Field;
@@ -323,7 +325,7 @@ class Instance : public vvl::base::Instance {
     vvl::unordered_map<VkPhysicalDevice, DeviceExtensions> physical_device_extensions{};
     // We have a copy of this in Stateless and vvl::Instance, could move the base::Instance, but we don't have a way to
 
-    Instance(vvl::dispatch::Instance *dispatch) : BaseClass(dispatch, LayerObjectTypeParameterValidation) {}
+    Instance(vvl::DispatchInstance* dispatch) : BaseInstance(dispatch, LayerObjectTypeParameterValidation) {}
 
     bool OutputExtensionError(const Location &loc, const vvl::Extensions &exentsions) const;
 
@@ -341,8 +343,8 @@ class Instance : public vvl::base::Instance {
     bool CheckPromotedApiAgainstVulkanVersion(VkPhysicalDevice pdev, const Location &loc, const uint32_t promoted_version) const;
 
     template <typename ExtensionState>
-    bool ValidateExtensionReqs(const ExtensionState &extensions, const char *vuid, const char *extension_type,
-                               vvl::Extension extension, const Location &extension_loc) const;
+    bool ValidateExtensionReqs(const ExtensionState& extensions, bool is_instance, vvl::Extension extension,
+                               const Location& extension_loc) const;
 
     bool PreCallValidateCreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator,
                                        VkInstance *pInstance, const ErrorObject &error_obj) const override;
@@ -442,15 +444,14 @@ class Instance : public vvl::base::Instance {
 #include "generated/stateless_instance_methods.h"
 };
 
-class Device : public vvl::base::Device {
-    using BaseClass = vvl::base::Device;
+class Device : public vvl::BaseDevice {
     using Func = vvl::Func;
     using Struct = vvl::Struct;
     using Field = vvl::Field;
 
   public:
-    Device(vvl::dispatch::Device *dev, Instance *instance_vo)
-        : BaseClass(dev, instance_vo, LayerObjectTypeParameterValidation), instance(instance_vo) {}
+    Device(vvl::DispatchDevice* dev, Instance* instance_vo)
+        : BaseDevice(dev, instance_vo, LayerObjectTypeParameterValidation), instance(instance_vo) {}
     ~Device() {}
 
     Instance *instance;
@@ -484,6 +485,9 @@ class Device : public vvl::base::Device {
 
     bool ValidateSubpassGraphicsFlags(const VkRenderPassCreateInfo2 &create_info, uint32_t subpass, VkPipelineStageFlags2 stages,
                                       const char *vuid, const Location &loc) const;
+
+    bool ValidateRenderPassTileShadingCreateInfo(const VkRenderPassTileShadingCreateInfoQCOM &rp_tile_shading_ci,
+                                                 const Location &rp_tile_shading_loc) const;
 
     bool ValidateCreateRenderPass(const VkRenderPassCreateInfo2 &create_info, const ErrorObject &error_obj) const;
 
@@ -523,32 +527,40 @@ class Device : public vvl::base::Device {
                                                                    VkDeviceAddress indirectCommandsCountAddress,
                                                                    uint32_t maxDecompressionCount, uint32_t stride,
                                                                    const Context& context) const;
-    bool manual_PreCallValidateCreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo *pCreateInfo,
-                                               const VkAllocationCallbacks *pAllocator, VkQueryPool *pQueryPool,
-                                               const Context &context) const;
+    bool manual_PreCallValidateCreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo,
+                                               const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool,
+                                               const Context& context) const;
 
-    bool manual_PreCallValidateCreateBuffer(VkDevice device, const VkBufferCreateInfo *pCreateInfo,
-                                            const VkAllocationCallbacks *pAllocator, VkBuffer *pBuffer,
-                                            const Context &context) const;
+    bool manual_PreCallValidateCreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo,
+                                            const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer,
+                                            const Context& context) const;
 
-    bool manual_PreCallValidateCreateImage(VkDevice device, const VkImageCreateInfo *pCreateInfo,
-                                           const VkAllocationCallbacks *pAllocator, VkImage *pImage, const Context &context) const;
-    bool ValidateCreateImageSparse(const VkImageCreateInfo &create_info, const Location &create_info_loc) const;
-    bool ValidateCreateImageFragmentShadingRate(const VkImageCreateInfo &create_info, const Location &create_info_loc) const;
-    bool ValidateCreateImageCornerSampled(const VkImageCreateInfo &create_info, const Location &create_info_loc) const;
-    bool ValidateCreateImageStencilUsage(const VkImageCreateInfo &create_info, const Location &create_info_loc) const;
-    bool ValidateCreateImageCompressionControl(const Context &context, const VkImageCreateInfo &create_info,
-                                               const Location &create_info_loc) const;
-    bool ValidateCreateImageSwapchain(const VkImageCreateInfo &create_info, const Location &create_info_loc) const;
-    bool ValidateCreateImageFormatList(const VkImageCreateInfo &create_info, const Location &create_info_loc) const;
-    bool ValidateCreateImageMetalObject(const VkImageCreateInfo &create_info, const Location &create_info_loc) const;
-    bool ValidateCreateImageDrmFormatModifiers(const VkImageCreateInfo &create_info, const Location &create_info_loc,
-                                               std::vector<uint64_t> &image_create_drm_format_modifiers) const;
+    bool manual_PreCallValidateCreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo,
+                                           const VkAllocationCallbacks* pAllocator, VkImage* pImage, const Context& context) const;
+    bool ValidateCreateImageSparse(const VkImageCreateInfo& create_info, const Location& create_info_loc,
+                                   const VkImageCreateFlags2KHR create_flags, const Location& create_flags_loc,
+                                   const VkImageCreateFlags2KHR usage, const Location& usage_loc) const;
+    bool ValidateCreateImageFragmentShadingRate(const VkImageCreateInfo& create_info, const Location& create_info_loc,
+                                                const VkImageUsageFlags2KHR usage, const Location& usage_loc) const;
+    bool ValidateCreateImageCornerSampled(const VkImageCreateInfo& create_info, const Location& create_info_loc,
+                                          const VkImageCreateFlags2KHR create_flags, const Location& create_flags_loc) const;
+    bool ValidateCreateImageStencilUsage(const VkImageCreateInfo& create_info, const Location& create_info_loc,
+                                         const VkImageUsageFlags2KHR usage, const Location& usage_loc) const;
+    bool ValidateCreateImageCompressionControl(const Context& context, const VkImageCreateInfo& create_info,
+                                               const Location& create_info_loc) const;
+    bool ValidateCreateImageSwapchain(const VkImageCreateInfo& create_info, const Location& create_info_loc,
+                                      const VkImageCreateFlags2KHR create_flags) const;
+    bool ValidateCreateImageFormatList(const VkImageCreateInfo& create_info, const Location& create_info_loc,
+                                       const VkImageCreateFlags2KHR create_flags) const;
+    bool ValidateCreateImageMetalObject(const VkImageCreateInfo& create_info, const Location& create_info_loc) const;
+    bool ValidateCreateImageDrmFormatModifiers(const VkImageCreateInfo& create_info, const Location& create_info_loc,
+                                               std::vector<uint64_t>& image_create_drm_format_modifiers,
+                                               const VkImageCreateFlags2KHR create_flags) const;
 
-    bool ValidateImageViewCreateInfo(const VkImageViewCreateInfo &create_info, const Location &create_info_loc) const;
-    bool manual_PreCallValidateCreateImageView(VkDevice device, const VkImageViewCreateInfo *pCreateInfo,
-                                               const VkAllocationCallbacks *pAllocator, VkImageView *pView,
-                                               const Context &context) const;
+    bool ValidateImageViewCreateInfo(const VkImageViewCreateInfo& create_info, const Location& create_info_loc) const;
+    bool manual_PreCallValidateCreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo,
+                                               const VkAllocationCallbacks* pAllocator, VkImageView* pView,
+                                               const Context& context) const;
 
     bool manual_PreCallValidateGetDeviceImageSubresourceLayout(VkDevice device, const VkDeviceImageSubresourceInfo *pInfo,
                                                                VkSubresourceLayout2 *pLayout, const Context &context) const;
@@ -578,12 +590,13 @@ class Device : public vvl::base::Device {
                                                           const Location& loc) const;
     bool ValidatePipelineShaderStageCreateInfoCommon(const Context &context, const VkPipelineShaderStageCreateInfo &create_info,
                                                      const Location &loc) const;
-    bool ValidatePipelineBinaryInfo(const void* next, VkPipelineCreateFlags flags, VkPipelineCache pipelineCache,
-                                    VkPipelineLayout layout, const Location& loc) const;
+    bool ValidatePipelineBinaryInfo(const void* next, VkPipelineCreateFlags2 create_flags_2, VkPipelineCache pipeline_cache,
+                                    const Location& loc) const;
     bool ValidatePipelineRenderingCreateInfo(const Context &context, const VkPipelineRenderingCreateInfo &rendering_struct,
                                              const Location &loc) const;
     bool ValidateCreateGraphicsPipelinesFlags(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const;
-    bool ValidateCreatePipelinesFlagsCommon(const VkPipelineCreateFlags2 flags, const Location &flags_loc) const;
+    bool ValidateCreatePipelinesFlagsCommon(const VkPipelineCreateFlags2 flags, const Location& flags_loc,
+                                            VkPipelineCache pipeline_cache, VkPipelineLayout layout) const;
     bool manual_PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                        const VkGraphicsPipelineCreateInfo *pCreateInfos,
                                                        const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
@@ -691,9 +704,43 @@ class Device : public vvl::base::Device {
 
     bool manual_PreCallValidateCmdUpdateBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
                                                VkDeviceSize dataSize, const void *pData, const Context &context) const;
+    bool manual_PreCallValidateCmdUpdateMemoryKHR(VkCommandBuffer commandBuffer, const VkDeviceAddressRangeKHR* pDstRange,
+                                                  VkAddressCommandFlagsKHR dstFlags, VkDeviceSize dataSize, const void* pData,
+                                                  const Context& context) const;
+    bool manual_PreCallValidateCmdCopyMemoryToImageKHR(VkCommandBuffer commandBuffer,
+                                                       const VkCopyDeviceMemoryImageInfoKHR* pCopyMemoryInfo,
+                                                       const Context& context) const;
+    bool manual_PreCallValidateCmdCopyImageToMemoryKHR(VkCommandBuffer commandBuffer,
+                                                       const VkCopyDeviceMemoryImageInfoKHR* pCopyMemoryInfo,
+                                                       const Context& context) const;
+    bool manual_PreCallValidateCmdCopyMemoryKHR(VkCommandBuffer commandBuffer, const VkCopyDeviceMemoryInfoKHR* pCopyMemoryInfo,
+                                                const Context& context) const;
+    bool manual_PreCallValidateCmdBeginConditionalRendering2EXT(
+        VkCommandBuffer commandBuffer, const VkConditionalRenderingBeginInfo2EXT* pConditionalRenderingBegin,
+        const Context& context) const;
+    bool manual_PreCallValidateCmdBindVertexBuffers3KHR(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount,
+                                                        const VkBindVertexBuffer3InfoKHR* pBindingInfos,
+                                                        const Context& context) const;
+    bool manual_PreCallValidateCmdBindTransformFeedbackBuffers2EXT(VkCommandBuffer commandBuffer, uint32_t firstBinding,
+                                                                   uint32_t bindingCount,
+                                                                   const VkBindTransformFeedbackBuffer2InfoEXT* pBindingInfos,
+                                                                   const Context& context) const;
+    bool manual_PreCallValidateCmdEndTransformFeedback2EXT(VkCommandBuffer commandBuffer, uint32_t firstCounterRange,
+                                                           uint32_t counterRangeCount,
+                                                           const VkBindTransformFeedbackBuffer2InfoEXT* pCounterInfos,
+                                                           const Context& context) const;
+    bool manual_PreCallValidateCmdDrawIndirectByteCount2EXT(VkCommandBuffer commandBuffer, uint32_t instanceCount,
+                                                            uint32_t firstInstance,
+                                                            const VkBindTransformFeedbackBuffer2InfoEXT* pCounterInfo,
+                                                            uint32_t counterOffset, uint32_t vertexStride,
+                                                            const Context& context) const;
+    bool manual_PreCallValidateCmdBindIndexBuffer3KHR(VkCommandBuffer commandBuffer, const VkBindIndexBuffer3InfoKHR* pInfo,
+                                                      const Context& context) const;
 
     bool manual_PreCallValidateCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
                                              VkDeviceSize size, uint32_t data, const Context &context) const;
+    bool manual_PreCallValidateCmdFillMemoryKHR(VkCommandBuffer commandBuffer, const VkDeviceAddressRangeKHR* pDstRange,
+                                                VkAddressCommandFlagsKHR dstFlags, uint32_t data, const Context& context) const;
 
     bool manual_PreCallValidateCmdBindDescriptorBuffersEXT(VkCommandBuffer commandBuffer, uint32_t bufferCount,
                                                            const VkDescriptorBufferBindingInfoEXT *pBindingInfos,
@@ -745,11 +792,18 @@ class Device : public vvl::base::Device {
                                                              const VkAllocationCallbacks *pAllocator,
                                                              VkAccelerationStructureNV *pAccelerationStructure,
                                                              const Context &context) const;
+    bool ValidateCreateAccelerationStructure(const VkAccelerationStructureCreateFlagsKHR create_flags,
+                                             const void* create_info_pNext, const Location& create_info_loc) const;
     bool manual_PreCallValidateCreateAccelerationStructureKHR(VkDevice device,
                                                               const VkAccelerationStructureCreateInfoKHR *pCreateInfo,
                                                               const VkAllocationCallbacks *pAllocator,
                                                               VkAccelerationStructureKHR *pAccelerationStructure,
                                                               const Context &context) const;
+    bool manual_PreCallValidateCreateAccelerationStructure2KHR(VkDevice device,
+                                                               const VkAccelerationStructureCreateInfo2KHR* pCreateInfo,
+                                                               const VkAllocationCallbacks* pAllocator,
+                                                               VkAccelerationStructureKHR* pAccelerationStructure,
+                                                               const Context& context) const;
     bool manual_PreCallValidateDestroyAccelerationStructureKHR(VkDevice device, VkAccelerationStructureKHR accelerationStructure,
                                                                const VkAllocationCallbacks *pAllocator,
                                                                const Context &context) const;
@@ -830,6 +884,10 @@ class Device : public vvl::base::Device {
                                                             uint32_t counterBufferCount, const VkBuffer *pCounterBuffers,
                                                             const VkDeviceSize *pCounterBufferOffsets,
                                                             const Context &context) const;
+    bool manual_PreCallValidateCmdBeginTransformFeedback2EXT(VkCommandBuffer commandBuffer, uint32_t firstCounterRange,
+                                                             uint32_t counterRangeCount,
+                                                             const VkBindTransformFeedbackBuffer2InfoEXT* pCounterInfos,
+                                                             const Context& context) const;
 
     bool manual_PreCallValidateCmdEndTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32_t firstCounterBuffer,
                                                           uint32_t counterBufferCount, const VkBuffer *pCounterBuffers,
@@ -839,6 +897,26 @@ class Device : public vvl::base::Device {
                                                            uint32_t firstInstance, VkBuffer counterBuffer,
                                                            VkDeviceSize counterBufferOffset, uint32_t counterOffset,
                                                            uint32_t vertexStride, const Context &context) const;
+    bool ValidateDrawIndirect2Info(VkCommandBuffer commandBuffer, const VkDrawIndirect2InfoKHR& info, const Location& info_loc,
+                                   const Context& context) const;
+    bool manual_PreCallValidateCmdDrawIndirect2KHR(VkCommandBuffer commandBuffer, const VkDrawIndirect2InfoKHR* pInfo,
+                                                   const Context& context) const;
+    bool manual_PreCallValidateCmdDrawIndexedIndirect2KHR(VkCommandBuffer commandBuffer, const VkDrawIndirect2InfoKHR* pInfo,
+                                                          const Context& context) const;
+    bool manual_PreCallValidateCmdDrawMeshTasksIndirect2EXT(VkCommandBuffer commandBuffer, const VkDrawIndirect2InfoKHR* pInfo,
+                                                            const Context& context) const;
+    bool ValidateDrawIndirectCount2Info(VkCommandBuffer commandBuffer, const VkDrawIndirectCount2InfoKHR& info,
+                                        const Location& info_loc, const Context& context) const;
+    bool manual_PreCallValidateCmdDrawIndirectCount2KHR(VkCommandBuffer commandBuffer, const VkDrawIndirectCount2InfoKHR* pInfo,
+                                                        const Context& context) const;
+    bool manual_PreCallValidateCmdDrawIndexedIndirectCount2KHR(VkCommandBuffer commandBuffer,
+                                                               const VkDrawIndirectCount2InfoKHR* pInfo,
+                                                               const Context& context) const;
+    bool manual_PreCallValidateCmdDrawMeshTasksIndirectCount2EXT(VkCommandBuffer commandBuffer,
+                                                                 const VkDrawIndirectCount2InfoKHR* pInfo,
+                                                                 const Context& context) const;
+    bool manual_PreCallValidateCmdDispatchIndirect2KHR(VkCommandBuffer commandBuffer, const VkDispatchIndirect2InfoKHR* pInfo,
+                                                       const Context& context) const;
 
     bool manual_PreCallValidateCreateSamplerYcbcrConversion(VkDevice device, const VkSamplerYcbcrConversionCreateInfo *pCreateInfo,
                                                             const VkAllocationCallbacks *pAllocator,
@@ -1084,9 +1162,9 @@ class Device : public vvl::base::Device {
                                                   const VkImageSubresourceRange *pRanges, const Context &context) const;
 
     bool ValidateMultiviewPerViewRenderAreasRenderPassBeginInfo(
-        VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* rp_begin_info, const VkRenderingInfo* rendering_info,
+        const LogObjectList &objlist, const VkRenderPassBeginInfo* rp_begin_info, const VkRenderingInfo* rendering_info,
         const VkMultiviewPerViewRenderAreasRenderPassBeginInfoQCOM& multiview_per_view_info, const Location& loc) const;
-    bool ValidateRenderPassStripeBeginInfo(VkCommandBuffer commandBuffer, const void *pNext, const VkRect2D render_area,
+    bool ValidateRenderPassStripeBeginInfo(const LogObjectList &objlist, const void *pNext, const VkRect2D render_area,
                                            const Location &loc) const;
     bool ValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *const rp_begin,
                                     const ErrorObject &error_obj) const;
@@ -1097,24 +1175,26 @@ class Device : public vvl::base::Device {
     bool manual_PreCallValidateCmdBeginRendering(VkCommandBuffer commandBuffer, const VkRenderingInfo *pRenderingInfo,
                                                  const Context &context) const;
 
-    bool ValidateRenderingAttachmentLayout(VkCommandBuffer commandBuffer, const VkRenderingAttachmentInfo &attachment_info,
+    bool ValidateRenderingInfo(const LogObjectList &objlist, const VkRenderingInfo &rendering_info,
+                               const Location &rendering_info_loc) const;
+    bool ValidateRenderingAttachmentLayout(const LogObjectList &objlist, const VkRenderingAttachmentInfo &attachment_info,
                                            const Location &attachment_loc) const;
-    bool ValidateRenderingAttachmentFeedbackLoopInfo(VkCommandBuffer commandBuffer,
+    bool ValidateRenderingAttachmentFeedbackLoopInfo(const LogObjectList &objlist,
                                                      const VkRenderingAttachmentInfo &attachment_info,
                                                      const Location &attachment_loc) const;
-    bool ValidateRenderingCustomResolve(VkCommandBuffer commandBuffer, VkRenderingFlags rendering_flags,
+    bool ValidateRenderingCustomResolve(const LogObjectList &objlist, VkRenderingFlags rendering_flags,
                                         VkResolveModeFlagBits resolve_mode, const Location &attachment_loc) const;
-    bool ValidateBeginRenderingColorAttachment(VkCommandBuffer commandBuffer, const VkRenderingInfo &rendering_info,
+    bool ValidateBeginRenderingColorAttachment(const LogObjectList &objlist, const VkRenderingInfo &rendering_info,
                                                const Location &rendering_info_loc) const;
-    bool ValidateBeginRenderingDepthAttachment(VkCommandBuffer commandBuffer, const VkRenderingInfo &rendering_info,
+    bool ValidateBeginRenderingDepthAttachment(const LogObjectList &objlist, const VkRenderingInfo &rendering_info,
                                                const Location &rendering_info_loc) const;
-    bool ValidateBeginRenderingStencilAttachment(VkCommandBuffer commandBuffer, const VkRenderingInfo &rendering_info,
+    bool ValidateBeginRenderingStencilAttachment(const LogObjectList &objlist, const VkRenderingInfo &rendering_info,
                                                  const Location &rendering_info_loc) const;
     bool ValidateBeginRenderingAttachmentFlagsInfo(VkCommandBuffer commandBuffer, const VkRenderingInfo &rendering_info,
                                                    const Location &rendering_info_loc) const;
 
     bool ValidateBeginRenderingFragmentShadingRateAttachment(
-        VkCommandBuffer commandBuffer, const VkRenderingInfo &rendering_info,
+        const LogObjectList &objlist, const VkRenderingInfo &rendering_info,
         const VkRenderingFragmentShadingRateAttachmentInfoKHR &rendering_fsr_attachment_info,
         const Location &rendering_info_loc) const;
 
@@ -1124,12 +1204,18 @@ class Device : public vvl::base::Device {
     bool manual_PreCallValidateGetQueryPoolResults(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount,
                                                    size_t dataSize, void *pData, VkDeviceSize stride, VkQueryResultFlags flags,
                                                    const Context &context) const;
+    bool manual_PreCallValidateCmdCopyQueryPoolResultsToMemoryKHR(VkCommandBuffer commandBuffer, VkQueryPool queryPool,
+                                                                  uint32_t firstQuery, uint32_t queryCount,
+                                                                  const VkStridedDeviceAddressRangeKHR* pDstRange,
+                                                                  VkAddressCommandFlagsKHR dstFlags,
+                                                                  VkQueryResultFlags queryResultFlags,
+                                                                  const Context& context) const;
     bool manual_PreCallValidateCmdBeginConditionalRenderingEXT(VkCommandBuffer commandBuffer,
                                                                const VkConditionalRenderingBeginInfoEXT *pConditionalRenderingBegin,
                                                                const Context &context) const;
 
-    bool ValidateDeviceImageMemoryRequirements(VkDevice device, const VkDeviceImageMemoryRequirements &memory_requirements,
-                                               const Location &loc) const;
+    bool ValidateDeviceImageMemoryRequirements(VkDevice device, const VkDeviceImageMemoryRequirements& memory_requirements,
+                                               const Context& context) const;
 
     bool manual_PreCallValidateCmdSetDiscardRectangleEnableEXT(VkCommandBuffer commandBuffer, VkBool32 discardRectangleEnable,
                                                                const Context &context) const;
@@ -1246,6 +1332,9 @@ class Device : public vvl::base::Device {
     bool ValidateAllocateMemoryExternal(VkDevice device, const VkMemoryAllocateInfo &allocate_info, VkMemoryAllocateFlags flags,
                                         const Location &allocate_info_loc) const;
 
+    bool manual_PreCallValidateCmdSetPrimitiveRestartIndexEXT(VkCommandBuffer commandBuffer, uint32_t primitiveRestartIndex,
+                                                              const Context& context) const;
+
     bool ValidateVkConvertCooperativeVectorMatrixInfoNV(const LogObjectList &objlist,
                                                         const VkConvertCooperativeVectorMatrixInfoNV &info,
                                                         const Location &info_loc) const;
@@ -1288,6 +1377,13 @@ class Device : public vvl::base::Device {
                                                                      VkTilePropertiesQCOM* pProperties,
                                                                      const Context &context) const;
     bool ValidateTileMemorySizeInfo(const VkTileMemorySizeInfoQCOM& create_info, const Location& loc) const;
+    bool manual_PreCallValidateCmdBeginPerTileExecutionQCOM(VkCommandBuffer commandBuffer,
+                                                            const VkPerTileBeginInfoQCOM *pPerTileBeginInfo,
+                                                            const Context &context) const;
+    bool manual_PreCallValidateCmdDispatchTileQCOM(VkCommandBuffer commandBuffer, const VkDispatchTileInfoQCOM* pDispatchTileInfo,
+                                                   const Context& context) const;
+    bool manual_PreCallValidateQueueSetPerfHintQCOM(VkQueue queue, const VkPerfHintInfoQCOM *pPerfHintInfo,
+                                                    const Context &context) const;
 
 #include "generated/stateless_device_methods.h"
 };

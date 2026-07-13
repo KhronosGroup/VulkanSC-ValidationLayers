@@ -45,11 +45,9 @@ ExtensionData GetExtensionData(vvl::Extension extension);
 
 // We currently only check if the extension is enabled, if we decide in the future to check for support, instance extensions
 // we can try and use DispatchEnumerateInstanceExtensionProperties, but will likely run into many loader related issues.
-class Instance : public vvl::base::Instance {
-    using BaseClass = vvl::base::Instance;
-
+class Instance : public vvl::BaseInstance {
   public:
-    Instance(vvl::dispatch::Instance* dispatch) : BaseClass(dispatch, LayerObjectTypeLegacy) {}
+    Instance(vvl::DispatchInstance* dispatch) : BaseInstance(dispatch, LayerObjectTypeLegacy) {}
 
     // Special functions done in legacy_manual.cpp
     bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
@@ -85,17 +83,51 @@ class Instance : public vvl::base::Instance {
                                                                      uint32_t* pPropertyCount,
                                                                      VkSparseImageFormatProperties* pProperties,
                                                                      const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
+                                                                VkSurfaceCapabilitiesKHR* pSurfaceCapabilities,
+                                                                const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
+                                                           uint32_t* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats,
+                                                           const ErrorObject& error_obj) const override;
+
+    // Make sure we only report each warning once for the user
+    mutable bool reported_GetPhysicalDeviceFeatures = false;
+    mutable bool reported_GetPhysicalDeviceFormatProperties = false;
+    mutable bool reported_GetPhysicalDeviceImageFormatProperties = false;
+    mutable bool reported_GetPhysicalDeviceProperties = false;
+    mutable bool reported_GetPhysicalDeviceQueueFamilyProperties = false;
+    mutable bool reported_GetPhysicalDeviceMemoryProperties = false;
+    mutable bool reported_EnumerateDeviceLayerProperties = false;
+    mutable bool reported_GetPhysicalDeviceSparseImageFormatProperties = false;
+    mutable bool reported_GetPhysicalDeviceSurfaceCapabilitiesKHR = false;
+    mutable bool reported_GetPhysicalDeviceSurfaceFormatsKHR = false;
 };
 
-class Device : public vvl::base::Device {
-    using BaseClass = vvl::base::Device;
-
+class Device : public vvl::BaseDevice {
   public:
-    Device(vvl::dispatch::Device* dev, Instance* instance_vo)
-        : BaseClass(dev, instance_vo, LayerObjectTypeLegacy), instance(instance_vo) {}
+    Device(vvl::DispatchDevice* dev, Instance* instance_vo)
+        : BaseDevice(dev, instance_vo, LayerObjectTypeLegacy), instance(instance_vo) {}
     ~Device() {}
     Instance* instance;
 
+    bool PreCallValidateQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
+                                    const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdUpdateBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                        VkDeviceSize dataSize, const void* pData, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size,
+                                      uint32_t data, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask,
+                                           VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags,
+                                           uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
+                                           uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
+                                           uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers,
+                                           const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdWriteTimestamp(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage,
+                                          VkQueryPool queryPool, uint32_t query, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
+                                                uint32_t queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                                VkDeviceSize stride, VkQueryResultFlags flags,
+                                                const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
                                          const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
                                          const ErrorObject& error_obj) const override;
@@ -115,8 +147,6 @@ class Device : public vvl::base::Device {
                                             const ErrorObject& error_obj) const override;
     bool PreCallValidateAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
                                                VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj) const override;
-    bool PreCallValidateFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount,
-                                           const VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj) const override;
     bool PreCallValidateUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount,
                                              const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount,
                                              const VkCopyDescriptorSet* pDescriptorCopies,
@@ -125,6 +155,18 @@ class Device : public vvl::base::Device {
                                               VkPipelineLayout layout, uint32_t firstSet, uint32_t descriptorSetCount,
                                               const VkDescriptorSet* pDescriptorSets, uint32_t dynamicOffsetCount,
                                               const uint32_t* pDynamicOffsets, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                            const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
+                                    const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
+                                      const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
+                                      VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
+                                      uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
+                                      uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
+                                      uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers,
+                                      const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags,
                                          uint32_t offset, uint32_t size, const void* pValues,
                                          const ErrorObject& error_obj) const override;
@@ -136,11 +178,21 @@ class Device : public vvl::base::Device {
                                          const ErrorObject& error_obj) const override;
     bool PreCallValidateGetRenderAreaGranularity(VkDevice device, VkRenderPass renderPass, VkExtent2D* pGranularity,
                                                  const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount,
+                                        uint32_t stride, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                               uint32_t drawCount, uint32_t stride, const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
                                            VkSubpassContents contents, const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents,
                                        const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdEndRenderPass(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                             VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
+                                             uint32_t stride, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdDrawIndexedIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                    VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
+                                                    uint32_t stride, const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
                                           const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
                                           const ErrorObject& error_obj) const override;
@@ -151,11 +203,19 @@ class Device : public vvl::base::Device {
                                         const VkSubpassEndInfo* pSubpassEndInfo, const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdEndRenderPass2(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
                                           const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdCopyBuffer2(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2* pCopyBufferInfo,
+                                       const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdCopyBufferToImage2(VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo,
+                                              const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdCopyImageToBuffer2(VkCommandBuffer commandBuffer, const VkCopyImageToBufferInfo2* pCopyImageToBufferInfo,
+                                              const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdBindDescriptorSets2(VkCommandBuffer commandBuffer,
                                                const VkBindDescriptorSetsInfo* pBindDescriptorSetsInfo,
                                                const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdPushConstants2(VkCommandBuffer commandBuffer, const VkPushConstantsInfo* pPushConstantsInfo,
                                           const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBindIndexBuffer2(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size,
+                                            VkIndexType indexType, const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdSetDescriptorBufferOffsets2EXT(
         VkCommandBuffer commandBuffer, const VkSetDescriptorBufferOffsetsInfoEXT* pSetDescriptorBufferOffsetsInfo,
         const ErrorObject& error_obj) const override;
@@ -163,6 +223,31 @@ class Device : public vvl::base::Device {
         VkCommandBuffer commandBuffer,
         const VkBindDescriptorBufferEmbeddedSamplersInfoEXT* pBindDescriptorBufferEmbeddedSamplersInfo,
         const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBindTransformFeedbackBuffersEXT(VkCommandBuffer commandBuffer, uint32_t firstBinding,
+                                                           uint32_t bindingCount, const VkBuffer* pBuffers,
+                                                           const VkDeviceSize* pOffsets, const VkDeviceSize* pSizes,
+                                                           const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBeginTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32_t firstCounterBuffer,
+                                                     uint32_t counterBufferCount, const VkBuffer* pCounterBuffers,
+                                                     const VkDeviceSize* pCounterBufferOffsets,
+                                                     const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdEndTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32_t firstCounterBuffer,
+                                                   uint32_t counterBufferCount, const VkBuffer* pCounterBuffers,
+                                                   const VkDeviceSize* pCounterBufferOffsets,
+                                                   const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdDrawIndirectByteCountEXT(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance,
+                                                    VkBuffer counterBuffer, VkDeviceSize counterBufferOffset,
+                                                    uint32_t counterOffset, uint32_t vertexStride,
+                                                    const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBeginConditionalRenderingEXT(VkCommandBuffer commandBuffer,
+                                                        const VkConditionalRenderingBeginInfoEXT* pConditionalRenderingBegin,
+                                                        const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2 stage, VkBuffer dstBuffer,
+                                                 VkDeviceSize dstOffset, uint32_t marker,
+                                                 const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdBindVertexBuffers2EXT(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount,
+                                                 const VkBuffer* pBuffers, const VkDeviceSize* pOffsets, const VkDeviceSize* pSizes,
+                                                 const VkDeviceSize* pStrides, const ErrorObject& error_obj) const override;
     bool PreCallValidateGetDescriptorSetLayoutSizeEXT(VkDevice device, VkDescriptorSetLayout layout,
                                                       VkDeviceSize* pLayoutSizeInBytes,
                                                       const ErrorObject& error_obj) const override;
@@ -193,6 +278,123 @@ class Device : public vvl::base::Device {
     bool PreCallValidateGetAccelerationStructureOpaqueCaptureDescriptorDataEXT(
         VkDevice device, const VkAccelerationStructureCaptureDescriptorDataInfoEXT* pInfo, void* pData,
         const ErrorObject& error_obj) const override;
+    bool PreCallValidateBuildMicromapsEXT(VkDevice device, VkDeferredOperationKHR deferredOperation, uint32_t infoCount,
+                                          const VkMicromapBuildInfoEXT* pInfos, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCopyMicromapEXT(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                        const VkCopyMicromapInfoEXT* pInfo, const ErrorObject& error_obj) const override;
+    bool PreCallValidateCopyMicromapToMemoryEXT(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                const VkCopyMicromapToMemoryInfoEXT* pInfo,
+                                                const ErrorObject& error_obj) const override;
+    bool PreCallValidateCopyMemoryToMicromapEXT(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                const VkCopyMemoryToMicromapInfoEXT* pInfo,
+                                                const ErrorObject& error_obj) const override;
+    bool PreCallValidateWriteMicromapsPropertiesEXT(VkDevice device, uint32_t micromapCount, const VkMicromapEXT* pMicromaps,
+                                                    VkQueryType queryType, size_t dataSize, void* pData, size_t stride,
+                                                    const ErrorObject& error_obj) const override;
+    bool PreCallValidateCreateAccelerationStructureKHR(VkDevice device, const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
+                                                       const VkAllocationCallbacks* pAllocator,
+                                                       VkAccelerationStructureKHR* pAccelerationStructure,
+                                                       const ErrorObject& error_obj) const override;
+    bool PreCallValidateBuildAccelerationStructuresKHR(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                       uint32_t infoCount,
+                                                       const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
+                                                       const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos,
+                                                       const ErrorObject& error_obj) const override;
+    bool PreCallValidateCopyAccelerationStructureKHR(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                     const VkCopyAccelerationStructureInfoKHR* pInfo,
+                                                     const ErrorObject& error_obj) const override;
+    bool PreCallValidateCopyAccelerationStructureToMemoryKHR(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                             const VkCopyAccelerationStructureToMemoryInfoKHR* pInfo,
+                                                             const ErrorObject& error_obj) const override;
+    bool PreCallValidateCopyMemoryToAccelerationStructureKHR(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                             const VkCopyMemoryToAccelerationStructureInfoKHR* pInfo,
+                                                             const ErrorObject& error_obj) const override;
+    bool PreCallValidateWriteAccelerationStructuresPropertiesKHR(VkDevice device, uint32_t accelerationStructureCount,
+                                                                 const VkAccelerationStructureKHR* pAccelerationStructures,
+                                                                 VkQueryType queryType, size_t dataSize, void* pData, size_t stride,
+                                                                 const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdDrawMeshTasksIndirectEXT(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                    uint32_t drawCount, uint32_t stride,
+                                                    const ErrorObject& error_obj) const override;
+    bool PreCallValidateCmdDrawMeshTasksIndirectCountEXT(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                         VkBuffer countBuffer, VkDeviceSize countBufferOffset,
+                                                         uint32_t maxDrawCount, uint32_t stride,
+                                                         const ErrorObject& error_obj) const override;
+
+    // Make sure we only report each warning once for the user
+    mutable bool reported_QueueSubmit = false;
+    mutable bool reported_CmdUpdateBuffer = false;
+    mutable bool reported_CmdFillBuffer = false;
+    mutable bool reported_CmdPipelineBarrier = false;
+    mutable bool reported_CmdWriteTimestamp = false;
+    mutable bool reported_CmdCopyQueryPoolResults = false;
+    mutable bool reported_CreateBufferView = false;
+    mutable bool reported_CreatePipelineLayout = false;
+    mutable bool reported_CreateSampler = false;
+    mutable bool reported_CreateDescriptorSetLayout = false;
+    mutable bool reported_CreateDescriptorPool = false;
+    mutable bool reported_ResetDescriptorPool = false;
+    mutable bool reported_AllocateDescriptorSets = false;
+    mutable bool reported_UpdateDescriptorSets = false;
+    mutable bool reported_CmdBindDescriptorSets = false;
+    mutable bool reported_CmdDispatchIndirect = false;
+    mutable bool reported_CmdSetEvent = false;
+    mutable bool reported_CmdResetEvent = false;
+    mutable bool reported_CmdWaitEvents = false;
+    mutable bool reported_CmdPushConstants = false;
+    mutable bool reported_CreateFramebuffer = false;
+    mutable bool reported_CreateRenderPass = false;
+    mutable bool reported_GetRenderAreaGranularity = false;
+    mutable bool reported_CmdDrawIndirect = false;
+    mutable bool reported_CmdDrawIndexedIndirect = false;
+    mutable bool reported_CmdBeginRenderPass = false;
+    mutable bool reported_CmdNextSubpass = false;
+    mutable bool reported_CmdEndRenderPass = false;
+    mutable bool reported_CmdDrawIndirectCount = false;
+    mutable bool reported_CmdDrawIndexedIndirectCount = false;
+    mutable bool reported_CreateRenderPass2 = false;
+    mutable bool reported_CmdBeginRenderPass2 = false;
+    mutable bool reported_CmdNextSubpass2 = false;
+    mutable bool reported_CmdEndRenderPass2 = false;
+    mutable bool reported_CmdCopyBuffer2 = false;
+    mutable bool reported_CmdCopyBufferToImage2 = false;
+    mutable bool reported_CmdCopyImageToBuffer2 = false;
+    mutable bool reported_CmdBindDescriptorSets2 = false;
+    mutable bool reported_CmdPushConstants2 = false;
+    mutable bool reported_CmdBindIndexBuffer2 = false;
+    mutable bool reported_CmdSetDescriptorBufferOffsets2EXT = false;
+    mutable bool reported_CmdBindDescriptorBufferEmbeddedSamplers2EXT = false;
+    mutable bool reported_CmdBindTransformFeedbackBuffersEXT = false;
+    mutable bool reported_CmdBeginTransformFeedbackEXT = false;
+    mutable bool reported_CmdEndTransformFeedbackEXT = false;
+    mutable bool reported_CmdDrawIndirectByteCountEXT = false;
+    mutable bool reported_CmdBeginConditionalRenderingEXT = false;
+    mutable bool reported_CmdWriteBufferMarker2AMD = false;
+    mutable bool reported_CmdBindVertexBuffers2EXT = false;
+    mutable bool reported_GetDescriptorSetLayoutSizeEXT = false;
+    mutable bool reported_GetDescriptorSetLayoutBindingOffsetEXT = false;
+    mutable bool reported_GetDescriptorEXT = false;
+    mutable bool reported_CmdBindDescriptorBuffersEXT = false;
+    mutable bool reported_CmdSetDescriptorBufferOffsetsEXT = false;
+    mutable bool reported_CmdBindDescriptorBufferEmbeddedSamplersEXT = false;
+    mutable bool reported_GetBufferOpaqueCaptureDescriptorDataEXT = false;
+    mutable bool reported_GetImageOpaqueCaptureDescriptorDataEXT = false;
+    mutable bool reported_GetImageViewOpaqueCaptureDescriptorDataEXT = false;
+    mutable bool reported_GetSamplerOpaqueCaptureDescriptorDataEXT = false;
+    mutable bool reported_GetAccelerationStructureOpaqueCaptureDescriptorDataEXT = false;
+    mutable bool reported_BuildMicromapsEXT = false;
+    mutable bool reported_CopyMicromapEXT = false;
+    mutable bool reported_CopyMicromapToMemoryEXT = false;
+    mutable bool reported_CopyMemoryToMicromapEXT = false;
+    mutable bool reported_WriteMicromapsPropertiesEXT = false;
+    mutable bool reported_CreateAccelerationStructureKHR = false;
+    mutable bool reported_BuildAccelerationStructuresKHR = false;
+    mutable bool reported_CopyAccelerationStructureKHR = false;
+    mutable bool reported_CopyAccelerationStructureToMemoryKHR = false;
+    mutable bool reported_CopyMemoryToAccelerationStructureKHR = false;
+    mutable bool reported_WriteAccelerationStructuresPropertiesKHR = false;
+    mutable bool reported_CmdDrawMeshTasksIndirectEXT = false;
+    mutable bool reported_CmdDrawMeshTasksIndirectCountEXT = false;
 };
 }  // namespace legacy
 // NOLINTEND

@@ -1,5 +1,5 @@
-/* Copyright (c) 2024 Valve Corporation
- * Copyright (c) 2024 LunarG, Inc.
+/* Copyright (c) 2026 Valve Corporation
+ * Copyright (c) 2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,14 @@ VkDeviceSize ComputeAccelerationStructureSize(BuildType build_type, const VkDevi
                                               const VkAccelerationStructureBuildGeometryInfoKHR &build_info,
                                               const VkAccelerationStructureBuildRangeInfoKHR *range_infos);
 
+uint64_t MicromapUsageTotalTriangleCount(const VkAccelerationStructureBuildGeometryInfoKHR& build_info);
+
 inline const VkAccelerationStructureGeometryKHR &GetGeometry(const VkAccelerationStructureBuildGeometryInfoKHR &info,
                                                              uint32_t geometry_i) {
     return info.pGeometries ? info.pGeometries[geometry_i] : *info.ppGeometries[geometry_i];
+}
+
+inline const VkMicromapUsageKHR& GetMicroMapUsage(const VkAccelerationStructureGeometryMicromapDataKHR& info, uint32_t count_i) {
+    return info.pUsageCounts ? info.pUsageCounts[count_i] : *info.ppUsageCounts[count_i];
 }
 }  // namespace rt

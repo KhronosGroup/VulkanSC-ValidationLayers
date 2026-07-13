@@ -32,6 +32,7 @@ target_sources(VkLayer_utils PRIVATE
     containers/custom_containers.h
     containers/limits.h
     containers/small_container.h
+    containers/array_range_map.h
     containers/small_range_map.h
     containers/small_vector.h
     containers/span.h
@@ -41,6 +42,7 @@ target_sources(VkLayer_utils PRIVATE
     error_message/error_location.cpp
     error_message/error_location.h
     error_message/error_strings.h
+    error_message/error_strings.cpp
     error_message/record_object.h
     error_message/log_message_type.h
     external/xxhash.h
@@ -49,10 +51,12 @@ target_sources(VkLayer_utils PRIVATE
     ${API_TYPE}/generated/error_location_helper.h
     ${API_TYPE}/generated/feature_requirements_helper.cpp
     ${API_TYPE}/generated/feature_requirements_helper.h
+    ${API_TYPE}/generated/test_icd_helper.h
     ${API_TYPE}/generated/pnext_chain_extraction.cpp
     ${API_TYPE}/generated/pnext_chain_extraction.h
     ${API_TYPE}/generated/vk_function_pointers.cpp
     ${API_TYPE}/generated/vk_function_pointers.h
+    ${API_TYPE}/generated/vk_validation_error_messages.cpp
     ${API_TYPE}/generated/vk_validation_error_messages.h
     ${API_TYPE}/generated/vk_layer_dispatch_table.h
     ${API_TYPE}/generated/vk_dispatch_table_helper.h
@@ -141,6 +145,8 @@ if (WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
    endif()
 endif()
 
+target_compile_options(VkLayer_utils PRIVATE "$<IF:$<CXX_COMPILER_ID:MSVC>,/wd4100,-Wno-unused-parameter>")
+
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
     target_compile_options(VkLayer_utils PRIVATE
         -Wno-sign-conversion
@@ -153,6 +159,14 @@ elseif(MSVC)
         /wd4457 # hiding function parameter
         /wd4702 # unreachable code
         /wd4389 # signed/unsigned mismatch
+    )
+endif()
+
+if(APPLE)
+    # Github runners recently updated from Apple Clang 17 to 21
+    # This caused issues with the current custom hash solution
+    target_compile_options(VkLayer_utils PUBLIC
+        -Wno-deprecated-declarations
     )
 endif()
 
@@ -211,6 +225,7 @@ target_sources(vvl PRIVATE
     chassis/chassis_modification_state.h
     chassis/chassis_manual.cpp
     chassis/dispatch_object_manual.cpp
+    chassis/dispatch_object.h
     containers/range.h
     containers/range_map.h
     core_checks/cc_android.cpp
@@ -244,8 +259,6 @@ target_sources(vvl PRIVATE
     core_checks/cc_shader_object.cpp
     core_checks/cc_state_tracker.h
     core_checks/cc_state_tracker.cpp
-    core_checks/cc_submit.h
-    core_checks/cc_submit.cpp
     core_checks/cc_sync_vuid_maps.h
     core_checks/cc_sync_vuid_maps.cpp
     core_checks/cc_synchronization.h
@@ -302,6 +315,8 @@ target_sources(vvl PRIVATE
     ${API_TYPE}/generated/thread_safety_instance_defs.h
     ${API_TYPE}/generated/gpuav_offline_spirv.h
     ${API_TYPE}/generated/gpuav_offline_spirv.cpp
+    ${API_TYPE}/generated/extended_flags_helper_generator.h
+    ${API_TYPE}/generated/extended_flags_helper_generator.cpp
     gpuav/core/gpuav.h
     gpuav/core/gpuav_constants.h
     gpuav/core/gpuav_features.cpp
@@ -329,21 +344,21 @@ target_sources(vvl PRIVATE
     gpuav/descriptor_validation/gpuav_descriptor_set.h
     gpuav/debug_printf/debug_printf.cpp
     gpuav/debug_printf/debug_printf.h
-    gpuav/error_message/gpuav_vuids.cpp
-    gpuav/error_message/gpuav_vuids.h
     gpuav/instrumentation/gpuav_shader_instrumentor.cpp
     gpuav/instrumentation/gpuav_shader_instrumentor.h
     gpuav/instrumentation/gpuav_instrumentation.h
     gpuav/instrumentation/gpuav_instrumentation.cpp
     gpuav/instrumentation/buffer_device_address.cpp
-    gpuav/instrumentation/descriptor_checks.h
-    gpuav/instrumentation/descriptor_checks.cpp
+    gpuav/instrumentation/descriptor_checks_classic.h
+    gpuav/instrumentation/descriptor_checks_classic.cpp
+    gpuav/instrumentation/descriptor_checks_heap.h
+    gpuav/instrumentation/descriptor_checks_heap.cpp
     gpuav/instrumentation/mesh_shading.cpp
     gpuav/instrumentation/post_process_descriptor_indexing.cpp
-    gpuav/instrumentation/ray_query.cpp
-    gpuav/instrumentation/ray_hit_object.cpp
     gpuav/instrumentation/register_validation.h
     gpuav/instrumentation/sanitizer.cpp
+    gpuav/instrumentation/shared_memory_data_race.cpp
+    gpuav/instrumentation/trace_ray.cpp
     gpuav/instrumentation/vertex_attribute_fetch_oob.cpp
     gpuav/resources/gpuav_state_trackers.cpp
     gpuav/resources/gpuav_state_trackers.h
@@ -353,7 +368,18 @@ target_sources(vvl PRIVATE
     gpuav/shaders/gpuav_error_codes.h
     gpuav/shaders/gpuav_error_header.h
     gpuav/shaders/gpuav_shaders_constants.h
+    gpuav/shaders/setup/descriptor_encoding_update.h
     gpuav/shaders/validation_cmd/push_data.h
+    gpu_dump/gpu_dump.h
+    gpu_dump/gpu_dump.cpp
+    gpu_dump/gpu_dump_copy_memory_indirect.cpp
+    gpu_dump/gpu_dump_descriptor.cpp
+    gpu_dump/gpu_dump_descriptor_buffer.cpp
+    gpu_dump/gpu_dump_descriptor_heap.cpp
+    gpu_dump/gpu_dump_device_generated_commands.cpp
+    gpu_dump/gpu_dump_settings.h
+    gpu_dump/gpu_dump_state.h
+    gpu_dump/gpu_dump_state.cpp
     legacy/legacy_manual.cpp
     object_tracker/object_lifetime_validation.cpp
     object_tracker/object_lifetime_validation.h
@@ -373,9 +399,11 @@ target_sources(vvl PRIVATE
     state_tracker/device_generated_commands_state.h
     state_tracker/device_memory_state.cpp
     state_tracker/device_memory_state.h
+    state_tracker/device_range_state.h
     state_tracker/device_state.cpp
     state_tracker/device_state.h
-    state_tracker/event_map.h
+    state_tracker/event_state.cpp
+    state_tracker/event_state.h
     state_tracker/fence_state.cpp
     state_tracker/fence_state.h
     state_tracker/image_layout_map.cpp
@@ -402,6 +430,7 @@ target_sources(vvl PRIVATE
     state_tracker/tensor_state.h
     state_tracker/queue_state.cpp
     state_tracker/queue_state.h
+    state_tracker/ray_tracing_state.cpp
     state_tracker/ray_tracing_state.h
     state_tracker/render_pass_state.cpp
     state_tracker/render_pass_state.h
@@ -418,6 +447,8 @@ target_sources(vvl PRIVATE
     state_tracker/state_tracker.cpp
     state_tracker/state_tracker.h
     state_tracker/submission_reference.h
+    state_tracker/submit_time_tracker.cpp
+    state_tracker/submit_time_tracker.h
     state_tracker/subresource_adapter.cpp
     state_tracker/subresource_adapter.h
     state_tracker/vertex_index_buffer_state.cpp
@@ -433,11 +464,13 @@ target_sources(vvl PRIVATE
     stateless/sl_descriptor.cpp
     stateless/sl_device_generated_commands.cpp
     stateless/sl_device_memory.cpp
+    stateless/sl_drawdispatch.cpp
     stateless/sl_external_object.cpp
     stateless/sl_framebuffer.cpp
     stateless/sl_image.cpp
     stateless/sl_instance_device.cpp
     stateless/sl_pipeline.cpp
+    stateless/sl_queue.cpp
     stateless/sl_ray_tracing.cpp
     stateless/sl_ray_tracing_micromap.cpp
     stateless/sl_ray_tracing_nv.cpp
@@ -461,8 +494,8 @@ target_sources(vvl PRIVATE
     sync/sync_access_state.h
     sync/sync_barrier.cpp
     sync/sync_barrier.h
-    sync/sync_commandbuffer.cpp
-    sync/sync_commandbuffer.h
+    sync/sync_command_buffer.cpp
+    sync/sync_command_buffer.h
     sync/sync_common.cpp
     sync/sync_common.h
     sync/sync_error_messages.cpp
@@ -472,8 +505,8 @@ target_sources(vvl PRIVATE
     sync/sync_image.h
     sync/sync_op.cpp
     sync/sync_op.h
-    sync/sync_renderpass.cpp
-    sync/sync_renderpass.h
+    sync/sync_render_pass.cpp
+    sync/sync_render_pass.h
     sync/sync_reporting.cpp
     sync/sync_reporting.h
     sync/sync_settings.h
@@ -485,6 +518,8 @@ target_sources(vvl PRIVATE
     sync/sync_validation.h
     thread_tracker/thread_safety_validation.cpp
     thread_tracker/thread_safety_validation.h
+    utils/descriptor_utils.cpp
+    utils/descriptor_utils.h
     utils/shader_utils.cpp
     utils/shader_utils.h
     utils/spirv_tools_utils.cpp

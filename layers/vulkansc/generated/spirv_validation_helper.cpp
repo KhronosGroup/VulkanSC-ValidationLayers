@@ -239,8 +239,15 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityTextureBoxFilterQCOM, {0, &DeviceFeatures::textureBoxFilter, nullptr, ""}},
         {spv::CapabilityTextureBlockMatchQCOM, {0, &DeviceFeatures::textureBlockMatch, nullptr, ""}},
         {spv::CapabilityTextureBlockMatch2QCOM, {0, &DeviceFeatures::textureBlockMatch2, nullptr, ""}},
+        // Not found in current SPIR-V Headers
+        // {spv::CapabilityImageGatherLinearQCOM, {0, &DeviceFeatures::imageGatherLinear, nullptr, ""}},
+        // Not found in current SPIR-V Headers
+        // {spv::CapabilityImageGatherExtendedModesQCOM, {0, &DeviceFeatures::imageGatherExtendedModes, nullptr, ""}},
         {spv::CapabilityMeshShadingEXT, {0, nullptr, &DeviceExtensions::vk_ext_mesh_shader, ""}},
-        {spv::CapabilityRayTracingOpacityMicromapEXT, {0, nullptr, &DeviceExtensions::vk_ext_opacity_micromap, ""}},
+        // Not found in current SPIR-V Headers
+        // {spv::CapabilityRayTracingOpacityMicromapEXT, {0, nullptr, &DeviceExtensions::vk_ext_opacity_micromap, ""}},
+        {spv::CapabilityRayTracingOpacityMicromapKHR, {0, &DeviceFeatures::micromap, nullptr, ""}},
+        {spv::CapabilityRayTracingOpacityMicromapExecutionModeKHR, {0, &DeviceFeatures::micromap, nullptr, ""}},
         {spv::CapabilityCoreBuiltinsARM, {0, &DeviceFeatures::shaderCoreBuiltins, nullptr, ""}},
         {spv::CapabilityShaderInvocationReorderNV, {0, nullptr, &DeviceExtensions::vk_nv_ray_tracing_invocation_reorder, ""}},
         // Not found in current SPIR-V Headers
@@ -273,6 +280,7 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityCooperativeMatrixPerElementOperationsNV, {0, &DeviceFeatures::cooperativeMatrixPerElementOperations, nullptr, ""}},
         {spv::CapabilityCooperativeMatrixTensorAddressingNV, {0, &DeviceFeatures::cooperativeMatrixTensorAddressing, nullptr, ""}},
         {spv::CapabilityCooperativeMatrixBlockLoadsNV, {0, &DeviceFeatures::cooperativeMatrixBlockLoads, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixDecodeVectorNV, {0, &DeviceFeatures::cooperativeMatrixDecodeVector, nullptr, ""}},
         {spv::CapabilityRayTracingSpheresGeometryNV, {0, &DeviceFeatures::spheres, nullptr, ""}},
         {spv::CapabilityRayTracingLinearSweptSpheresGeometryNV, {0, &DeviceFeatures::linearSweptSpheres, nullptr, ""}},
         {spv::CapabilityRayTracingClusterAccelerationStructureNV, {0, &DeviceFeatures::clusterAccelerationStructure, nullptr, ""}},
@@ -281,6 +289,9 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityPushConstantBanksNV, {0, &DeviceFeatures::pushConstantBank, nullptr, ""}},
         {spv::CapabilityShaderInvocationReorderEXT, {0, nullptr, &DeviceExtensions::vk_ext_ray_tracing_invocation_reorder, ""}},
         {spv::CapabilityTileShadingQCOM, {0, &DeviceFeatures::tileShading, nullptr, ""}},
+        {spv::CapabilitySplitBarrierEXT, {0, &DeviceFeatures::shaderSplitBarrier, nullptr, ""}},
+        // Not found in current SPIR-V Headers
+        // {spv::CapabilityMultipleWaitQueuesQCOM, {0, &DeviceFeatures::shaderMultipleWaitQueues, nullptr, ""}},
         {spv::CapabilityTensorsARM, {0, &DeviceFeatures::shaderTensorAccess, nullptr, ""}},
         {spv::CapabilityStorageTensorArrayDynamicIndexingARM, {0, &DeviceFeatures::shaderStorageTensorArrayDynamicIndexing, nullptr, ""}},
         {spv::CapabilityStorageTensorArrayNonUniformIndexingARM, {0, &DeviceFeatures::shaderStorageTensorArrayNonUniformIndexing, nullptr, ""}},
@@ -294,14 +305,24 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityShader64BitIndexingEXT, {0, &DeviceFeatures::shader64BitIndexing, nullptr, ""}},
         {spv::CapabilityLongVectorEXT, {0, &DeviceFeatures::longVector, nullptr, ""}},
         {spv::CapabilityDescriptorHeapEXT, {0, &DeviceFeatures::descriptorHeap, nullptr, ""}},
+        {spv::CapabilityDotProductFloat16AccFloat32VALVE, {0, &DeviceFeatures::shaderMixedFloatDotProductFloat16AccFloat32, nullptr, ""}},
+        {spv::CapabilityDotProductFloat16AccFloat16VALVE, {0, &DeviceFeatures::shaderMixedFloatDotProductFloat16AccFloat16, nullptr, ""}},
+        {spv::CapabilityDotProductBFloat16AccVALVE, {0, &DeviceFeatures::shaderMixedFloatDotProductBFloat16Acc, nullptr, ""}},
+        {spv::CapabilityDotProductFloat8AccFloat32VALVE, {0, &DeviceFeatures::shaderMixedFloatDotProductFloat8AccFloat32, nullptr, ""}},
+        {spv::CapabilityConstantDataKHR, {0, &DeviceFeatures::shaderConstantData, nullptr, ""}},
+        {spv::CapabilityAbortKHR, {0, &DeviceFeatures::shaderAbort, nullptr, ""}},
         // Not found in current SPIR-V Headers
-        // {spv::CapabilityDotProductFloat16AccFloat32VALVE, {0, &DeviceFeatures::shaderMixedFloatDotProductFloat16AccFloat32, nullptr, ""}},
+        // {spv::CapabilityFloat4EXT, {0, &DeviceFeatures::shaderFloat4, nullptr, ""}},
         // Not found in current SPIR-V Headers
-        // {spv::CapabilityDotProductFloat16AccFloat16VALVE, {0, &DeviceFeatures::shaderMixedFloatDotProductFloat16AccFloat16, nullptr, ""}},
+        // {spv::CapabilityFloat6EXT, {0, &DeviceFeatures::shaderFloat6, nullptr, ""}},
         // Not found in current SPIR-V Headers
-        // {spv::CapabilityDotProductBFloat16AccVALVE, {0, &DeviceFeatures::shaderMixedFloatDotProductBFloat16Acc, nullptr, ""}},
+        // {spv::CapabilityFloat8UnsignedE8M0EXT, {0, &DeviceFeatures::shaderFloat8UnsignedE8M0, nullptr, ""}},
         // Not found in current SPIR-V Headers
-        // {spv::CapabilityDotProductFloat8AccFloat32VALVE, {0, &DeviceFeatures::shaderMixedFloatDotProductFloat8AccFloat32, nullptr, ""}},
+        // {spv::CapabilityMXInt8EXT, {0, &DeviceFeatures::shaderMXInt8, nullptr, ""}},
+        // Not found in current SPIR-V Headers
+        // {spv::CapabilityBitcastExtractEXT, {0, &DeviceFeatures::shaderFloat4, nullptr, ""}},
+        // Not found in current SPIR-V Headers
+        // {spv::CapabilityBitcastExtractEXT, {0, &DeviceFeatures::shaderFloat6, nullptr, ""}},
     };
     // clang-format on
     return spirv_capabilities;
@@ -399,11 +420,16 @@ const std::unordered_multimap<std::string_view, RequiredSpirvInfo>& GetSpirvExte
         {"SPV_KHR_device_group", {0, nullptr, &DeviceExtensions::vk_khr_device_group, ""}},
         {"SPV_QCOM_image_processing", {0, nullptr, &DeviceExtensions::vk_qcom_image_processing, ""}},
         {"SPV_QCOM_image_processing2", {0, nullptr, &DeviceExtensions::vk_qcom_image_processing2, ""}},
+        {"SPV_QCOM_image_processing3", {0, nullptr, &DeviceExtensions::vk_qcom_image_processing3, ""}},
         {"SPV_QCOM_cooperative_matrix_conversion", {0, nullptr, &DeviceExtensions::vk_qcom_cooperative_matrix_conversion, ""}},
+        {"SPV_QCOM_multiple_wait_queues", {0, nullptr, &DeviceExtensions::vk_qcom_shader_multiple_wait_queues, ""}},
         {"SPV_EXT_mesh_shader", {0, nullptr, &DeviceExtensions::vk_ext_mesh_shader, ""}},
         {"SPV_KHR_ray_tracing_position_fetch", {0, nullptr, &DeviceExtensions::vk_khr_ray_tracing_position_fetch, ""}},
         {"SPV_EXT_shader_tile_image", {0, nullptr, &DeviceExtensions::vk_ext_shader_tile_image, ""}},
         {"SPV_EXT_opacity_micromap", {0, nullptr, &DeviceExtensions::vk_ext_opacity_micromap, ""}},
+        {"SPV_EXT_opacity_micromap", {0, nullptr, &DeviceExtensions::vk_khr_opacity_micromap, ""}},
+        {"SPV_KHR_opacity_micromap", {0, nullptr, &DeviceExtensions::vk_khr_opacity_micromap, ""}},
+        {"SPV_EXT_split_barrier", {0, nullptr, &DeviceExtensions::vk_ext_shader_split_barrier, ""}},
         {"SPV_KHR_cooperative_matrix", {0, nullptr, &DeviceExtensions::vk_khr_cooperative_matrix, ""}},
         {"SPV_ARM_core_builtins", {0, nullptr, &DeviceExtensions::vk_arm_shader_core_builtins, ""}},
         {"SPV_HUAWEI_cluster_culling_shader", {0, nullptr, &DeviceExtensions::vk_huawei_cluster_culling_shader, ""}},
@@ -424,6 +450,7 @@ const std::unordered_multimap<std::string_view, RequiredSpirvInfo>& GetSpirvExte
         {"SPV_EXT_replicated_composites", {0, nullptr, &DeviceExtensions::vk_ext_shader_replicated_composites, ""}},
         {"SPV_KHR_relaxed_extended_instruction", {0, nullptr, &DeviceExtensions::vk_khr_shader_relaxed_extended_instruction, ""}},
         {"SPV_NV_cooperative_matrix2", {0, nullptr, &DeviceExtensions::vk_nv_cooperative_matrix2, ""}},
+        {"SPV_NV_cooperative_matrix_decode_vector", {0, nullptr, &DeviceExtensions::vk_nv_cooperative_matrix_decode_vector, ""}},
         {"SPV_NV_tensor_addressing", {0, nullptr, &DeviceExtensions::vk_nv_cooperative_matrix2, ""}},
         {"SPV_NV_linear_swept_spheres", {0, nullptr, &DeviceExtensions::vk_nv_ray_tracing_linear_swept_spheres, ""}},
         {"SPV_NV_cluster_acceleration_structure", {0, nullptr, &DeviceExtensions::vk_nv_cluster_acceleration_structure, ""}},
@@ -439,6 +466,9 @@ const std::unordered_multimap<std::string_view, RequiredSpirvInfo>& GetSpirvExte
         {"SPV_EXT_long_vector", {0, nullptr, &DeviceExtensions::vk_ext_shader_long_vector, ""}},
         {"SPV_EXT_descriptor_heap", {0, nullptr, &DeviceExtensions::vk_ext_descriptor_heap, ""}},
         {"SPV_VALVE_mixed_float_dot_product", {0, nullptr, &DeviceExtensions::vk_valve_shader_mixed_float_dot_product, ""}},
+        {"SPV_KHR_abort", {0, nullptr, &DeviceExtensions::vk_khr_shader_abort, ""}},
+        {"SPV_KHR_constant_data", {0, nullptr, &DeviceExtensions::vk_khr_shader_constant_data, ""}},
+        {"SPV_EXT_ocp_microscaling_types", {0, nullptr, &DeviceExtensions::vk_ext_shader_ocp_microscaling_types, ""}},
     };
     // clang-format on
     return spirv_extensions;
@@ -686,8 +716,18 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "BFloat16DotProductKHR";
         case spv::CapabilityBFloat16CooperativeMatrixKHR:
             return "BFloat16CooperativeMatrixKHR";
+        case spv::CapabilityAbortKHR:
+            return "AbortKHR";
         case spv::CapabilityDescriptorHeapEXT:
             return "DescriptorHeapEXT";
+        case spv::CapabilityConstantDataKHR:
+            return "ConstantDataKHR";
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+        case spv::CapabilityPoisonFreezeKHR:
+            return "PoisonFreezeKHR";
+#endif
+        case spv::CapabilityWeakLinkageAMD:
+            return "WeakLinkageAMD";
         case spv::CapabilitySampleMaskOverrideCoverageNV:
             return "SampleMaskOverrideCoverageNV";
         case spv::CapabilityGeometryShaderPassthroughNV:
@@ -770,8 +810,8 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "DemoteToHelperInvocation";
         case spv::CapabilityDisplacementMicromapNV:
             return "DisplacementMicromapNV";
-        case spv::CapabilityRayTracingOpacityMicromapEXT:
-            return "RayTracingOpacityMicromapEXT";
+        case spv::CapabilityRayTracingOpacityMicromapKHR:
+            return "RayTracingOpacityMicromapKHR";
         case spv::CapabilityShaderInvocationReorderNV:
             return "ShaderInvocationReorderNV";
         case spv::CapabilityShaderInvocationReorderEXT:
@@ -814,6 +854,8 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "RayTracingClusterAccelerationStructureNV";
         case spv::CapabilityTensorAddressingNV:
             return "TensorAddressingNV";
+        case spv::CapabilityCooperativeMatrixDecodeVectorNV:
+            return "CooperativeMatrixDecodeVectorNV";
         case spv::CapabilityIntegerFunctions2INTEL:
             return "IntegerFunctions2INTEL";
         case spv::CapabilityFunctionPointersINTEL:
@@ -848,6 +890,8 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "FloatControls2";
         case spv::CapabilityFMAKHR:
             return "FMAKHR";
+        case spv::CapabilityRayTracingOpacityMicromapExecutionModeKHR:
+            return "RayTracingOpacityMicromapExecutionModeKHR";
         case spv::CapabilityAtomicFloat32AddEXT:
             return "AtomicFloat32AddEXT";
         case spv::CapabilityAtomicFloat64AddEXT:
@@ -856,6 +900,8 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
             return "OptNoneEXT";
         case spv::CapabilityAtomicFloat16AddEXT:
             return "AtomicFloat16AddEXT";
+        case spv::CapabilitySplitBarrierEXT:
+            return "SplitBarrierEXT";
         case spv::CapabilityArithmeticFenceEXT:
             return "ArithmeticFenceEXT";
         case spv::CapabilitySubgroupBufferPrefetchINTEL:
@@ -880,6 +926,10 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
         case spv::CapabilityFunctionVariantsINTEL:
             return "FunctionVariantsINTEL";
 #endif
+        case spv::CapabilityPredicatedIOINTEL:
+            return "PredicatedIOINTEL";
+        case spv::CapabilityRoundedDivideSqrtINTEL:
+            return "RoundedDivideSqrtINTEL";
         case spv::CapabilityGroupUniformArithmeticKHR:
             return "GroupUniformArithmeticKHR";
         case spv::CapabilityTensorFloat32RoundingINTEL:
@@ -888,6 +938,14 @@ static inline const char* string_SpvCapability(uint32_t input_value) {
         case spv::CapabilityBindlessImagesINTEL:
             return "BindlessImagesINTEL";
 #endif
+        case spv::CapabilityDotProductFloat16AccFloat32VALVE:
+            return "DotProductFloat16AccFloat32VALVE";
+        case spv::CapabilityDotProductFloat16AccFloat16VALVE:
+            return "DotProductFloat16AccFloat16VALVE";
+        case spv::CapabilityDotProductBFloat16AccVALVE:
+            return "DotProductBFloat16AccVALVE";
+        case spv::CapabilityDotProductFloat8AccFloat32VALVE:
+            return "DotProductFloat8AccFloat32VALVE";
         default:
             return "Unhandled OpCapability";
     };
@@ -1122,7 +1180,7 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityStorageImageReadWithoutFormat, "VkPhysicalDeviceFeatures::shaderStorageImageReadWithoutFormat OR VK_VERSION_1_3 OR VK_KHR_format_feature_flags2"},
     {spv::CapabilityStorageImageWriteWithoutFormat, "VkPhysicalDeviceFeatures::shaderStorageImageWriteWithoutFormat OR VK_VERSION_1_3 OR VK_KHR_format_feature_flags2"},
     {spv::CapabilityMultiViewport, "VkPhysicalDeviceFeatures::multiViewport"},
-    {spv::CapabilityDrawParameters, "VkPhysicalDeviceVulkan11Features::shaderDrawParameters OR VK_KHR_shader_draw_parameters"},
+    {spv::CapabilityDrawParameters, "VkPhysicalDeviceVulkan11Features::shaderDrawParameters OR VK_KHR_shader_draw_parameters [when using Vulkan 1.0]"},
     {spv::CapabilityMultiView, "VkPhysicalDeviceVulkan11Features::multiview"},
     {spv::CapabilityDeviceGroup, "VK_VERSION_1_1 OR VK_KHR_device_group"},
     {spv::CapabilityVariablePointersStorageBuffer, "VkPhysicalDeviceVulkan11Features::variablePointersStorageBuffer"},
@@ -1138,7 +1196,7 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityGeometryShaderPassthroughNV, "VK_NV_geometry_shader_passthrough"},
     {spv::CapabilityShaderViewportIndex, "VkPhysicalDeviceVulkan12Features::shaderOutputViewportIndex"},
     {spv::CapabilityShaderLayer, "VkPhysicalDeviceVulkan12Features::shaderOutputLayer"},
-    {spv::CapabilityShaderViewportIndexLayerEXT, "VK_EXT_shader_viewport_index_layer OR VK_NV_viewport_array2"},
+    {spv::CapabilityShaderViewportIndexLayerEXT, "VK_EXT_shader_viewport_index_layer [when using Vulkan 1.0 or 1.1] OR VK_NV_viewport_array2"},
     {spv::CapabilityShaderViewportMaskNV, "VK_NV_viewport_array2"},
     {spv::CapabilityPerViewAttributesNV, "VK_NVX_multiview_per_view_attributes"},
     {spv::CapabilityStorageBuffer16BitAccess, "VkPhysicalDeviceVulkan11Features::storageBuffer16BitAccess"},
@@ -1215,7 +1273,8 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityTextureBlockMatchQCOM, "VkPhysicalDeviceImageProcessingFeaturesQCOM::textureBlockMatch"},
     {spv::CapabilityTextureBlockMatch2QCOM, "VkPhysicalDeviceImageProcessing2FeaturesQCOM::textureBlockMatch2"},
     {spv::CapabilityMeshShadingEXT, "VK_EXT_mesh_shader"},
-    {spv::CapabilityRayTracingOpacityMicromapEXT, "VK_EXT_opacity_micromap"},
+    {spv::CapabilityRayTracingOpacityMicromapKHR, "VkPhysicalDeviceOpacityMicromapFeaturesKHR::micromap"},
+    {spv::CapabilityRayTracingOpacityMicromapExecutionModeKHR, "VkPhysicalDeviceOpacityMicromapFeaturesKHR::micromap"},
     {spv::CapabilityCoreBuiltinsARM, "VkPhysicalDeviceShaderCoreBuiltinsFeaturesARM::shaderCoreBuiltins"},
     {spv::CapabilityShaderInvocationReorderNV, "VK_NV_ray_tracing_invocation_reorder"},
     {spv::CapabilityRayTracingPositionFetchKHR, "VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR::rayTracingPositionFetch"},
@@ -1243,6 +1302,7 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityCooperativeMatrixPerElementOperationsNV, "VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixPerElementOperations"},
     {spv::CapabilityCooperativeMatrixTensorAddressingNV, "VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixTensorAddressing"},
     {spv::CapabilityCooperativeMatrixBlockLoadsNV, "VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixBlockLoads"},
+    {spv::CapabilityCooperativeMatrixDecodeVectorNV, "VkPhysicalDeviceCooperativeMatrixDecodeVectorFeaturesNV::cooperativeMatrixDecodeVector"},
     {spv::CapabilityRayTracingSpheresGeometryNV, "VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV::spheres"},
     {spv::CapabilityRayTracingLinearSweptSpheresGeometryNV, "VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV::linearSweptSpheres"},
     {spv::CapabilityRayTracingClusterAccelerationStructureNV, "VkPhysicalDeviceClusterAccelerationStructureFeaturesNV::clusterAccelerationStructure"},
@@ -1251,6 +1311,7 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityPushConstantBanksNV, "VkPhysicalDevicePushConstantBankFeaturesNV::pushConstantBank"},
     {spv::CapabilityShaderInvocationReorderEXT, "VK_EXT_ray_tracing_invocation_reorder"},
     {spv::CapabilityTileShadingQCOM, "VkPhysicalDeviceTileShadingFeaturesQCOM::tileShading"},
+    {spv::CapabilitySplitBarrierEXT, "VkPhysicalDeviceShaderSplitBarrierFeaturesEXT::shaderSplitBarrier"},
     {spv::CapabilityTensorsARM, "VkPhysicalDeviceTensorFeaturesARM::shaderTensorAccess"},
     {spv::CapabilityStorageTensorArrayDynamicIndexingARM, "VkPhysicalDeviceTensorFeaturesARM::shaderStorageTensorArrayDynamicIndexing"},
     {spv::CapabilityStorageTensorArrayNonUniformIndexingARM, "VkPhysicalDeviceTensorFeaturesARM::shaderStorageTensorArrayNonUniformIndexing"},
@@ -1262,6 +1323,12 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityShader64BitIndexingEXT, "VkPhysicalDeviceShader64BitIndexingFeaturesEXT::shader64BitIndexing"},
     {spv::CapabilityLongVectorEXT, "VkPhysicalDeviceShaderLongVectorFeaturesEXT::longVector"},
     {spv::CapabilityDescriptorHeapEXT, "VkPhysicalDeviceDescriptorHeapFeaturesEXT::descriptorHeap"},
+    {spv::CapabilityDotProductFloat16AccFloat32VALVE, "VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE::shaderMixedFloatDotProductFloat16AccFloat32"},
+    {spv::CapabilityDotProductFloat16AccFloat16VALVE, "VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE::shaderMixedFloatDotProductFloat16AccFloat16"},
+    {spv::CapabilityDotProductBFloat16AccVALVE, "VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE::shaderMixedFloatDotProductBFloat16Acc"},
+    {spv::CapabilityDotProductFloat8AccFloat32VALVE, "VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE::shaderMixedFloatDotProductFloat8AccFloat32"},
+    {spv::CapabilityConstantDataKHR, "VkPhysicalDeviceShaderConstantDataFeaturesKHR::shaderConstantData"},
+    {spv::CapabilityAbortKHR, "VkPhysicalDeviceShaderAbortFeaturesKHR::shaderAbort"},
     };
 
     // VUs before catch unknown capabilities
@@ -1341,11 +1408,15 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
     {"SPV_KHR_device_group", {{vvl::Version::_VK_VERSION_1_1}, {vvl::Extension::_VK_KHR_device_group}}},
     {"SPV_QCOM_image_processing", {{vvl::Extension::_VK_QCOM_image_processing}}},
     {"SPV_QCOM_image_processing2", {{vvl::Extension::_VK_QCOM_image_processing2}}},
+    {"SPV_QCOM_image_processing3", {{vvl::Extension::_VK_QCOM_image_processing3}}},
     {"SPV_QCOM_cooperative_matrix_conversion", {{vvl::Extension::_VK_QCOM_cooperative_matrix_conversion}}},
+    {"SPV_QCOM_multiple_wait_queues", {{vvl::Extension::_VK_QCOM_shader_multiple_wait_queues}}},
     {"SPV_EXT_mesh_shader", {{vvl::Extension::_VK_EXT_mesh_shader}}},
     {"SPV_KHR_ray_tracing_position_fetch", {{vvl::Extension::_VK_KHR_ray_tracing_position_fetch}}},
     {"SPV_EXT_shader_tile_image", {{vvl::Extension::_VK_EXT_shader_tile_image}}},
-    {"SPV_EXT_opacity_micromap", {{vvl::Extension::_VK_EXT_opacity_micromap}}},
+    {"SPV_EXT_opacity_micromap", {{vvl::Extension::_VK_EXT_opacity_micromap}, {vvl::Extension::_VK_KHR_opacity_micromap}}},
+    {"SPV_KHR_opacity_micromap", {{vvl::Extension::_VK_KHR_opacity_micromap}}},
+    {"SPV_EXT_split_barrier", {{vvl::Extension::_VK_EXT_shader_split_barrier}}},
     {"SPV_KHR_cooperative_matrix", {{vvl::Extension::_VK_KHR_cooperative_matrix}}},
     {"SPV_ARM_core_builtins", {{vvl::Extension::_VK_ARM_shader_core_builtins}}},
     {"SPV_HUAWEI_cluster_culling_shader", {{vvl::Extension::_VK_HUAWEI_cluster_culling_shader}}},
@@ -1363,6 +1434,7 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
     {"SPV_EXT_replicated_composites", {{vvl::Extension::_VK_EXT_shader_replicated_composites}}},
     {"SPV_KHR_relaxed_extended_instruction", {{vvl::Extension::_VK_KHR_shader_relaxed_extended_instruction}}},
     {"SPV_NV_cooperative_matrix2", {{vvl::Extension::_VK_NV_cooperative_matrix2}}},
+    {"SPV_NV_cooperative_matrix_decode_vector", {{vvl::Extension::_VK_NV_cooperative_matrix_decode_vector}}},
     {"SPV_NV_tensor_addressing", {{vvl::Extension::_VK_NV_cooperative_matrix2}}},
     {"SPV_NV_linear_swept_spheres", {{vvl::Extension::_VK_NV_ray_tracing_linear_swept_spheres}}},
     {"SPV_NV_cluster_acceleration_structure", {{vvl::Extension::_VK_NV_cluster_acceleration_structure}}},
@@ -1378,6 +1450,9 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
     {"SPV_EXT_long_vector", {{vvl::Extension::_VK_EXT_shader_long_vector}}},
     {"SPV_EXT_descriptor_heap", {{vvl::Extension::_VK_EXT_descriptor_heap}}},
     {"SPV_VALVE_mixed_float_dot_product", {{vvl::Extension::_VK_VALVE_shader_mixed_float_dot_product}}},
+    {"SPV_KHR_abort", {{vvl::Extension::_VK_KHR_shader_abort}}},
+    {"SPV_KHR_constant_data", {{vvl::Extension::_VK_KHR_shader_constant_data}}},
+    {"SPV_EXT_ocp_microscaling_types", {{vvl::Extension::_VK_EXT_shader_ocp_microscaling_types}}},
     };
 
     // VUs before catch unknown extensions

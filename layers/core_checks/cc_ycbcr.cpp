@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+/* Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (C) 2015-2023 Google Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
@@ -34,10 +34,10 @@ bool CoreChecks::FormatRequiresYcbcrConversionExplicitly(const VkFormat format) 
     return vkuFormatRequiresYcbcrConversion(format);
 }
 
-bool CoreChecks::PreCallValidateCreateSamplerYcbcrConversion(VkDevice device, const VkSamplerYcbcrConversionCreateInfo *pCreateInfo,
-                                                             const VkAllocationCallbacks *pAllocator,
-                                                             VkSamplerYcbcrConversion *pYcbcrConversion,
-                                                             const ErrorObject &error_obj) const {
+bool CoreChecks::PreCallValidateCreateSamplerYcbcrConversion(VkDevice device, const VkSamplerYcbcrConversionCreateInfo* pCreateInfo,
+                                                             const VkAllocationCallbacks* pAllocator,
+                                                             VkSamplerYcbcrConversion* pYcbcrConversion,
+                                                             const ErrorObject& error_obj) const {
     bool skip = false;
     const VkFormat conversion_format = pCreateInfo->format;
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -61,13 +61,11 @@ bool CoreChecks::PreCallValidateCreateSamplerYcbcrConversion(VkDevice device, co
     // (vkspec.html#potential-format-features)
     VkFormatFeatureFlags2 format_features = ~0ULL;
     if (conversion_format == VK_FORMAT_UNDEFINED) {
-        // only check for external format inside VK_FORMAT_UNDEFINED check to prevent unnecessary extra errors from no format
-        // features being supported
-        if (external_format != 0) {
-            auto it = device_state->ahb_ext_formats_map.find(external_format);
-            if (it != device_state->ahb_ext_formats_map.end()) {
-                format_features = it->second;
-            }
+        format_features = device_state->GetExternalFormatFeaturesANDROID(pCreateInfo->pNext);
+        if (format_features == 0) {
+            // only check for external format inside VK_FORMAT_UNDEFINED check to prevent unnecessary extra errors from no format
+            // features being supported
+            format_features = ~0ULL;
         }
     } else {
         format_features = GetPotentialFormatFeatures(conversion_format);
@@ -136,9 +134,9 @@ bool CoreChecks::PreCallValidateCreateSamplerYcbcrConversion(VkDevice device, co
 }
 
 bool CoreChecks::PreCallValidateCreateSamplerYcbcrConversionKHR(VkDevice device,
-                                                                const VkSamplerYcbcrConversionCreateInfo *pCreateInfo,
-                                                                const VkAllocationCallbacks *pAllocator,
-                                                                VkSamplerYcbcrConversion *pYcbcrConversion,
-                                                                const ErrorObject &error_obj) const {
+                                                                const VkSamplerYcbcrConversionCreateInfo* pCreateInfo,
+                                                                const VkAllocationCallbacks* pAllocator,
+                                                                VkSamplerYcbcrConversion* pYcbcrConversion,
+                                                                const ErrorObject& error_obj) const {
     return PreCallValidateCreateSamplerYcbcrConversion(device, pCreateInfo, pAllocator, pYcbcrConversion, error_obj);
 }

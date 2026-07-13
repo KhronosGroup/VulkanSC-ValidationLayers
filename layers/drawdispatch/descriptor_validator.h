@@ -1,6 +1,6 @@
-/* Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
+/* Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
  * Copyright (c) 2025 Arm Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,10 +22,10 @@
 
 namespace spirv {
 struct ResourceInterfaceVariable;
+struct ImageInstruction;
 }  // namespace spirv
 
 namespace vvl {
-struct DrawDispatchVuid;
 class DescriptorBinding;
 class DeviceProxy;
 class BufferDescriptor;
@@ -38,6 +38,8 @@ class CommandBuffer;
 class Sampler;
 class DescriptorSet;
 class TensorDescriptor;
+class Image;
+class ImageView;
 
 class DescriptorValidator : public Logger {
   public:
@@ -82,6 +84,21 @@ class DescriptorValidator : public Logger {
     bool ValidateSamplerDescriptor(const spirv::ResourceInterfaceVariable& binding_info, uint32_t index, VkSampler sampler,
                                    bool is_immutable, const vvl::Sampler* sampler_state) const;
 
+    // Validate samplers that were used with an image (and we have the image info)
+    bool ValidateImageSamplerDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                                        VkDescriptorType descriptor_type, const spirv::ImageInstruction& image_insn,
+                                        const vvl::ImageView& image_view_state, const vvl::Sampler& sampler_state) const;
+
+    bool ValidateSampledImageDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                                        VkDescriptorType descriptor_type, const spirv::ImageInstruction& image_insn,
+                                        const vvl::ImageView& image_view_state, const vvl::Image& image_state) const;
+    bool ValidateImageAttachmentDescriptor(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                                           VkDescriptorType descriptor_type, const vvl::ImageView& image_view_state) const;
+
+    bool ValidateImageDescriptorQCOM(const spirv::ResourceInterfaceVariable& binding_info, const uint32_t index,
+                                     VkDescriptorType descriptor_type, const vvl::ImageDescriptor& image_descriptor,
+                                     bool has_sampler) const;
+
     std::string DescribeDescriptor(const spirv::ResourceInterfaceVariable& binding_info, uint32_t index,
                                    VkDescriptorType type) const;
 
@@ -93,7 +110,6 @@ class DescriptorValidator : public Logger {
     vvl::DescriptorSet& descriptor_set;
     const VkFramebuffer framebuffer;
     LocationCapture loc;
-    const DrawDispatchVuid* vuids;
 
     const std::vector<uint32_t>* original_spirv;
     uint32_t instruction_position_offset;

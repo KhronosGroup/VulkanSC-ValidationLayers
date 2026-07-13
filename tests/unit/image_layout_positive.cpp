@@ -9,10 +9,10 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/render_pass_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
+#include "render_pass_helper.h"
 
 class PositiveImageLayout : public ImageTest {};
 
@@ -41,7 +41,7 @@ TEST_F(PositiveImageLayout, BarriersAndImageUsage) {
         vkt::Image img_sampled(*m_device, 32, 32, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
         vkt::Image img_input(*m_device, 128, 128, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
         const struct {
-            vkt::Image &image_obj;
+            vkt::Image& image_obj;
             VkImageLayout old_layout;
             VkImageLayout new_layout;
         } buffer_layouts[] = {
@@ -110,8 +110,8 @@ TEST_F(PositiveImageLayout, ImagelessTracking) {
     RETURN_IF_SKIP(InitState(nullptr, &create_device_pnext));
     RETURN_IF_SKIP(InitSwapchain(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT));
 
-    uint32_t attachmentWidth = m_surface_capabilities.minImageExtent.width;
-    uint32_t attachmentHeight = m_surface_capabilities.minImageExtent.height;
+    uint32_t attachmentWidth = GetSwapchainExtent(m_surface_capabilities).width;
+    uint32_t attachmentHeight = GetSwapchainExtent(m_surface_capabilities).height;
     VkFormat attachmentFormat = m_surface_formats[0].format;
 
     RenderPassSingleSubpass rp(*this);
@@ -148,8 +148,9 @@ TEST_F(PositiveImageLayout, ImagelessTracking) {
 
     const std::vector<VkImage> swapchain_images = m_swapchain.GetImages();
 
-    vkt::Semaphore image_acquired(*m_device);
+    vkt::Fence image_acquired(*m_device);
     const uint32_t current_buffer = m_swapchain.AcquireNextImage(image_acquired, kWaitTimeout);
+    image_acquired.Wait(kWaitTimeout);
 
     vkt::ImageView imageView = image.CreateView();
     VkFramebufferAttachmentImageInfo framebufferAttachmentImageInfo = {VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO_KHR,
@@ -169,7 +170,7 @@ TEST_F(PositiveImageLayout, ImagelessTracking) {
                                                      VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT,
                                                      rp,
                                                      1,
-                                                     reinterpret_cast<const VkImageView *>(1),
+                                                     reinterpret_cast<const VkImageView*>(1),
                                                      attachmentWidth,
                                                      attachmentHeight,
                                                      1};
@@ -189,7 +190,7 @@ TEST_F(PositiveImageLayout, ImagelessTracking) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    m_default_queue->Present(m_swapchain, current_buffer, image_acquired);
+    m_default_queue->Present(m_swapchain, current_buffer, vkt::no_semaphore);
     m_default_queue->Wait();
 }
 
@@ -202,8 +203,8 @@ TEST_F(PositiveImageLayout, Subresource) {
 
     m_command_buffer.Begin();
     const VkImageSubresourceRange subresource_range = image.SubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-    auto barrier = image.ImageMemoryBarrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-                                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresource_range);
+    auto barrier =
+        image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresource_range);
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
                            0, nullptr, 1, &barrier);
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
@@ -528,7 +529,7 @@ TEST_F(PositiveImageLayout, DescriptorArray) {
     RETURN_IF_SKIP(Init());
     RETURN_IF_SKIP(InitRenderTarget());
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_nonuniform_qualifier : enable
         layout(set = 0, binding = 0) uniform UBO { uint index; };
@@ -557,7 +558,7 @@ TEST_F(PositiveImageLayout, DescriptorArray) {
     pipe.CreateGraphicsPipeline();
 
     vkt::Buffer in_buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *in_buffer_ptr = (uint32_t *)in_buffer.Memory().Map();
+    uint32_t* in_buffer_ptr = (uint32_t*)in_buffer.Memory().Map();
     in_buffer_ptr[0] = 1;
 
     vkt::Image bad_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
@@ -903,7 +904,7 @@ TEST_F(PositiveImageLayout, DepthSliceTransitionCriteriaNotMet) {
     layout_transition.image = image;
     layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450 core
         layout (rgba8, set = 0, binding = 0) uniform image2D verifyImage;
         void main (void) {
@@ -1369,7 +1370,54 @@ TEST_F(PositiveImageLayout, CopyColorToDepthOnTransferQueue) {
     copy_region.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
     copy_region.srcOffset = {0, 0, 0};
     copy_region.dstOffset = {0, 0, 0};
-    copy_region.extent = {1, 1, 1};
+    copy_region.extent = {32, 32, 1};
 
     vk::CmdCopyImage(cb, src_image, VK_IMAGE_LAYOUT_GENERAL, depth_image, VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
+}
+
+TEST_F(PositiveImageLayout, DynamicRenderingDepthAttachmentResolveLayout) {
+    TEST_DESCRIPTION("Depth resolve attachment layout");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat depth_format = FindSupportedDepthOnlyFormat(Gpu());
+
+    VkPhysicalDeviceDepthStencilResolveProperties depth_stencil_resolve_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(depth_stencil_resolve_properties);
+    if ((depth_stencil_resolve_properties.supportedDepthResolveModes & VK_RESOLVE_MODE_MIN_BIT) == 0) {
+        GTEST_SKIP() << "VK_RESOLVE_MODE_MIN_BIT not supported";
+    }
+
+    VkImageCreateInfo image_ci = vkt::Image::ImageCreateInfo2D(
+        128, 128, 1, 1, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    vkt::Image image(*m_device, image_ci);
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    vkt::Image resolve_image(*m_device, image_ci);
+    vkt::ImageView resolve_image_view = resolve_image.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    VkRenderingAttachmentInfo depth_attachment = vku::InitStructHelper();
+    depth_attachment.imageView = image_view;
+    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    depth_attachment.resolveMode = VK_RESOLVE_MODE_MIN_BIT;
+    depth_attachment.resolveImageView = resolve_image_view;
+    depth_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea.extent = {128, 128};
+    rendering_info.layerCount = 1;
+    rendering_info.pDepthAttachment = &depth_attachment;
+
+    VkClearDepthStencilValue clear_value{};
+    VkImageSubresourceRange clear_subresource{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    vk::CmdClearDepthStencilImage(m_command_buffer, resolve_image, VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &clear_subresource);
+    m_command_buffer.BeginRendering(rendering_info);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }

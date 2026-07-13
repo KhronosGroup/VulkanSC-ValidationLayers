@@ -15,9 +15,9 @@
  */
 
 #include <gtest/gtest.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 #include "generated/vk_function_pointers.h"
 
 void GpuAVBufferDeviceAddressTest::InitGpuVUBufferDeviceAddress(bool safe_mode) {
@@ -37,7 +37,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd140) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, buffer_reference_align = 16) buffer bufStruct;
@@ -81,14 +81,14 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd140) {
     const uint32_t storage_buffer_size = 16 * 4;
     vkt::Buffer storage_buffer(*m_device, storage_buffer_size, 0, vkt::device_address);
 
-    auto *uniform_buffer_ptr = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
+    auto* uniform_buffer_ptr = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = storage_buffer.Address();
     uniform_buffer_ptr[1] = 4;
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Make sure shader wrote 42
-    auto *storage_buffer_ptr = static_cast<uint32_t *>(storage_buffer.Memory().Map());
+    auto* storage_buffer_ptr = static_cast<uint32_t*>(storage_buffer.Memory().Map());
     for (int i = 0; i < 4; ++i) {
         ASSERT_EQ(*storage_buffer_ptr, 42);
         storage_buffer_ptr += 4;
@@ -102,7 +102,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd140NumerousAddressRanges) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, buffer_reference_align = 16) buffer bufStruct;
@@ -152,14 +152,14 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd140NumerousAddressRanges) {
         (void)dummy_storage_buffers.emplace_back(*m_device, storage_buffer_size, 0, vkt::device_address).Address();
     }
 
-    auto *uniform_buffer_ptr = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
+    auto* uniform_buffer_ptr = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = storage_buffer.Address();
     uniform_buffer_ptr[1] = 4;
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Make sure shader wrote 42
-    auto *storage_buffer_ptr = static_cast<uint32_t *>(storage_buffer.Memory().Map());
+    auto* storage_buffer_ptr = static_cast<uint32_t*>(storage_buffer.Memory().Map());
     for (int i = 0; i < 4; ++i) {
         ASSERT_EQ(*storage_buffer_ptr, 42);
         storage_buffer_ptr += 4;
@@ -171,7 +171,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd430) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, buffer_reference_align = 16) buffer bufStruct;
@@ -215,14 +215,14 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd430) {
     const uint32_t storage_buffer_size = 4 * 4;
     vkt::Buffer storage_buffer(*m_device, storage_buffer_size, 0, vkt::device_address);
 
-    auto *uniform_buffer_ptr = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
+    auto* uniform_buffer_ptr = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = storage_buffer.Address();
     uniform_buffer_ptr[1] = 4;
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Make sure shader wrote 42
-    auto *storage_buffer_ptr = static_cast<uint32_t *>(storage_buffer.Memory().Map());
+    auto* storage_buffer_ptr = static_cast<uint32_t*>(storage_buffer.Memory().Map());
     for (int i = 0; i < 4; ++i) {
         ASSERT_EQ(storage_buffer_ptr[i], 42);
     }
@@ -232,7 +232,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreExplicitOffset) {
     TEST_DESCRIPTION("Do a OpStore to a PhysicalStorageBuffer");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -261,7 +261,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreExplicitOffset) {
     vkt::Buffer bda_buffer(*m_device, 64, 0, vkt::device_address);
 
     VkDeviceAddress buffer_ptr = bda_buffer.Address();
-    uint8_t *in_buffer_ptr = (uint8_t *)in_buffer.Memory().Map();
+    uint8_t* in_buffer_ptr = (uint8_t*)in_buffer.Memory().Map();
     memcpy(in_buffer_ptr, &buffer_ptr, sizeof(VkDeviceAddress));
 
     pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -276,8 +276,8 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreExplicitOffset) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    uint8_t *bda_buffer_ptr = (uint8_t *)bda_buffer.Memory().Map();
-    uint32_t output = *((uint32_t *)(bda_buffer_ptr + 32));
+    uint8_t* bda_buffer_ptr = (uint8_t*)bda_buffer.Memory().Map();
+    uint32_t output = *((uint32_t*)(bda_buffer_ptr + 32));
     ASSERT_TRUE(output == 0xca7);
 }
 
@@ -285,7 +285,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StructLoad) {
     TEST_DESCRIPTION("Do a OpLoad through a struct PhysicalStorageBuffer");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -320,14 +320,14 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StructLoad) {
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
 
     float expected_output = 0x00EEAADD;
-    uint8_t *block_buffer_ptr = (uint8_t *)block_buffer.Memory().Map();
+    uint8_t* block_buffer_ptr = (uint8_t*)block_buffer.Memory().Map();
     memcpy(block_buffer_ptr, &expected_output, sizeof(float));
 
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
     VkDeviceAddress block_ptr = block_buffer.Address();
 
-    uint8_t *in_buffer_ptr = (uint8_t *)in_buffer.Memory().Map();
+    uint8_t* in_buffer_ptr = (uint8_t*)in_buffer.Memory().Map();
     memcpy(in_buffer_ptr, &block_ptr, sizeof(VkDeviceAddress));
 
     pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -342,7 +342,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StructLoad) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    float output = *((float *)(in_buffer_ptr + sizeof(VkDeviceAddress)));
+    float output = *((float*)(in_buffer_ptr + sizeof(VkDeviceAddress)));
     ASSERT_TRUE(output == expected_output);
 }
 
@@ -352,7 +352,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StructLoadPadded) {
     TEST_DESCRIPTION("Do a OpLoad through a padded struct PhysicalStorageBuffer");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -389,14 +389,14 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StructLoadPadded) {
     vkt::Buffer block_buffer(*m_device, 32, 0, vkt::device_address);
 
     float expected_output = 0x00EEAADD;
-    uint8_t *block_buffer_ptr = (uint8_t *)block_buffer.Memory().Map();
+    uint8_t* block_buffer_ptr = (uint8_t*)block_buffer.Memory().Map();
     memcpy(block_buffer_ptr + 24, &expected_output, sizeof(float));
 
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
     VkDeviceAddress block_ptr = block_buffer.Address();
 
-    uint8_t *in_buffer_ptr = (uint8_t *)in_buffer.Memory().Map();
+    uint8_t* in_buffer_ptr = (uint8_t*)in_buffer.Memory().Map();
     memcpy(in_buffer_ptr, &block_ptr, sizeof(VkDeviceAddress));
 
     pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -411,7 +411,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StructLoadPadded) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    float output = *((float *)(in_buffer_ptr + sizeof(VkDeviceAddress)));
+    float output = *((float*)(in_buffer_ptr + sizeof(VkDeviceAddress)));
     ASSERT_TRUE(output == expected_output);
 }
 
@@ -420,7 +420,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, UVec3Array) {
     AddRequiredFeature(vkt::Feature::scalarBlockLayout);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_EXT_scalar_block_layout : enable
@@ -454,7 +454,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, UVec3Array) {
     VkDeviceAddress block_ptr = block_buffer.Address();
     const uint32_t n_reads = 4;  // uvec3[0] to uvec3[3]
 
-    uint8_t *in_buffer_ptr = (uint8_t *)in_buffer.Memory().Map();
+    uint8_t* in_buffer_ptr = (uint8_t*)in_buffer.Memory().Map();
     memcpy(in_buffer_ptr, &block_ptr, sizeof(VkDeviceAddress));
     memcpy(in_buffer_ptr + sizeof(VkDeviceAddress), &n_reads, sizeof(uint32_t));
 
@@ -475,7 +475,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ArrayOfStruct) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(std430, buffer_reference) buffer T1 {
@@ -513,7 +513,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ArrayOfStruct) {
 
     vkt::Buffer storage_buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    uint8_t *buffer_ptr = (uint8_t *)storage_buffer.Memory().Map();
+    uint8_t* buffer_ptr = (uint8_t*)storage_buffer.Memory().Map();
     const uint32_t index = 0;
     memcpy(buffer_ptr, &index, sizeof(uint32_t));
     memcpy(buffer_ptr + (1 * sizeof(VkDeviceAddress)), &block_ptr, sizeof(VkDeviceAddress));
@@ -537,7 +537,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, BitCastUvec2) {
     TEST_DESCRIPTION("test loading and storing with GL_EXT_buffer_reference_uvec2");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_EXT_buffer_reference_uvec2 : enable
@@ -569,12 +569,12 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, BitCastUvec2) {
     VkDeviceAddress block_a_ptr = buffer_node_a.Address();
     VkDeviceAddress block_b_ptr = buffer_node_b.Address();
 
-    auto *buffer_ptr = static_cast<uint32_t *>(buffer_node_b.Memory().Map());
+    auto* buffer_ptr = static_cast<uint32_t*>(buffer_node_b.Memory().Map());
     *buffer_ptr = 1234;  // data to pass
 
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    uint8_t *in_buffer_ptr = (uint8_t *)in_buffer.Memory().Map();
+    uint8_t* in_buffer_ptr = (uint8_t*)in_buffer.Memory().Map();
     memcpy(in_buffer_ptr, &block_a_ptr, sizeof(VkDeviceAddress));
     memcpy(in_buffer_ptr + sizeof(VkDeviceAddress), &block_b_ptr, sizeof(VkDeviceAddress));
 
@@ -590,7 +590,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, BitCastUvec2) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    buffer_ptr = static_cast<uint32_t *>(buffer_node_a.Memory().Map());
+    buffer_ptr = static_cast<uint32_t*>(buffer_node_a.Memory().Map());
     ASSERT_TRUE(*buffer_ptr == 1234);
 }
 
@@ -613,7 +613,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreRelaxedBlockLayout) {
     //     ssbo.ptr.f = 42.0;
     //     ssbo.ptr.v = uvec3(1.0, 2.0, 3.0);
     // }
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpMemoryModel PhysicalStorageBuffer64 GLSL450
@@ -692,13 +692,13 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreRelaxedBlockLayout) {
     const uint32_t storage_buffer_size = 4 * sizeof(float);  // float + vec3
     vkt::Buffer storage_buffer(*m_device, storage_buffer_size, 0, vkt::device_address);
 
-    auto *uniform_buffer_ptr = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
+    auto* uniform_buffer_ptr = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = storage_buffer.Address();
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Make sure shader wrote to float and vec3
-    auto *storage_buffer_ptr = static_cast<float *>(storage_buffer.Memory().Map());
+    auto* storage_buffer_ptr = static_cast<float*>(storage_buffer.Memory().Map());
     ASSERT_EQ(storage_buffer_ptr[0], 42.0f);
     ASSERT_EQ(storage_buffer_ptr[1], 1.0f);
     ASSERT_EQ(storage_buffer_ptr[2], 2.0f);
@@ -714,7 +714,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreScalarBlockLayout) {
 
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_scalar_block_layout : enable
         #extension GL_EXT_buffer_reference : enable
@@ -755,12 +755,12 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreScalarBlockLayout) {
     const uint32_t storage_buffer_size = 4 * sizeof(float);  // float + vec3
     vkt::Buffer storage_buffer(*m_device, storage_buffer_size, 0, vkt::device_address);
 
-    auto *uniform_buffer_ptr = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
+    auto* uniform_buffer_ptr = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = storage_buffer.Address();
     m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Make sure shader wrote to float and vec3
-    auto *storage_buffer_ptr = static_cast<float *>(storage_buffer.Memory().Map());
+    auto* storage_buffer_ptr = static_cast<float*>(storage_buffer.Memory().Map());
     ASSERT_EQ(storage_buffer_ptr[0], 42.0f);
     ASSERT_EQ(storage_buffer_ptr[1], 1.0f);
     ASSERT_EQ(storage_buffer_ptr[2], 2.0f);
@@ -775,7 +775,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd430LinkedList) {
     const uint32_t uniform_buffer_size = 3 * sizeof(VkDeviceAddress);
     vkt::Buffer uniform_buffer(*m_device, uniform_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -821,7 +821,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd430LinkedList) {
     constexpr size_t nodes_count = 3;
     const uint32_t storage_buffer_size = (4 * sizeof(float)) + sizeof(VkDeviceAddress);
     std::vector<vkt::Buffer> storage_buffers;
-    auto *uniform_buffer_ptr = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
+    auto* uniform_buffer_ptr = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
 
     for (size_t i = 0; i < nodes_count; ++i) {
         const VkDeviceAddress addr = storage_buffers.emplace_back(*m_device, storage_buffer_size, 0, vkt::device_address).Address();
@@ -832,7 +832,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, StoreStd430LinkedList) {
 
     // Make sure shader wrote values to all nodes
     for (auto [buffer_i, buffer] : vvl::enumerate(storage_buffers)) {
-        auto storage_buffer_ptr = static_cast<float *>(buffer.Memory().Map());
+        auto storage_buffer_ptr = static_cast<float*>(buffer.Memory().Map());
 
         ASSERT_EQ(storage_buffer_ptr[0], float(3 * buffer_i + 1));
         ASSERT_EQ(storage_buffer_ptr[1], float(3 * buffer_i + 2));
@@ -845,7 +845,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleBufferReferenceBlocks) {
 
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -897,15 +897,15 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleBufferReferenceBlocks) {
     const uint32_t bar_storage_buffer_size = sizeof(float) + sizeof(int32_t) + 4 * sizeof(float);
     vkt::Buffer bar_storage_buffer(*m_device, bar_storage_buffer_size, 0, vkt::device_address);
 
-    auto *uniform_buffer_ptr = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
+    auto* uniform_buffer_ptr = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = foo_storage_buffer.Address();
     uniform_buffer_ptr[1] = bar_storage_buffer.Address();
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Make sure shader wrote to float and vec3
-    auto *foo_ptr = static_cast<int *>(foo_storage_buffer.Memory().Map());
-    auto *bar_ptr = static_cast<int *>(bar_storage_buffer.Memory().Map());
+    auto* foo_ptr = static_cast<int*>(foo_storage_buffer.Memory().Map());
+    auto* bar_ptr = static_cast<int*>(bar_storage_buffer.Memory().Map());
     ASSERT_EQ(bar_ptr[0], 42);
     ASSERT_EQ(foo_ptr[3], bar_ptr[0]);
 }
@@ -915,7 +915,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, LoadStoreStruct) {
 
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_scalar_block_layout : enable
         #extension GL_EXT_buffer_reference : enable
@@ -969,7 +969,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, LoadStoreStruct) {
     vkt::Buffer storage_buffer(*m_device, storage_buffer_size, 0, vkt::device_address);
 
     // Write vertex 0
-    auto vertex_buffer_ptr = static_cast<Vertex *>(storage_buffer.Memory().Map());
+    auto vertex_buffer_ptr = static_cast<Vertex*>(storage_buffer.Memory().Map());
     vertex_buffer_ptr[0].x = 1.0f;
     vertex_buffer_ptr[0].y = 2.0f;
     vertex_buffer_ptr[0].z = 3.0f;
@@ -981,7 +981,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, LoadStoreStruct) {
     vertex_buffer_ptr[0].uv[0] = 7.0f;
     vertex_buffer_ptr[0].uv[1] = 8.0f;
 
-    auto data = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     data[0] = storage_buffer.Address();
 
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -1022,7 +1022,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ConcurrentAccessesToBdaBuffer) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -1054,11 +1054,11 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ConcurrentAccessesToBdaBuffer) {
     std::vector<vkt::CommandBuffer> cmd_buffers;
     std::vector<vkt::Buffer> storage_buffers;
     for (int i = 0; i < 64; ++i) {
-        auto &cb = cmd_buffers.emplace_back(*m_device, m_command_pool);
+        auto& cb = cmd_buffers.emplace_back(*m_device, m_command_pool);
 
         // Create a storage buffer and get its address,
         // effectively adding it to the BDA table
-        auto &storage_buffer = storage_buffers.emplace_back(*m_device, storage_buffer_size, 0, vkt::device_address);
+        auto& storage_buffer = storage_buffers.emplace_back(*m_device, storage_buffer_size, 0, vkt::device_address);
 
         auto storage_buffer_addr = storage_buffer.Address();
 
@@ -1082,7 +1082,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ProxyStructLoad) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8073");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 460
         #extension GL_EXT_scalar_block_layout : require
         #extension GL_EXT_buffer_reference2 : require
@@ -1115,7 +1115,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ProxyStructLoad) {
     vkt::Buffer in_buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
     VkDeviceAddress buffer_ptr = bda_buffer.Address();
-    uint8_t *in_buffer_ptr = (uint8_t *)in_buffer.Memory().Map();
+    uint8_t* in_buffer_ptr = (uint8_t*)in_buffer.Memory().Map();
     memcpy(in_buffer_ptr, &buffer_ptr, sizeof(VkDeviceAddress));
 
     pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1135,7 +1135,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ProxyStructLoadLinkedList) {
     TEST_DESCRIPTION("Make sure we don't get in an infinite loop searching for BDA length");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -1169,7 +1169,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ProxyStructUnsafe) {
     TEST_DESCRIPTION("Make sure the range for a struct load is the whole struct.");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress(false));
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 460
         #extension GL_EXT_buffer_reference2 : require
 
@@ -1221,7 +1221,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ProxyStructUnsafe) {
     vkt::Buffer ssbo_buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
     VkDeviceAddress bda_buffer_addr = bda_buffer.Address();
-    uint8_t *ssbo_buffer_ptr = (uint8_t *)ssbo_buffer.Memory().Map();
+    uint8_t* ssbo_buffer_ptr = (uint8_t*)ssbo_buffer.Memory().Map();
     memcpy(ssbo_buffer_ptr, &bda_buffer_addr, sizeof(VkDeviceAddress));
 
     descriptor_set.WriteDescriptorBufferInfo(0, ssbo_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1243,7 +1243,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, BasicRangeUnsafe) {
     TEST_DESCRIPTION("Simple test to examine how we do the range check in unsafe mode.");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress(false));
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 460
         #extension GL_EXT_buffer_reference2 : require
 
@@ -1303,7 +1303,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, NonStructPointer) {
 
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         uniform uint* data_ptr;
         [numthreads(1,1,1)]
         void main() {
@@ -1319,7 +1319,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, NonStructPointer) {
     vkt::Buffer block_buffer(*m_device, 256, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto in_buffer_ptr = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto in_buffer_ptr = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     in_buffer_ptr[0] = block_buffer.Address();
 
     pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE);
@@ -1334,7 +1334,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, NonStructPointer) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    auto block_buffer_ptr = static_cast<uint32_t *>(block_buffer.Memory().Map());
+    auto block_buffer_ptr = static_cast<uint32_t*>(block_buffer.Memory().Map());
     ASSERT_TRUE(block_buffer_ptr[2] == 999);
 }
 
@@ -1345,7 +1345,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleAccessChains) {
 
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         struct Data {
             uint x;
             uint payload[16]; // last item is OOB
@@ -1360,7 +1360,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleAccessChains) {
     vkt::Buffer bda_buffer(*m_device, 64, 0, vkt::device_address);
     vkt::Buffer ubo_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto ubo_buffer_ptr = static_cast<VkDeviceAddress *>(ubo_buffer.Memory().Map());
+    auto ubo_buffer_ptr = static_cast<VkDeviceAddress*>(ubo_buffer.Memory().Map());
     ubo_buffer_ptr[0] = bda_buffer.Address();
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
@@ -1391,7 +1391,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, DescriptorStructPointerSlang) {
     RETURN_IF_SKIP(CheckSlangSupport());
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress(false));
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         struct Data {
             int32_t x;
         }
@@ -1405,7 +1405,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, DescriptorStructPointerSlang) {
     vkt::Buffer bda_buffer(*m_device, 4, 0, vkt::device_address);
     vkt::Buffer ubo_buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto ubo_buffer_ptr = static_cast<VkDeviceAddress *>(ubo_buffer.Memory().Map());
+    auto ubo_buffer_ptr = static_cast<VkDeviceAddress*>(ubo_buffer.Memory().Map());
     ubo_buffer_ptr[0] = bda_buffer.Address();
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
@@ -1439,7 +1439,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PushConstantStructPointerSlang) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress(false));
     InitRenderTarget();
 
-    const char *vert_source = R"(
+    const char* vert_source = R"(
         float4 operator*(float4x4 a, float4 b) { return mul(b, a); }
 
         struct PerFrame {
@@ -1492,7 +1492,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleStructPointerSlang) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress(false));
     InitRenderTarget();
 
-    const char *vert_source = R"(
+    const char* vert_source = R"(
         struct Data {
             float4 a;
             float4 b;
@@ -1544,83 +1544,6 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleStructPointerSlang) {
     pipe.CreateGraphicsPipeline();
 }
 
-TEST_F(PositiveGpuAVBufferDeviceAddress, MultipleAccessChainsDescriptorBuffer) {
-    TEST_DESCRIPTION("Slang will produce a chain of OpAccessChains");
-
-    RETURN_IF_SKIP(CheckSlangSupport());
-
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::descriptorBuffer);
-    RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
-
-    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
-    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
-
-    const char *slang_shader = R"slang(
-        struct Data {
-            uint x;
-            uint payload[16]; // last item is OOB
-        }
-        uniform Data* bda;
-        [numthreads(1,1,1)]
-        void main() {
-           uint a = bda->payload[0] * bda->payload[14];
-           bda->x = a;
-        }
-    )slang";
-    vkt::Buffer bda_buffer(*m_device, 64, 0, vkt::device_address);
-    vkt::Buffer ubo_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vkt::device_address);
-
-    auto ubo_buffer_ptr = static_cast<VkDeviceAddress *>(ubo_buffer.Memory().Map());
-    ubo_buffer_ptr[0] = bda_buffer.Address();
-
-    const VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
-
-    const VkDescriptorBindingFlags ds_binding_flags = 0;
-
-    VkDescriptorSetLayoutBindingFlagsCreateInfo flags_create_info = vku::InitStructHelper();
-    flags_create_info.bindingCount = 1u;
-    flags_create_info.pBindingFlags = &ds_binding_flags;
-
-    VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper(&flags_create_info);
-    ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
-    ds_layout_ci.bindingCount = 1u;
-    ds_layout_ci.pBindings = &binding;
-    vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_ci);
-
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&ds_layout});
-
-    CreateComputePipelineHelper pipe(*this);
-    pipe.cp_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
-    pipe.cs_ = VkShaderObj(*m_device, slang_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG);
-    pipe.cp_ci_.layout = pipeline_layout;
-    pipe.CreateComputePipeline();
-
-    vkt::Buffer descriptor_buffer(*m_device, 4096, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
-    uint8_t *descriptor_data = reinterpret_cast<uint8_t *>(descriptor_buffer.Memory().Map());
-    VkDeviceSize buffer_offset = ds_layout.GetDescriptorBufferBindingOffset(0);
-
-    vkt::DescriptorGetInfo buffer_get_info(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, ubo_buffer, ubo_buffer.CreateInfo().size);
-    vk::GetDescriptorEXT(*m_device, buffer_get_info, descriptor_buffer_properties.uniformBufferDescriptorSize,
-                         descriptor_data + buffer_offset);
-
-    VkDescriptorBufferBindingInfoEXT buffer_binding_info = vku::InitStructHelper();
-    buffer_binding_info.address = descriptor_buffer.Address();
-    buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
-    m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
-
-    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &buffer_binding_info);
-    uint32_t buffer_index = 0u;
-    VkDeviceSize offset = 0u;
-    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0u, 1u, &buffer_index,
-                                         &offset);
-    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
-    m_command_buffer.End();
-
-    m_default_queue->SubmitAndWait(m_command_buffer);
-}
-
 TEST_F(PositiveGpuAVBufferDeviceAddress, AtomicExchangeSlang) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
@@ -1641,7 +1564,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, AtomicExchangeSlang) {
     //     InterlockedExchange(*foo.a, 0);
     //     InterlockedExchange(*(x->b), 0);
     // }
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Int64
                OpCapability PhysicalStorageBufferAddresses
                OpCapability Shader
@@ -1703,7 +1626,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, AtomicExchangeSlang) {
     vkt::Buffer bda_buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto in_buffer_ptr = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto in_buffer_ptr = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     in_buffer_ptr[0] = bda_buffer.Address();
 
     CreateComputePipelineHelper pipe(*this);
@@ -1735,7 +1658,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MemoryModelOperand) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -1761,7 +1684,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MemoryModelOperand) {
     vkt::Buffer bda_buffer(*m_device, 128, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto in_buffer_ptr = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto in_buffer_ptr = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     in_buffer_ptr[0] = bda_buffer.Address();
 
     CreateComputePipelineHelper pipe(*this);
@@ -1789,7 +1712,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MemoryModelOperand2) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 460
         #pragma use_vulkan_memory_model
         #extension GL_KHR_memory_scope_semantics : enable
@@ -1823,7 +1746,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, MemoryModelOperand2) {
     vkt::Buffer bda_buffer(*m_device, 128, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto in_buffer_ptr = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto in_buffer_ptr = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     in_buffer_ptr[0] = bda_buffer.Address();
     in_buffer_ptr[1] = 0;  // set SSBO.a to be zero
 
@@ -1851,7 +1774,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, Atomics) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 460
         #pragma use_vulkan_memory_model
         #extension GL_KHR_memory_scope_semantics : enable
@@ -1877,7 +1800,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, Atomics) {
     vkt::Buffer bda_buffer(*m_device, 128, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto in_buffer_ptr = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto in_buffer_ptr = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     in_buffer_ptr[0] = bda_buffer.Address();
 
     CreateComputePipelineHelper pipe(*this);
@@ -1905,7 +1828,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, Atomics2) {
     AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -1940,7 +1863,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, Atomics2) {
     vkt::Buffer bda_buffer(*m_device, 64, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto in_buffer_ptr = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto in_buffer_ptr = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     in_buffer_ptr[0] = bda_buffer.Address();
 
     CreateComputePipelineHelper pipe(*this);
@@ -1964,7 +1887,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, AtomicsWorkgroups) {
     TEST_DESCRIPTION("Found case where a potential BDA points to a variable not in the function");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
 
         shared int x;
@@ -1993,7 +1916,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointer) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         RWStructuredBuffer<uint> result;
         struct Data{
            uint* node;
@@ -2008,7 +1931,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointer) {
     vkt::Buffer bda_buffer(*m_device, 32, 0, vkt::device_address);
     vkt::Buffer out_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto bda_buffer_ptr = static_cast<uint32_t *>(bda_buffer.Memory().Map());
+    auto bda_buffer_ptr = static_cast<uint32_t*>(bda_buffer.Memory().Map());
     bda_buffer_ptr[0] = 33;
     bda_buffer_ptr[1] = 66;
     bda_buffer_ptr[2] = 99;
@@ -2037,7 +1960,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointer) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    auto out_buffer_ptr = static_cast<uint32_t *>(out_buffer.Memory().Map());
+    auto out_buffer_ptr = static_cast<uint32_t*>(out_buffer.Memory().Map());
     ASSERT_TRUE(out_buffer_ptr[0] == 66);
 }
 
@@ -2049,7 +1972,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointerInStruct) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         RWStructuredBuffer<uint> result;
         struct Foo {
             uint pad_0;
@@ -2072,7 +1995,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointerInStruct) {
     vkt::Buffer bda_buffer(*m_device, 32, 0, vkt::device_address);
     vkt::Buffer out_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto bda_buffer_ptr = static_cast<uint32_t *>(bda_buffer.Memory().Map());
+    auto bda_buffer_ptr = static_cast<uint32_t*>(bda_buffer.Memory().Map());
     bda_buffer_ptr[0] = 33;
 
     VkPushConstantRange pc_range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, 64};
@@ -2099,7 +2022,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PieceOfDataPointerInStruct) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    auto out_buffer_ptr = static_cast<uint32_t *>(out_buffer.Memory().Map());
+    auto out_buffer_ptr = static_cast<uint32_t*>(out_buffer.Memory().Map());
     ASSERT_TRUE(out_buffer_ptr[0] == 33);
 }
 
@@ -2130,7 +2053,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, SharedPipelineLayoutSubsetGraphicsPushC
     pipeline_layout_ci.pushConstantRangeCount = 2;
     const vkt::PipelineLayout pipeline_layout_2(*m_device, pipeline_layout_ci);
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2148,7 +2071,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, SharedPipelineLayoutSubsetGraphicsPushC
         }
     )glsl";
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo_1 { uint c; };
         void main() {}
@@ -2226,7 +2149,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, SharedPipelineLayoutSubsetGraphicsPushC
     pipeline_layout_ci.pPushConstantRanges = push_constant_ranges.data();
     const vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci);
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2244,7 +2167,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, SharedPipelineLayoutSubsetGraphicsPushC
         }
     )glsl";
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo_1 { uint c; };
         void main() {}
@@ -2316,7 +2239,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PointerChain) {
     TEST_DESCRIPTION("Have BDA point to more BDA creating a chain");
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2353,13 +2276,13 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PointerChain) {
     pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE);
     pipe.descriptor_set_.UpdateDescriptorSets();
 
-    auto buffer_ptr = (VkDeviceAddress *)in_buffer.Memory().Map();
+    auto buffer_ptr = (VkDeviceAddress*)in_buffer.Memory().Map();
     buffer_ptr[0] = ssbo_c_buffer.Address();
 
-    buffer_ptr = (VkDeviceAddress *)ssbo_c_buffer.Memory().Map();
+    buffer_ptr = (VkDeviceAddress*)ssbo_c_buffer.Memory().Map();
     buffer_ptr[0] = ssbo_b_buffer.Address();
 
-    buffer_ptr = (VkDeviceAddress *)ssbo_b_buffer.Memory().Map();
+    buffer_ptr = (VkDeviceAddress*)ssbo_b_buffer.Memory().Map();
     buffer_ptr[0] = ssbo_a_buffer.Address();
 
     m_command_buffer.Begin();
@@ -2371,7 +2294,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, PointerChain) {
 
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    auto out_buffer_ptr = (uint32_t *)ssbo_a_buffer.Memory().Map();
+    auto out_buffer_ptr = (uint32_t*)ssbo_a_buffer.Memory().Map();
     ASSERT_TRUE(out_buffer_ptr[0] == 42);
 }
 
@@ -2380,7 +2303,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, ManyAccessToSameStruct) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2444,7 +2367,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, GlobalInvocationIdIVec3) {
     // void main() {
     //     ptr.x = int(gl_GlobalInvocationID.x);
     // }
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_physical_storage_buffer"
@@ -2502,7 +2425,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, DualShaderLibrary) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2577,7 +2500,7 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, DualShaderLibraryDestroyModule) {
     RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
 
@@ -2646,4 +2569,41 @@ TEST_F(PositiveGpuAVBufferDeviceAddress, DualShaderLibraryDestroyModule) {
     exe_pipe_ci.layout = pipeline_layout;
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     ASSERT_TRUE(exe_pipe.initialized());
+}
+
+TEST_F(PositiveGpuAVBufferDeviceAddress, LinkingSameStruct) {
+    TEST_DESCRIPTION("https://gitlab.khronos.org/spirv/SPIR-V/-/issues/918");
+    RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
+
+    const char* shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference : require
+        #extension GL_EXT_scalar_block_layout : require
+        #extension GL_ARB_gpu_shader_int64 : require
+
+        // Matches that foudn in inst_buffer_device_address_range()
+        // to ensure the linking of structs work
+        struct Range {
+            uint64_t a;
+            uint64_t b;
+        };
+
+        layout(buffer_reference, buffer_reference_align = 8, scalar) buffer BufferDeviceAddressRanges {
+            Range bda_ranges;
+        };
+
+        layout(set = 0, binding = 0, scalar) buffer BuffAddrInputBuffer {
+            BufferDeviceAddressRanges bda_ranges_ptr;
+        };
+
+        void main() {
+            Range cache_range = bda_ranges_ptr.bda_ranges;
+            cache_range.a = 0;
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    pipe.cs_ = VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.CreateComputePipeline();
 }

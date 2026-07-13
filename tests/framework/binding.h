@@ -215,10 +215,11 @@ class QueueCreateInfoArray {
 
 class Device : public internal::Handle<VkDevice> {
   public:
-    explicit Device(VkPhysicalDevice phy, const VkDeviceCreateInfo &info) : physical_device_(phy) { Init(info); }
+    explicit Device(VkPhysicalDevice phy, const VkDeviceCreateInfo &info) : target_api_version_(VK_API_VERSION_1_0), physical_device_(phy) { Init(info); }
     explicit Device(VkPhysicalDevice phy, std::vector<const char *> &extension_names, VkPhysicalDeviceFeatures *features = nullptr,
-                    void *create_device_pnext = nullptr, bool all_queue_count = false)
-        : physical_device_(phy) {
+                    void *create_device_pnext = nullptr, bool all_queue_count = false,
+                    uint32_t target_api_version = VK_API_VERSION_1_0)
+        : target_api_version_(target_api_version), physical_device_(phy) {
         Init(extension_names, features, create_device_pnext, all_queue_count);
     }
 
@@ -257,7 +258,7 @@ class Device : public internal::Handle<VkDevice> {
     std::optional<uint32_t> ComputeOnlyQueueFamily() const;
     Queue *ComputeOnlyQueue() const;
 
-    // Dedicated transfer queue family: has tranfer but no graphics/compute
+    // Dedicated transfer queue family: has transfer but no graphics/compute
     std::optional<uint32_t> TransferOnlyQueueFamily() const;
     Queue *TransferOnlyQueue() const;
 
@@ -266,6 +267,7 @@ class Device : public internal::Handle<VkDevice> {
     Queue *NonGraphicsQueue() const;
 
     uint32_t graphics_queue_node_index_ = vvl::kNoIndex32;
+    const uint32_t target_api_version_;
 
     const PhysicalDevice physical_device_;
 
@@ -316,7 +318,6 @@ class Device : public internal::Handle<VkDevice> {
 
     std::vector<const char *> enabled_extensions_;
     VkPhysicalDeviceFeatures features_;
-
     std::vector<QueueFamilyQueues> queue_families_;
     std::vector<Queue *> queues_[QUEUE_CAPABILITY_COUNT];
 };
@@ -416,25 +417,17 @@ inline const Semaphore no_semaphore;  // equivalent to vkt::Semaphore{}
 class Event : public internal::NonDispHandle<VkEvent> {
   public:
     Event() = default;
-    Event(const Device &dev) { Init(dev, CreateInfo(0)); }
-    Event(const Device &dev, const VkEventCreateInfo &info) { Init(dev, info); }
+    Event(const Device& dev) { Init(dev, CreateInfo(0)); }
+    Event(const Device& dev, const VkEventCreateInfo& info) { Init(dev, info); }
     ~Event() noexcept;
     void Destroy() noexcept;
 
     // vkCreateEvent()
-    void Init(const Device &dev, const VkEventCreateInfo &info);
-    void SetName(const char *name) { NonDispHandle<VkEvent>::SetName(VK_OBJECT_TYPE_EVENT, name); }
+    void Init(const Device& dev, const VkEventCreateInfo& info);
+    void SetName(const char* name) { NonDispHandle<VkEvent>::SetName(VK_OBJECT_TYPE_EVENT, name); }
 
-    // vkGetEventStatus()
-    // vkSetEvent()
-    // vkResetEvent()
-    VkResult GetStatus() const { return vk::GetEventStatus(device(), handle()); }
+    VkResult GetStatus() const;
     void Set();
-    void CmdSet(const CommandBuffer &cmd, VkPipelineStageFlags stage_mask);
-    void CmdReset(const CommandBuffer &cmd, VkPipelineStageFlags stage_mask);
-    void CmdWait(const CommandBuffer &cmd, VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
-                 const std::vector<VkMemoryBarrier> &memory_barriers, const std::vector<VkBufferMemoryBarrier> &buffer_barriers,
-                 const std::vector<VkImageMemoryBarrier> &image_barriers);
     void Reset();
 
     static VkEventCreateInfo CreateInfo(VkFlags flags);
@@ -661,6 +654,7 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
 
     [[nodiscard]] VkDeviceAddress Address() const;
     [[nodiscard]] VkDeviceAddressRangeEXT AddressRange() const;
+    [[nodiscard]] VkStridedDeviceAddressRangeKHR StridedAddressRange(VkDeviceSize stride = 0) const;
 
   private:
     VkBufferCreateInfo create_info_;
@@ -742,27 +736,12 @@ class Image : public internal::NonDispHandle<VkImage> {
     VkFormat Format() const { return create_info_.format; }
     VkImageUsageFlags Usage() const { return create_info_.usage; }
 
-    VkImageMemoryBarrier ImageMemoryBarrier(VkAccessFlags src_access, VkAccessFlags dst_access, VkImageLayout old_layout,
-                                            VkImageLayout new_layout, const VkImageSubresourceRange &range) const {
-        VkImageMemoryBarrier barrier = vku::InitStructHelper();
-        barrier.srcAccessMask = src_access;
-        barrier.dstAccessMask = dst_access;
-        barrier.oldLayout = old_layout;
-        barrier.newLayout = new_layout;
-        barrier.image = handle();
-        barrier.subresourceRange = range;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        return barrier;
-    }
-
-    void ImageMemoryBarrier(CommandBuffer &cmd, VkAccessFlags src_access, VkAccessFlags dst_access, VkImageLayout old_layout,
-                            VkImageLayout new_layout, VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                            VkPipelineStageFlags dest_stages = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    VkImageMemoryBarrier LayoutTransitionBarrier(VkImageLayout old_layout, VkImageLayout new_layout,
+                                                 const VkImageSubresourceRange& range) const;
 
     const VkImageCreateInfo &CreateInfo() const { return create_info_; }
 
-    VkImageSubresourceRange SubresourceRange(VkImageAspectFlags aspect_mask) {
+    VkImageSubresourceRange SubresourceRange(VkImageAspectFlags aspect_mask) const {
         return VkImageSubresourceRange{aspect_mask, 0, create_info_.mipLevels, 0, create_info_.arrayLayers};
     }
 
@@ -775,8 +754,6 @@ class Image : public internal::NonDispHandle<VkImage> {
     // This overload does queue submit and waits for layout transition to finish.
     void SetLayout(VkImageLayout image_layout);
 
-    // Performs layout transition from old to new layout.
-    void TransitionLayout(CommandBuffer &cmd_buf, VkImageLayout old_layout, VkImageLayout new_layout);
     // This overload does queue submit and waits for layout transition to finish.
     void TransitionLayout(VkImageLayout old_layout, VkImageLayout new_layout);
 
@@ -1087,6 +1064,9 @@ class CommandPool : public internal::NonDispHandle<VkCommandPool> {
     void Init(const Device &dev, const VkCommandPoolCreateInfo &info);
     void Init(const Device &dev, uint32_t queue_family_index, VkCommandPoolCreateFlags flags = 0);
     void SetName(const char *name) { NonDispHandle<VkCommandPool>::SetName(VK_OBJECT_TYPE_COMMAND_POOL, name); }
+
+    CommandPool(CommandPool&& rhs) noexcept : NonDispHandle(std::move(rhs)) {}
+    CommandPool& operator=(CommandPool&& rhs) noexcept;
 };
 
 class CommandBuffer : public internal::Handle<VkCommandBuffer> {
@@ -1095,16 +1075,12 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     void Destroy() noexcept;
 
     explicit CommandBuffer() : Handle() {}
-    CommandBuffer(const Device &dev, const VkCommandBufferAllocateInfo &info) { Init(dev, info); }
-    CommandBuffer(const Device &dev, const CommandPool &pool, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY) {
+    CommandBuffer(const Device& dev, const VkCommandBufferAllocateInfo& info) { Init(dev, info); }
+    CommandBuffer(const Device& dev, const CommandPool& pool, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY) {
         Init(dev, pool, level);
     }
-    CommandBuffer(CommandBuffer &&rhs) noexcept : Handle(std::move(rhs)) {
-        dev_handle_ = rhs.dev_handle_;
-        rhs.dev_handle_ = VK_NULL_HANDLE;
-        cmd_pool_ = rhs.cmd_pool_;
-        rhs.cmd_pool_ = VK_NULL_HANDLE;
-    }
+    CommandBuffer(CommandBuffer&& rhs) noexcept;
+    CommandBuffer& operator=(CommandBuffer&& rhs) noexcept;
 
     // vkAllocateCommandBuffers()
     void Init(const Device &dev, const VkCommandBufferAllocateInfo &info);
@@ -1135,6 +1111,8 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     void BeginRenderingColor(const VkImageView imageView, VkRect2D render_area);
     void EndRendering();
 
+    void PushData(uint32_t offset, size_t size, const void* address);
+
     void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &frag_shader);
     void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &geom_shader, const vkt::Shader &frag_shader);
     void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &tesc_shader, const vkt::Shader &tese_shader,
@@ -1151,15 +1129,20 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     void EncodeVideo(const VkVideoEncodeInfoKHR &encodeInfo);
     void EndVideoCoding(const VkVideoEndCodingInfoKHR &endInfo);
 
-    void SetEvent(Event &event, VkPipelineStageFlags stageMask) { event.CmdSet(*this, stageMask); }
-    void ResetEvent(Event &event, VkPipelineStageFlags stageMask) { event.CmdReset(*this, stageMask); }
-    void WaitEvents(uint32_t eventCount, const VkEvent *pEvents, VkPipelineStageFlags srcStageMask,
-                    VkPipelineStageFlags dstStageMask, uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers,
-                    uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier *pBufferMemoryBarriers,
-                    uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier *pImageMemoryBarriers) {
-        vk::CmdWaitEvents(handle(), eventCount, pEvents, srcStageMask, dstStageMask, memoryBarrierCount, pMemoryBarriers,
-                          bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
-    }
+    void ResetEvent(const Event& event, VkPipelineStageFlags stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    void SetEvent(const Event& event, VkPipelineStageFlags src_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    void WaitEvent(const Event& event, VkPipelineStageFlags src_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                   VkPipelineStageFlags dst_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    void WaitEvent(const Event& event, VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
+                   const VkMemoryBarrier& memory_barrier);
+    void WaitEvent(const Event& event, VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
+                   const VkBufferMemoryBarrier& buffer_barrier);
+    void WaitEvent(const Event& event, VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
+                   const VkImageMemoryBarrier& image_barrier);
+
+    void ResetEvent2(const Event& event, VkPipelineStageFlags2 stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+    void SetEvent2(const Event& event, const VkMemoryBarrier2& memory_barrier);
+    void WaitEvent2(const Event& event, const VkMemoryBarrier2& memory_barrier);
 
     void Copy(const Buffer &src, const Buffer &dst);
     void ExecuteCommands(const CommandBuffer &secondary);
@@ -1173,6 +1156,18 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     void BarrierKHR(const VkBufferMemoryBarrier2 &buffer_barrier, VkDependencyFlags dependency_flags = 0);
     void BarrierKHR(const VkImageMemoryBarrier2 &image_barrier, VkDependencyFlags dependency_flags = 0);
     void BarrierKHR(const VkDependencyInfo &dep_info);
+
+    void Barrier(const VkImageMemoryBarrier& image_barrier, VkPipelineStageFlags src_stage_mask,
+                 VkPipelineStageFlags dst_stage_mask, VkDependencyFlags dependency_flags = 0);
+
+    // Synchronize image accesses. Do not transition image layout
+    void ImageBarrier(const vkt::Image& image, VkImageLayout current_layout);
+
+    void TransitionLayout(const vkt::Image& image, VkImageLayout old_layout, VkImageLayout new_layout);
+
+    // Used when vkt:Image is not available, for example, for swapchain images
+    void TransitionLayout(const VkImage image, VkImageLayout old_layout, VkImageLayout new_layout,
+                          const VkImageSubresourceRange& subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
 
     void FullMemoryBarrier();
 
@@ -1305,12 +1300,10 @@ class TensorView : public internal::NonDispHandle<VkTensorViewARM> {
 class DataGraphPipelineSession : public internal::NonDispHandle<VkDataGraphPipelineSessionARM> {
   public:
     explicit DataGraphPipelineSession(const Device &dev, const VkDataGraphPipelineSessionCreateInfoARM &info);
+    DataGraphPipelineSession(const Device &dev, const VkDataGraphPipelineSessionCreateInfoARM &info, NoMemT);
     ~DataGraphPipelineSession() noexcept;
     void Destroy() noexcept;
-
-    // CreateDataGraphPipelineSessionARM
-    void Init(const Device &dev);
-
+    void Init(const Device &dev, const VkDataGraphPipelineSessionCreateInfoARM& info);
     void GetMemoryReqs();
     void AllocSessionMem(std::vector<vkt::DeviceMemory> &device_mem, bool is_protected = false, size_t scale_factor = 1,
                          int32_t size_modifier = 0);
@@ -1417,6 +1410,16 @@ class Swapchain : public internal::NonDispHandle<VkSwapchainKHR> {
 
     uint32_t GetImageCount() const;
     std::vector<VkImage> GetImages() const;
+
+    // Each command buffer records layout transition to present layout for corresponding swapchain image
+    std::vector<vkt::CommandBuffer> RecordTransitionToPresentLayout(
+        const vkt::Device& device, const vkt::CommandPool& command_pool,
+        VkImageLayout present_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) const;
+
+    // Return true if *all* swapchain images were transitioned.
+    // We don't have a guarantee its always possible because the ordering of the acquired images is unspecified
+    bool TryTransitionToPresentLayout(const vkt::Device& device, vkt::Queue& queue, const vkt::CommandPool& command_pool,
+                                      VkImageLayout present_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     uint32_t AcquireNextImage(const Semaphore &image_acquired, uint64_t timeout, VkResult *result = nullptr);
     uint32_t AcquireNextImage(const Fence &image_acquired, uint64_t timeout, VkResult *result = nullptr);

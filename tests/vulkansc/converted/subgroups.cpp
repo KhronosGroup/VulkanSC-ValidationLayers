@@ -15,8 +15,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 #include <cmath>
 
 class NegativeSubgroup : public VkLayerTest {};
@@ -58,16 +58,16 @@ TEST_F(NegativeSubgroup, Properties) {
     }
 
     std::string vsSource;
-    std::vector<const char *> errors;
+    std::vector<const char*> errors;
     // There is no 'supportedOperations' check due to it would be redundant to the Capability check done first in VUID 01091 since
     // each 'supportedOperations' flag is 1:1 map to a SPIR-V Capability
-    const char *operation_vuid = "VUID-VkShaderModuleCreateInfo-pCode-08740";
-    const char *stage_vuid = "VUID-RuntimeSpirv-None-06343";
-    const char *quad_vuid = "VUID-RuntimeSpirv-None-06342";
+    const char* operation_vuid = "VUID-VkShaderModuleCreateInfo-pCode-08740";
+    const char* stage_vuid = "VUID-RuntimeSpirv-None-06343";
+    const char* quad_vuid = "VUID-RuntimeSpirv-None-06342";
 
     // Same pipeline creation for each subgroup test
-    auto subgroup_test = [this](std::string source, const std::vector<const char *> &errors) {
-        for (const auto &error : errors) m_errorMonitor->SetDesiredError(error);
+    auto subgroup_test = [this](std::string source, const std::vector<const char*>& errors) {
+        for (const auto& error : errors) m_errorMonitor->SetDesiredError(error);
         VkShaderObj vs(*m_device, source.c_str(), VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_1);
         if (!errors.empty()) {
             m_errorMonitor->VerifyFound();
@@ -283,7 +283,7 @@ TEST_F(NegativeSubgroup, ExtendedTypesDisabled) {
         GTEST_SKIP() << "Required features not supported";
     }
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_arithmetic : enable
         #extension GL_EXT_shader_subgroup_extended_types_float16 : enable
@@ -538,7 +538,7 @@ TEST_F(NegativeSubgroup, SubgroupSizeControlStage) {
         GTEST_SKIP() << "Vertex shader subgroup not supported.";
     }
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 450
         #extension GL_KHR_shader_subgroup_basic : require
         void main() {
@@ -562,7 +562,7 @@ TEST_F(NegativeSubgroup, SubgroupUniformControlFlow) {
     AddRequiredExtensions(VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_subgroup_uniform_control_flow"
           %1 = OpExtInstImport "GLSL.std.450"

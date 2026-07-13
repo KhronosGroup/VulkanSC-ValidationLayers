@@ -5,7 +5,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2024 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/external_memory_sync.h"
+#include "layer_validation_tests.h"
+#include "external_memory_sync.h"
 #include "utils/math_utils.h"
 
 class PositiveExternalMemorySync : public ExternalMemorySyncTest {};
@@ -101,7 +101,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryHost) {
     GetPhysicalDeviceProperties2(memory_host_props);
 
     VkDeviceSize alloc_size = memory_host_props.minImportedHostPointerAlignment;
-    void *host_memory = ::operator new((size_t)alloc_size, std::align_val_t(alloc_size));
+    void* host_memory = ::operator new((size_t)alloc_size, std::align_val_t(alloc_size));
     if (!host_memory) {
         GTEST_SKIP() << "Can't allocate host memory";
     }
@@ -230,7 +230,7 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     // Create test buffers and fill input buffer
     vkt::Buffer buffer_input(*m_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    auto input_mem = (uint8_t *)buffer_input.Memory().Map();
+    auto input_mem = (uint8_t*)buffer_input.Memory().Map();
     for (uint32_t i = 0; i < buffer_size; i++) {
         input_mem[i] = (i & 0xFF);
     }

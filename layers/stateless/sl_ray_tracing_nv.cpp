@@ -54,7 +54,7 @@ bool Device::ValidateGeometryTrianglesNV(const VkGeometryTrianglesNV& triangles,
         triangles.indexType != VK_INDEX_TYPE_NONE_NV) {
         skip |= LogError("VUID-VkGeometryTrianglesNV-indexType-02433", object_handle, loc, "is invalid.");
     } else {
-        const uint32_t index_type_size = IndexTypeSize(triangles.indexType);
+        const uint32_t index_type_size = IndexTypeByteSize(triangles.indexType);
         if (index_type_size > 0 && !IsIntegerMultipleOf(triangles.indexOffset, index_type_size)) {
             skip |= LogError("VUID-VkGeometryTrianglesNV-indexOffset-02432", object_handle, loc, "is invalid.");
         }
@@ -340,7 +340,7 @@ bool Device::manual_PreCallValidateCreateRayTracingPipelinesNV(VkDevice device, 
         } else {
             skip |= ValidateCreatePipelinesFlags2(create_info.flags, flags, flags_loc);
         }
-        skip |= ValidateCreatePipelinesFlagsCommon(flags, flags_loc);
+        skip |= ValidateCreatePipelinesFlagsCommon(flags, flags_loc, pipelineCache, create_info.layout);
 
         if (flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) {
             if (create_info.basePipelineIndex != -1) {
@@ -372,8 +372,7 @@ bool Device::manual_PreCallValidateCreateRayTracingPipelinesNV(VkDevice device, 
             }
         }
 
-        skip |=
-            ValidatePipelineBinaryInfo(create_info.pNext, create_info.flags, pipelineCache, create_info.layout, create_info_loc);
+        skip |= ValidatePipelineBinaryInfo(create_info.pNext, flags, pipelineCache, create_info_loc);
     }
 
     return skip;

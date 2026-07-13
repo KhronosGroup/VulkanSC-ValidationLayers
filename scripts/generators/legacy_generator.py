@@ -18,6 +18,7 @@
 
 import os
 from base_generator import BaseGenerator
+from generators.generator_utils import destroyObject
 
 class LegacyGenerator(BaseGenerator):
     def __init__(self):
@@ -25,55 +26,6 @@ class LegacyGenerator(BaseGenerator):
 
         self.all_device_extensions = set()
         self.all_instance_extensions = set()
-
-        # Try and provide a mapping of the "new" function to replace
-        # (This should really be in the vk.xml)
-        self.replacement = {
-            "vkGetPhysicalDeviceFeatures" : {
-                "version" : "vkGetPhysicalDeviceFeatures2",
-                "extension" : "vkGetPhysicalDeviceFeatures2KHR",
-            },
-            "vkGetPhysicalDeviceFormatProperties" : {
-                "version" : "vkGetPhysicalDeviceFormatProperties2",
-                "extension" : "vkGetPhysicalDeviceFormatProperties2KHR",
-            },
-            "vkGetPhysicalDeviceImageFormatProperties" : {
-                "version" : "vkGetPhysicalDeviceImageFormatProperties2",
-                "extension" : "vkGetPhysicalDeviceImageFormatProperties2KHR",
-            },
-            "vkGetPhysicalDeviceProperties" : {
-                "version" : "vkGetPhysicalDeviceProperties2",
-                "extension" : "vkGetPhysicalDeviceProperties2KHR",
-            },
-            "vkGetPhysicalDeviceQueueFamilyProperties" : {
-                "version" : "vkGetPhysicalDeviceQueueFamilyProperties2",
-                "extension" : "vkGetPhysicalDeviceQueueFamilyProperties2KHR",
-            },
-            "vkGetPhysicalDeviceMemoryProperties" : {
-                "version" : "vkGetPhysicalDeviceMemoryProperties2",
-                "extension" : "vkGetPhysicalDeviceMemoryProperties2KHR",
-            },
-            "vkGetPhysicalDeviceSparseImageFormatProperties" : {
-                "version" : "vkGetPhysicalDeviceSparseImageFormatProperties2",
-                "extension" : "vkGetPhysicalDeviceSparseImageFormatProperties2KHR",
-            },
-            "vkCreateRenderPass" : {
-                "version" : "vkCreateRenderPass2",
-                "extension" : "vkCreateRenderPass2KHR",
-            },
-            "vkCmdBeginRenderPass" : {
-                "version" : "vkCmdBeginRenderPass2",
-                "extension" : "vkCmdBeginRenderPass2KHR",
-            },
-            "vkCmdNextSubpass" : {
-                "version" : "vkCmdNextSubpass2",
-                "extension" : "vkCmdNextSubpass2KHR",
-            },
-            "vkCmdEndRenderPass" : {
-                "version" : "vkCmdEndRenderPass2",
-                "extension" : "vkCmdEndRenderPass2KHR",
-            },
-        }
 
     def generate(self):
         self.write(f'''// *** THIS FILE IS GENERATED - DO NOT EDIT ***
@@ -139,11 +91,9 @@ class LegacyGenerator(BaseGenerator):
 
             // We currently only check if the extension is enabled, if we decide in the future to check for support, instance extensions
             // we can try and use DispatchEnumerateInstanceExtensionProperties, but will likely run into many loader related issues.
-            class Instance : public vvl::base::Instance {
-                using BaseClass = vvl::base::Instance;
-
+            class Instance : public vvl::BaseInstance {
             public:
-                Instance(vvl::dispatch::Instance *dispatch) : BaseClass(dispatch, LayerObjectTypeLegacy) {}
+                Instance(vvl::DispatchInstance *dispatch) : BaseInstance(dispatch, LayerObjectTypeLegacy) {}
 
                 // Special functions done in legacy_manual.cpp
                 bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
@@ -160,15 +110,21 @@ class LegacyGenerator(BaseGenerator):
             prePrototype = prototype.replace(')', ', const ErrorObject& error_obj)')
             out.append(f'bool PreCallValidate{prePrototype} const override;\n')
 
+        out.append('\n')
+        # https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12556
+        out.append("// Make sure we only report each warning once for the user\n")
+        for command in [x for x in self.vk.commands.values() if x.legacy and x.instance]:
+            if destroyObject(command.name):
+                continue
+            out.append(f'mutable bool reported_{command.name[2:]} = false;\n')
+
         out.append('''
             };
 
-            class Device : public vvl::base::Device {
-                using BaseClass = vvl::base::Device;
-
+            class Device : public vvl::BaseDevice {
             public:
-                Device(vvl::dispatch::Device *dev, Instance *instance_vo)
-                    : BaseClass(dev, instance_vo, LayerObjectTypeLegacy), instance(instance_vo) {}
+                Device(vvl::DispatchDevice *dev, Instance *instance_vo)
+                    : BaseDevice(dev, instance_vo, LayerObjectTypeLegacy), instance(instance_vo) {}
                 ~Device() {}
                 Instance *instance;
 
@@ -178,12 +134,20 @@ class LegacyGenerator(BaseGenerator):
 
         for command in [x for x in self.vk.commands.values() if x.legacy and x.device]:
             # There is really no good use to warn developer both the create and destroy are superseded
-            if command.name.startswith('vkDestroy'):
+            if destroyObject(command.name):
                 continue
 
             prototype = (command.cPrototype.split('VKAPI_CALL ')[1])[2:-1]
             prePrototype = prototype.replace(')', ', const ErrorObject& error_obj)')
             out.append(f'bool PreCallValidate{prePrototype} const override;\n')
+
+        out.append('\n')
+        # https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12556
+        out.append("// Make sure we only report each warning once for the user\n")
+        for command in [x for x in self.vk.commands.values() if x.legacy and x.device]:
+            if destroyObject(command.name):
+                continue
+            out.append(f'mutable bool reported_{command.name[2:]} = false;\n')
 
         out.append('};')
         out.append('}  // namespace legacy')
@@ -197,10 +161,21 @@ class LegacyGenerator(BaseGenerator):
             namespace legacy {
         ''')
 
+        # Currently we only validate the incoming commands, not the <deprecate> tags around flags/enums/etc
+        #
+        # 1. It is easier to just do this as must things marked as "legacy" can't be used without being
+        #    called in a vulkan command anyway.
+        # 2. If we do decide to add them one day, we need to be VERY cautious as there are things like
+        #    VkPipelineCreateFlags that is "supersededby" by VkPipelineCreateFlags2, but really we don't
+        #    want to report those (as discussed in https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/8072).
         for command in [x for x in self.vk.commands.values() if x.legacy]:
             # There is really no good use to warn developer both the create and destroy are superseded
-            if command.name.startswith('vkDestroy'):
+            if destroyObject(command.name):
                 continue
+
+            extra = ''
+            if command.legacy.link == 'legacy-gpdp2':
+                extra = "\\nNOTE: Many implicit layers and libraries (such as VMA) are known to still be using these functions. One may add \\\"WARNING-legacy-gpdp2\\\" to their VUID Mute Message list to ignore these."
 
             className = 'Device' if command.device else 'Instance'
             handleName = 'VkDevice' if command.device else 'VkInstance'
@@ -209,10 +184,10 @@ class LegacyGenerator(BaseGenerator):
 
             prototype = (command.cPrototype.split('VKAPI_CALL ')[1])[2:-1]
             prePrototype = prototype.replace(')', ', const ErrorObject& error_obj)')
+            reportedMember = f'reported_{command.name[2:]}'
             out.append(f'''
                 bool {className}::PreCallValidate{prePrototype} const {{
-                    static bool reported = false;
-                    if (reported) return false;
+                    if ({reportedMember}) return false;
                 ''')
 
             firstCheck = True
@@ -221,14 +196,14 @@ class LegacyGenerator(BaseGenerator):
                 if firstCheck:
                     firstCheck = False
 
-                if command.name in self.replacement:
-                    replacement = f'which contains {self.replacement[command.name]["version"]} that can be used instead'
+                if command.legacy.supersededBy:
+                    replacement = f'which contains {command.legacy.supersededBy} that can be used instead'
 
                 out.append(f'''
                     {logic} (api_version >= {command.legacy.version.nameApi}) {{
-                        reported = true;
+                        {reportedMember} = true;
                         LogWarning("WARNING-{command.legacy.link}", {objName}, error_obj.location,
-                            "{command.name} is a legacy command and this {handleName} was created with {command.legacy.version.name} {replacement}.\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
+                            "{command.name} is a legacy command and this {handleName} was created with {command.legacy.version.name} {replacement}.{extra}\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
                     }}''')
 
             for extension in command.legacy.extensions:
@@ -236,14 +211,25 @@ class LegacyGenerator(BaseGenerator):
                 if firstCheck:
                     firstCheck = False
 
-                if command.name in self.replacement:
-                    replacement = f'which contains {self.replacement[command.name]["extension"]} that can be used instead'
+                if command.legacy.supersededBy:
+                    # Currenty the |supersededBy| only has the version
+                    # Slightly hacky way to check, will be fine until we have some strange legacy combo
+                    new_command = command.legacy.supersededBy # backup value
+                    if new_command[-3:].isupper() and new_command[-3:].isalpha():
+                        new_command = command.legacy.supersededBy
+                    elif (command.legacy.supersededBy + 'KHR') in self.vk.commands:
+                        new_command += 'KHR'
+                    elif (command.legacy.supersededBy + 'EXT') in self.vk.commands:
+                        new_command += 'EXT'
+                    else:
+                        print(f'WARNING - need to fix supersededBy logic for {command.name} with {command.legacy.supersededBy}')
+                    replacement = f'which contains {new_command} that can be used instead'
 
                 out.append(f'''
                     {logic} (IsExtEnabled(extensions.{extension.lower()})) {{
-                        reported = true;
+                        {reportedMember} = true;
                         LogWarning("WARNING-{command.legacy.link}", {objName}, error_obj.location,
-                            "{command.name} is a legacy command and this {handleName} enabled the {extension} extension {replacement}.\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
+                            "{command.name} is a legacy command and this {handleName} enabled the {extension} extension {replacement}.{extra}\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
                     }}''')
 
             # For things mark as legacy in Vulkan 1.0

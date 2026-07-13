@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +15,32 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 
-class VkPositiveBestPracticesLayerTest : public VkBestPracticesLayerTest {};
+void VkBestPracticesLayerTest::InitBestPracticesFramework(const char* vendor_checks_to_enable) {
+    const VkLayerSettingEXT settings = {OBJECT_LAYER_NAME, vendor_checks_to_enable, VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
+    const VkLayerSettingsCreateInfoEXT layer_settings_create_info{VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                                  &settings};
+
+    if (vendor_checks_to_enable) {
+        features_.pNext = &layer_settings_create_info;
+    }
+
+    AddRequiredExtensions(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
+    InitFramework(&features_);
+}
+
+void VkBestPracticesLayerTest::InitBestPractices(const char* vendor_checks_to_enable) {
+    RETURN_IF_SKIP(InitBestPracticesFramework(vendor_checks_to_enable));
+    RETURN_IF_SKIP(InitState());
+}
+
+class PositiveBestPractices : public VkBestPracticesLayerTest {};
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
+TEST_F(PositiveBestPractices, DISABLED_TestDestroyFreeNullHandles) {
     VkResult err;
 
     TEST_DESCRIPTION("Call all applicable destroy and free routines with NULL handles, expecting no validation errors");
@@ -92,7 +110,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
+TEST_F(PositiveBestPractices, DISABLED_DrawingWithUnboundUnusedSet) {
     TEST_DESCRIPTION(
         "Test issuing draw command with pipeline layout that has 2 descriptor sets with first descriptor set begin unused and "
         "unbound. Its purpose is to catch regression of this bug: "
@@ -127,7 +145,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DynStateIgnoreAttachments) {
+TEST_F(PositiveBestPractices, DISABLED_DynStateIgnoreAttachments) {
     TEST_DESCRIPTION("Make sure pAttachments is ignored if dynamic state is enabled");
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
@@ -162,7 +180,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DynStateIgnoreAttachments) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PipelineLibraryNoRendering) {
+TEST_F(PositiveBestPractices, DISABLED_PipelineLibraryNoRendering) {
     TEST_DESCRIPTION("Create a pipeline library without a render pass or rendering info");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
@@ -184,14 +202,14 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PipelineLibraryNoRendering) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PushConstantSet) {
+TEST_F(PositiveBestPractices, DISABLED_PushConstantSet) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
-    const char *const vsSource = R"glsl(
+    const char* const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { uint x[4]; } constants;
         void main(){
@@ -210,8 +228,8 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PushConstantSet) {
         }
     )glsl";
 
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     uint32_t data[5];
     std::vector<VkPushConstantRange> push_constant_ranges = {{VK_SHADER_STAGE_VERTEX_BIT, 0, 16},
@@ -233,7 +251,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PushConstantSet) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_VertexBufferNotForAllDraws) {
+TEST_F(PositiveBestPractices, DISABLED_VertexBufferNotForAllDraws) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7636");
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::nullDescriptor);
@@ -275,7 +293,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_VertexBufferNotForAllDraws) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_SetDifferentEvents) {
+TEST_F(PositiveBestPractices, DISABLED_SetDifferentEvents) {
     TEST_DESCRIPTION("Signal different events");
     RETURN_IF_SKIP(InitBestPractices());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
@@ -290,7 +308,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_SetDifferentEvents) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventBeforeSet) {
+TEST_F(PositiveBestPractices, DISABLED_ResetEventBeforeSet) {
     TEST_DESCRIPTION("Set event two times with reset in between");
     RETURN_IF_SKIP(InitBestPractices());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
@@ -305,7 +323,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventBeforeSet) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventBeforeSetMultipleSubmits) {
+TEST_F(PositiveBestPractices, DISABLED_ResetEventBeforeSetMultipleSubmits) {
     TEST_DESCRIPTION("Set event two times with reset in between from multiple submits");
     RETURN_IF_SKIP(InitBestPractices());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
@@ -327,7 +345,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventBeforeSetMultipleSub
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventBeforeSetMultipleSubmits2) {
+TEST_F(PositiveBestPractices, DISABLED_ResetEventBeforeSetMultipleSubmits2) {
     TEST_DESCRIPTION("Set event two times with reset in between using single submit with two batches");
     RETURN_IF_SKIP(InitBestPractices());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
@@ -357,7 +375,24 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventBeforeSetMultipleSub
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventFromSecondary) {
+TEST_F(PositiveBestPractices, DISABLED_HostResetEventBeforeSet) {
+    TEST_DESCRIPTION("Set event two times with host reset in between");
+    RETURN_IF_SKIP(InitBestPractices());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
+
+    vkt::Event event(*m_device);
+
+    m_command_buffer.Begin();
+    m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    event.Reset();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+// Not supported in Vulkan SC: best practices layers
+TEST_F(PositiveBestPractices, DISABLED_ResetEventFromSecondary) {
     TEST_DESCRIPTION("Set event two times with reset in between executed from a secondary command buffer");
     RETURN_IF_SKIP(InitBestPractices());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
@@ -377,7 +412,29 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventFromSecondary) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
+TEST_F(PositiveBestPractices, DISABLED_DestroyEventThenUseAnotherEvent) {
+    TEST_DESCRIPTION("Destroy event that was set in a command buffer");
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    // Scope to destroy event object at the end
+    {
+        vkt::Event event1(*m_device);
+        m_command_buffer.Begin();
+        m_command_buffer.SetEvent(event1);
+        m_command_buffer.End();
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        // event1 is destroyed somewhere here and should not cause troubles in the event code below
+    }
+    vkt::Event event2(*m_device);
+    m_command_buffer.Begin();
+    m_command_buffer.SetEvent(event2);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+// Not supported in Vulkan SC: best practices layers
+TEST_F(PositiveBestPractices, DISABLED_CreateFifoRelaxedSwapchain) {
     TEST_DESCRIPTION("Test creating fifo relaxed swapchain");
 
     AddSurfaceExtension();
@@ -393,7 +450,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
     }
 
     bool fifo_relaxed = false;
-    for (const auto &present_mode : m_surface_present_modes) {
+    for (const auto& present_mode : m_surface_present_modes) {
         if (present_mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
             fifo_relaxed = true;
             break;
@@ -411,7 +468,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
     swapchain_create_info.minImageCount = 2;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
     swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
-    swapchain_create_info.imageExtent = m_surface_capabilities.minImageExtent;
+    swapchain_create_info.imageExtent = GetSwapchainExtent(m_surface_capabilities);
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = imageUsage;
     swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -427,26 +484,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetCommandPool) {
-    TEST_DESCRIPTION("Destroy event that was set in a command buffer");
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-
-    vkt::Event event1(*m_device);
-    m_command_buffer.Begin();
-    event1.CmdSet(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-    m_command_buffer.End();
-    m_default_queue->SubmitAndWait(m_command_buffer);
-
-    vkt::Event event2(*m_device);
-    m_command_buffer.Begin();
-    event2.CmdSet(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-    m_command_buffer.End();
-    m_default_queue->SubmitAndWait(m_command_buffer);
-}
-
-// Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ShaderObjectDraw) {
+TEST_F(PositiveBestPractices, DISABLED_ShaderObjectDraw) {
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
@@ -497,7 +535,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ShaderObjectDraw) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateDeviceWithFeatures) {
+TEST_F(PositiveBestPractices, DISABLED_CreateDeviceWithFeatures) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     const vkt::PhysicalDevice phys_device_obj(gpu_);
 
@@ -515,7 +553,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateDeviceWithFeatures) {
     VkPhysicalDeviceFeatures features;
     vk::GetPhysicalDeviceFeatures(gpu_, &features);
 
-    const char *portability_extension = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
+    const char* portability_extension = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
 
     VkDeviceCreateInfo device_ci = vku::InitStructHelper();
     device_ci.queueCreateInfoCount = create_queue_infos.size();

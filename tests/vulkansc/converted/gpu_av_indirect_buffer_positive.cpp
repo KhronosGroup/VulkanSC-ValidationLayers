@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2020-2025 The Khronos Group Inc.
- * Copyright (c) 2020-2025 Valve Corporation
- * Copyright (c) 2020-2025 LunarG, Inc.
- * Copyright (c) 2020-2025 Google, Inc.
+ * Copyright (c) 2020-2026 The Khronos Group Inc.
+ * Copyright (c) 2020-2026 Valve Corporation
+ * Copyright (c) 2020-2026 LunarG, Inc.
+ * Copyright (c) 2020-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,15 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/buffer_helper.h"
-#include "../framework/ray_tracing_objects.h"
-#include "../framework/shader_object_helper.h"
+#include <cstdint>
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "buffer_helper.h"
+#include "ray_tracing_objects.h"
+#include "render.h"
+#include "shader_object_helper.h"
 #include "shader_templates.h"
+#include "test_framework.h"
 
 class PositiveGpuAVIndirectBuffer : public GpuAVTest {};
 
@@ -51,7 +54,7 @@ TEST_F(PositiveGpuAVIndirectBuffer, BasicTraceRaysMultipleStages) {
 
     // Set shaders
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require // Requires SPIR-V 1.5 (Vulkan 1.2)
 
@@ -65,7 +68,7 @@ TEST_F(PositiveGpuAVIndirectBuffer, BasicTraceRaysMultipleStages) {
     )glsl";
     pipeline.SetGlslRayGenShader(ray_gen);
 
-    const char *miss = R"glsl(
+    const char* miss = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
 
@@ -79,7 +82,7 @@ TEST_F(PositiveGpuAVIndirectBuffer, BasicTraceRaysMultipleStages) {
     )glsl";
     pipeline.AddGlslMissShader(miss);
 
-    const char *closest_hit = R"glsl(
+    const char* closest_hit = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
 
@@ -140,14 +143,14 @@ TEST_F(PositiveGpuAVIndirectBuffer, Mesh) {
     uint32_t buffer_size = mesh_commands * (sizeof(VkDrawMeshTasksIndirectCommandEXT) + 4);  // 4 byte pad between commands
 
     vkt::Buffer draw_buffer(*m_device, buffer_size, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *draw_ptr = static_cast<uint32_t *>(draw_buffer.Memory().Map());
+    uint32_t* draw_ptr = static_cast<uint32_t*>(draw_buffer.Memory().Map());
     // Set all mesh group counts to 1
     for (uint32_t i = 0; i < mesh_commands * 4; ++i) {
         draw_ptr[i] = 1;
     }
 
     vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
+    uint32_t* count_ptr = static_cast<uint32_t*>(count_buffer.Memory().Map());
     *count_ptr = 3;
 
     VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
@@ -190,14 +193,14 @@ TEST_F(PositiveGpuAVIndirectBuffer, MeshSingleCommand) {
     uint32_t buffer_size = mesh_commands * (sizeof(VkDrawMeshTasksIndirectCommandEXT) + 4);  // 4 byte pad between commands
 
     vkt::Buffer draw_buffer(*m_device, buffer_size, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *draw_ptr = static_cast<uint32_t *>(draw_buffer.Memory().Map());
+    uint32_t* draw_ptr = static_cast<uint32_t*>(draw_buffer.Memory().Map());
     // Set all mesh group counts to 1
     for (uint32_t i = 0; i < mesh_commands * 4; ++i) {
         draw_ptr[i] = 1;
     }
 
     vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
+    uint32_t* count_ptr = static_cast<uint32_t*>(count_buffer.Memory().Map());
     *count_ptr = 3;
 
     VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
@@ -263,7 +266,7 @@ TEST_F(PositiveGpuAVIndirectBuffer, PipelineAndShaderObjectComputeDispatchIndire
 
     vkt::Buffer dispatch_params_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                        kHostVisibleMemProps);
-    auto &indirect_dispatch_parameters = *static_cast<VkDispatchIndirectCommand *>(dispatch_params_buffer.Memory().Map());
+    auto& indirect_dispatch_parameters = *static_cast<VkDispatchIndirectCommand*>(dispatch_params_buffer.Memory().Map());
     indirect_dispatch_parameters.x = 1u;
     indirect_dispatch_parameters.y = 1u;
     indirect_dispatch_parameters.z = 1u;
@@ -299,13 +302,13 @@ TEST_F(PositiveGpuAVIndirectBuffer, RestoreStress) {
 
     vkt::Buffer dispatch_params_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                        kHostVisibleMemProps);
-    auto &indirect_dispatch_parameters = *static_cast<VkDispatchIndirectCommand *>(dispatch_params_buffer.Memory().Map());
+    auto& indirect_dispatch_parameters = *static_cast<VkDispatchIndirectCommand*>(dispatch_params_buffer.Memory().Map());
     indirect_dispatch_parameters.x = 1u;
     indirect_dispatch_parameters.y = 1u;
     indirect_dispatch_parameters.z = 1u;
 
     // used for all stage types
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer Input {
             uint x;
@@ -409,7 +412,7 @@ TEST_F(PositiveGpuAVIndirectBuffer, BufferUsageFlags2) {
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&buffer_usage_flags);
     buffer_ci.size = sizeof(VkDispatchIndirectCommand);
     vkt::Buffer indirect_buffer(*m_device, buffer_ci, kHostVisibleMemProps);
-    VkDispatchIndirectCommand *ptr = static_cast<VkDispatchIndirectCommand *>(indirect_buffer.Memory().Map());
+    VkDispatchIndirectCommand* ptr = static_cast<VkDispatchIndirectCommand*>(indirect_buffer.Memory().Map());
     ptr->x = 1;
     ptr->y = 1;
     ptr->z = 1;
@@ -421,5 +424,44 @@ TEST_F(PositiveGpuAVIndirectBuffer, BufferUsageFlags2) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
     vk::CmdDispatchIndirect(m_command_buffer, indirect_buffer, 0);
     m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVIndirectBuffer, FirstInstanceCustomStride) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12575");
+    AddRequiredFeature(vkt::Feature::multiDrawIndirect);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    struct CustomDrawIndirectCommand {
+        uint32_t vertexCount;
+        uint32_t instanceCount;
+        uint32_t firstVertex;
+        uint32_t firstInstance;
+        uint32_t padding;
+    };
+
+    constexpr uint32_t draw_cmd_size = sizeof(CustomDrawIndirectCommand);  // 20
+    vkt::Buffer indirect_buffer(*m_device, draw_cmd_size * 6, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
+    CustomDrawIndirectCommand* draw_params = (CustomDrawIndirectCommand*)(indirect_buffer.Memory().Map());
+    draw_params[0] = {3, 1, 0, 1, 8};  // unused, offset is after
+    draw_params[1] = {3, 1, 0, 0, 8};
+    draw_params[2] = {3, 1, 0, 0, 8};
+    draw_params[3] = {3, 1, 0, 0, 8};
+    draw_params[4] = {3, 1, 0, 0, 8};
+    draw_params[5] = {3, 1, 0, 0, 8};
+
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+    m_command_buffer.Begin(&begin_info);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDrawIndirect(m_command_buffer, indirect_buffer, draw_cmd_size, 5, draw_cmd_size);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
     m_default_queue->SubmitAndWait(m_command_buffer);
 }

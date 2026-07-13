@@ -120,6 +120,8 @@ ValidValue stateless::Context::IsValidEnumValue(VkFragmentShadingRateCombinerOpK
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkVideoEncodeTuningModeKHR value) const;
 template <>
+ValidValue stateless::Context::IsValidEnumValue(VkAccelerationStructureTypeKHR value) const;
+template <>
 ValidValue stateless::Context::IsValidEnumValue(VkComponentTypeKHR value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkVideoEncodeAV1PredictionModeKHR value) const;
@@ -127,6 +129,10 @@ template <>
 ValidValue stateless::Context::IsValidEnumValue(VkVideoEncodeAV1RateControlGroupKHR value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkTimeDomainKHR value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkDeviceFaultVendorBinaryHeaderVersionKHR value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkOpacityMicromapFormatKHR value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkDebugReportObjectTypeEXT value) const;
 template <>
@@ -148,6 +154,12 @@ ValidValue stateless::Context::IsValidEnumValue(VkDiscardRectangleModeEXT value)
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkConservativeRasterizationModeEXT value) const;
 template <>
+ValidValue stateless::Context::IsValidEnumValue(VkGpaPerfBlockAMD value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkGpaSampleTypeAMD value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkGpaDeviceClockModeAMD value) const;
+template <>
 ValidValue stateless::Context::IsValidEnumValue(VkDescriptorMappingSourceEXT value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkBlendOverlapEXT value) const;
@@ -161,8 +173,6 @@ template <>
 ValidValue stateless::Context::IsValidEnumValue(VkRayTracingShaderGroupTypeKHR value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkGeometryTypeKHR value) const;
-template <>
-ValidValue stateless::Context::IsValidEnumValue(VkAccelerationStructureTypeKHR value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkCopyAccelerationStructureModeKHR value) const;
 template <>
@@ -194,15 +204,13 @@ ValidValue stateless::Context::IsValidEnumValue(VkIndirectCommandsTokenTypeNV va
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkDepthBiasRepresentationEXT value) const;
 template <>
+ValidValue stateless::Context::IsValidEnumValue(VkPerfHintTypeQCOM value) const;
+template <>
 ValidValue stateless::Context::IsValidEnumValue(VkFragmentShadingRateTypeNV value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkFragmentShadingRateNV value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkAccelerationStructureMotionInstanceTypeNV value) const;
-template <>
-ValidValue stateless::Context::IsValidEnumValue(VkDeviceFaultAddressTypeEXT value) const;
-template <>
-ValidValue stateless::Context::IsValidEnumValue(VkDeviceFaultVendorBinaryHeaderVersionEXT value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkDeviceAddressBindingTypeEXT value) const;
 #ifdef VK_USE_PLATFORM_SCI
@@ -281,6 +289,16 @@ template <>
 ValidValue stateless::Context::IsValidEnumValue(VkIndirectCommandsTokenTypeEXT value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkDataGraphModelCacheTypeQCOM value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkDataGraphOpticalFlowPerformanceLevelARM value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkDataGraphPipelineNodeTypeARM value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkDataGraphPipelineNodeConnectionTypeARM value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkThrottleHintTypeSEC value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkNeuralAcceleratorStatisticsModeARM value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkBuildAccelerationStructureModeKHR value) const;
 template <>

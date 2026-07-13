@@ -16,33 +16,17 @@
  */
 
 #include <thread>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/render_pass_helper.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/sync_helper.h"
-#include "../framework/thread_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "render_pass_helper.h"
+#include "descriptor_helper.h"
+#include "sync_helper.h"
+#include "thread_helper.h"
 
-void VkBestPracticesLayerTest::InitBestPracticesFramework(const char *vendor_checks_to_enable) {
-    const VkLayerSettingEXT settings = {OBJECT_LAYER_NAME, vendor_checks_to_enable, VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
-    const VkLayerSettingsCreateInfoEXT layer_settings_create_info{VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
-                                                                  &settings};
-
-    if (vendor_checks_to_enable) {
-        features_.pNext = &layer_settings_create_info;
-    }
-
-    AddRequiredExtensions(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
-    InitFramework(&features_);
-}
-
-void VkBestPracticesLayerTest::InitBestPractices(const char *vendor_checks_to_enable) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(vendor_checks_to_enable));
-    RETURN_IF_SKIP(InitState());
-}
+class NegativeBestPractices : public VkBestPracticesLayerTest {};
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_ReturnCodes) {
+TEST_F(NegativeBestPractices, DISABLED_ReturnCodes) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
     AddSurfaceExtension();
@@ -87,7 +71,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ReturnCodes) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SpecialUseExtensionsInstance) {
+TEST_F(NegativeBestPractices, DISABLED_SpecialUseExtensionsInstance) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     if (!InstanceExtensionSupported(VK_GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME)) {
         GTEST_SKIP() << "Did not find required instance extension";
@@ -101,7 +85,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SpecialUseExtensionsInstance) {
                                                                   &settings};
 
     // GetDebugCreateInfo() is last pNext chain set in GetInstanceCreateInfo()
-    const_cast<VkDebugUtilsMessengerCreateInfoEXT *>(m_errorMonitor->GetDebugCreateInfo())->pNext = &layer_settings_create_info;
+    const_cast<VkDebugUtilsMessengerCreateInfoEXT*>(m_errorMonitor->GetDebugCreateInfo())->pNext = &layer_settings_create_info;
 
     Monitor().SetDesiredWarning("BestPractices-specialuse-extension");
     VkInstance dummy_instance;
@@ -111,7 +95,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SpecialUseExtensionsInstance) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SpecialUseExtensionsDevice) {
+TEST_F(NegativeBestPractices, DISABLED_SpecialUseExtensionsDevice) {
     AddRequiredExtensions(VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBestPracticesFramework());
 
@@ -135,7 +119,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SpecialUseExtensionsDevice) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_CmdClearAttachmentTest) {
+TEST_F(NegativeBestPractices, DISABLED_CmdClearAttachmentTest) {
     TEST_DESCRIPTION("Test for validating usage of vkCmdClearAttachments");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -165,7 +149,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_CmdClearAttachmentTest) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_CmdClearAttachmentTestSecondary) {
+TEST_F(NegativeBestPractices, DISABLED_CmdClearAttachmentTestSecondary) {
     TEST_DESCRIPTION("Test for validating usage of vkCmdClearAttachments with secondary command buffers");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -233,7 +217,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_CmdClearAttachmentTestSecondary) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_ZeroSizeBlitRegion) {
+TEST_F(NegativeBestPractices, DISABLED_ZeroSizeBlitRegion) {
     TEST_DESCRIPTION("vkCmdBlitImage with a zero area region");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -260,7 +244,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ZeroSizeBlitRegion) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SecondaryCommandBuffer) {
+TEST_F(NegativeBestPractices, DISABLED_SecondaryCommandBuffer) {
     TEST_DESCRIPTION("Test for validating usage of vkCreateCommandPool with VK_COMMAND_BUFFER_LEVEL_SECONDARY");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -304,7 +288,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SecondaryCommandBuffer) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SmallDedicatedAllocation) {
+TEST_F(NegativeBestPractices, DISABLED_SmallDedicatedAllocation) {
     TEST_DESCRIPTION("Test for small dedicated memory allocations");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -325,7 +309,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SmallDedicatedAllocation) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_MSImageRequiresMemory) {
+TEST_F(NegativeBestPractices, DISABLED_MSImageRequiresMemory) {
     TEST_DESCRIPTION("Test for MS image that requires memory");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -356,7 +340,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_MSImageRequiresMemory) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_AttachmentShouldNotBeTransient) {
+TEST_F(NegativeBestPractices, DISABLED_AttachmentShouldNotBeTransient) {
     TEST_DESCRIPTION("Test for non-lazy multisampled images");
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
@@ -390,7 +374,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_AttachmentShouldNotBeTransient) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_TooManyInstancedVertexBuffers) {
+TEST_F(NegativeBestPractices, DISABLED_TooManyInstancedVertexBuffers) {
     TEST_DESCRIPTION("Test for too many instanced vertex buffers");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -440,7 +424,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_TooManyInstancedVertexBuffers) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoad) {
+TEST_F(NegativeBestPractices, DISABLED_ClearAttachmentsAfterLoad) {
     TEST_DESCRIPTION("Test for clearing attachments after load");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -483,7 +467,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoad) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
+TEST_F(NegativeBestPractices, DISABLED_ClearAttachmentsAfterLoadSecondary) {
     TEST_DESCRIPTION("Test for clearing attachments after load with secondary command buffers");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -620,7 +604,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ClearAttachmentsAfterLoadSecondary) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_TripleBufferingTest) {
+TEST_F(NegativeBestPractices, DISABLED_TripleBufferingTest) {
     TEST_DESCRIPTION("Test for usage of triple buffering");
 
     AddSurfaceExtension();
@@ -636,7 +620,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_TripleBufferingTest) {
     }
 
     bool fifo_present = false;
-    for (const auto &present_mode : m_surface_present_modes) {
+    for (const auto& present_mode : m_surface_present_modes) {
         if (present_mode == VK_PRESENT_MODE_FIFO_KHR) {
             fifo_present = true;
             break;
@@ -654,7 +638,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_TripleBufferingTest) {
     swapchain_create_info.minImageCount = 2;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
     swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
-    swapchain_create_info.imageExtent = m_surface_capabilities.minImageExtent;
+    swapchain_create_info.imageExtent = GetSwapchainExtent(m_surface_capabilities);
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = imageUsage;
     swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -678,7 +662,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_TripleBufferingTest) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SwapchainCreationTest) {
+TEST_F(NegativeBestPractices, DISABLED_SwapchainCreationTest) {
     TEST_DESCRIPTION("Test for correct swapchain creation");
 
     AddSurfaceExtension();
@@ -721,7 +705,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SwapchainCreationTest) {
 
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
     swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
-    swapchain_create_info.imageExtent = m_surface_capabilities.minImageExtent;
+    swapchain_create_info.imageExtent = GetSwapchainExtent(m_surface_capabilities);
 
     // GetPhysicalDeviceSurfacePresentModesKHR() not called before trying to create a swapchain
     m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateSwapchainKHR-present-mode-no-surface");
@@ -743,7 +727,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SwapchainCreationTest) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_ExpectedQueryDetails) {
+TEST_F(NegativeBestPractices, DISABLED_ExpectedQueryDetails) {
     TEST_DESCRIPTION("Check that GetPhysicalDeviceQueueFamilyProperties is working as expected");
 
     // Vulkan 1.1 required to test vkGetPhysicalDeviceQueueFamilyProperties2
@@ -782,7 +766,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExpectedQueryDetails) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_MissingQueryDetails) {
+TEST_F(NegativeBestPractices, DISABLED_MissingQueryDetails) {
     TEST_DESCRIPTION("Check that GetPhysicalDeviceQueueFamilyProperties generates appropriate query warning");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -831,13 +815,13 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_MissingQueryDetails) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_CreatePipelineVsFsTypeMismatchArraySize) {
+TEST_F(NegativeBestPractices, DISABLED_CreatePipelineVsFsTypeMismatchArraySize) {
     TEST_DESCRIPTION("Test that an error is produced for mismatched array sizes across the vertex->fragment shader interface");
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *vsSource = R"glsl(
+    const char* vsSource = R"glsl(
         #version 450
         layout(location=0) out float x[2];
         void main(){
@@ -845,7 +829,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_CreatePipelineVsFsTypeMismatchArraySiz
            gl_Position = vec4(1);
         }
     )glsl";
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(location=0) in float x[1];
         layout(location=0) out vec4 color;
@@ -857,14 +841,14 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_CreatePipelineVsFsTypeMismatchArraySiz
     VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kPerformanceWarningBit, "WARNING-Shader-OutputNotConsumed");
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_WorkgroupSizeDeprecated) {
+TEST_F(NegativeBestPractices, DISABLED_WorkgroupSizeDeprecated) {
     TEST_DESCRIPTION("SPIR-V 1.6 deprecated WorkgroupSize build-in.");
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -872,7 +856,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_WorkgroupSizeDeprecated) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *spv_source = R"(
+    const char* spv_source = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -893,14 +877,14 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_WorkgroupSizeDeprecated) {
                OpFunctionEnd
         )";
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
         helper.cs_ = VkShaderObj(*m_device, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kWarningBit, "BestPractices-SpirvDeprecated_WorkgroupSize");
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_ImageExtendedUsageWithoutMutableFormat) {
+TEST_F(NegativeBestPractices, DISABLED_ImageExtendedUsageWithoutMutableFormat) {
     TEST_DESCRIPTION("Create image with extended usage bit but not mutable format bit.");
     AddRequiredExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -916,7 +900,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ImageExtendedUsageWithoutMutableFormat
 
 #if GTEST_IS_THREADSAFE
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_ThreadUpdateDescriptorUpdateAfterBindNoCollision) {
+TEST_F(NegativeBestPractices, DISABLED_ThreadUpdateDescriptorUpdateAfterBindNoCollision) {
     TEST_DESCRIPTION("Two threads updating the same UAB descriptor set, expected not to generate a threading error");
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
@@ -962,7 +946,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ThreadUpdateDescriptorUpdateAfterBindN
 #endif  // GTEST_IS_THREADSAFE
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_TransitionFromUndefinedToReadOnly) {
+TEST_F(NegativeBestPractices, DISABLED_TransitionFromUndefinedToReadOnly) {
     TEST_DESCRIPTION("Transition image layout from undefined to read only");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -1001,7 +985,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_TransitionFromUndefinedToReadOnly) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_OverAllocateFromDescriptorPool) {
+TEST_F(NegativeBestPractices, DISABLED_OverAllocateFromDescriptorPool) {
     TEST_DESCRIPTION("Attempt to allocate more sets and descriptors than descriptor pool has available.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -1032,7 +1016,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_OverAllocateFromDescriptorPool) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_OverAllocateTypeFromDescriptorPool) {
+TEST_F(NegativeBestPractices, DISABLED_OverAllocateTypeFromDescriptorPool) {
     TEST_DESCRIPTION("Attempt to allocate more sets and descriptors than descriptor pool has available.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -1064,7 +1048,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_OverAllocateTypeFromDescriptorPool) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearWithoutLoadOpClear) {
+TEST_F(NegativeBestPractices, DISABLED_RenderPassClearWithoutLoadOpClear) {
     TEST_DESCRIPTION("Test for clearing a RenderPass with non-zero clearValueCount without any VK_ATTACHMENT_LOAD_OP_CLEAR");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -1128,7 +1112,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearWithoutLoadOpClear) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearValueCountHigherThanAttachmentCount) {
+TEST_F(NegativeBestPractices, DISABLED_RenderPassClearValueCountHigherThanAttachmentCount) {
     TEST_DESCRIPTION(
         "Test for beginning a RenderPass with VkRenderPassBeginInfo.clearValueCount > VkRenderPassCreateInfo.attachmentCount");
 
@@ -1200,7 +1184,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_RenderPassClearValueCountHigherThanAtt
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_DontCareThenLoad) {
+TEST_F(NegativeBestPractices, DISABLED_DontCareThenLoad) {
     TEST_DESCRIPTION("Test for storing an attachment with STORE_OP_DONT_CARE then loading with LOAD_OP_LOAD");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -1277,15 +1261,15 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_DontCareThenLoad) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
+TEST_F(NegativeBestPractices, DISABLED_ExclusiveImageMultiQueueUsage) {
     TEST_DESCRIPTION("Test for using a queue exclusive image on multiple queues");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
-    vkt::Queue *graphics_queue = m_device->QueuesWithGraphicsCapability()[0];
+    vkt::Queue* graphics_queue = m_device->QueuesWithGraphicsCapability()[0];
 
-    vkt::Queue *compute_queue = nullptr;
+    vkt::Queue* compute_queue = nullptr;
     for (uint32_t i = 0; i < m_device->QueuesWithComputeCapability().size(); ++i) {
         auto cqi = m_device->QueuesWithComputeCapability()[i];
         if (cqi->family_index != graphics_queue->family_index) {
@@ -1351,7 +1335,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
 
     // Prepare compute
 
-    const char *cs = R"glsl(#version 450
+    const char* cs = R"glsl(#version 450
     layout(local_size_x=1, local_size_y=1) in;
     layout(set=0, binding=0, rgba32f) uniform image2D img;
     void main(){
@@ -1462,7 +1446,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ExclusiveImageMultiQueueUsage) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_ImageMemoryBarrierAccessLayoutCombinations) {
+TEST_F(NegativeBestPractices, DISABLED_ImageMemoryBarrierAccessLayoutCombinations) {
     TEST_DESCRIPTION("Transition image layout from undefined to read only");
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -1556,7 +1540,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_ImageMemoryBarrierAccessLayoutCombinat
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_NonSimultaneousSecondaryMarksPrimary) {
+TEST_F(NegativeBestPractices, DISABLED_NonSimultaneousSecondaryMarksPrimary) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -1580,7 +1564,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_NonSimultaneousSecondaryMarksPrimary) 
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_NoCreateSwapchainPresentModes) {
+TEST_F(NegativeBestPractices, DISABLED_NoCreateSwapchainPresentModes) {
     TEST_DESCRIPTION("With swapchain maintenance 1, CreateSwapchain with VkPresentModesCreateInfoEXT");
 
     AddSurfaceExtension();
@@ -1597,7 +1581,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_NoCreateSwapchainPresentModes) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_PipelineWithoutRenderPassOrRenderingInfo) {
+TEST_F(NegativeBestPractices, DISABLED_PipelineWithoutRenderPassOrRenderingInfo) {
     TEST_DESCRIPTION("Create pipeline with VK_NULL_HANDLE render pass and no VkPipelineRenderingCreateInfo in pNext chain");
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
@@ -1615,7 +1599,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_PipelineWithoutRenderPassOrRenderingIn
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_GetQueryPoolResultsWithoutBegin) {
+TEST_F(NegativeBestPractices, DISABLED_GetQueryPoolResultsWithoutBegin) {
     TEST_DESCRIPTION("Get query pool results without ever beginning the query");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(InitBestPracticesFramework());
@@ -1636,7 +1620,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_GetQueryPoolResultsWithoutBegin) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_NonOptimalResolveFormat) {
+TEST_F(NegativeBestPractices, DISABLED_NonOptimalResolveFormat) {
     TEST_DESCRIPTION("Create a render pass with a resolve attachment that is not optimal");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1696,14 +1680,14 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_NonOptimalResolveFormat) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetEnd) {
+TEST_F(NegativeBestPractices, DISABLED_PartialPushConstantSetEnd) {
     TEST_DESCRIPTION("Set only a part of push constants at end of a struct");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *const vsSource = R"glsl(
+    const char* const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { uint x[2]; } constants;
         void main(){
@@ -1711,8 +1695,8 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetEnd) {
         }
     )glsl";
 
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     uint32_t data[2] = {1u, 2u};
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(data)};
@@ -1740,13 +1724,13 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetEnd) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetMiddle) {
+TEST_F(NegativeBestPractices, DISABLED_PartialPushConstantSetMiddle) {
     TEST_DESCRIPTION("Set only a part of push constants in middle of as struct");
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *const vsSource = R"glsl(
+    const char* const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo {
             uint a; // set
@@ -1758,8 +1742,8 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetMiddle) {
         }
     )glsl";
 
-    VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     uint32_t data = 1u;
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(uint32_t) * 3};
@@ -1786,7 +1770,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetMiddle) {
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7495
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_IgnoreResolveImageView) {
+TEST_F(NegativeBestPractices, DISABLED_IgnoreResolveImageView) {
     TEST_DESCRIPTION("Help warn user when they might have resolveMode set to NONE by accident");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -1832,7 +1816,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_IgnoreResolveImageView) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEvent) {
+TEST_F(NegativeBestPractices, DISABLED_SetSignaledEvent) {
     TEST_DESCRIPTION("Signal event two times");
     RETURN_IF_SKIP(InitBestPractices());
 
@@ -1847,7 +1831,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEvent) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEvent2) {
+TEST_F(NegativeBestPractices, DISABLED_SetSignaledEvent2) {
     TEST_DESCRIPTION("Signal event two times using CmdSetEvent2 api");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredFeature(vkt::Feature::synchronization2);
@@ -1869,7 +1853,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEvent2) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SetEventSignaledByHost) {
+TEST_F(NegativeBestPractices, DISABLED_SetEventSignaledByHost) {
     TEST_DESCRIPTION("Set event that was previously set be the host");
     RETURN_IF_SKIP(InitBestPractices());
 
@@ -1885,7 +1869,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetEventSignaledByHost) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventMultipleSubmits) {
+TEST_F(NegativeBestPractices, DISABLED_SetSignaledEventMultipleSubmits) {
     TEST_DESCRIPTION("Set event from different submits");
     RETURN_IF_SKIP(InitBestPractices());
 
@@ -1907,7 +1891,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventMultipleSubmits) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventMultipleSubmits2) {
+TEST_F(NegativeBestPractices, DISABLED_SetSignaledEventMultipleSubmits2) {
     TEST_DESCRIPTION("Set event from multiple submits using QueueSubmit2 api");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredFeature(vkt::Feature::synchronization2);
@@ -1931,7 +1915,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventMultipleSubmits2) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventSecondary) {
+TEST_F(NegativeBestPractices, DISABLED_SetSignaledEventSecondary) {
     TEST_DESCRIPTION("Set event in the primary command buffer and then one more time in the secondary");
     RETURN_IF_SKIP(InitBestPractices());
 
@@ -1951,7 +1935,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventSecondary) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventSecondary2) {
+TEST_F(NegativeBestPractices, DISABLED_SetSignaledEventSecondary2) {
     TEST_DESCRIPTION("Set event in different secondary command buffers");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredFeature(vkt::Feature::synchronization2);
@@ -1977,7 +1961,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventSecondary2) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventSecondary3) {
+TEST_F(NegativeBestPractices, DISABLED_SetSignaledEventSecondary3) {
     TEST_DESCRIPTION("Set event in the secondary command buffer and in the primary from different submissions");
     RETURN_IF_SKIP(InitBestPractices());
 
@@ -2004,13 +1988,13 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_SetSignaledEventSecondary3) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetEndCompute) {
+TEST_F(NegativeBestPractices, DISABLED_PartialPushConstantSetEndCompute) {
     TEST_DESCRIPTION("Set only a part of push constants at end of a struct");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *const csSource = R"glsl(
+    const char* const csSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo { uint x[2]; } constants;
         layout(set = 0, binding = 0) buffer bar { vec4 r; } res;
@@ -2053,7 +2037,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_PartialPushConstantSetEndCompute) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_UnneededQueueFamilyOwnershipTransfer) {
+TEST_F(NegativeBestPractices, DISABLED_UnneededQueueFamilyOwnershipTransfer) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
@@ -2107,7 +2091,58 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_UnneededQueueFamilyOwnershipTransfer) 
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_BadDestroy) {
+TEST_F(NegativeBestPractices, DISABLED_UnneededQueueFamilyOwnershipTransferImage) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance9);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    std::optional<uint32_t> transfer_only_family = m_device->TransferOnlyQueueFamily();
+    if (!transfer_only_family.has_value()) {
+        GTEST_SKIP() << "Transfer-only queue family is required";
+    }
+
+    uint32_t qf_count = m_device->physical_device_.queue_properties_.size();
+    std::vector<VkQueueFamilyOwnershipTransferPropertiesKHR> qfot_props(qf_count);
+    std::vector<VkQueueFamilyProperties2> qf_props(qf_count);
+    for (uint32_t i = 0; i < qf_count; i++) {
+        qfot_props[i] = vku::InitStructHelper();
+        qf_props[i] = vku::InitStructHelper(&qfot_props[i]);
+    }
+    vk::GetPhysicalDeviceQueueFamilyProperties2(gpu_, &qf_count, qf_props.data());
+
+    if ((qfot_props[transfer_only_family.value()].optimalImageTransferToQueueFamilies & (1 << transfer_only_family.value())) == 0) {
+        GTEST_SKIP() << "optimalImageTransferToQueueFamilies does not include transfer queue";
+    }
+
+    vkt::CommandPool transfer_pool(*m_device, transfer_only_family.value(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    vkt::CommandBuffer transfer_cb(*m_device, transfer_pool);
+
+    vkt::Image image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+
+    VkImageMemoryBarrier2 acquire_barrier = vku::InitStructHelper();
+    acquire_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    acquire_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    acquire_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    acquire_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    acquire_barrier.srcQueueFamilyIndex = m_default_queue->family_index;
+    acquire_barrier.dstQueueFamilyIndex = transfer_only_family.value();
+    acquire_barrier.image = image;
+    acquire_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    transfer_cb.Begin();
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-PipelineBarrier-unneeded-QFOT");
+    transfer_cb.Barrier(acquire_barrier);
+    m_errorMonitor->VerifyFound();
+    transfer_cb.End();
+}
+
+// Not supported in Vulkan SC: best practices layers
+TEST_F(NegativeBestPractices, DISABLED_BadDestroy) {
     TEST_DESCRIPTION(
         "In PreCallRecordDestroyDevice, make sure CommandBufferSubState is destroyed before destroying device state and validation "
         "does not crash");
@@ -2156,7 +2191,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_BadDestroy) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_MutableDescriptors) {
+TEST_F(NegativeBestPractices, DISABLED_MutableDescriptors) {
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::mutableDescriptorType);
     RETURN_IF_SKIP(InitBestPractices());
@@ -2180,7 +2215,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_MutableDescriptors) {
 }
 
 // Not supported in Vulkan SC: best practices layers
-TEST_F(VkBestPracticesLayerTest, DISABLED_MaxPreferredWorkGroupInvocations) {
+TEST_F(NegativeBestPractices, DISABLED_MaxPreferredWorkGroupInvocations) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::meshShader);
@@ -2196,7 +2231,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_MaxPreferredWorkGroupInvocations) {
         GTEST_SKIP() << "Preferred values are too high";
     }
 
-    const char *task_source = R"glsl(
+    const char* task_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
@@ -2205,7 +2240,7 @@ TEST_F(VkBestPracticesLayerTest, DISABLED_MaxPreferredWorkGroupInvocations) {
         }
     )glsl";
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;

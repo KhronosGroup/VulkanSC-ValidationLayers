@@ -25,11 +25,8 @@ option(VULKANSC "Build Vulkan SC validation layers" ON)
 if(VULKANSC)
     project(VVL VERSION 1.0.21 LANGUAGES CXX) # vulkansc
 else()
-    project(VVL VERSION 1.4.344 LANGUAGES CXX) # vulkan
+    project(VVL VERSION 1.4.356 LANGUAGES CXX) # vulkan
 endif()
-
-option(BUILD_WSI_SCREEN_QNX_SUPPORT "Build QNX screen support" OFF)
-option(BUILD_WSI_SCI_SUPPORT "Build SCI WSI support" OFF)
 
 # This variable enables downstream users to customize the target API
 # variant (e.g. Vulkan SC)

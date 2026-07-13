@@ -2,8 +2,8 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2022-2025 The Khronos Group Inc.
- * Copyright (c) 2022-2025 RasterGrid Kft.
+ * Copyright (c) 2022-2026 The Khronos Group Inc.
+ * Copyright (c) 2022-2026 RasterGrid Kft.
  * Modifications Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +13,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/video_objects.h"
+#include "video_objects.h"
 
 class NegativeVideoEncodeQuantizationMap : public VkVideoLayerTest {};
 
@@ -1706,7 +1706,7 @@ TEST_F(NegativeVideoEncodeQuantizationMap, CreateImageViewQuantMapUnsupportedFor
 
         // The image is not created with MUTABLE, so we need to allow this VU.
         // This should also bypass view format compatibility checks
-        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageViewCreateInfo-image-01762");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageViewCreateInfo-image-12397");
         m_errorMonitor->SetDesiredError(vuid);
         VkImageView image_view = VK_NULL_HANDLE;
         vk::CreateImageView(device(), &image_view_ci, nullptr, &image_view);

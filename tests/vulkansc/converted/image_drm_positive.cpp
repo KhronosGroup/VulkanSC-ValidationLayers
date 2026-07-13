@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 void ImageDrmTest::InitBasicImageDrm() {
     SetTargetApiVersion(VK_API_VERSION_1_2);  // required extension added here
@@ -37,7 +37,7 @@ std::vector<uint64_t> ImageDrmTest::GetFormatModifier(VkFormat format, VkFormatF
     vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &format_props);
 
     for (uint32_t i = 0; i < mod_props.drmFormatModifierCount; ++i) {
-        auto &mod = mod_props.pDrmFormatModifierProperties[i];
+        auto& mod = mod_props.pDrmFormatModifierProperties[i];
         if (((mod.drmFormatModifierTilingFeatures & features) == features) && (plane_count == mod.drmFormatModifierPlaneCount)) {
             mods.push_back(mod.drmFormatModifier);
         }

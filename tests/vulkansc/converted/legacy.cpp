@@ -14,7 +14,7 @@
  */
 // stype-check off
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 static const VkLayerSettingEXT kLegacySetting = {OBJECT_LAYER_NAME, "legacy_detection", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
                                                  &kVkTrue};
@@ -44,10 +44,6 @@ TEST_F(NegativeLegacy, DISABLED_MultipleDifferentWarnings) {
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework(&kLegacySettingCreateInfo));
     RETURN_IF_SKIP(InitState());
-    if (IsPlatformMockICD()) {
-        // Works locally
-        GTEST_SKIP() << "Github Action doesn't unload VVL and static reported bool is not reset";
-    }
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
     VkSubpassDescription subpass = {};
@@ -69,7 +65,7 @@ TEST_F(NegativeLegacy, DISABLED_MultipleDifferentWarnings) {
 TEST_F(NegativeLegacy, DISABLED_MuteSingleWarning) {
     TEST_DESCRIPTION("Only mute of the two warnings to make sure mutting works");
 
-    const char *ids[] = {"WARNING-legacy-renderpass2"};
+    const char* ids[] = {"WARNING-legacy-renderpass2"};
     VkLayerSettingEXT layer_settings[2] = {kLegacySetting,
                                            {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids}};
 
@@ -79,10 +75,6 @@ TEST_F(NegativeLegacy, DISABLED_MuteSingleWarning) {
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework(&layer_setting_ci));
     RETURN_IF_SKIP(InitState());
-    if (IsPlatformMockICD()) {
-        // Works locally
-        GTEST_SKIP() << "Github Action doesn't unload VVL and static reported bool is not reset";
-    }
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
     VkSubpassDescription subpass = {};
@@ -104,13 +96,6 @@ TEST_F(NegativeLegacy, DISABLED_GetPhysicalDeviceProperties2Extension) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework(&kLegacySettingCreateInfo));
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
-    if (IsPlatformMockICD()) {
-        // Works locally
-        GTEST_SKIP() << "Github Action doesn't unload VVL and static reported bool is not reset";
-    }
-#if defined(VK_USE_PLATFORM_ANDROID_KHR) || defined(VK_USE_PLATFORM_METAL_EXT)
-    GTEST_SKIP() << "Android/macOS doesn't unload VVL and static reported bool is not reset";
-#endif
 
     m_errorMonitor->SetDesiredWarning("WARNING-legacy-gpdp2");
     VkPhysicalDeviceFeatures features{};
@@ -132,13 +117,6 @@ TEST_F(NegativeLegacy, DISABLED_GetPhysicalDeviceProperties2Version) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(InitFramework(&kLegacySettingCreateInfo));
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
-    if (IsPlatformMockICD()) {
-        // Works locally
-        GTEST_SKIP() << "Github Action doesn't unload VVL and static reported bool is not reset";
-    }
-#if defined(VK_USE_PLATFORM_ANDROID_KHR) || defined(VK_USE_PLATFORM_METAL_EXT)
-    GTEST_SKIP() << "Android/macOS doesn't unload VVL and static reported bool is not reset";
-#endif
 
     m_errorMonitor->SetDesiredWarning("WARNING-legacy-gpdp2");
     VkPhysicalDeviceFeatures features{};
@@ -164,7 +142,7 @@ TEST_F(NegativeLegacy, DISABLED_UseDeprecatedInstanceExtensions) {
 
     auto ici = GetInstanceCreateInfo();
     auto debug_info = Monitor().GetDebugCreateInfo();
-    const_cast<VkDebugUtilsMessengerCreateInfoEXT *>(debug_info)->pNext = &kLegacySettingCreateInfo;
+    const_cast<VkDebugUtilsMessengerCreateInfoEXT*>(debug_info)->pNext = &kLegacySettingCreateInfo;
     ici.pNext = debug_info;
 
     Monitor().SetDesiredWarning("WARNING-legacy-extension");
@@ -215,7 +193,7 @@ TEST_F(NegativeLegacy, DISABLED_LoadDeprecatedExtension) {
     RETURN_IF_SKIP(InitFramework(&kLegacySettingCreateInfo));
     RETURN_IF_SKIP(InitState());
 
-    const char *extension = VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME;
+    const char* extension = VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME;
 
     if (!DeviceExtensionSupported(extension)) {
         GTEST_SKIP() << extension << " not supported.";

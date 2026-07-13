@@ -65,6 +65,8 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/external_memory_sync.cpp
     ../framework/descriptor_helper.h
     ../framework/descriptor_helper.cpp
+    ../framework/descriptor_heap_object.h
+    ../framework/descriptor_heap_object.cpp
     ../framework/thread_helper.h
     ../framework/thread_helper.cpp
     ../framework/render_pass_helper.h
@@ -97,7 +99,7 @@ target_sources(vksc_layer_validation_tests PRIVATE
 )
 
 add_dependencies(vksc_layer_validation_tests vvl)
-target_include_directories(vksc_layer_validation_tests PRIVATE . .. ../framework)
+target_include_directories(vksc_layer_validation_tests PRIVATE . .. ../framework ../..)
 
 target_compile_options(vksc_layer_validation_tests PRIVATE "$<IF:$<CXX_COMPILER_ID:MSVC>,/wd4100,-Wno-unused-parameter>")
 

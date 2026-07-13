@@ -3,9 +3,9 @@
         {
             "reason": "This test case are replaced with Vulkan SC specific ones",
             "cases": [
-                "VkLayerTest.SpecLinksImplicit",
-                "VkLayerTest.SpecLinksExplicit",
-                "VkLayerTest.MissingCreateInfo",
+                "NegativeOther.SpecLinksImplicit",
+                "NegativeOther.SpecLinksExplicit",
+                "NegativeOther.MissingCreateInfo",
                 "NegativeImage.ImageMisc",
                 "PositiveInstance.ValidationInstanceExtensions",
                 "NegativeMemory.BindMemory",
@@ -21,19 +21,26 @@
             ]
         },
         {
-            "reason": "This test case are not relevant for Vulkan SC",
+            "reason": "These test cases are not relevant for Vulkan SC",
             "cases": [
-                "VkPositiveLayerTest.ExtensionsInCreateInstance",
+                "PositiveOther.ExtensionsInCreateInstance",
                 "NegativeImage.GetPhysicalDeviceImageFormatProperties"
+            ]
+        },
+        {
+            "reason": "These test cases are not relevant for Vulkan SC as the device object reservation already cross-validate with general max object counts",
+            "cases": [
+                "NegativeMemory.AllocationCount",
+                "NegativeSampler.AllocationCount"
             ]
         },
         {
             "reason": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
             "cases": [
-                "VkLayerTest.UnsupportedPnextApiVersion",
-                "VkLayerTest.ExtensionXmlDependsLogic3",
-                "VkPositiveLayerTest.Vulkan12FeaturesBufferDeviceAddress",
-                "VkPositiveLayerTest.UseInteractionApi2",
+                "NegativeOther.UnsupportedPnextApiVersion",
+                "NegativeOther.ExtensionXmlDependsLogic3",
+                "PositiveOther.Vulkan12FeaturesBufferDeviceAddress",
+                "PositiveOther.UseInteractionApi2",
                 "NegativeCopyBufferImage.ImageCopyAspectMismatch",
                 "NegativeDescriptorIndexing.SetLayoutWithoutExtension",
                 "NegativePipeline.ShaderDrawParametersNotEnabled10",
@@ -50,6 +57,12 @@
             ]
         },
         {
+            "reason": "TODO: Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality, although it's only due to incorrect spec",
+            "cases": [
+                "NegativeShaderLimits.MaxFragmentCombinedOutputResources"
+            ]
+        },
+        {
             "reason": "Not supported in Vulkan SC: shader module",
             "cases": [
                 "NegativeParent.PipelineShaderStageCreateInfo",
@@ -60,7 +73,7 @@
         {
             "reason": "Not supported in Vulkan SC: allocation callbacks",
             "cases": [
-                "VkLayerTest.InvalidAllocationCallbacks",
+                "NegativeOther.InvalidAllocationCallbacks",
                 "NegativeInstanceless.DestroyInstanceAllocationCallbacksCompatibility"
             ]
         },
@@ -74,11 +87,11 @@
         {
             "reason": "Not supported in Vulkan SC: best practices layers",
             "cases": [
-                "VkBestPracticesLayerTest.*",
-                "VkPositiveBestPracticesLayerTest.*",
-                "VkAmdBestPracticesLayerTest.*",
-                "VkArmBestPracticesLayerTest.*",
-                "VkNvidiaBestPracticesLayerTest.*"
+                "NegativeBestPractices.*",
+                "PositiveBestPractices.*",
+                "NegativeBestPracticesAMD.*",
+                "NegativeBestPracticesARM.*",
+                "NegativeBestPracticesNV.*"
             ]
         },
         {
@@ -109,7 +122,7 @@
         {
             "reason": "Not supported in Vulkan SC: split-instance bind regions",
             "cases": [
-                "VkLayerTest.InvalidImageCreateFlagWithPhysicalDeviceCount",
+                "NegativeOther.InvalidImageCreateFlagWithPhysicalDeviceCount",
                 "NegativeImage.ImageSplitInstanceBindRegionCount"
             ]
         },
@@ -159,7 +172,7 @@
         {
             "reason": "Not supported in Vulkan SC: vkTrimCommandBuffer",
             "cases": [
-                "VkPositiveLayerTest.GetDevProcAddrExtensions"
+                "PositiveOther.GetDevProcAddrExtensions"
             ]
         },
         {
@@ -182,7 +195,9 @@
                 "NegativeDebugExtensions.DebugMarkerSetObject",
                 "NegativeDebugExtensions.DebugMarkerSetUtils",
                 "NegativeDebugExtensions.SwapchainImagesDebugMarker",
-                "PositiveDebugExtensions.SwapchainImagesDebugMarker"
+                "PositiveDebugExtensions.SwapchainImagesDebugMarker",
+                "NegativeTileShading.DebugMarkerInsidePerTileExecutionModelScope",
+                "PositiveTileShading.LaunchDebugMarkerOutsidePerTileExecutionModelScope"
             ]
         },
         {
@@ -207,7 +222,7 @@
         {
             "reason": "Not supported in Vulkan SC: VK_EXT_validation_cache",
             "cases": [
-                "VkLayerTest.ValidationCacheTestBadMerge"
+                "NegativeOther.ValidationCacheTestBadMerge"
             ]
         },
         {
@@ -283,6 +298,13 @@
                 "NegativePipeline.CreateFlags",
                 "NegativePipeline.CreateFlagsCompute",
                 "PositiveDeviceFeatureProperty.PropertyWithoutExtension"
+            ]
+        },
+        {
+            "reason": "TODO: These tests check things that are hacked in without spec support the debug utils additions expected here",
+            "cases": [
+                "PositiveDebugExtensions.VkDebugUtilsObjectNameInfoEXTExtendsCreateInfo",
+                "PositiveDebugExtensions.VkDebugUtilsObjectTagInfoEXTExtendsCreateInfo"
             ]
         },
         {
@@ -523,6 +545,7 @@
                 "NegativeSyncVal.StorageImageDescriptorHazard",
                 "NegativeSyncVal.WriteOnlyBufferWriteHazard",
                 "NegativeSyncVal.WriteOnlyImageWriteHazard",
+                "NegativeSyncVal.WriteSameLocationFromTwoDispatches",
                 "NegativeSyncVal.WriteSameLocationFromTwoSubmits",
                 "NegativeSyncVal.TexelBufferDescriptorHazard",
                 "NegativeSyncVal.UniformBufferDescriptorHazard",

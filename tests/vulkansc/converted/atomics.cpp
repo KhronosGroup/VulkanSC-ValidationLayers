@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +15,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class NegativeAtomic : public VkLayerTest {};
 
@@ -33,7 +33,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
 
     // Test StoreOp
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, rgba8) uniform image2D si0;
             void main() {
@@ -43,7 +43,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
 
         VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
-        auto info_override = [&](CreatePipelineHelper &info) {
+        auto info_override = [&](CreatePipelineHelper& info) {
             info.shader_stages_ = {vs.GetStageCreateInfo(), info.fs_->GetStageCreateInfo()};
             info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr};
         };
@@ -53,7 +53,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
 
     // Test AtomicOp
     {
-        const char *vsSource = R"glsl(
+        const char* vsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, r32f) uniform image2D si0;
             void main() {
@@ -63,7 +63,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
 
         VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
         if (VK_SUCCESS == vs.InitFromGLSLTry()) {
-            auto info_override = [&](CreatePipelineHelper &info) {
+            auto info_override = [&](CreatePipelineHelper& info) {
                 info.shader_stages_ = {vs.GetStageCreateInfo(), info.fs_->GetStageCreateInfo()};
                 info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr};
             };
@@ -86,7 +86,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
 
     // Test StoreOp
     {
-        const char *fsSource = R"glsl(
+        const char* fsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, rgba8) uniform image2D si0;
             void main() {
@@ -96,7 +96,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
 
         VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-        auto info_override = [&](CreatePipelineHelper &info) {
+        auto info_override = [&](CreatePipelineHelper& info) {
             info.shader_stages_ = {info.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
             info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
         };
@@ -106,7 +106,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
 
     // Test AtomicOp
     {
-        const char *fsSource = R"glsl(
+        const char* fsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, r32f) uniform image2D si0;
             void main() {
@@ -116,7 +116,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
 
         VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL_TRY);
         if (VK_SUCCESS == fs.InitFromGLSLTry()) {
-            auto info_override = [&](CreatePipelineHelper &info) {
+            auto info_override = [&](CreatePipelineHelper& info) {
                 info.shader_stages_ = {info.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
                 info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
             };
@@ -135,7 +135,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureBuffer) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer ssbo { int y; };
         void main() {
@@ -145,7 +145,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureBuffer) {
 
     VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    auto info_override = [&](CreatePipelineHelper &info) {
+    auto info_override = [&](CreatePipelineHelper& info) {
         info.shader_stages_ = {info.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         info.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     };
@@ -163,7 +163,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisableShaderObject) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         layout(set=0, binding=0, rgba8) uniform image2D si0;
         void main() {
@@ -468,7 +468,7 @@ TEST_F(NegativeAtomic, ImageInt64DrawtimeSparse) {
     AddRequiredFeature(vkt::Feature::shaderImageInt64Atomics);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_explicit_arithmetic_types_int64 : enable
         #extension GL_EXT_shader_image_int64 : enable
@@ -524,7 +524,7 @@ TEST_F(NegativeAtomic, ImageInt64Mesh32) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         #extension GL_KHR_memory_scope_semantics : enable
@@ -1237,8 +1237,8 @@ TEST_F(NegativeAtomic, Float2WidthMismatch) {
     )glsl";
     // clang-format on
 
-    const char *current_shader = nullptr;
-    const auto set_info = [this, &current_shader](CreateComputePipelineHelper &helper) {
+    const char* current_shader = nullptr;
+    const auto set_info = [this, &current_shader](CreateComputePipelineHelper& helper) {
         helper.cs_ = VkShaderObj(*m_device, current_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3);
         helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     };
@@ -1365,7 +1365,7 @@ TEST_F(NegativeAtomic, InvalidStorageOperation) {
     vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
     vkt::BufferView buffer_view(*m_device, buffer, buffer_view_format);
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set = 0, binding = 3, r32f) uniform image2D si0;
         layout(set = 0, binding = 2, r32f) uniform image2D si1[2];
@@ -1504,7 +1504,7 @@ TEST_F(NegativeAtomic, VertexPipelineStoresAndAtomics) {
     //     float a;
     //     float b;
     // } data;
-    const char *vsSource = R"(
+    const char* vsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Vertex %main "main" %o

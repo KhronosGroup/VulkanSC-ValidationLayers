@@ -35,6 +35,7 @@ struct GpuAVSettings {
     bool validate_copy_memory_indirect = true;
     bool validate_index_buffers = true;
     bool validate_acceleration_structures_builds = true;
+    bool ray_tracing_buffers_consistency = false;
 
     // Currently turned of due to some false positives still observed
     bool validate_image_layout = false;
@@ -45,6 +46,7 @@ struct GpuAVSettings {
     bool debug_dump_instrumented_shaders = false;
     uint32_t debug_max_instrumentations_count = 0;  // zero is same as "unlimited"
     bool debug_print_instrumentation_info = false;
+    bool debug_disable_dontinline = false;
 
     // We create a buffer of N slots as [0, N-1],
     // but N-1 is used to signal the app everything after is garbage.
@@ -54,20 +56,18 @@ struct GpuAVSettings {
     uint32_t invalid_index_command = 8191;                      // N-1
     uint32_t indices_buffer_count = invalid_index_command + 1;  // N
 
-    bool descriptor_buffer_override = false;
-
     // Note - even though DebugPrintf basically fits in here, from the user point of view they are different and that is reflected
     // in the settings (which are reflected in VkConfig). To make our lives easier, we just make these settings with the hierarchy
     // of the settings exposed
     struct ShaderInstrumentation {
         bool descriptor_checks = true;
         bool buffer_device_address = true;
-        bool ray_query = true;
-        bool ray_hit_object = true;
         bool mesh_shading = true;
         bool post_process_descriptor_indexing = true;
+        bool trace_ray = true;
         bool vertex_attribute_fetch_oob = true;
         bool sanitizer = true;
+        bool shared_memory_data_race = true;
     } shader_instrumentation;
 
     bool IsShaderInstrumentationEnabled() const;

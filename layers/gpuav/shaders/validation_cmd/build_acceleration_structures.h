@@ -39,11 +39,7 @@ namespace gpuav {
 namespace glsl {
 using uint = uint32_t;
 #else
-#if defined(GL_ARB_gpu_shader_int64)
 #extension GL_ARB_gpu_shader_int64 : require
-#else
-#error No extension available for 64-bit integers.
-#endif
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_buffer_reference_uvec2 : require
@@ -125,18 +121,23 @@ struct TLASValidationShaderPushData {
 };
 
 const uint kBLASValidationMode_triangles_indices = 0;
-const uint kBLASValidationMode_aabbs = 1;
-const uint kBLASValidationMode_transform_matrix = 2;
+const uint kBLASValidationMode_active_triangles = 1;
+const uint kBLASValidationMode_aabbs = 2;
+const uint kBLASValidationMode_transform_matrix = 3;
 
-// Caution, I think Vulkan only guarantes 16 bytes of push constants
+// #ARNO_TODO Vulkan only guarantees 128 bytes of push constants, need to move this to a buffer
 struct BLASValidationShaderPushData {
     uint64_t address;  // Cast it appropriately according to index_type
-    uint64_t stride;
+    uint64_t address_2;
+    uint64_t address_3;
+    uint64_t update_time_stride;
+    uint64_t build_time_stride;
     uint validation_mode;
     uint index_type;
+    uint vertex_format;
     uint max_vertex;
     uint first_vertex;
-    uint address_byte_offset;
+    uint primitive_offset;
     uint primitive_count;
     uint error_info_i;
 };

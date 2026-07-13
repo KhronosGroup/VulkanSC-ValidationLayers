@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "error_message/spirv_logging.h"
 #include "gpuav/core/gpuav.h"
 #include "gpuav/resources/gpuav_state_trackers.h"
 #include "gpuav/resources/gpuav_vulkan_objects.h"
@@ -37,98 +38,127 @@ void RegisterBufferDeviceAddressValidation(Validator& gpuav, CommandBufferSubSta
 
     cb.on_instrumentation_error_logger_register_functions.emplace_back([](Validator& gpuav, CommandBufferSubState& cb,
                                                                           const LastBound& last_bound) {
-        CommandBufferSubState::InstrumentationErrorLogger inst_error_logger = [](Validator& gpuav, const Location&,
-                                                                                 const uint32_t* error_record,
-                                                                                 std::string& out_error_msg,
-                                                                                 std::string& out_vuid_msg) {
-            using namespace glsl;
-            bool error_found = false;
-            if (GetErrorGroup(error_record) != kErrorGroup_InstBufferDeviceAddress) {
+        CommandBufferSubState::InstrumentationErrorLogger inst_error_logger =
+            [](Validator& gpuav, const Location&, const uint32_t* error_record, const InstrumentedShader* instrumented_shader,
+               std::string& out_error_msg, std::string& out_vuid_msg) {
+                using namespace glsl;
+                bool error_found = false;
+                if (GetErrorGroup(error_record) != kErrorGroup_InstBufferDeviceAddress) {
+                    return error_found;
+                }
+                error_found = true;
+
+                std::ostringstream ss;
+
+                const uint32_t payload = error_record[kInst_LogError_ParameterOffset_2];
+                const bool is_write = ((payload >> kInst_BuffAddrAccess_PayloadShiftIsWrite) & 1) != 0;
+                const bool is_struct = ((payload >> kInst_BuffAddrAccess_PayloadShiftIsStruct) & 1) != 0;
+
+                const uint64_t address = *reinterpret_cast<const uint64_t*>(error_record + kInst_LogError_ParameterOffset_0);
+                const uint32_t error_sub_code = GetSubError(error_record);
+                switch (error_sub_code) {
+                    case kErrorSubCode_BufferDeviceAddress_UnallocRef: {
+                        const char* access_type = is_write ? "written" : "read";
+                        const uint32_t byte_size = payload & kInst_BuffAddrAccess_PayloadMaskAccessInfo;
+                        ss << "Out of bounds access: " << byte_size << " bytes " << access_type << " at buffer device address 0x"
+                           << std::hex << address << '.';
+                        if (is_struct) {
+                            // Added because glslang currently has no way to seperate out the struct (Slang does as of 2025.6.2)
+                            ss << " This " << (is_write ? "write" : "read") << " corresponds to a full OpTypeStruct load";
+                            const uint32_t instruction_position_offset =
+                                error_record[kHeader_StageInstructionIdOffset] & kInstructionId_Mask;
+                            ::spirv::FindOpStructFromBDA(ss, instrumented_shader->original_spirv, instruction_position_offset);
+                            ss << ". While not all members of the struct might be accessed, "
+                                  "it is up "
+                                  "to the source language or tooling to detect that and reflect it in the SPIR-V.";
+                        }
+
+                        const NearestBufferResult nearest = gpuav.GetNearestBuffersByAddress(address);
+                        auto plural = [&](uint64_t counter) -> const char* { return counter > 1 ? "s" : ""; };
+                        if (!nearest.above_buffers.empty()) {
+                            const VkDeviceAddress offset = nearest.above_range.begin - address;
+                            ss << "\nNearest above committed device address range " << vvl::string_range_hex(nearest.above_range)
+                               << " is above address by " << std::dec << offset << " byte" << plural(offset) << " and has buffer"
+                               << plural(nearest.above_buffers.size()) << ":";
+                            for (const auto buffer : nearest.above_buffers) {
+                                ss << "\n  " << buffer->Describe(gpuav);
+                            }
+                        }
+                        if (!nearest.below_buffers.empty()) {
+                            const VkDeviceAddress offset = address - nearest.below_range.end + 1;
+                            ss << "\nNearest below committed device address range " << vvl::string_range_hex(nearest.below_range)
+                               << " is below address by " << std::dec << offset << " byte" << plural(offset) << " and has buffer"
+                               << plural(nearest.below_buffers.size()) << ":";
+                            for (const auto buffer : nearest.below_buffers) {
+                                ss << "\n  " << buffer->Describe(gpuav);
+                            }
+                        }
+                        out_vuid_msg = "VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819";
+
+                    } break;
+                    case kErrorSubCode_BufferDeviceAddress_Alignment: {
+                        const char* access_type = is_write ? "OpStore" : "OpLoad";
+                        const uint32_t alignment = (payload & kInst_BuffAddrAccess_PayloadMaskAccessInfo);
+                        ss << "Unaligned pointer access: The " << access_type << " at buffer device address 0x" << std::hex
+                           << address << " is not aligned to the instruction Aligned operand of " << std::dec << alignment << '.';
+                        if (auto buffers = gpuav.GetBuffersByAddress(address); !buffers.empty()) {
+                            ss << "\nAddress belongs to the follwing buffer(s):\n";
+                            for (const auto buffer : buffers) {
+                                ss << "\n  " << buffer->Describe(gpuav);
+                            }
+                        }
+                        // else it's an invalid address, handled by error logic above
+                        out_vuid_msg = "VUID-RuntimeSpirv-PhysicalStorageBuffer64-06315";
+
+                    } break;
+                    default:
+                        error_found = false;
+                        break;
+                }
+                out_error_msg += ss.str();
                 return error_found;
-            }
-            error_found = true;
-
-            std::ostringstream strm;
-
-            const uint32_t payload = error_record[kInst_LogError_ParameterOffset_2];
-            const bool is_write = ((payload >> kInst_BuffAddrAccess_PayloadShiftIsWrite) & 1) != 0;
-            const bool is_struct = ((payload >> kInst_BuffAddrAccess_PayloadShiftIsStruct) & 1) != 0;
-
-            const uint64_t address = *reinterpret_cast<const uint64_t*>(error_record + kInst_LogError_ParameterOffset_0);
-
-            const uint32_t error_sub_code = GetSubError(error_record);
-            switch (error_sub_code) {
-                case kErrorSubCode_BufferDeviceAddress_UnallocRef: {
-                    const char* access_type = is_write ? "written" : "read";
-                    const uint32_t byte_size = payload & kInst_BuffAddrAccess_PayloadMaskAccessInfo;
-                    strm << "Out of bounds access: " << byte_size << " bytes " << access_type << " at buffer device address 0x"
-                         << std::hex << address << '.';
-                    if (is_struct) {
-                        // Added because glslang currently has no way to seperate out the struct (Slang does as of 2025.6.2)
-                        strm << " This " << (is_write ? "write" : "read")
-                             << " corresponds to a full OpTypeStruct load. While not all members of the struct might be accessed, "
-                                "it is up "
-                                "to the source language or tooling to detect that and reflect it in the SPIR-V.";
-                    }
-                    out_vuid_msg = "VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819";
-
-                } break;
-                case kErrorSubCode_BufferDeviceAddress_Alignment: {
-                    const char* access_type = is_write ? "OpStore" : "OpLoad";
-                    const uint32_t alignment = (payload & kInst_BuffAddrAccess_PayloadMaskAccessInfo);
-                    strm << "Unaligned pointer access: The " << access_type << " at buffer device address 0x" << std::hex << address
-                         << " is not aligned to the instruction Aligned operand of " << std::dec << alignment << '.';
-                    out_vuid_msg = "VUID-RuntimeSpirv-PhysicalStorageBuffer64-06315";
-
-                } break;
-                default:
-                    error_found = false;
-                    break;
-            }
-            out_error_msg += strm.str();
-            return error_found;
-        };
+            };
 
         return inst_error_logger;
     });
 
-    cb.on_instrumentation_desc_set_update_functions.emplace_back([](CommandBufferSubState& cb, VkPipelineBindPoint, const Location&,
-                                                                    VkDescriptorBufferInfo& out_buffer_info,
-                                                                    uint32_t& out_dst_binding) {
-        BufferDeviceAddressCbState& bda_cb_state = cb.shared_resources_cache.GetOrCreate<BufferDeviceAddressCbState>(cb);
-        out_buffer_info.buffer = bda_cb_state.bda_ranges_snapshot_ptr.buffer;
-        out_buffer_info.offset = bda_cb_state.bda_ranges_snapshot_ptr.offset;
-        out_buffer_info.range = bda_cb_state.bda_ranges_snapshot_ptr.size;
+    cb.on_instrumentation_common_desc_update_functions.emplace_back(
+        [](CommandBufferSubState& cb, const LastBound&, const Location&, CommonDescriptorUpdate& out_update) {
+            BufferDeviceAddressCbState& bda_cb_state = cb.shared_resources_cache.GetOrCreate<BufferDeviceAddressCbState>(cb);
+            const vko::BufferRange& buffer_range = bda_cb_state.bda_ranges_snapshot_ptr;
+            out_update.buffer = buffer_range.buffer;
+            out_update.offset = buffer_range.offset;
+            out_update.range = buffer_range.size;
+            out_update.address = buffer_range.offset_address;
+            out_update.binding = glsl::kBindingInstBufferDeviceAddress;
+        });
 
-        out_dst_binding = glsl::kBindingInstBufferDeviceAddress;
-    });
+    cb.on_pre_cb_submission_functions.emplace_back(
+        [](Validator& gpuav, CommandBufferSubState& cb, VkCommandBuffer per_submission_cb) {
+            BufferDeviceAddressCbState* bda_cb_state = cb.shared_resources_cache.TryGet<BufferDeviceAddressCbState>();
+            // Can happen if command buffer did not record any action command
+            if (!bda_cb_state) {
+                return;
+            }
 
-    cb.on_pre_cb_submission_functions.emplace_back([](Validator& gpuav, CommandBufferSubState& cb,
-                                                      VkCommandBuffer per_submission_cb) {
-        BufferDeviceAddressCbState* bda_cb_state = cb.shared_resources_cache.TryGet<BufferDeviceAddressCbState>();
-        // Can happen if command buffer did not record any action command
-        if (!bda_cb_state) {
-            return;
-        }
+            // Update buffer device address (BDA) table
+            // One snapshot update per CB submission, to prevent concurrent submissions of the same CB to write and read
+            // to the same snapshot.
+            const size_t bda_ranges_count = gpuav.device_state->GetBufferAddressRangesCount();
+            const VkDeviceSize bda_table_byte_size = 2 * sizeof(uint32_t) + 2 * sizeof(VkDeviceAddress) * bda_ranges_count;
+            vko::BufferRange bda_table = cb.gpu_resources_manager.GetHostCachedBufferRange(bda_table_byte_size);
 
-        // Update buffer device address (BDA) table
-        // One snapshot update per CB submission, to prevent concurrent submissions of the same CB to write and read
-        // to the same snapshot.
-        const size_t bda_ranges_count = gpuav.device_state->GetBufferAddressRangesCount();
-        const VkDeviceSize bda_table_byte_size = 2 * sizeof(uint32_t) + 2 * sizeof(VkDeviceAddress) * bda_ranges_count;
-        vko::BufferRange bda_table = cb.gpu_resources_manager.GetHostCachedBufferRange(bda_table_byte_size);
+            auto bda_table_ranges_u32_ptr = (uint32_t*)bda_table.offset_mapped_ptr;
+            *bda_table_ranges_u32_ptr = (uint32_t)bda_ranges_count;
+            gpuav.device_state->GetBufferAddressRanges((vvl::DeviceState::BufferAddressRange*)(bda_table_ranges_u32_ptr + 2));
+            cb.gpu_resources_manager.FlushAllocation(bda_table);
 
-        auto bda_table_ranges_u32_ptr = (uint32_t*)bda_table.offset_mapped_ptr;
-        *bda_table_ranges_u32_ptr = (uint32_t)bda_ranges_count;
-        gpuav.device_state->GetBufferAddressRanges((vvl::DeviceState::BufferAddressRange*)(bda_table_ranges_u32_ptr + 2));
-        cb.gpu_resources_manager.FlushAllocation(bda_table);
+            // Fill a GPU buffer with a pointer to the BDA table
+            vko::BufferRange bda_table_ptr = cb.gpu_resources_manager.GetHostCoherentBufferRange(sizeof(VkDeviceAddress));
+            *(VkDeviceAddress*)bda_table_ptr.offset_mapped_ptr = bda_table.offset_address;
 
-        // Fill a GPU buffer with a pointer to the BDA table
-        vko::BufferRange bda_table_ptr = cb.gpu_resources_manager.GetHostCoherentBufferRange(sizeof(VkDeviceAddress));
-        *(VkDeviceAddress*)bda_table_ptr.offset_mapped_ptr = bda_table.offset_address;
-
-        vko::CmdSynchronizedCopyBufferRange(per_submission_cb, bda_cb_state->bda_ranges_snapshot_ptr, bda_table_ptr);
-    });
+            vko::CmdSynchronizedCopyBufferRange(per_submission_cb, bda_cb_state->bda_ranges_snapshot_ptr, bda_table_ptr);
+        });
 }
 
 }  // namespace gpuav

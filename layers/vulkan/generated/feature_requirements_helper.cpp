@@ -29,11 +29,11 @@
 #include <vulkan/utility/vk_struct_helper.hpp>
 
 namespace vkt {
-FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **inout_pnext_chain) {
+FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void** inout_pnext_chain) {
     switch (feature) {
         case Feature::storageBuffer16BitAccess:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -46,7 +46,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->storageBuffer16BitAccess, "VkPhysicalDeviceVulkan11Features::storageBuffer16BitAccess"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevice16BitStorageFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevice16BitStorageFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevice16BitStorageFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevice16BitStorageFeatures;
@@ -61,7 +61,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::storageInputOutput16:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -74,7 +74,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->storageInputOutput16, "VkPhysicalDeviceVulkan11Features::storageInputOutput16"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevice16BitStorageFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevice16BitStorageFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevice16BitStorageFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevice16BitStorageFeatures;
@@ -89,7 +89,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::storagePushConstant16:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -102,7 +102,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->storagePushConstant16, "VkPhysicalDeviceVulkan11Features::storagePushConstant16"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevice16BitStorageFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevice16BitStorageFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevice16BitStorageFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevice16BitStorageFeatures;
@@ -117,7 +117,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::uniformAndStorageBuffer16BitAccess:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -131,7 +131,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->uniformAndStorageBuffer16BitAccess,
                         "VkPhysicalDeviceVulkan11Features::uniformAndStorageBuffer16BitAccess"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevice16BitStorageFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevice16BitStorageFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevice16BitStorageFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevice16BitStorageFeatures;
@@ -146,7 +146,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDevice16BitStorageFeatures::uniformAndStorageBuffer16BitAccess"};
             }
         case Feature::formatA4B4G4R4: {
-            auto vk_struct = const_cast<VkPhysicalDevice4444FormatsFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevice4444FormatsFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevice4444FormatsFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevice4444FormatsFeaturesEXT;
@@ -161,7 +161,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::formatA4R4G4B4: {
-            auto vk_struct = const_cast<VkPhysicalDevice4444FormatsFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevice4444FormatsFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevice4444FormatsFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevice4444FormatsFeaturesEXT;
@@ -177,7 +177,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::storageBuffer8BitAccess:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -190,7 +190,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->storageBuffer8BitAccess, "VkPhysicalDeviceVulkan12Features::storageBuffer8BitAccess"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevice8BitStorageFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevice8BitStorageFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevice8BitStorageFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevice8BitStorageFeatures;
@@ -205,7 +205,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::storagePushConstant8:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -218,7 +218,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->storagePushConstant8, "VkPhysicalDeviceVulkan12Features::storagePushConstant8"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevice8BitStorageFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevice8BitStorageFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevice8BitStorageFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevice8BitStorageFeatures;
@@ -233,7 +233,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::uniformAndStorageBuffer8BitAccess:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -247,7 +247,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->uniformAndStorageBuffer8BitAccess,
                         "VkPhysicalDeviceVulkan12Features::uniformAndStorageBuffer8BitAccess"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevice8BitStorageFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevice8BitStorageFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevice8BitStorageFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevice8BitStorageFeatures;
@@ -262,7 +262,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDevice8BitStorageFeatures::uniformAndStorageBuffer8BitAccess"};
             }
         case Feature::decodeModeSharedExponent: {
-            auto vk_struct = const_cast<VkPhysicalDeviceASTCDecodeFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceASTCDecodeFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceASTCDecodeFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceASTCDecodeFeaturesEXT;
@@ -277,7 +277,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::accelerationStructure: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAccelerationStructureFeaturesKHR;
@@ -292,7 +292,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::accelerationStructureCaptureReplay: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAccelerationStructureFeaturesKHR;
@@ -308,7 +308,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::accelerationStructureHostCommands: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAccelerationStructureFeaturesKHR;
@@ -324,7 +324,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::accelerationStructureIndirectBuild: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAccelerationStructureFeaturesKHR;
@@ -340,7 +340,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorBindingAccelerationStructureUpdateAfterBind: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAccelerationStructureFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAccelerationStructureFeaturesKHR;
@@ -356,7 +356,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::reportAddressBinding: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAddressBindingReportFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAddressBindingReportFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAddressBindingReportFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAddressBindingReportFeaturesEXT;
@@ -371,7 +371,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::amigoProfiling: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAmigoProfilingFeaturesSEC *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAmigoProfilingFeaturesSEC*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAmigoProfilingFeaturesSEC>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAmigoProfilingFeaturesSEC;
@@ -386,7 +386,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::antiLag: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAntiLagFeaturesAMD *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAntiLagFeaturesAMD*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAntiLagFeaturesAMD>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAntiLagFeaturesAMD;
@@ -401,7 +401,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::attachmentFeedbackLoopDynamicState: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT;
@@ -417,7 +417,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::attachmentFeedbackLoopLayout: {
-            auto vk_struct = const_cast<VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT;
@@ -433,7 +433,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::advancedBlendCoherentOperations: {
-            auto vk_struct = const_cast<VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT;
@@ -449,7 +449,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::borderColorSwizzle: {
-            auto vk_struct = const_cast<VkPhysicalDeviceBorderColorSwizzleFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceBorderColorSwizzleFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceBorderColorSwizzleFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceBorderColorSwizzleFeaturesEXT;
@@ -464,7 +464,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::borderColorSwizzleFromImage: {
-            auto vk_struct = const_cast<VkPhysicalDeviceBorderColorSwizzleFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceBorderColorSwizzleFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceBorderColorSwizzleFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceBorderColorSwizzleFeaturesEXT;
@@ -481,7 +481,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::bufferDeviceAddress:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -494,7 +494,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->bufferDeviceAddress, "VkPhysicalDeviceVulkan12Features::bufferDeviceAddress"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceBufferDeviceAddressFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceBufferDeviceAddressFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceBufferDeviceAddressFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceBufferDeviceAddressFeatures;
@@ -509,7 +509,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::bufferDeviceAddressCaptureReplay:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -523,7 +523,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->bufferDeviceAddressCaptureReplay,
                         "VkPhysicalDeviceVulkan12Features::bufferDeviceAddressCaptureReplay"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceBufferDeviceAddressFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceBufferDeviceAddressFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceBufferDeviceAddressFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceBufferDeviceAddressFeatures;
@@ -539,7 +539,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::bufferDeviceAddressMultiDevice:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -553,7 +553,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->bufferDeviceAddressMultiDevice,
                         "VkPhysicalDeviceVulkan12Features::bufferDeviceAddressMultiDevice"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceBufferDeviceAddressFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceBufferDeviceAddressFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceBufferDeviceAddressFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceBufferDeviceAddressFeatures;
@@ -568,7 +568,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceBufferDeviceAddressFeatures::bufferDeviceAddressMultiDevice"};
             }
         case Feature::clusterAccelerationStructure: {
-            auto vk_struct = const_cast<VkPhysicalDeviceClusterAccelerationStructureFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceClusterAccelerationStructureFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceClusterAccelerationStructureFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceClusterAccelerationStructureFeaturesNV;
@@ -584,7 +584,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::clustercullingShader: {
-            auto vk_struct = const_cast<VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI;
@@ -599,7 +599,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::multiviewClusterCullingShader: {
-            auto vk_struct = const_cast<VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI;
@@ -615,7 +615,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::deviceCoherentMemory: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCoherentMemoryFeaturesAMD *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCoherentMemoryFeaturesAMD*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCoherentMemoryFeaturesAMD>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCoherentMemoryFeaturesAMD;
@@ -630,7 +630,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::colorWriteEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceColorWriteEnableFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceColorWriteEnableFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceColorWriteEnableFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceColorWriteEnableFeaturesEXT;
@@ -645,7 +645,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::commandBufferInheritance: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCommandBufferInheritanceFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCommandBufferInheritanceFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCommandBufferInheritanceFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCommandBufferInheritanceFeaturesNV;
@@ -661,7 +661,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::computeOccupancyPriority: {
-            auto vk_struct = const_cast<VkPhysicalDeviceComputeOccupancyPriorityFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceComputeOccupancyPriorityFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceComputeOccupancyPriorityFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceComputeOccupancyPriorityFeaturesNV;
@@ -677,7 +677,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::computeDerivativeGroupLinear: {
-            auto vk_struct = const_cast<VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR;
@@ -693,7 +693,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::computeDerivativeGroupQuads: {
-            auto vk_struct = const_cast<VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR;
@@ -709,7 +709,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::conditionalRendering: {
-            auto vk_struct = const_cast<VkPhysicalDeviceConditionalRenderingFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceConditionalRenderingFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceConditionalRenderingFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceConditionalRenderingFeaturesEXT;
@@ -724,7 +724,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::inheritedConditionalRendering: {
-            auto vk_struct = const_cast<VkPhysicalDeviceConditionalRenderingFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceConditionalRenderingFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceConditionalRenderingFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceConditionalRenderingFeaturesEXT;
@@ -740,7 +740,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeMatrixBlockLoads: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrix2FeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrix2FeaturesNV;
@@ -756,7 +756,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeMatrixConversions: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrix2FeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrix2FeaturesNV;
@@ -772,7 +772,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeMatrixFlexibleDimensions: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrix2FeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrix2FeaturesNV;
@@ -788,7 +788,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeMatrixPerElementOperations: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrix2FeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrix2FeaturesNV;
@@ -804,7 +804,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeMatrixReductions: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrix2FeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrix2FeaturesNV;
@@ -820,7 +820,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeMatrixTensorAddressing: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrix2FeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrix2FeaturesNV;
@@ -836,7 +836,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeMatrixWorkgroupScope: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrix2FeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrix2FeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrix2FeaturesNV;
@@ -852,7 +852,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeMatrixConversion: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrixConversionFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrixConversionFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrixConversionFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrixConversionFeaturesQCOM;
@@ -867,8 +867,24 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                     "VkPhysicalDeviceCooperativeMatrixConversionFeaturesQCOM::cooperativeMatrixConversion"};
         }
 
+        case Feature::cooperativeMatrixDecodeVector: {
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrixDecodeVectorFeaturesNV*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrixDecodeVectorFeaturesNV>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceCooperativeMatrixDecodeVectorFeaturesNV;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->cooperativeMatrixDecodeVector,
+                    "VkPhysicalDeviceCooperativeMatrixDecodeVectorFeaturesNV::cooperativeMatrixDecodeVector"};
+        }
+
         case Feature::cooperativeMatrix: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrixFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrixFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrixFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrixFeaturesKHR;
@@ -883,7 +899,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeMatrixRobustBufferAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrixFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeMatrixFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeMatrixFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeMatrixFeaturesKHR;
@@ -899,7 +915,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeVector: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeVectorFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeVectorFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeVectorFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeVectorFeaturesNV;
@@ -914,7 +930,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cooperativeVectorTraining: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeVectorFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCooperativeVectorFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCooperativeVectorFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCooperativeVectorFeaturesNV;
@@ -930,7 +946,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::indirectMemoryCopy: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR;
@@ -945,7 +961,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::indirectMemoryToImageCopy: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR;
@@ -961,7 +977,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::indirectCopy: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCopyMemoryIndirectFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCopyMemoryIndirectFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCopyMemoryIndirectFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCopyMemoryIndirectFeaturesNV;
@@ -976,7 +992,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cornerSampledImage: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCornerSampledImageFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCornerSampledImageFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCornerSampledImageFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCornerSampledImageFeaturesNV;
@@ -991,7 +1007,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::coverageReductionMode: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCoverageReductionModeFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCoverageReductionModeFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCoverageReductionModeFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCoverageReductionModeFeaturesNV;
@@ -1006,7 +1022,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::cubicRangeClamp: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCubicClampFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCubicClampFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCubicClampFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCubicClampFeaturesQCOM;
@@ -1021,7 +1037,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::selectableCubicWeights: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCubicWeightsFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCubicWeightsFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCubicWeightsFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCubicWeightsFeaturesQCOM;
@@ -1037,7 +1053,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::cudaKernelLaunchFeatures: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCudaKernelLaunchFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCudaKernelLaunchFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCudaKernelLaunchFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCudaKernelLaunchFeaturesNV;
@@ -1053,7 +1069,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #endif  // VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::customBorderColorWithoutFormat: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCustomBorderColorFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCustomBorderColorFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCustomBorderColorFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCustomBorderColorFeaturesEXT;
@@ -1069,7 +1085,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::customBorderColors: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCustomBorderColorFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCustomBorderColorFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCustomBorderColorFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCustomBorderColorFeaturesEXT;
@@ -1084,7 +1100,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::customResolve: {
-            auto vk_struct = const_cast<VkPhysicalDeviceCustomResolveFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceCustomResolveFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceCustomResolveFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceCustomResolveFeaturesEXT;
@@ -1099,7 +1115,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::dataGraph: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDataGraphFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDataGraphFeaturesARM;
@@ -1114,7 +1130,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::dataGraphDescriptorBuffer: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDataGraphFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDataGraphFeaturesARM;
@@ -1129,7 +1145,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::dataGraphShaderModule: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDataGraphFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDataGraphFeaturesARM;
@@ -1144,7 +1160,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::dataGraphSpecializationConstants: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDataGraphFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDataGraphFeaturesARM;
@@ -1160,7 +1176,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::dataGraphUpdateAfterBind: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDataGraphFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDataGraphFeaturesARM;
@@ -1175,7 +1191,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::dataGraphModel: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphModelFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphModelFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDataGraphModelFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDataGraphModelFeaturesQCOM;
@@ -1189,8 +1205,39 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->dataGraphModel, "VkPhysicalDeviceDataGraphModelFeaturesQCOM::dataGraphModel"};
         }
 
+        case Feature::dataGraphNeuralAcceleratorStatistics: {
+            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphNeuralAcceleratorStatisticsFeaturesARM*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceDataGraphNeuralAcceleratorStatisticsFeaturesARM>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceDataGraphNeuralAcceleratorStatisticsFeaturesARM;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->dataGraphNeuralAcceleratorStatistics,
+                    "VkPhysicalDeviceDataGraphNeuralAcceleratorStatisticsFeaturesARM::dataGraphNeuralAcceleratorStatistics"};
+        }
+
+        case Feature::dataGraphOpticalFlow: {
+            auto vk_struct = const_cast<VkPhysicalDeviceDataGraphOpticalFlowFeaturesARM*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceDataGraphOpticalFlowFeaturesARM>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceDataGraphOpticalFlowFeaturesARM;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->dataGraphOpticalFlow, "VkPhysicalDeviceDataGraphOpticalFlowFeaturesARM::dataGraphOpticalFlow"};
+        }
+
         case Feature::dedicatedAllocationImageAliasing: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV;
@@ -1207,7 +1254,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::denseGeometryFormat: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDenseGeometryFormatFeaturesAMDX *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDenseGeometryFormatFeaturesAMDX*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDenseGeometryFormatFeaturesAMDX>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDenseGeometryFormatFeaturesAMDX;
@@ -1223,7 +1270,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #endif  // VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::depthBiasControl: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDepthBiasControlFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDepthBiasControlFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDepthBiasControlFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDepthBiasControlFeaturesEXT;
@@ -1238,7 +1285,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::depthBiasExact: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDepthBiasControlFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDepthBiasControlFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDepthBiasControlFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDepthBiasControlFeaturesEXT;
@@ -1253,7 +1300,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::floatRepresentation: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDepthBiasControlFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDepthBiasControlFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDepthBiasControlFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDepthBiasControlFeaturesEXT;
@@ -1268,7 +1315,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::leastRepresentableValueForceUnormRepresentation: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDepthBiasControlFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDepthBiasControlFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDepthBiasControlFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDepthBiasControlFeaturesEXT;
@@ -1284,7 +1331,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::depthClampControl: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDepthClampControlFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDepthClampControlFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDepthClampControlFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDepthClampControlFeaturesEXT;
@@ -1299,7 +1346,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::depthClampZeroOne: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDepthClampZeroOneFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDepthClampZeroOneFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDepthClampZeroOneFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDepthClampZeroOneFeaturesKHR;
@@ -1314,7 +1361,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::depthClipControl: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDepthClipControlFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDepthClipControlFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDepthClipControlFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDepthClipControlFeaturesEXT;
@@ -1329,7 +1376,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::depthClipEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDepthClipEnableFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDepthClipEnableFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDepthClipEnableFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDepthClipEnableFeaturesEXT;
@@ -1344,7 +1391,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorBuffer: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorBufferFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDescriptorBufferFeaturesEXT;
@@ -1359,7 +1406,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorBufferCaptureReplay: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorBufferFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDescriptorBufferFeaturesEXT;
@@ -1375,7 +1422,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorBufferImageLayoutIgnored: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorBufferFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDescriptorBufferFeaturesEXT;
@@ -1391,7 +1438,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorBufferPushDescriptors: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorBufferFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDescriptorBufferFeaturesEXT;
@@ -1407,7 +1454,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorBufferTensorDescriptors: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferTensorFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorBufferTensorFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorBufferTensorFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDescriptorBufferTensorFeaturesARM;
@@ -1423,7 +1470,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorHeap: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorHeapFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorHeapFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorHeapFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDescriptorHeapFeaturesEXT;
@@ -1438,7 +1485,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorHeapCaptureReplay: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorHeapFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorHeapFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorHeapFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDescriptorHeapFeaturesEXT;
@@ -1455,7 +1502,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::descriptorBindingPartiallyBound:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1469,7 +1516,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingPartiallyBound,
                         "VkPhysicalDeviceVulkan12Features::descriptorBindingPartiallyBound"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1485,7 +1532,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::descriptorBindingSampledImageUpdateAfterBind:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1499,7 +1546,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingSampledImageUpdateAfterBind,
                         "VkPhysicalDeviceVulkan12Features::descriptorBindingSampledImageUpdateAfterBind"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1515,7 +1562,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::descriptorBindingStorageBufferUpdateAfterBind:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1529,7 +1576,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingStorageBufferUpdateAfterBind,
                         "VkPhysicalDeviceVulkan12Features::descriptorBindingStorageBufferUpdateAfterBind"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1545,7 +1592,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::descriptorBindingStorageImageUpdateAfterBind:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1559,7 +1606,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingStorageImageUpdateAfterBind,
                         "VkPhysicalDeviceVulkan12Features::descriptorBindingStorageImageUpdateAfterBind"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1575,7 +1622,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::descriptorBindingStorageTexelBufferUpdateAfterBind:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1589,7 +1636,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingStorageTexelBufferUpdateAfterBind,
                         "VkPhysicalDeviceVulkan12Features::descriptorBindingStorageTexelBufferUpdateAfterBind"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1605,7 +1652,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::descriptorBindingUniformBufferUpdateAfterBind:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1619,7 +1666,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingUniformBufferUpdateAfterBind,
                         "VkPhysicalDeviceVulkan12Features::descriptorBindingUniformBufferUpdateAfterBind"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1635,7 +1682,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::descriptorBindingUniformTexelBufferUpdateAfterBind:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1649,7 +1696,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingUniformTexelBufferUpdateAfterBind,
                         "VkPhysicalDeviceVulkan12Features::descriptorBindingUniformTexelBufferUpdateAfterBind"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1665,7 +1712,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::descriptorBindingUpdateUnusedWhilePending:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1679,7 +1726,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingUpdateUnusedWhilePending,
                         "VkPhysicalDeviceVulkan12Features::descriptorBindingUpdateUnusedWhilePending"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1695,7 +1742,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::descriptorBindingVariableDescriptorCount:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1709,7 +1756,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingVariableDescriptorCount,
                         "VkPhysicalDeviceVulkan12Features::descriptorBindingVariableDescriptorCount"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1725,7 +1772,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::runtimeDescriptorArray:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1738,7 +1785,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->runtimeDescriptorArray, "VkPhysicalDeviceVulkan12Features::runtimeDescriptorArray"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1753,7 +1800,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderInputAttachmentArrayDynamicIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1767,7 +1814,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderInputAttachmentArrayDynamicIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderInputAttachmentArrayDynamicIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1783,7 +1830,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderInputAttachmentArrayNonUniformIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1797,7 +1844,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderInputAttachmentArrayNonUniformIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderInputAttachmentArrayNonUniformIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1813,7 +1860,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderSampledImageArrayNonUniformIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1827,7 +1874,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderSampledImageArrayNonUniformIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderSampledImageArrayNonUniformIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1843,7 +1890,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderStorageBufferArrayNonUniformIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1857,7 +1904,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderStorageBufferArrayNonUniformIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderStorageBufferArrayNonUniformIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1873,7 +1920,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderStorageImageArrayNonUniformIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1887,7 +1934,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderStorageImageArrayNonUniformIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderStorageImageArrayNonUniformIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1903,7 +1950,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderStorageTexelBufferArrayDynamicIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1917,7 +1964,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderStorageTexelBufferArrayDynamicIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderStorageTexelBufferArrayDynamicIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1933,7 +1980,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderStorageTexelBufferArrayNonUniformIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1947,7 +1994,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderStorageTexelBufferArrayNonUniformIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderStorageTexelBufferArrayNonUniformIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1963,7 +2010,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderUniformBufferArrayNonUniformIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -1977,7 +2024,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderUniformBufferArrayNonUniformIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderUniformBufferArrayNonUniformIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -1993,7 +2040,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderUniformTexelBufferArrayDynamicIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -2007,7 +2054,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderUniformTexelBufferArrayDynamicIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderUniformTexelBufferArrayDynamicIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -2023,7 +2070,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderUniformTexelBufferArrayNonUniformIndexing:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -2037,7 +2084,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderUniformTexelBufferArrayNonUniformIndexing,
                         "VkPhysicalDeviceVulkan12Features::shaderUniformTexelBufferArrayNonUniformIndexing"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDescriptorIndexingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorIndexingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDescriptorIndexingFeatures;
@@ -2052,7 +2099,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceDescriptorIndexingFeatures::shaderUniformTexelBufferArrayNonUniformIndexing"};
             }
         case Feature::descriptorPoolOverallocation: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorPoolOverallocationFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorPoolOverallocationFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorPoolOverallocationFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDescriptorPoolOverallocationFeaturesNV;
@@ -2068,7 +2115,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorSetHostMapping: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorSetHostMappingFeaturesVALVE *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDescriptorSetHostMappingFeaturesVALVE*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDescriptorSetHostMappingFeaturesVALVE>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDescriptorSetHostMappingFeaturesVALVE;
@@ -2083,8 +2130,23 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                     "VkPhysicalDeviceDescriptorSetHostMappingFeaturesVALVE::descriptorSetHostMapping"};
         }
 
+        case Feature::deviceAddressCommands: {
+            auto vk_struct = const_cast<VkPhysicalDeviceDeviceAddressCommandsFeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceDeviceAddressCommandsFeaturesKHR>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceDeviceAddressCommandsFeaturesKHR;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->deviceAddressCommands, "VkPhysicalDeviceDeviceAddressCommandsFeaturesKHR::deviceAddressCommands"};
+        }
+
         case Feature::deviceGeneratedCompute: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV;
@@ -2100,7 +2162,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::deviceGeneratedComputeCaptureReplay: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV;
@@ -2116,7 +2178,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::deviceGeneratedComputePipelines: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV;
@@ -2132,7 +2194,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::deviceGeneratedCommands: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT;
@@ -2148,7 +2210,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::dynamicGeneratedPipelineLayout: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT;
@@ -2164,7 +2226,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::deviceMemoryReport: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDeviceMemoryReportFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDeviceMemoryReportFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDeviceMemoryReportFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDeviceMemoryReportFeaturesEXT;
@@ -2179,7 +2241,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::diagnosticsConfig: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDiagnosticsConfigFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDiagnosticsConfigFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDiagnosticsConfigFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDiagnosticsConfigFeaturesNV;
@@ -2195,7 +2257,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::displacementMicromap: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDisplacementMicromapFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDisplacementMicromapFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDisplacementMicromapFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDisplacementMicromapFeaturesNV;
@@ -2212,7 +2274,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::dynamicRendering:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -2225,7 +2287,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->dynamicRendering, "VkPhysicalDeviceVulkan13Features::dynamicRendering"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDynamicRenderingFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDynamicRenderingFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDynamicRenderingFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDynamicRenderingFeatures;
@@ -2240,7 +2302,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::dynamicRenderingLocalRead:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -2253,7 +2315,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->dynamicRenderingLocalRead, "VkPhysicalDeviceVulkan14Features::dynamicRenderingLocalRead"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceDynamicRenderingLocalReadFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceDynamicRenderingLocalReadFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceDynamicRenderingLocalReadFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceDynamicRenderingLocalReadFeatures;
@@ -2268,7 +2330,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceDynamicRenderingLocalReadFeatures::dynamicRenderingLocalRead"};
             }
         case Feature::dynamicRenderingUnusedAttachments: {
-            auto vk_struct = const_cast<VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT;
@@ -2283,8 +2345,23 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                     "VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT::dynamicRenderingUnusedAttachments"};
         }
 
+        case Feature::elapsedTimerQuery: {
+            auto vk_struct = const_cast<VkPhysicalDeviceElapsedTimerQueryFeaturesQCOM*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceElapsedTimerQueryFeaturesQCOM>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceElapsedTimerQueryFeaturesQCOM;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->elapsedTimerQuery, "VkPhysicalDeviceElapsedTimerQueryFeaturesQCOM::elapsedTimerQuery"};
+        }
+
         case Feature::exclusiveScissor: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExclusiveScissorFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExclusiveScissorFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExclusiveScissorFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExclusiveScissorFeaturesNV;
@@ -2299,7 +2376,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState2: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState2FeaturesEXT;
@@ -2314,7 +2391,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState2LogicOp: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState2FeaturesEXT;
@@ -2330,7 +2407,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState2PatchControlPoints: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState2FeaturesEXT;
@@ -2346,7 +2423,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3AlphaToCoverageEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2362,7 +2439,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3AlphaToOneEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2378,7 +2455,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ColorBlendAdvanced: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2394,7 +2471,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ColorBlendEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2410,7 +2487,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ColorBlendEquation: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2426,7 +2503,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ColorWriteMask: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2442,7 +2519,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ConservativeRasterizationMode: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2458,7 +2535,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3CoverageModulationMode: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2474,7 +2551,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3CoverageModulationTable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2490,7 +2567,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3CoverageModulationTableEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2506,7 +2583,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3CoverageReductionMode: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2522,7 +2599,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3CoverageToColorEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2538,7 +2615,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3CoverageToColorLocation: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2554,7 +2631,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3DepthClampEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2570,7 +2647,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3DepthClipEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2586,7 +2663,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3DepthClipNegativeOneToOne: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2602,7 +2679,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ExtraPrimitiveOverestimationSize: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2618,7 +2695,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3LineRasterizationMode: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2634,7 +2711,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3LineStippleEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2650,7 +2727,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3LogicOpEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2666,7 +2743,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3PolygonMode: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2682,7 +2759,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ProvokingVertexMode: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2698,7 +2775,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3RasterizationSamples: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2714,7 +2791,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3RasterizationStream: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2730,7 +2807,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3RepresentativeFragmentTestEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2746,7 +2823,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3SampleLocationsEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2762,7 +2839,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3SampleMask: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2778,7 +2855,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ShadingRateImageEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2794,7 +2871,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3TessellationDomainOrigin: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2810,7 +2887,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ViewportSwizzle: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2826,7 +2903,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState3ViewportWScalingEnable: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicState3FeaturesEXT;
@@ -2842,7 +2919,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::extendedDynamicState: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicStateFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedDynamicStateFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedDynamicStateFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedDynamicStateFeaturesEXT;
@@ -2856,8 +2933,23 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->extendedDynamicState, "VkPhysicalDeviceExtendedDynamicStateFeaturesEXT::extendedDynamicState"};
         }
 
+        case Feature::extendedFlags: {
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedFlagsFeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceExtendedFlagsFeaturesKHR>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceExtendedFlagsFeaturesKHR;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->extendedFlags, "VkPhysicalDeviceExtendedFlagsFeaturesKHR::extendedFlags"};
+        }
+
         case Feature::extendedSparseAddressSpace: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExtendedSparseAddressSpaceFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExtendedSparseAddressSpaceFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExtendedSparseAddressSpaceFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExtendedSparseAddressSpaceFeaturesNV;
@@ -2874,7 +2966,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 
         case Feature::externalFormatResolve: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExternalFormatResolveFeaturesANDROID *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExternalFormatResolveFeaturesANDROID*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExternalFormatResolveFeaturesANDROID>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExternalFormatResolveFeaturesANDROID;
@@ -2891,7 +2983,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #endif  // VK_USE_PLATFORM_ANDROID_KHR
 
         case Feature::externalMemoryRDMA: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExternalMemoryRDMAFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExternalMemoryRDMAFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExternalMemoryRDMAFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExternalMemoryRDMAFeaturesNV;
@@ -2907,7 +2999,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 
         case Feature::screenBufferImport: {
-            auto vk_struct = const_cast<VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX;
@@ -2923,10 +3015,10 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
 
         case Feature::deviceFault: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFaultFeaturesEXT *>(
-                vku::FindStructInPNextChain<VkPhysicalDeviceFaultFeaturesEXT>(*inout_pnext_chain));
+            auto vk_struct = const_cast<VkPhysicalDeviceFaultFeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceFaultFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
-                vk_struct = new VkPhysicalDeviceFaultFeaturesEXT;
+                vk_struct = new VkPhysicalDeviceFaultFeaturesKHR;
                 *vk_struct = vku::InitStructHelper();
                 if (*inout_pnext_chain) {
                     vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
@@ -2934,14 +3026,44 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                     *inout_pnext_chain = vk_struct;
                 }
             }
-            return {&vk_struct->deviceFault, "VkPhysicalDeviceFaultFeaturesEXT::deviceFault"};
+            return {&vk_struct->deviceFault, "VkPhysicalDeviceFaultFeaturesKHR::deviceFault"};
+        }
+
+        case Feature::deviceFaultDeviceLostOnMasked: {
+            auto vk_struct = const_cast<VkPhysicalDeviceFaultFeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceFaultFeaturesKHR>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceFaultFeaturesKHR;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->deviceFaultDeviceLostOnMasked, "VkPhysicalDeviceFaultFeaturesKHR::deviceFaultDeviceLostOnMasked"};
+        }
+
+        case Feature::deviceFaultReportMasked: {
+            auto vk_struct = const_cast<VkPhysicalDeviceFaultFeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceFaultFeaturesKHR>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceFaultFeaturesKHR;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->deviceFaultReportMasked, "VkPhysicalDeviceFaultFeaturesKHR::deviceFaultReportMasked"};
         }
 
         case Feature::deviceFaultVendorBinary: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFaultFeaturesEXT *>(
-                vku::FindStructInPNextChain<VkPhysicalDeviceFaultFeaturesEXT>(*inout_pnext_chain));
+            auto vk_struct = const_cast<VkPhysicalDeviceFaultFeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceFaultFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
-                vk_struct = new VkPhysicalDeviceFaultFeaturesEXT;
+                vk_struct = new VkPhysicalDeviceFaultFeaturesKHR;
                 *vk_struct = vku::InitStructHelper();
                 if (*inout_pnext_chain) {
                     vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
@@ -2949,11 +3071,11 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                     *inout_pnext_chain = vk_struct;
                 }
             }
-            return {&vk_struct->deviceFaultVendorBinary, "VkPhysicalDeviceFaultFeaturesEXT::deviceFaultVendorBinary"};
+            return {&vk_struct->deviceFaultVendorBinary, "VkPhysicalDeviceFaultFeaturesKHR::deviceFaultVendorBinary"};
         }
 
         case Feature::formatPack: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFormatPackFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFormatPackFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFormatPackFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFormatPackFeaturesARM;
@@ -2968,7 +3090,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentDensityMapDeferred: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMap2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMap2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentDensityMap2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentDensityMap2FeaturesEXT;
@@ -2984,7 +3106,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentDensityMap: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentDensityMapFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentDensityMapFeaturesEXT;
@@ -2999,7 +3121,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentDensityMapDynamic: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentDensityMapFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentDensityMapFeaturesEXT;
@@ -3015,7 +3137,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentDensityMapNonSubsampledImages: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentDensityMapFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentDensityMapFeaturesEXT;
@@ -3031,7 +3153,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentDensityMapLayered: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE;
@@ -3047,7 +3169,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentDensityMapOffset: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapOffsetFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentDensityMapOffsetFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentDensityMapOffsetFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentDensityMapOffsetFeaturesEXT;
@@ -3063,7 +3185,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentShaderBarycentric: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR;
@@ -3079,7 +3201,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentShaderPixelInterlock: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT;
@@ -3095,7 +3217,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentShaderSampleInterlock: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT;
@@ -3111,7 +3233,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentShaderShadingRateInterlock: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT;
@@ -3127,7 +3249,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::fragmentShadingRateEnums: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV;
@@ -3143,7 +3265,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::noInvocationFragmentShadingRates: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV;
@@ -3159,7 +3281,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::supersampleFragmentShadingRates: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV;
@@ -3175,7 +3297,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::attachmentFragmentShadingRate: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShadingRateFeaturesKHR;
@@ -3191,7 +3313,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::pipelineFragmentShadingRate: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShadingRateFeaturesKHR;
@@ -3207,7 +3329,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::primitiveFragmentShadingRate: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFragmentShadingRateFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFragmentShadingRateFeaturesKHR;
@@ -3223,7 +3345,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::frameBoundary: {
-            auto vk_struct = const_cast<VkPhysicalDeviceFrameBoundaryFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceFrameBoundaryFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceFrameBoundaryFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceFrameBoundaryFeaturesEXT;
@@ -3239,7 +3361,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::globalPriorityQuery:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3252,7 +3374,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->globalPriorityQuery, "VkPhysicalDeviceVulkan14Features::globalPriorityQuery"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceGlobalPriorityQueryFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceGlobalPriorityQueryFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceGlobalPriorityQueryFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceGlobalPriorityQueryFeatures;
@@ -3265,8 +3387,68 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->globalPriorityQuery, "VkPhysicalDeviceGlobalPriorityQueryFeatures::globalPriorityQuery"};
             }
+        case Feature::clockModes: {
+            auto vk_struct = const_cast<VkPhysicalDeviceGpaFeaturesAMD*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceGpaFeaturesAMD>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceGpaFeaturesAMD;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->clockModes, "VkPhysicalDeviceGpaFeaturesAMD::clockModes"};
+        }
+
+        case Feature::perfCounters: {
+            auto vk_struct = const_cast<VkPhysicalDeviceGpaFeaturesAMD*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceGpaFeaturesAMD>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceGpaFeaturesAMD;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->perfCounters, "VkPhysicalDeviceGpaFeaturesAMD::perfCounters"};
+        }
+
+        case Feature::sqThreadTracing: {
+            auto vk_struct = const_cast<VkPhysicalDeviceGpaFeaturesAMD*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceGpaFeaturesAMD>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceGpaFeaturesAMD;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->sqThreadTracing, "VkPhysicalDeviceGpaFeaturesAMD::sqThreadTracing"};
+        }
+
+        case Feature::streamingPerfCounters: {
+            auto vk_struct = const_cast<VkPhysicalDeviceGpaFeaturesAMD*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceGpaFeaturesAMD>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceGpaFeaturesAMD;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->streamingPerfCounters, "VkPhysicalDeviceGpaFeaturesAMD::streamingPerfCounters"};
+        }
+
         case Feature::graphicsPipelineLibrary: {
-            auto vk_struct = const_cast<VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT;
@@ -3282,7 +3464,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::hdrVivid: {
-            auto vk_struct = const_cast<VkPhysicalDeviceHdrVividFeaturesHUAWEI *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceHdrVividFeaturesHUAWEI*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceHdrVividFeaturesHUAWEI>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceHdrVividFeaturesHUAWEI;
@@ -3298,7 +3480,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::hostImageCopy:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3311,7 +3493,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->hostImageCopy, "VkPhysicalDeviceVulkan14Features::hostImageCopy"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceHostImageCopyFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceHostImageCopyFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceHostImageCopyFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceHostImageCopyFeatures;
@@ -3326,7 +3508,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::hostQueryReset:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -3339,7 +3521,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->hostQueryReset, "VkPhysicalDeviceVulkan12Features::hostQueryReset"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceHostQueryResetFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceHostQueryResetFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceHostQueryResetFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceHostQueryResetFeatures;
@@ -3353,7 +3535,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->hostQueryReset, "VkPhysicalDeviceHostQueryResetFeatures::hostQueryReset"};
             }
         case Feature::image2DViewOf3D: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImage2DViewOf3DFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImage2DViewOf3DFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImage2DViewOf3DFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImage2DViewOf3DFeaturesEXT;
@@ -3368,7 +3550,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::sampler2DViewOf3D: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImage2DViewOf3DFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImage2DViewOf3DFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImage2DViewOf3DFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImage2DViewOf3DFeaturesEXT;
@@ -3383,7 +3565,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::imageAlignmentControl: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImageAlignmentControlFeaturesMESA *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImageAlignmentControlFeaturesMESA*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageAlignmentControlFeaturesMESA>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImageAlignmentControlFeaturesMESA;
@@ -3398,7 +3580,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::imageCompressionControl: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImageCompressionControlFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImageCompressionControlFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageCompressionControlFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImageCompressionControlFeaturesEXT;
@@ -3414,7 +3596,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::imageCompressionControlSwapchain: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT;
@@ -3430,7 +3612,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::textureBlockMatch2: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessing2FeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessing2FeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageProcessing2FeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImageProcessing2FeaturesQCOM;
@@ -3444,8 +3626,54 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->textureBlockMatch2, "VkPhysicalDeviceImageProcessing2FeaturesQCOM::textureBlockMatch2"};
         }
 
+        case Feature::blockMatchExtendedClampToEdge: {
+            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessing3FeaturesQCOM*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceImageProcessing3FeaturesQCOM>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceImageProcessing3FeaturesQCOM;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->blockMatchExtendedClampToEdge,
+                    "VkPhysicalDeviceImageProcessing3FeaturesQCOM::blockMatchExtendedClampToEdge"};
+        }
+
+        case Feature::imageGatherExtendedModes: {
+            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessing3FeaturesQCOM*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceImageProcessing3FeaturesQCOM>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceImageProcessing3FeaturesQCOM;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->imageGatherExtendedModes, "VkPhysicalDeviceImageProcessing3FeaturesQCOM::imageGatherExtendedModes"};
+        }
+
+        case Feature::imageGatherLinear: {
+            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessing3FeaturesQCOM*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceImageProcessing3FeaturesQCOM>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceImageProcessing3FeaturesQCOM;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->imageGatherLinear, "VkPhysicalDeviceImageProcessing3FeaturesQCOM::imageGatherLinear"};
+        }
+
         case Feature::textureBlockMatch: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageProcessingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImageProcessingFeaturesQCOM;
@@ -3460,7 +3688,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::textureBoxFilter: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageProcessingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImageProcessingFeaturesQCOM;
@@ -3475,7 +3703,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::textureSampleWeighted: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImageProcessingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageProcessingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImageProcessingFeaturesQCOM;
@@ -3491,7 +3719,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::robustImageAccess:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -3504,7 +3732,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->robustImageAccess, "VkPhysicalDeviceVulkan13Features::robustImageAccess"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceImageRobustnessFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceImageRobustnessFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceImageRobustnessFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceImageRobustnessFeatures;
@@ -3518,7 +3746,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->robustImageAccess, "VkPhysicalDeviceImageRobustnessFeatures::robustImageAccess"};
             }
         case Feature::imageSlicedViewOf3D: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImageSlicedViewOf3DFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImageSlicedViewOf3DFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageSlicedViewOf3DFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImageSlicedViewOf3DFeaturesEXT;
@@ -3533,7 +3761,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::minLod: {
-            auto vk_struct = const_cast<VkPhysicalDeviceImageViewMinLodFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceImageViewMinLodFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageViewMinLodFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceImageViewMinLodFeaturesEXT;
@@ -3549,7 +3777,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::imagelessFramebuffer:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -3562,7 +3790,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->imagelessFramebuffer, "VkPhysicalDeviceVulkan12Features::imagelessFramebuffer"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceImagelessFramebufferFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceImagelessFramebufferFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceImagelessFramebufferFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceImagelessFramebufferFeatures;
@@ -3577,7 +3805,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::indexTypeUint8:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3590,7 +3818,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->indexTypeUint8, "VkPhysicalDeviceVulkan14Features::indexTypeUint8"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceIndexTypeUint8Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceIndexTypeUint8Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceIndexTypeUint8Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceIndexTypeUint8Features;
@@ -3604,7 +3832,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->indexTypeUint8, "VkPhysicalDeviceIndexTypeUint8Features::indexTypeUint8"};
             }
         case Feature::inheritedViewportScissor2D: {
-            auto vk_struct = const_cast<VkPhysicalDeviceInheritedViewportScissorFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceInheritedViewportScissorFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceInheritedViewportScissorFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceInheritedViewportScissorFeaturesNV;
@@ -3621,7 +3849,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::descriptorBindingInlineUniformBlockUpdateAfterBind:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -3635,7 +3863,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->descriptorBindingInlineUniformBlockUpdateAfterBind,
                         "VkPhysicalDeviceVulkan13Features::descriptorBindingInlineUniformBlockUpdateAfterBind"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceInlineUniformBlockFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceInlineUniformBlockFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceInlineUniformBlockFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceInlineUniformBlockFeatures;
@@ -3651,7 +3879,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::inlineUniformBlock:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -3664,7 +3892,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->inlineUniformBlock, "VkPhysicalDeviceVulkan13Features::inlineUniformBlock"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceInlineUniformBlockFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceInlineUniformBlockFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceInlineUniformBlockFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceInlineUniformBlockFeatures;
@@ -3678,7 +3906,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->inlineUniformBlock, "VkPhysicalDeviceInlineUniformBlockFeatures::inlineUniformBlock"};
             }
         case Feature::internallySynchronizedQueues: {
-            auto vk_struct = const_cast<VkPhysicalDeviceInternallySynchronizedQueuesFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceInternallySynchronizedQueuesFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceInternallySynchronizedQueuesFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceInternallySynchronizedQueuesFeaturesKHR;
@@ -3694,7 +3922,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::invocationMask: {
-            auto vk_struct = const_cast<VkPhysicalDeviceInvocationMaskFeaturesHUAWEI *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceInvocationMaskFeaturesHUAWEI*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceInvocationMaskFeaturesHUAWEI>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceInvocationMaskFeaturesHUAWEI;
@@ -3709,7 +3937,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::legacyDithering: {
-            auto vk_struct = const_cast<VkPhysicalDeviceLegacyDitheringFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceLegacyDitheringFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceLegacyDitheringFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceLegacyDitheringFeaturesEXT;
@@ -3724,7 +3952,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::legacyVertexAttributes: {
-            auto vk_struct = const_cast<VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT;
@@ -3741,7 +3969,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::bresenhamLines:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3754,7 +3982,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->bresenhamLines, "VkPhysicalDeviceVulkan14Features::bresenhamLines"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceLineRasterizationFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceLineRasterizationFeatures;
@@ -3769,7 +3997,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::rectangularLines:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3782,7 +4010,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->rectangularLines, "VkPhysicalDeviceVulkan14Features::rectangularLines"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceLineRasterizationFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceLineRasterizationFeatures;
@@ -3797,7 +4025,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::smoothLines:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3810,7 +4038,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->smoothLines, "VkPhysicalDeviceVulkan14Features::smoothLines"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceLineRasterizationFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceLineRasterizationFeatures;
@@ -3825,7 +4053,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::stippledBresenhamLines:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3838,7 +4066,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->stippledBresenhamLines, "VkPhysicalDeviceVulkan14Features::stippledBresenhamLines"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceLineRasterizationFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceLineRasterizationFeatures;
@@ -3853,7 +4081,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::stippledRectangularLines:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3866,7 +4094,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->stippledRectangularLines, "VkPhysicalDeviceVulkan14Features::stippledRectangularLines"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceLineRasterizationFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceLineRasterizationFeatures;
@@ -3882,7 +4110,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::stippledSmoothLines:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3895,7 +4123,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->stippledSmoothLines, "VkPhysicalDeviceVulkan14Features::stippledSmoothLines"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceLineRasterizationFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceLineRasterizationFeatures;
@@ -3909,7 +4137,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->stippledSmoothLines, "VkPhysicalDeviceLineRasterizationFeatures::stippledSmoothLines"};
             }
         case Feature::linearColorAttachment: {
-            auto vk_struct = const_cast<VkPhysicalDeviceLinearColorAttachmentFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceLinearColorAttachmentFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceLinearColorAttachmentFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceLinearColorAttachmentFeaturesNV;
@@ -3924,7 +4152,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::maintenance10: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMaintenance10FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMaintenance10FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMaintenance10FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMaintenance10FeaturesKHR;
@@ -3938,9 +4166,24 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->maintenance10, "VkPhysicalDeviceMaintenance10FeaturesKHR::maintenance10"};
         }
 
+        case Feature::maintenance11: {
+            auto vk_struct = const_cast<VkPhysicalDeviceMaintenance11FeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceMaintenance11FeaturesKHR>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceMaintenance11FeaturesKHR;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->maintenance11, "VkPhysicalDeviceMaintenance11FeaturesKHR::maintenance11"};
+        }
+
         case Feature::maintenance4:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -3953,7 +4196,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->maintenance4, "VkPhysicalDeviceVulkan13Features::maintenance4"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceMaintenance4Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceMaintenance4Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceMaintenance4Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceMaintenance4Features;
@@ -3968,7 +4211,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::maintenance5:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -3981,7 +4224,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->maintenance5, "VkPhysicalDeviceVulkan14Features::maintenance5"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceMaintenance5Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceMaintenance5Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceMaintenance5Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceMaintenance5Features;
@@ -3996,7 +4239,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::maintenance6:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -4009,7 +4252,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->maintenance6, "VkPhysicalDeviceVulkan14Features::maintenance6"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceMaintenance6Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceMaintenance6Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceMaintenance6Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceMaintenance6Features;
@@ -4023,7 +4266,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->maintenance6, "VkPhysicalDeviceMaintenance6Features::maintenance6"};
             }
         case Feature::maintenance7: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMaintenance7FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMaintenance7FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMaintenance7FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMaintenance7FeaturesKHR;
@@ -4038,7 +4281,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::maintenance8: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMaintenance8FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMaintenance8FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMaintenance8FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMaintenance8FeaturesKHR;
@@ -4053,7 +4296,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::maintenance9: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMaintenance9FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMaintenance9FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMaintenance9FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMaintenance9FeaturesKHR;
@@ -4068,7 +4311,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::memoryMapPlaced: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMapMemoryPlacedFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMapMemoryPlacedFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMapMemoryPlacedFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMapMemoryPlacedFeaturesEXT;
@@ -4083,7 +4326,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::memoryMapRangePlaced: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMapMemoryPlacedFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMapMemoryPlacedFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMapMemoryPlacedFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMapMemoryPlacedFeaturesEXT;
@@ -4098,7 +4341,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::memoryUnmapReserve: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMapMemoryPlacedFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMapMemoryPlacedFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMapMemoryPlacedFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMapMemoryPlacedFeaturesEXT;
@@ -4113,7 +4356,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::memoryDecompression: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMemoryDecompressionFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMemoryDecompressionFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMemoryDecompressionFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMemoryDecompressionFeaturesEXT;
@@ -4128,7 +4371,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::memoryPriority: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMemoryPriorityFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMemoryPriorityFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMemoryPriorityFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMemoryPriorityFeaturesEXT;
@@ -4143,7 +4386,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::meshShaderQueries: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMeshShaderFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMeshShaderFeaturesEXT;
@@ -4158,7 +4401,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::multiviewMeshShader: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMeshShaderFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMeshShaderFeaturesEXT;
@@ -4173,7 +4416,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::primitiveFragmentShadingRateMeshShader: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMeshShaderFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMeshShaderFeaturesEXT;
@@ -4189,7 +4432,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::meshShader: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMeshShaderFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMeshShaderFeaturesEXT;
@@ -4204,7 +4447,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::taskShader: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMeshShaderFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMeshShaderFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMeshShaderFeaturesEXT;
@@ -4219,7 +4462,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::multiDraw: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMultiDrawFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMultiDrawFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMultiDrawFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMultiDrawFeaturesEXT;
@@ -4234,7 +4477,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::multisampledRenderToSingleSampled: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT;
@@ -4249,9 +4492,25 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                     "VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT::multisampledRenderToSingleSampled"};
         }
 
+        case Feature::multisampledRenderToSwapchain: {
+            auto vk_struct = const_cast<VkPhysicalDeviceMultisampledRenderToSwapchainFeaturesEXT*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceMultisampledRenderToSwapchainFeaturesEXT>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceMultisampledRenderToSwapchainFeaturesEXT;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->multisampledRenderToSwapchain,
+                    "VkPhysicalDeviceMultisampledRenderToSwapchainFeaturesEXT::multisampledRenderToSwapchain"};
+        }
+
         case Feature::multiview:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -4264,7 +4523,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->multiview, "VkPhysicalDeviceVulkan11Features::multiview"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceMultiviewFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceMultiviewFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceMultiviewFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceMultiviewFeatures;
@@ -4279,7 +4538,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::multiviewGeometryShader:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -4292,7 +4551,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->multiviewGeometryShader, "VkPhysicalDeviceVulkan11Features::multiviewGeometryShader"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceMultiviewFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceMultiviewFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceMultiviewFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceMultiviewFeatures;
@@ -4307,7 +4566,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::multiviewTessellationShader:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -4320,7 +4579,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->multiviewTessellationShader, "VkPhysicalDeviceVulkan11Features::multiviewTessellationShader"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceMultiviewFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceMultiviewFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceMultiviewFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceMultiviewFeatures;
@@ -4334,7 +4593,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->multiviewTessellationShader, "VkPhysicalDeviceMultiviewFeatures::multiviewTessellationShader"};
             }
         case Feature::multiviewPerViewRenderAreas: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM;
@@ -4350,7 +4609,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::multiviewPerViewViewports: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM;
@@ -4366,7 +4625,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::mutableDescriptorType: {
-            auto vk_struct = const_cast<VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT;
@@ -4381,7 +4640,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::nestedCommandBuffer: {
-            auto vk_struct = const_cast<VkPhysicalDeviceNestedCommandBufferFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceNestedCommandBufferFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceNestedCommandBufferFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceNestedCommandBufferFeaturesEXT;
@@ -4396,7 +4655,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::nestedCommandBufferRendering: {
-            auto vk_struct = const_cast<VkPhysicalDeviceNestedCommandBufferFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceNestedCommandBufferFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceNestedCommandBufferFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceNestedCommandBufferFeaturesEXT;
@@ -4412,7 +4671,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::nestedCommandBufferSimultaneousUse: {
-            auto vk_struct = const_cast<VkPhysicalDeviceNestedCommandBufferFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceNestedCommandBufferFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceNestedCommandBufferFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceNestedCommandBufferFeaturesEXT;
@@ -4428,7 +4687,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::nonSeamlessCubeMap: {
-            auto vk_struct = const_cast<VkPhysicalDeviceNonSeamlessCubeMapFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceNonSeamlessCubeMapFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceNonSeamlessCubeMapFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceNonSeamlessCubeMapFeaturesEXT;
@@ -4443,10 +4702,10 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::micromap: {
-            auto vk_struct = const_cast<VkPhysicalDeviceOpacityMicromapFeaturesEXT *>(
-                vku::FindStructInPNextChain<VkPhysicalDeviceOpacityMicromapFeaturesEXT>(*inout_pnext_chain));
+            auto vk_struct = const_cast<VkPhysicalDeviceOpacityMicromapFeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceOpacityMicromapFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
-                vk_struct = new VkPhysicalDeviceOpacityMicromapFeaturesEXT;
+                vk_struct = new VkPhysicalDeviceOpacityMicromapFeaturesKHR;
                 *vk_struct = vku::InitStructHelper();
                 if (*inout_pnext_chain) {
                     vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
@@ -4454,41 +4713,11 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                     *inout_pnext_chain = vk_struct;
                 }
             }
-            return {&vk_struct->micromap, "VkPhysicalDeviceOpacityMicromapFeaturesEXT::micromap"};
-        }
-
-        case Feature::micromapCaptureReplay: {
-            auto vk_struct = const_cast<VkPhysicalDeviceOpacityMicromapFeaturesEXT *>(
-                vku::FindStructInPNextChain<VkPhysicalDeviceOpacityMicromapFeaturesEXT>(*inout_pnext_chain));
-            if (!vk_struct) {
-                vk_struct = new VkPhysicalDeviceOpacityMicromapFeaturesEXT;
-                *vk_struct = vku::InitStructHelper();
-                if (*inout_pnext_chain) {
-                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
-                } else {
-                    *inout_pnext_chain = vk_struct;
-                }
-            }
-            return {&vk_struct->micromapCaptureReplay, "VkPhysicalDeviceOpacityMicromapFeaturesEXT::micromapCaptureReplay"};
-        }
-
-        case Feature::micromapHostCommands: {
-            auto vk_struct = const_cast<VkPhysicalDeviceOpacityMicromapFeaturesEXT *>(
-                vku::FindStructInPNextChain<VkPhysicalDeviceOpacityMicromapFeaturesEXT>(*inout_pnext_chain));
-            if (!vk_struct) {
-                vk_struct = new VkPhysicalDeviceOpacityMicromapFeaturesEXT;
-                *vk_struct = vku::InitStructHelper();
-                if (*inout_pnext_chain) {
-                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
-                } else {
-                    *inout_pnext_chain = vk_struct;
-                }
-            }
-            return {&vk_struct->micromapHostCommands, "VkPhysicalDeviceOpacityMicromapFeaturesEXT::micromapHostCommands"};
+            return {&vk_struct->micromap, "VkPhysicalDeviceOpacityMicromapFeaturesKHR::micromap"};
         }
 
         case Feature::opticalFlow: {
-            auto vk_struct = const_cast<VkPhysicalDeviceOpticalFlowFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceOpticalFlowFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceOpticalFlowFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceOpticalFlowFeaturesNV;
@@ -4503,7 +4732,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::pageableDeviceLocalMemory: {
-            auto vk_struct = const_cast<VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT;
@@ -4519,7 +4748,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::partitionedAccelerationStructure: {
-            auto vk_struct = const_cast<VkPhysicalDevicePartitionedAccelerationStructureFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePartitionedAccelerationStructureFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePartitionedAccelerationStructureFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePartitionedAccelerationStructureFeaturesNV;
@@ -4535,7 +4764,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::dynamicPipelineLayout: {
-            auto vk_struct = const_cast<VkPhysicalDevicePerStageDescriptorSetFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePerStageDescriptorSetFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePerStageDescriptorSetFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePerStageDescriptorSetFeaturesNV;
@@ -4550,7 +4779,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::perStageDescriptorSet: {
-            auto vk_struct = const_cast<VkPhysicalDevicePerStageDescriptorSetFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePerStageDescriptorSetFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePerStageDescriptorSetFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePerStageDescriptorSetFeaturesNV;
@@ -4565,7 +4794,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::performanceCountersByRegion: {
-            auto vk_struct = const_cast<VkPhysicalDevicePerformanceCountersByRegionFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePerformanceCountersByRegionFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePerformanceCountersByRegionFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePerformanceCountersByRegionFeaturesARM;
@@ -4581,7 +4810,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::performanceCounterMultipleQueryPools: {
-            auto vk_struct = const_cast<VkPhysicalDevicePerformanceQueryFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePerformanceQueryFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePerformanceQueryFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePerformanceQueryFeaturesKHR;
@@ -4597,7 +4826,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::performanceCounterQueryPools: {
-            auto vk_struct = const_cast<VkPhysicalDevicePerformanceQueryFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePerformanceQueryFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePerformanceQueryFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePerformanceQueryFeaturesKHR;
@@ -4613,7 +4842,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::pipelineBinaries: {
-            auto vk_struct = const_cast<VkPhysicalDevicePipelineBinaryFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePipelineBinaryFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePipelineBinaryFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePipelineBinaryFeaturesKHR;
@@ -4628,7 +4857,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::pipelineCacheIncrementalMode: {
-            auto vk_struct = const_cast<VkPhysicalDevicePipelineCacheIncrementalModeFeaturesSEC *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePipelineCacheIncrementalModeFeaturesSEC*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePipelineCacheIncrementalModeFeaturesSEC>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePipelineCacheIncrementalModeFeaturesSEC;
@@ -4645,7 +4874,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::pipelineCreationCacheControl:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -4658,7 +4887,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->pipelineCreationCacheControl, "VkPhysicalDeviceVulkan13Features::pipelineCreationCacheControl"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevicePipelineCreationCacheControlFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevicePipelineCreationCacheControlFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevicePipelineCreationCacheControlFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevicePipelineCreationCacheControlFeatures;
@@ -4673,7 +4902,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDevicePipelineCreationCacheControlFeatures::pipelineCreationCacheControl"};
             }
         case Feature::pipelineExecutableInfo: {
-            auto vk_struct = const_cast<VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR;
@@ -4689,7 +4918,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::pipelineLibraryGroupHandles: {
-            auto vk_struct = const_cast<VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT;
@@ -4705,7 +4934,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::pipelineOpacityMicromap: {
-            auto vk_struct = const_cast<VkPhysicalDevicePipelineOpacityMicromapFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePipelineOpacityMicromapFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePipelineOpacityMicromapFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePipelineOpacityMicromapFeaturesARM;
@@ -4721,7 +4950,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::pipelinePropertiesIdentifier: {
-            auto vk_struct = const_cast<VkPhysicalDevicePipelinePropertiesFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePipelinePropertiesFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePipelinePropertiesFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePipelinePropertiesFeaturesEXT;
@@ -4738,7 +4967,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::pipelineProtectedAccess:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -4751,7 +4980,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->pipelineProtectedAccess, "VkPhysicalDeviceVulkan14Features::pipelineProtectedAccess"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevicePipelineProtectedAccessFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevicePipelineProtectedAccessFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevicePipelineProtectedAccessFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevicePipelineProtectedAccessFeatures;
@@ -4767,7 +4996,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::pipelineRobustness:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -4780,7 +5009,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->pipelineRobustness, "VkPhysicalDeviceVulkan14Features::pipelineRobustness"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevicePipelineRobustnessFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevicePipelineRobustnessFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevicePipelineRobustnessFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevicePipelineRobustnessFeatures;
@@ -4796,7 +5025,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
             case Feature::constantAlphaColorBlendFactors: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4814,7 +5043,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::events: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4831,7 +5060,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::imageView2DOn3DImage: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4848,7 +5077,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::imageViewFormatReinterpretation: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4866,7 +5095,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::imageViewFormatSwizzle: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4883,7 +5112,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::multisampleArrayImage: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4900,7 +5129,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::mutableComparisonSamplers: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4918,7 +5147,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::pointPolygons: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4935,7 +5164,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::samplerMipLodBias: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4952,7 +5181,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::separateStencilMaskRef: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4969,7 +5198,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::shaderSampleRateInterpolationFunctions: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -4987,7 +5216,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::tessellationIsolines: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -5004,7 +5233,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::tessellationPointMode: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -5021,7 +5250,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::triangleFans: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -5038,7 +5267,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::vertexAttributeAccessBeyondStride: {
-            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePortabilitySubsetFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePortabilitySubsetFeaturesKHR;
@@ -5055,7 +5284,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #endif  // VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::presentBarrier: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentBarrierFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentBarrierFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentBarrierFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentBarrierFeaturesNV;
@@ -5070,7 +5299,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::presentId2: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentId2FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentId2FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentId2FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentId2FeaturesKHR;
@@ -5085,7 +5314,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::presentId: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentIdFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentIdFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentIdFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentIdFeaturesKHR;
@@ -5098,10 +5327,9 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
             return {&vk_struct->presentId, "VkPhysicalDevicePresentIdFeaturesKHR::presentId"};
         }
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::presentMetering: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentMeteringFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentMeteringFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentMeteringFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentMeteringFeaturesNV;
@@ -5114,10 +5342,9 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
             return {&vk_struct->presentMetering, "VkPhysicalDevicePresentMeteringFeaturesNV::presentMetering"};
         }
-#endif  // VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::presentModeFifoLatestReady: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR;
@@ -5133,7 +5360,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::presentAtAbsoluteTime: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentTimingFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentTimingFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentTimingFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentTimingFeaturesEXT;
@@ -5148,7 +5375,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::presentAtRelativeTime: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentTimingFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentTimingFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentTimingFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentTimingFeaturesEXT;
@@ -5163,7 +5390,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::presentTiming: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentTimingFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentTimingFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentTimingFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentTimingFeaturesEXT;
@@ -5178,7 +5405,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::presentWait2: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentWait2FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentWait2FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentWait2FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentWait2FeaturesKHR;
@@ -5193,7 +5420,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::presentWait: {
-            auto vk_struct = const_cast<VkPhysicalDevicePresentWaitFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePresentWaitFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePresentWaitFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePresentWaitFeaturesKHR;
@@ -5207,8 +5434,23 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->presentWait, "VkPhysicalDevicePresentWaitFeaturesKHR::presentWait"};
         }
 
+        case Feature::primitiveRestartIndex: {
+            auto vk_struct = const_cast<VkPhysicalDevicePrimitiveRestartIndexFeaturesEXT*>(
+                vku::FindStructInPNextChain<VkPhysicalDevicePrimitiveRestartIndexFeaturesEXT>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDevicePrimitiveRestartIndexFeaturesEXT;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->primitiveRestartIndex, "VkPhysicalDevicePrimitiveRestartIndexFeaturesEXT::primitiveRestartIndex"};
+        }
+
         case Feature::primitiveTopologyListRestart: {
-            auto vk_struct = const_cast<VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT;
@@ -5224,7 +5466,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::primitiveTopologyPatchListRestart: {
-            auto vk_struct = const_cast<VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT;
@@ -5240,7 +5482,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::primitivesGeneratedQuery: {
-            auto vk_struct = const_cast<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT;
@@ -5256,7 +5498,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::primitivesGeneratedQueryWithNonZeroStreams: {
-            auto vk_struct = const_cast<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT;
@@ -5272,7 +5514,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::primitivesGeneratedQueryWithRasterizerDiscard: {
-            auto vk_struct = const_cast<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT;
@@ -5289,7 +5531,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::privateData:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -5302,7 +5544,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->privateData, "VkPhysicalDeviceVulkan13Features::privateData"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDevicePrivateDataFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDevicePrivateDataFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDevicePrivateDataFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDevicePrivateDataFeatures;
@@ -5317,7 +5559,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::protectedMemory:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -5330,7 +5572,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->protectedMemory, "VkPhysicalDeviceVulkan11Features::protectedMemory"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceProtectedMemoryFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceProtectedMemoryFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceProtectedMemoryFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceProtectedMemoryFeatures;
@@ -5344,7 +5586,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->protectedMemory, "VkPhysicalDeviceProtectedMemoryFeatures::protectedMemory"};
             }
         case Feature::provokingVertexLast: {
-            auto vk_struct = const_cast<VkPhysicalDeviceProvokingVertexFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceProvokingVertexFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceProvokingVertexFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceProvokingVertexFeaturesEXT;
@@ -5359,7 +5601,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::transformFeedbackPreservesProvokingVertex: {
-            auto vk_struct = const_cast<VkPhysicalDeviceProvokingVertexFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceProvokingVertexFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceProvokingVertexFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceProvokingVertexFeaturesEXT;
@@ -5375,7 +5617,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::pushConstantBank: {
-            auto vk_struct = const_cast<VkPhysicalDevicePushConstantBankFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDevicePushConstantBankFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDevicePushConstantBankFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDevicePushConstantBankFeaturesNV;
@@ -5389,8 +5631,23 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->pushConstantBank, "VkPhysicalDevicePushConstantBankFeaturesNV::pushConstantBank"};
         }
 
+        case Feature::queuePerfHint: {
+            auto vk_struct = const_cast<VkPhysicalDeviceQueuePerfHintFeaturesQCOM*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceQueuePerfHintFeaturesQCOM>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceQueuePerfHintFeaturesQCOM;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->queuePerfHint, "VkPhysicalDeviceQueuePerfHintFeaturesQCOM::queuePerfHint"};
+        }
+
         case Feature::formatRgba10x6WithoutYCbCrSampler: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRGBA10X6FormatsFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRGBA10X6FormatsFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRGBA10X6FormatsFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRGBA10X6FormatsFeaturesEXT;
@@ -5406,7 +5663,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rasterizationOrderColorAttachmentAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT;
@@ -5422,7 +5679,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rasterizationOrderDepthAttachmentAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT;
@@ -5438,7 +5695,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rasterizationOrderStencilAttachmentAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT;
@@ -5454,7 +5711,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderRawAccessChains: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRawAccessChainsFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRawAccessChainsFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRawAccessChainsFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRawAccessChainsFeaturesNV;
@@ -5469,7 +5726,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayQuery: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayQueryFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayQueryFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayQueryFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayQueryFeaturesKHR;
@@ -5484,7 +5741,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingInvocationReorder: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingInvocationReorderFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingInvocationReorderFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingInvocationReorderFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingInvocationReorderFeaturesEXT;
@@ -5500,7 +5757,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::linearSweptSpheres: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV;
@@ -5515,7 +5772,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::spheres: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV;
@@ -5530,7 +5787,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingMaintenance1: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingMaintenance1FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingMaintenance1FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingMaintenance1FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingMaintenance1FeaturesKHR;
@@ -5546,7 +5803,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingPipelineTraceRaysIndirect2: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingMaintenance1FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingMaintenance1FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingMaintenance1FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingMaintenance1FeaturesKHR;
@@ -5562,7 +5819,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingMotionBlur: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingMotionBlurFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingMotionBlurFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingMotionBlurFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingMotionBlurFeaturesNV;
@@ -5577,7 +5834,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingMotionBlurPipelineTraceRaysIndirect: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingMotionBlurFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingMotionBlurFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingMotionBlurFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingMotionBlurFeaturesNV;
@@ -5593,7 +5850,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingPipeline: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingPipelineFeaturesKHR;
@@ -5608,7 +5865,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingPipelineShaderGroupHandleCaptureReplay: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingPipelineFeaturesKHR;
@@ -5624,7 +5881,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingPipelineShaderGroupHandleCaptureReplayMixed: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingPipelineFeaturesKHR;
@@ -5640,7 +5897,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingPipelineTraceRaysIndirect: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingPipelineFeaturesKHR;
@@ -5656,7 +5913,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTraversalPrimitiveCulling: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPipelineFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingPipelineFeaturesKHR;
@@ -5672,7 +5929,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingPositionFetch: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR;
@@ -5688,7 +5945,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::rayTracingValidation: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingValidationFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingValidationFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingValidationFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRayTracingValidationFeaturesNV;
@@ -5703,7 +5960,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::relaxedLineRasterization: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG;
@@ -5719,7 +5976,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::renderPassStriped: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRenderPassStripedFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRenderPassStripedFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRenderPassStripedFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRenderPassStripedFeaturesARM;
@@ -5734,7 +5991,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::representativeFragmentTest: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV;
@@ -5750,7 +6007,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::nullDescriptor: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRobustness2FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRobustness2FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRobustness2FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRobustness2FeaturesKHR;
@@ -5765,7 +6022,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::robustBufferAccess2: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRobustness2FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRobustness2FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRobustness2FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRobustness2FeaturesKHR;
@@ -5780,7 +6037,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::robustImageAccess2: {
-            auto vk_struct = const_cast<VkPhysicalDeviceRobustness2FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceRobustness2FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRobustness2FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceRobustness2FeaturesKHR;
@@ -5796,7 +6053,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::samplerYcbcrConversion:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -5809,7 +6066,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->samplerYcbcrConversion, "VkPhysicalDeviceVulkan11Features::samplerYcbcrConversion"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceSamplerYcbcrConversionFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceSamplerYcbcrConversionFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceSamplerYcbcrConversionFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceSamplerYcbcrConversionFeatures;
@@ -5825,7 +6082,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::scalarBlockLayout:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -5838,7 +6095,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->scalarBlockLayout, "VkPhysicalDeviceVulkan12Features::scalarBlockLayout"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceScalarBlockLayoutFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceScalarBlockLayoutFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceScalarBlockLayoutFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceScalarBlockLayoutFeatures;
@@ -5852,7 +6109,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->scalarBlockLayout, "VkPhysicalDeviceScalarBlockLayoutFeatures::scalarBlockLayout"};
             }
         case Feature::schedulingControls: {
-            auto vk_struct = const_cast<VkPhysicalDeviceSchedulingControlsFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceSchedulingControlsFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceSchedulingControlsFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceSchedulingControlsFeaturesARM;
@@ -5868,7 +6125,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::separateDepthStencilLayouts:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -5881,7 +6138,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->separateDepthStencilLayouts, "VkPhysicalDeviceVulkan12Features::separateDepthStencilLayouts"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures;
@@ -5896,7 +6153,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures::separateDepthStencilLayouts"};
             }
         case Feature::shader64BitIndexing: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShader64BitIndexingFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShader64BitIndexingFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShader64BitIndexingFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShader64BitIndexingFeaturesEXT;
@@ -5910,8 +6167,23 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->shader64BitIndexing, "VkPhysicalDeviceShader64BitIndexingFeaturesEXT::shader64BitIndexing"};
         }
 
+        case Feature::shaderAbort: {
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAbortFeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceShaderAbortFeaturesKHR>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceShaderAbortFeaturesKHR;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderAbort, "VkPhysicalDeviceShaderAbortFeaturesKHR::shaderAbort"};
+        }
+
         case Feature::shaderFloat16VectorAtomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV;
@@ -5927,7 +6199,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBufferFloat16AtomicAdd: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -5943,7 +6215,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBufferFloat16AtomicMinMax: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -5959,7 +6231,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBufferFloat16Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -5975,7 +6247,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBufferFloat32AtomicMinMax: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -5991,7 +6263,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBufferFloat64AtomicMinMax: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -6007,7 +6279,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderImageFloat32AtomicMinMax: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -6023,7 +6295,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSharedFloat16AtomicAdd: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -6039,7 +6311,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSharedFloat16AtomicMinMax: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -6055,7 +6327,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSharedFloat16Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -6071,7 +6343,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSharedFloat32AtomicMinMax: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -6087,7 +6359,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSharedFloat64AtomicMinMax: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -6103,7 +6375,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::sparseImageFloat32AtomicMinMax: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT;
@@ -6119,7 +6391,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBufferFloat32AtomicAdd: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6135,7 +6407,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBufferFloat32Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6151,7 +6423,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBufferFloat64AtomicAdd: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6167,7 +6439,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBufferFloat64Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6183,7 +6455,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderImageFloat32AtomicAdd: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6199,7 +6471,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderImageFloat32Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6215,7 +6487,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSharedFloat32AtomicAdd: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6231,7 +6503,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSharedFloat32Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6247,7 +6519,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSharedFloat64AtomicAdd: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6263,7 +6535,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSharedFloat64Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6279,7 +6551,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::sparseImageFloat32AtomicAdd: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6295,7 +6567,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::sparseImageFloat32Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderAtomicFloatFeaturesEXT;
@@ -6312,7 +6584,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::shaderBufferInt64Atomics:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -6325,7 +6597,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderBufferInt64Atomics, "VkPhysicalDeviceVulkan12Features::shaderBufferInt64Atomics"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicInt64Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicInt64Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicInt64Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderAtomicInt64Features;
@@ -6341,7 +6613,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderSharedInt64Atomics:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -6354,7 +6626,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderSharedInt64Atomics, "VkPhysicalDeviceVulkan12Features::shaderSharedInt64Atomics"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicInt64Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderAtomicInt64Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderAtomicInt64Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderAtomicInt64Features;
@@ -6369,7 +6641,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceShaderAtomicInt64Features::shaderSharedInt64Atomics"};
             }
         case Feature::shaderBFloat16CooperativeMatrix: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderBfloat16FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderBfloat16FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderBfloat16FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderBfloat16FeaturesKHR;
@@ -6385,7 +6657,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBFloat16DotProduct: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderBfloat16FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderBfloat16FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderBfloat16FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderBfloat16FeaturesKHR;
@@ -6400,7 +6672,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderBFloat16Type: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderBfloat16FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderBfloat16FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderBfloat16FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderBfloat16FeaturesKHR;
@@ -6415,7 +6687,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderDeviceClock: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderClockFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderClockFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderClockFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderClockFeaturesKHR;
@@ -6430,7 +6702,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSubgroupClock: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderClockFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderClockFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderClockFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderClockFeaturesKHR;
@@ -6444,8 +6716,23 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->shaderSubgroupClock, "VkPhysicalDeviceShaderClockFeaturesKHR::shaderSubgroupClock"};
         }
 
+        case Feature::shaderConstantData: {
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderConstantDataFeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceShaderConstantDataFeaturesKHR>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceShaderConstantDataFeaturesKHR;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderConstantData, "VkPhysicalDeviceShaderConstantDataFeaturesKHR::shaderConstantData"};
+        }
+
         case Feature::shaderCoreBuiltins: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderCoreBuiltinsFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderCoreBuiltinsFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderCoreBuiltinsFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderCoreBuiltinsFeaturesARM;
@@ -6461,7 +6748,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::shaderDemoteToHelperInvocation:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -6475,7 +6762,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderDemoteToHelperInvocation,
                         "VkPhysicalDeviceVulkan13Features::shaderDemoteToHelperInvocation"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures;
@@ -6491,7 +6778,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderDrawParameters:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -6504,7 +6791,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderDrawParameters, "VkPhysicalDeviceVulkan11Features::shaderDrawParameters"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderDrawParametersFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderDrawParametersFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderDrawParametersFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderDrawParametersFeatures;
@@ -6518,7 +6805,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderDrawParameters, "VkPhysicalDeviceShaderDrawParametersFeatures::shaderDrawParameters"};
             }
         case Feature::shaderEarlyAndLateFragmentTests: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD;
@@ -6535,7 +6822,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::shaderEnqueue: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderEnqueueFeaturesAMDX *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderEnqueueFeaturesAMDX*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderEnqueueFeaturesAMDX>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderEnqueueFeaturesAMDX;
@@ -6552,7 +6839,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
         case Feature::shaderMeshEnqueue: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderEnqueueFeaturesAMDX *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderEnqueueFeaturesAMDX*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderEnqueueFeaturesAMDX>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderEnqueueFeaturesAMDX;
@@ -6569,7 +6856,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::shaderExpectAssume:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -6582,7 +6869,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderExpectAssume, "VkPhysicalDeviceVulkan14Features::shaderExpectAssume"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderExpectAssumeFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderExpectAssumeFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderExpectAssumeFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderExpectAssumeFeatures;
@@ -6597,7 +6884,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderFloat16:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -6610,7 +6897,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderFloat16, "VkPhysicalDeviceVulkan12Features::shaderFloat16"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderFloat16Int8Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderFloat16Int8Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderFloat16Int8Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderFloat16Int8Features;
@@ -6625,7 +6912,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderInt8:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -6638,7 +6925,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderInt8, "VkPhysicalDeviceVulkan12Features::shaderInt8"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderFloat16Int8Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderFloat16Int8Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderFloat16Int8Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderFloat16Int8Features;
@@ -6652,7 +6939,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderInt8, "VkPhysicalDeviceShaderFloat16Int8Features::shaderInt8"};
             }
         case Feature::shaderFloat8: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderFloat8FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderFloat8FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderFloat8FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderFloat8FeaturesEXT;
@@ -6667,7 +6954,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderFloat8CooperativeMatrix: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderFloat8FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderFloat8FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderFloat8FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderFloat8FeaturesEXT;
@@ -6684,7 +6971,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::shaderFloatControls2:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -6697,7 +6984,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderFloatControls2, "VkPhysicalDeviceVulkan14Features::shaderFloatControls2"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderFloatControls2Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderFloatControls2Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderFloatControls2Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderFloatControls2Features;
@@ -6711,7 +6998,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderFloatControls2, "VkPhysicalDeviceShaderFloatControls2Features::shaderFloatControls2"};
             }
         case Feature::shaderFmaFloat16: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderFmaFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderFmaFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderFmaFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderFmaFeaturesKHR;
@@ -6726,7 +7013,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderFmaFloat32: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderFmaFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderFmaFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderFmaFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderFmaFeaturesKHR;
@@ -6741,7 +7028,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderFmaFloat64: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderFmaFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderFmaFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderFmaFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderFmaFeaturesKHR;
@@ -6756,7 +7043,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderImageInt64Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT;
@@ -6772,7 +7059,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::sparseImageInt64Atomics: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT;
@@ -6788,7 +7075,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::imageFootprint: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderImageFootprintFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderImageFootprintFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderImageFootprintFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderImageFootprintFeaturesNV;
@@ -6802,9 +7089,24 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->imageFootprint, "VkPhysicalDeviceShaderImageFootprintFeaturesNV::imageFootprint"};
         }
 
+        case Feature::shaderInstrumentation: {
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderInstrumentationFeaturesARM*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceShaderInstrumentationFeaturesARM>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceShaderInstrumentationFeaturesARM;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderInstrumentation, "VkPhysicalDeviceShaderInstrumentationFeaturesARM::shaderInstrumentation"};
+        }
+
         case Feature::shaderIntegerDotProduct:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -6817,7 +7119,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderIntegerDotProduct, "VkPhysicalDeviceVulkan13Features::shaderIntegerDotProduct"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderIntegerDotProductFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderIntegerDotProductFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderIntegerDotProductFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderIntegerDotProductFeatures;
@@ -6832,7 +7134,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceShaderIntegerDotProductFeatures::shaderIntegerDotProduct"};
             }
         case Feature::shaderIntegerFunctions2: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL;
@@ -6848,7 +7150,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::longVector: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderLongVectorFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderLongVectorFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderLongVectorFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderLongVectorFeaturesEXT;
@@ -6863,7 +7165,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderMaximalReconvergence: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR;
@@ -6879,7 +7181,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderMixedFloatDotProductBFloat16Acc: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE;
@@ -6895,7 +7197,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderMixedFloatDotProductFloat16AccFloat16: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE;
@@ -6911,7 +7213,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderMixedFloatDotProductFloat16AccFloat32: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE;
@@ -6927,7 +7229,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderMixedFloatDotProductFloat8AccFloat32: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE;
@@ -6943,7 +7245,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderModuleIdentifier: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT;
@@ -6958,8 +7260,85 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                     "VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT::shaderModuleIdentifier"};
         }
 
+        case Feature::shaderMultipleWaitQueues: {
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderMultipleWaitQueuesFeaturesQCOM*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceShaderMultipleWaitQueuesFeaturesQCOM>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceShaderMultipleWaitQueuesFeaturesQCOM;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderMultipleWaitQueues,
+                    "VkPhysicalDeviceShaderMultipleWaitQueuesFeaturesQCOM::shaderMultipleWaitQueues"};
+        }
+
+        case Feature::shaderFloat4: {
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderFloat4, "VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderFloat4"};
+        }
+
+        case Feature::shaderFloat6: {
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderFloat6, "VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderFloat6"};
+        }
+
+        case Feature::shaderFloat8UnsignedE8M0: {
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderFloat8UnsignedE8M0,
+                    "VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderFloat8UnsignedE8M0"};
+        }
+
+        case Feature::shaderMXInt8: {
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderMXInt8, "VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderMXInt8"};
+        }
+
         case Feature::shaderObject: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderObjectFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderObjectFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderObjectFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderObjectFeaturesEXT;
@@ -6974,7 +7353,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderQuadControl: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderQuadControlFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderQuadControlFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderQuadControlFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderQuadControlFeaturesKHR;
@@ -6989,7 +7368,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderRelaxedExtendedInstruction: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR;
@@ -7005,7 +7384,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderReplicatedComposites: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderReplicatedCompositesFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderReplicatedCompositesFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderReplicatedCompositesFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderReplicatedCompositesFeaturesEXT;
@@ -7021,7 +7400,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderSMBuiltins: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderSMBuiltinsFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderSMBuiltinsFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderSMBuiltinsFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderSMBuiltinsFeaturesNV;
@@ -7035,9 +7414,24 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->shaderSMBuiltins, "VkPhysicalDeviceShaderSMBuiltinsFeaturesNV::shaderSMBuiltins"};
         }
 
+        case Feature::shaderSplitBarrier: {
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderSplitBarrierFeaturesEXT*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceShaderSplitBarrierFeaturesEXT>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceShaderSplitBarrierFeaturesEXT;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderSplitBarrier, "VkPhysicalDeviceShaderSplitBarrierFeaturesEXT::shaderSplitBarrier"};
+        }
+
         case Feature::shaderSubgroupExtendedTypes:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -7050,7 +7444,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderSubgroupExtendedTypes, "VkPhysicalDeviceVulkan12Features::shaderSubgroupExtendedTypes"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures;
@@ -7065,7 +7459,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures::shaderSubgroupExtendedTypes"};
             }
         case Feature::shaderSubgroupPartitioned: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupPartitionedFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupPartitionedFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderSubgroupPartitionedFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderSubgroupPartitionedFeaturesEXT;
@@ -7082,7 +7476,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::shaderSubgroupRotate:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -7095,7 +7489,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderSubgroupRotate, "VkPhysicalDeviceVulkan14Features::shaderSubgroupRotate"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupRotateFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupRotateFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderSubgroupRotateFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderSubgroupRotateFeatures;
@@ -7110,7 +7504,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderSubgroupRotateClustered:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -7124,7 +7518,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderSubgroupRotateClustered,
                         "VkPhysicalDeviceVulkan14Features::shaderSubgroupRotateClustered"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupRotateFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupRotateFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderSubgroupRotateFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderSubgroupRotateFeatures;
@@ -7139,7 +7533,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceShaderSubgroupRotateFeatures::shaderSubgroupRotateClustered"};
             }
         case Feature::shaderSubgroupUniformControlFlow: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR;
@@ -7156,7 +7550,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::shaderTerminateInvocation:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -7169,7 +7563,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->shaderTerminateInvocation, "VkPhysicalDeviceVulkan13Features::shaderTerminateInvocation"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceShaderTerminateInvocationFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceShaderTerminateInvocationFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceShaderTerminateInvocationFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceShaderTerminateInvocationFeatures;
@@ -7184,7 +7578,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceShaderTerminateInvocationFeatures::shaderTerminateInvocation"};
             }
         case Feature::shaderTileImageColorReadAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderTileImageFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderTileImageFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderTileImageFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderTileImageFeaturesEXT;
@@ -7200,7 +7594,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderTileImageDepthReadAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderTileImageFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderTileImageFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderTileImageFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderTileImageFeaturesEXT;
@@ -7216,7 +7610,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderTileImageStencilReadAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderTileImageFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderTileImageFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderTileImageFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderTileImageFeaturesEXT;
@@ -7232,7 +7626,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderUniformBufferUnsizedArray: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT;
@@ -7248,7 +7642,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderUntypedPointers: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShaderUntypedPointersFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShaderUntypedPointersFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShaderUntypedPointersFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShaderUntypedPointersFeaturesKHR;
@@ -7263,7 +7657,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shadingRateCoarseSampleOrder: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShadingRateImageFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShadingRateImageFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShadingRateImageFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShadingRateImageFeaturesNV;
@@ -7279,7 +7673,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shadingRateImage: {
-            auto vk_struct = const_cast<VkPhysicalDeviceShadingRateImageFeaturesNV *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceShadingRateImageFeaturesNV*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceShadingRateImageFeaturesNV>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceShadingRateImageFeaturesNV;
@@ -7295,7 +7689,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::computeFullSubgroups:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -7308,7 +7702,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->computeFullSubgroups, "VkPhysicalDeviceVulkan13Features::computeFullSubgroups"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceSubgroupSizeControlFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceSubgroupSizeControlFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceSubgroupSizeControlFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceSubgroupSizeControlFeatures;
@@ -7323,7 +7717,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::subgroupSizeControl:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -7336,7 +7730,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->subgroupSizeControl, "VkPhysicalDeviceVulkan13Features::subgroupSizeControl"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceSubgroupSizeControlFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceSubgroupSizeControlFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceSubgroupSizeControlFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceSubgroupSizeControlFeatures;
@@ -7350,7 +7744,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->subgroupSizeControl, "VkPhysicalDeviceSubgroupSizeControlFeatures::subgroupSizeControl"};
             }
         case Feature::subpassMergeFeedback: {
-            auto vk_struct = const_cast<VkPhysicalDeviceSubpassMergeFeedbackFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceSubpassMergeFeedbackFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceSubpassMergeFeedbackFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceSubpassMergeFeedbackFeaturesEXT;
@@ -7365,7 +7759,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::subpassShading: {
-            auto vk_struct = const_cast<VkPhysicalDeviceSubpassShadingFeaturesHUAWEI *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceSubpassShadingFeaturesHUAWEI*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceSubpassShadingFeaturesHUAWEI>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceSubpassShadingFeaturesHUAWEI;
@@ -7380,7 +7774,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::swapchainMaintenance1: {
-            auto vk_struct = const_cast<VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR;
@@ -7396,7 +7790,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::synchronization2:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -7409,7 +7803,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->synchronization2, "VkPhysicalDeviceVulkan13Features::synchronization2"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceSynchronization2Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceSynchronization2Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceSynchronization2Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceSynchronization2Features;
@@ -7423,7 +7817,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->synchronization2, "VkPhysicalDeviceSynchronization2Features::synchronization2"};
             }
         case Feature::descriptorBindingStorageTensorUpdateAfterBind: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTensorFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTensorFeaturesARM;
@@ -7439,7 +7833,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderStorageTensorArrayDynamicIndexing: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTensorFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTensorFeaturesARM;
@@ -7455,7 +7849,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderStorageTensorArrayNonUniformIndexing: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTensorFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTensorFeaturesARM;
@@ -7471,7 +7865,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderTensorAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTensorFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTensorFeaturesARM;
@@ -7486,7 +7880,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tensorNonPacked: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTensorFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTensorFeaturesARM;
@@ -7501,7 +7895,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tensors: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTensorFeaturesARM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTensorFeaturesARM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTensorFeaturesARM;
@@ -7516,7 +7910,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::texelBufferAlignment: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT;
@@ -7531,7 +7925,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::textureCompressionASTC_3D: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTextureCompressionASTC3DFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTextureCompressionASTC3DFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTextureCompressionASTC3DFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTextureCompressionASTC3DFeaturesEXT;
@@ -7548,7 +7942,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::textureCompressionASTC_HDR:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -7561,7 +7955,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->textureCompressionASTC_HDR, "VkPhysicalDeviceVulkan13Features::textureCompressionASTC_HDR"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceTextureCompressionASTCHDRFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceTextureCompressionASTCHDRFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceTextureCompressionASTCHDRFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceTextureCompressionASTCHDRFeatures;
@@ -7575,8 +7969,23 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->textureCompressionASTC_HDR,
                         "VkPhysicalDeviceTextureCompressionASTCHDRFeatures::textureCompressionASTC_HDR"};
             }
+        case Feature::throttleHint: {
+            auto vk_struct = const_cast<VkPhysicalDeviceThrottleHintFeaturesSEC*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceThrottleHintFeaturesSEC>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceThrottleHintFeaturesSEC;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->throttleHint, "VkPhysicalDeviceThrottleHintFeaturesSEC::throttleHint"};
+        }
+
         case Feature::tileMemoryHeap: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileMemoryHeapFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileMemoryHeapFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileMemoryHeapFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileMemoryHeapFeaturesQCOM;
@@ -7591,7 +8000,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileProperties: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTilePropertiesFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTilePropertiesFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTilePropertiesFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTilePropertiesFeaturesQCOM;
@@ -7606,7 +8015,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShading: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7621,7 +8030,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingAnisotropicApron: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7637,7 +8046,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingApron: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7652,7 +8061,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingAtomicOps: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7667,7 +8076,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingColorAttachments: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7683,7 +8092,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingDepthAttachments: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7699,7 +8108,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingDispatchTile: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7714,7 +8123,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingFragmentStage: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7729,7 +8138,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingImageProcessing: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7744,7 +8153,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingInputAttachments: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7760,7 +8169,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingPerTileDispatch: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7775,7 +8184,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingPerTileDraw: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7790,7 +8199,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingSampledAttachments: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7806,7 +8215,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::tileShadingStencilAttachments: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTileShadingFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTileShadingFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTileShadingFeaturesQCOM;
@@ -7823,7 +8232,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::timelineSemaphore:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -7836,7 +8245,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->timelineSemaphore, "VkPhysicalDeviceVulkan12Features::timelineSemaphore"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceTimelineSemaphoreFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceTimelineSemaphoreFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceTimelineSemaphoreFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceTimelineSemaphoreFeatures;
@@ -7850,7 +8259,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->timelineSemaphore, "VkPhysicalDeviceTimelineSemaphoreFeatures::timelineSemaphore"};
             }
         case Feature::geometryStreams: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTransformFeedbackFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTransformFeedbackFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTransformFeedbackFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTransformFeedbackFeaturesEXT;
@@ -7865,7 +8274,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::transformFeedback: {
-            auto vk_struct = const_cast<VkPhysicalDeviceTransformFeedbackFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceTransformFeedbackFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceTransformFeedbackFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceTransformFeedbackFeaturesEXT;
@@ -7880,7 +8289,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::unifiedImageLayouts: {
-            auto vk_struct = const_cast<VkPhysicalDeviceUnifiedImageLayoutsFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceUnifiedImageLayoutsFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceUnifiedImageLayoutsFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceUnifiedImageLayoutsFeaturesKHR;
@@ -7895,7 +8304,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::unifiedImageLayoutsVideo: {
-            auto vk_struct = const_cast<VkPhysicalDeviceUnifiedImageLayoutsFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceUnifiedImageLayoutsFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceUnifiedImageLayoutsFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceUnifiedImageLayoutsFeaturesKHR;
@@ -7912,7 +8321,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::uniformBufferStandardLayout:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -7925,7 +8334,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->uniformBufferStandardLayout, "VkPhysicalDeviceVulkan12Features::uniformBufferStandardLayout"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceUniformBufferStandardLayoutFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceUniformBufferStandardLayoutFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceUniformBufferStandardLayoutFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceUniformBufferStandardLayoutFeatures;
@@ -7941,7 +8350,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::variablePointers:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -7954,7 +8363,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->variablePointers, "VkPhysicalDeviceVulkan11Features::variablePointers"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceVariablePointersFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVariablePointersFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVariablePointersFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVariablePointersFeatures;
@@ -7969,7 +8378,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::variablePointersStorageBuffer:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan11Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan11Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan11Features;
@@ -7983,7 +8392,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->variablePointersStorageBuffer,
                         "VkPhysicalDeviceVulkan11Features::variablePointersStorageBuffer"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceVariablePointersFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVariablePointersFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVariablePointersFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVariablePointersFeatures;
@@ -7999,7 +8408,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::vertexAttributeInstanceRateDivisor:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -8013,7 +8422,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->vertexAttributeInstanceRateDivisor,
                         "VkPhysicalDeviceVulkan14Features::vertexAttributeInstanceRateDivisor"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceVertexAttributeDivisorFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVertexAttributeDivisorFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVertexAttributeDivisorFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVertexAttributeDivisorFeatures;
@@ -8029,7 +8438,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::vertexAttributeInstanceRateZeroDivisor:
             if (api_version >= VK_API_VERSION_1_4) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -8043,7 +8452,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->vertexAttributeInstanceRateZeroDivisor,
                         "VkPhysicalDeviceVulkan14Features::vertexAttributeInstanceRateZeroDivisor"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceVertexAttributeDivisorFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVertexAttributeDivisorFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVertexAttributeDivisorFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVertexAttributeDivisorFeatures;
@@ -8058,7 +8467,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceVertexAttributeDivisorFeatures::vertexAttributeInstanceRateZeroDivisor"};
             }
         case Feature::vertexAttributeRobustness: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT;
@@ -8074,7 +8483,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::vertexInputDynamicState: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT;
@@ -8090,7 +8499,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::videoDecodeVP9: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVideoDecodeVP9FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVideoDecodeVP9FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVideoDecodeVP9FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVideoDecodeVP9FeaturesKHR;
@@ -8105,7 +8514,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::videoEncodeAV1: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVideoEncodeAV1FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVideoEncodeAV1FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVideoEncodeAV1FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVideoEncodeAV1FeaturesKHR;
@@ -8119,8 +8528,23 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->videoEncodeAV1, "VkPhysicalDeviceVideoEncodeAV1FeaturesKHR::videoEncodeAV1"};
         }
 
+        case Feature::videoEncodeFeedback2: {
+            auto vk_struct = const_cast<VkPhysicalDeviceVideoEncodeFeedback2FeaturesKHR*>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceVideoEncodeFeedback2FeaturesKHR>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceVideoEncodeFeedback2FeaturesKHR;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->videoEncodeFeedback2, "VkPhysicalDeviceVideoEncodeFeedback2FeaturesKHR::videoEncodeFeedback2"};
+        }
+
         case Feature::videoEncodeIntraRefresh: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR;
@@ -8136,7 +8560,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::videoEncodeQuantizationMap: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR;
@@ -8152,7 +8576,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::videoEncodeRgbConversion: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE;
@@ -8168,7 +8592,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::videoMaintenance1: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVideoMaintenance1FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVideoMaintenance1FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVideoMaintenance1FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVideoMaintenance1FeaturesKHR;
@@ -8183,7 +8607,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::videoMaintenance2: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVideoMaintenance2FeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVideoMaintenance2FeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVideoMaintenance2FeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVideoMaintenance2FeaturesKHR;
@@ -8198,7 +8622,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::descriptorIndexing: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8213,7 +8637,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::drawIndirectCount: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8228,7 +8652,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::samplerFilterMinmax: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8243,7 +8667,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::samplerMirrorClampToEdge: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8258,7 +8682,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderOutputLayer: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8273,7 +8697,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::shaderOutputViewportIndex: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8288,7 +8712,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::subgroupBroadcastDynamicId: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8304,7 +8728,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
 
         case Feature::vulkanMemoryModel:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8317,7 +8741,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->vulkanMemoryModel, "VkPhysicalDeviceVulkan12Features::vulkanMemoryModel"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkanMemoryModelFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkanMemoryModelFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkanMemoryModelFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkanMemoryModelFeatures;
@@ -8332,7 +8756,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::vulkanMemoryModelAvailabilityVisibilityChains:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8346,7 +8770,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->vulkanMemoryModelAvailabilityVisibilityChains,
                         "VkPhysicalDeviceVulkan12Features::vulkanMemoryModelAvailabilityVisibilityChains"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkanMemoryModelFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkanMemoryModelFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkanMemoryModelFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkanMemoryModelFeatures;
@@ -8362,7 +8786,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::vulkanMemoryModelDeviceScope:
             if (api_version >= VK_API_VERSION_1_2) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan12Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan12Features;
@@ -8375,7 +8799,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
                 return {&vk_struct->vulkanMemoryModelDeviceScope, "VkPhysicalDeviceVulkan12Features::vulkanMemoryModelDeviceScope"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkanMemoryModelFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkanMemoryModelFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkanMemoryModelFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkanMemoryModelFeatures;
@@ -8391,7 +8815,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
         case Feature::shaderZeroInitializeWorkgroupMemory:
             if (api_version >= VK_API_VERSION_1_3) {
-                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceVulkan13Features*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceVulkan13Features;
@@ -8405,7 +8829,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 return {&vk_struct->shaderZeroInitializeWorkgroupMemory,
                         "VkPhysicalDeviceVulkan13Features::shaderZeroInitializeWorkgroupMemory"};
             } else {
-                auto vk_struct = const_cast<VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures *>(
+                auto vk_struct = const_cast<VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures*>(
                     vku::FindStructInPNextChain<VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures>(*inout_pnext_chain));
                 if (!vk_struct) {
                     vk_struct = new VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures;
@@ -8420,7 +8844,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                         "VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures::shaderZeroInitializeWorkgroupMemory"};
             }
         case Feature::pushDescriptor: {
-            auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceVulkan14Features*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceVulkan14Features;
@@ -8435,7 +8859,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::workgroupMemoryExplicitLayout: {
-            auto vk_struct = const_cast<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR;
@@ -8451,7 +8875,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::workgroupMemoryExplicitLayout16BitAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR;
@@ -8467,7 +8891,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::workgroupMemoryExplicitLayout8BitAccess: {
-            auto vk_struct = const_cast<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR;
@@ -8483,7 +8907,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::workgroupMemoryExplicitLayoutScalarBlockLayout: {
-            auto vk_struct = const_cast<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR;
@@ -8499,7 +8923,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::ycbcr2plane444Formats: {
-            auto vk_struct = const_cast<VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT;
@@ -8514,7 +8938,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::ycbcrDegamma: {
-            auto vk_struct = const_cast<VkPhysicalDeviceYcbcrDegammaFeaturesQCOM *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceYcbcrDegammaFeaturesQCOM*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceYcbcrDegammaFeaturesQCOM>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceYcbcrDegammaFeaturesQCOM;
@@ -8529,7 +8953,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::ycbcrImageArrays: {
-            auto vk_struct = const_cast<VkPhysicalDeviceYcbcrImageArraysFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceYcbcrImageArraysFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceYcbcrImageArraysFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceYcbcrImageArraysFeaturesEXT;
@@ -8544,7 +8968,7 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
         }
 
         case Feature::zeroInitializeDeviceMemory: {
-            auto vk_struct = const_cast<VkPhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT *>(
+            auto vk_struct = const_cast<VkPhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT*>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT>(*inout_pnext_chain));
             if (!vk_struct) {
                 vk_struct = new VkPhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT;

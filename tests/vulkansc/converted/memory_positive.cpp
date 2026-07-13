@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
- * Copyright (c) 2023-2025 Collabora, Inc.
+ * Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
+ * Copyright (c) 2023-2026 Collabora, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 #include <thread>
 #include <vector>
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 #ifndef VK_USE_PLATFORM_WIN32_KHR
 #include <sys/mman.h>
@@ -52,7 +52,7 @@ TEST_F(PositiveMemory, MemoryDecompression) {
     dst_usage2.usage = VK_BUFFER_USAGE_2_MEMORY_DECOMPRESSION_BIT_EXT;
     vkt::Buffer dst_buffer(*m_device, decompressed_size, dst_usage2, vkt::device_address);
 
-    void *p = src_buffer.Memory().Map();
+    void* p = src_buffer.Memory().Map();
     std::memcpy(p, compressed.data(), compressed.size());
 
     VkDecompressMemoryRegionEXT decompress_region = {};
@@ -107,7 +107,7 @@ TEST_F(PositiveMemory, MemoryDecompressionIndirectCount) {
     dst_usage2_ind.usage = VK_BUFFER_USAGE_2_MEMORY_DECOMPRESSION_BIT_EXT;
     vkt::Buffer dst_buffer(*m_device, decompressed_size, dst_usage2_ind, vkt::device_address);
 
-    void *p = src_buffer.Memory().Map();
+    void* p = src_buffer.Memory().Map();
     std::memcpy(p, compressed.data(), compressed.size());
 
     VkDecompressMemoryRegionEXT decompress_region = {};
@@ -118,12 +118,12 @@ TEST_F(PositiveMemory, MemoryDecompressionIndirectCount) {
     VkDecompressMemoryRegionEXT cmds[2] = {decompress_region, decompress_region};
 
     vkt::Buffer ic_buffer(*m_device, sizeof(cmds), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
-    void *p_ic = ic_buffer.Memory().Map();
+    void* p_ic = ic_buffer.Memory().Map();
     memcpy(p_ic, cmds, sizeof(cmds));
 
     vkt::Buffer icc_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
     uint32_t count = sizeof(cmds) / sizeof(VkDecompressMemoryRegionEXT);
-    void *p_cnt = icc_buffer.Memory().Map();
+    void* p_cnt = icc_buffer.Memory().Map();
     memcpy(p_cnt, &count, sizeof(count));
 
     VkPhysicalDeviceMemoryDecompressionPropertiesEXT memory_decompression_props = vku::InitStructHelper();
@@ -176,8 +176,8 @@ TEST_F(PositiveMemory, MapMemory2) {
     VkMemoryUnmapInfoKHR unmap_info = vku::InitStructHelper();
     unmap_info.memory = memory;
 
-    uint32_t *pData = nullptr;
-    VkResult err = vk::MapMemory2KHR(device(), &map_info, (void **)&pData);
+    uint32_t* pData = nullptr;
+    VkResult err = vk::MapMemory2KHR(device(), &map_info, (void**)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     ASSERT_TRUE(pData != nullptr);
 
@@ -187,7 +187,7 @@ TEST_F(PositiveMemory, MapMemory2) {
     map_info.size = VK_WHOLE_SIZE;
 
     pData = nullptr;
-    err = vk::MapMemory2KHR(device(), &map_info, (void **)&pData);
+    err = vk::MapMemory2KHR(device(), &map_info, (void**)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     ASSERT_TRUE(pData != nullptr);
 
@@ -224,12 +224,12 @@ TEST_F(PositiveMemory, MapMemoryPlaced) {
 
     /* Reserve one more page in case we need to deal with any alignment weirdness. */
     size_t reservation_size = allocation_size + map_placed_props.minPlacedMemoryMapAlignment;
-    void *reservation = mmap(NULL, reservation_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void* reservation = mmap(NULL, reservation_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     ASSERT_TRUE(reservation != MAP_FAILED);
 
     /* Align up to minPlacedMemoryMapAlignment */
     uintptr_t align_1 = map_placed_props.minPlacedMemoryMapAlignment - 1;
-    void *addr = reinterpret_cast<void *>((reinterpret_cast<uintptr_t>(reservation) + align_1) & ~align_1);
+    void* addr = reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(reservation) + align_1) & ~align_1);
 
     VkMemoryMapInfo map_info = vku::InitStructHelper();
     map_info.memory = memory;
@@ -241,7 +241,7 @@ TEST_F(PositiveMemory, MapMemoryPlaced) {
     placed_info.pPlacedAddress = addr;
     map_info.pNext = &placed_info;
 
-    void *pData;
+    void* pData;
     VkResult res = vk::MapMemory2KHR(device(), &map_info, &pData);
     ASSERT_EQ(VK_SUCCESS, res);
 
@@ -275,7 +275,7 @@ TEST_F(PositiveMemory, MapMemoryPlaced) {
     /* We unmapped with RESERVE above so this should be different */
     ASSERT_NE(pData, addr);
 
-    ASSERT_EQ(static_cast<uint8_t *>(pData)[0], 0x5c);
+    ASSERT_EQ(static_cast<uint8_t*>(pData)[0], 0x5c);
 
     unmap_info.flags = 0;
     res = vk::UnmapMemory2KHR(device(), &unmap_info);
@@ -321,8 +321,7 @@ TEST_F(PositiveMemory, GetMemoryRequirements2) {
 
     // Transition and clear image
     const VkImageSubresourceRange subresource_range = image.SubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-    const auto barrier = image.ImageMemoryBarrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-                                                  VK_IMAGE_LAYOUT_GENERAL, subresource_range);
+    const auto barrier = image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, subresource_range);
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
                            0, nullptr, 1, &barrier);
     const VkClearColorValue color = {};
@@ -364,8 +363,7 @@ TEST_F(PositiveMemory, BindMemory2) {
 
     // Transition and clear image
     const VkImageSubresourceRange subresource_range = image.SubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-    const auto barrier = image.ImageMemoryBarrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-                                                  VK_IMAGE_LAYOUT_GENERAL, subresource_range);
+    const auto barrier = image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, subresource_range);
     vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
                            0, nullptr, 1, &barrier);
     const VkClearColorValue color = {};
@@ -381,7 +379,7 @@ TEST_F(PositiveMemory, NonCoherentMapping) {
         "Ensure that validations handling of non-coherent memory mapping while using VK_WHOLE_SIZE does not cause access "
         "violations");
     VkResult err;
-    uint8_t *pData;
+    uint8_t* pData;
     RETURN_IF_SKIP(Init());
 
     VkMemoryRequirements mem_reqs;
@@ -414,7 +412,7 @@ TEST_F(PositiveMemory, NonCoherentMapping) {
     vkt::DeviceMemory mem(*m_device, alloc_info);
 
     // Map/Flush/Invalidate using WHOLE_SIZE and zero offsets and entire mapped range
-    err = vk::MapMemory(device(), mem, 0, VK_WHOLE_SIZE, 0, (void **)&pData);
+    err = vk::MapMemory(device(), mem, 0, VK_WHOLE_SIZE, 0, (void**)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     VkMappedMemoryRange mmr = vku::InitStructHelper();
     mmr.memory = mem;
@@ -427,7 +425,7 @@ TEST_F(PositiveMemory, NonCoherentMapping) {
     vk::UnmapMemory(device(), mem);
 
     // Map/Flush/Invalidate using WHOLE_SIZE and an offset and entire mapped range
-    err = vk::MapMemory(device(), mem, 5 * atom_size, VK_WHOLE_SIZE, 0, (void **)&pData);
+    err = vk::MapMemory(device(), mem, 5 * atom_size, VK_WHOLE_SIZE, 0, (void**)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     mmr.memory = mem;
     mmr.offset = 6 * atom_size;
@@ -440,7 +438,7 @@ TEST_F(PositiveMemory, NonCoherentMapping) {
 
     // Map with offset and size
     // Flush/Invalidate subrange of mapped area with offset and size
-    err = vk::MapMemory(device(), mem, 3 * atom_size, 9 * atom_size, 0, (void **)&pData);
+    err = vk::MapMemory(device(), mem, 3 * atom_size, 9 * atom_size, 0, (void**)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     mmr.memory = mem;
     mmr.offset = 4 * atom_size;
@@ -452,7 +450,7 @@ TEST_F(PositiveMemory, NonCoherentMapping) {
     vk::UnmapMemory(device(), mem);
 
     // Map without offset and flush WHOLE_SIZE with two separate offsets
-    err = vk::MapMemory(device(), mem, 0, VK_WHOLE_SIZE, 0, (void **)&pData);
+    err = vk::MapMemory(device(), mem, 0, VK_WHOLE_SIZE, 0, (void**)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     mmr.memory = mem;
     mmr.offset = allocation_size - (4 * atom_size);
@@ -494,8 +492,8 @@ TEST_F(PositiveMemory, MappingWithMultiInstanceHeapFlag) {
 
     vkt::DeviceMemory memory(*m_device, mem_alloc);
 
-    uint32_t *pData;
-    vk::MapMemory(device(), memory, 0, VK_WHOLE_SIZE, 0, (void **)&pData);
+    uint32_t* pData;
+    vk::MapMemory(device(), memory, 0, VK_WHOLE_SIZE, 0, (void**)&pData);
     vk::UnmapMemory(device(), memory);
 }
 
@@ -535,7 +533,7 @@ TEST_F(PositiveMemory, DISABLED_BindImageMemoryMultiThreaded) {
     for (int i = 0; i < worker_count; ++i) {
         workers.emplace_back(worker_thread);
     }
-    for (auto &worker : workers) {
+    for (auto& worker : workers) {
         worker.join();
     }
 }
@@ -752,8 +750,8 @@ TEST_F(PositiveMemory, MapMemoryCoherentAtomSize) {
     }
     vkt::DeviceMemory mem(*m_device, alloc_info);
 
-    uint8_t *pData;
-    ASSERT_EQ(VK_SUCCESS, vk::MapMemory(device(), mem, 0, VK_WHOLE_SIZE, 0, (void **)&pData));
+    uint8_t* pData;
+    ASSERT_EQ(VK_SUCCESS, vk::MapMemory(device(), mem, 0, VK_WHOLE_SIZE, 0, (void**)&pData));
     // Offset is atom size, but total memory range is not atom size
     VkMappedMemoryRange mem_range = vku::InitStructHelper();
     mem_range.memory = mem;

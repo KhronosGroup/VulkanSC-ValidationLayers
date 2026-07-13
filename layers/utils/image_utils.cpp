@@ -1,6 +1,6 @@
-/* Copyright (c) 2020-2025 The Khronos Group Inc.
- * Copyright (c) 2020-2025 Valve Corporation
- * Copyright (c) 2020-2025 LunarG, Inc.
+/* Copyright (c) 2020-2026 The Khronos Group Inc.
+ * Copyright (c) 2020-2026 Valve Corporation
+ * Copyright (c) 2020-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
 
-uint32_t GetEffectiveLevelCount(const VkImageSubresourceRange &subresource_range, uint32_t total_level_count) {
+uint32_t GetEffectiveLevelCount(const VkImageSubresourceRange& subresource_range, uint32_t total_level_count) {
     uint32_t level_count = subresource_range.levelCount;
     if (level_count == VK_REMAINING_MIP_LEVELS) {
         if (total_level_count > subresource_range.baseMipLevel) {
@@ -40,7 +40,7 @@ uint32_t GetEffectiveLevelCount(const VkImageSubresourceRange &subresource_range
     return level_count;
 }
 
-uint32_t GetEffectiveLayerCount(const VkImageSubresourceRange &subresource_range, uint32_t total_layer_count) {
+uint32_t GetEffectiveLayerCount(const VkImageSubresourceRange& subresource_range, uint32_t total_layer_count) {
     uint32_t layer_count = subresource_range.layerCount;
     if (layer_count == VK_REMAINING_ARRAY_LAYERS) {
         if (total_layer_count > subresource_range.baseArrayLayer) {
@@ -53,16 +53,15 @@ uint32_t GetEffectiveLayerCount(const VkImageSubresourceRange &subresource_range
 }
 
 // Returns the effective extent of an image subresource, adjusted for mip level and array depth.
-VkExtent3D GetEffectiveExtent(const VkImageCreateInfo &ci, const VkImageAspectFlags aspect_mask, const uint32_t mip_level) {
+VkExtent3D GetEffectiveExtent(uint32_t mip_levels, VkExtent3D extent, VkFormat format, VkImageCreateFlags2KHR flags,
+                              VkImageType image_type, uint32_t array_layers, VkImageAspectFlags aspect_mask, uint32_t mip_level,
+                              bool layer_only) {
     // Return zero extent if mip level doesn't exist
-    if (mip_level >= ci.mipLevels) {
+    if (mip_level >= mip_levels) {
         return VkExtent3D{0, 0, 0};
     }
 
-    VkExtent3D extent = ci.extent;
-
     // If multi-plane, adjust per-plane extent
-    const VkFormat format = ci.format;
     if (vkuFormatIsMultiplane(format)) {
         VkExtent2D divisors = vkuFindMultiplaneExtentDivisors(format, static_cast<VkImageAspectFlagBits>(aspect_mask));
         extent.width /= divisors.width;
@@ -71,7 +70,7 @@ VkExtent3D GetEffectiveExtent(const VkImageCreateInfo &ci, const VkImageAspectFl
 
     // Mip Maps
     {
-        const uint32_t corner = (ci.flags & VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV) ? 1 : 0;
+        const uint32_t corner = (flags & VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV) ? 1 : 0;
         const uint32_t min_size = 1 + corner;
         const uint32_t round_up_nudge = corner ? static_cast<uint32_t>((1 << mip_level) - 1) : 0u;
 
@@ -90,11 +89,36 @@ VkExtent3D GetEffectiveExtent(const VkImageCreateInfo &ci, const VkImageAspectFl
     }
 
     // Image arrays have an effective z extent that isn't diminished by mip level
-    if (VK_IMAGE_TYPE_3D != ci.imageType) {
-        extent.depth = ci.arrayLayers;
+    // Some cases (https://gitlab.khronos.org/vulkan/vulkan/-/issues/4819) we want only 1 layer's extent
+    if (VK_IMAGE_TYPE_3D != image_type && !layer_only) {
+        extent.depth = array_layers;
     }
 
     return extent;
+}
+
+// Currently only used by the testing framework
+VkExtent3D GetEffectiveExtent(const VkImageCreateInfo& ci, const VkImageAspectFlags aspect_mask, const uint32_t mip_level) {
+    return GetEffectiveExtent(ci.mipLevels, ci.extent, ci.format, ci.flags, ci.imageType, ci.arrayLayers, aspect_mask, mip_level,
+                              false);
+}
+
+std::optional<VkImageUsageFlags2KHR> GetImageStencilUsageFlags(const void* pNext) {
+    if (const auto stencil_usage_2 = vku::FindStructInPNextChain<VkImageStencilUsage2CreateInfoKHR>(pNext)) {
+        return stencil_usage_2->stencilUsage;
+    } else if (const auto stencil_usage = vku::FindStructInPNextChain<VkImageStencilUsageCreateInfo>(pNext)) {
+        return stencil_usage->stencilUsage;
+    }
+    return std::nullopt;
+}
+
+std::optional<VkImageUsageFlags2KHR> GetImageViewUsageFlags(const VkImageViewCreateInfo& create_info) {
+    if (const auto usage_create_info_2 = vku::FindStructInPNextChain<VkImageViewUsage2CreateInfoKHR>(create_info.pNext)) {
+        return usage_create_info_2->usage;
+    } else if (const auto usage_create_info = vku::FindStructInPNextChain<VkImageViewUsageCreateInfo>(create_info.pNext)) {
+        return usage_create_info->usage;
+    }
+    return std::nullopt;
 }
 
 // Returns true if [x, x + x_size) and [y, y + y_size) overlap
@@ -170,10 +194,10 @@ uint32_t GetTexelBufferFormatSize(VkFormat format) {
 
 // Used to get the VkExternalFormatANDROID without having to use ifdef in logic
 // Result of zero is same of not having pNext struct
-uint64_t GetExternalFormat(const void *pNext) {
+uint64_t GetExternalFormat(const void* pNext) {
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
     if (pNext) {
-        const auto *external_format = vku::FindStructInPNextChain<VkExternalFormatANDROID>(pNext);
+        const auto* external_format = vku::FindStructInPNextChain<VkExternalFormatANDROID>(pNext);
         if (external_format) {
             return external_format->externalFormat;
         }
@@ -279,17 +303,16 @@ bool IsImageLayoutStencilReadOnly(VkImageLayout layout) {
                        [layout](const VkImageLayout read_only_layout) { return layout == read_only_layout; });
 }
 
-bool IsDepthSliceView(const VkImageCreateInfo &image_create_info, VkImageViewType view_type) {
-    constexpr VkImageCreateFlags depth_slice_view_flags =
+bool IsDepthSliceView(VkImageType imageType, VkImageCreateFlags2KHR imageCreateFlags, VkImageViewType view_type) {
+    constexpr VkImageCreateFlags2KHR depth_slice_view_flags =
         VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT | VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
 
-    const bool image_supports_depth_slice_view =
-        image_create_info.imageType == VK_IMAGE_TYPE_3D && (image_create_info.flags & depth_slice_view_flags) != 0;
+    const bool image_supports_depth_slice_view = imageType == VK_IMAGE_TYPE_3D && (imageCreateFlags & depth_slice_view_flags) != 0;
 
     return image_supports_depth_slice_view && (view_type == VK_IMAGE_VIEW_TYPE_2D || view_type == VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 }
 
-bool CanTransitionDepthSlices(const DeviceExtensions &extensions, const VkImageCreateInfo &create_info) {
-    return IsExtEnabled(extensions.vk_khr_maintenance9) && create_info.imageType == VK_IMAGE_TYPE_3D &&
-           (create_info.flags & VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT) != 0;
+bool CanTransitionDepthSlices(const DeviceExtensions& extensions, VkImageType imageType, VkImageCreateFlags2KHR imageCreateFlags) {
+    return IsExtEnabled(extensions.vk_khr_maintenance9) && imageType == VK_IMAGE_TYPE_3D &&
+           (imageCreateFlags & VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT) != 0;
 }

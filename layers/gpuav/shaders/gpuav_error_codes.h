@@ -30,7 +30,6 @@ namespace glsl {
 // Note - We currently have a max of 256 slots for error groups (see kHeader_ShaderIdErrorOffset)
 const int kErrorGroup_InstDescriptorIndexingOOB = 1;
 const int kErrorGroup_InstBufferDeviceAddress = 2;
-const int kErrorGroup_InstRayQuery = 3;
 const int kErrorGroup_GpuPreDraw = 4;
 const int kErrorGroup_GpuPreDispatch = 5;
 const int kErrorGroup_GpuPreTraceRays = 6;
@@ -41,7 +40,9 @@ const int kErrorGroup_GpuCopyMemoryIndirect = 10;
 const int kErrorGroup_InstSanitizer = 11;
 const int kErrorGroup_GpuPreBuildAccelerationStructures = 12;
 const int kErrorGroup_InstMeshShading = 13;
-const int kErrorGroup_InstRayHitObject = 14;
+const int kErrorGroup_SharedMemoryDataRace = 15;
+const int kErrorGroup_TraceRay = 16;
+const int kErrorGroup_InstDescriptorHeap = 17;
 
 // We just take ExecutionModel and normalize it so we only use 5 bits to store it
 const int kExecutionModel_Vertex = 0;
@@ -78,29 +79,25 @@ const int kErrorSubCode_DescriptorClass_TexelBufferBounds = 2;
 // Buffers, but with Cooperative Matrix
 const int kErrorSubCode_DescriptorClass_GeneralBufferCoopMatBounds = 3;
 
+// Descriptor Heap
+//
+const int kErrorSubCode_DescriptorHeap_HeapOOB = 1;
+const int kErrorSubCode_DescriptorHeap_ReservedRange = 2;
+const int kErrorSubCode_DescriptorHeap_DescriptorAlignment = 3;
+const int kErrorSubCode_DescriptorHeap_DescriptorAlignmentUntyped = 4;
+const int kErrorSubCode_DescriptorHeap_IndirectIndexPushAlignment = 5;
+const int kErrorSubCode_DescriptorHeap_IndirectAddressPushAlignment = 6;
+const int kErrorSubCode_DescriptorHeap_AddressBufferAlignment = 7;
+const int kErrorSubCode_DescriptorHeap_InvalidDeviceAddress = 8;
+const int kErrorSubCode_DescriptorHeap_InvalidDeviceAddressResource = 9;
+const int kErrorSubCode_DescriptorHeap_HeapBufferAlignment = 10;
+
 // Buffer Device Address
 //
 const int kErrorSubCode_BufferDeviceAddress_UnallocRef = 1;
 const int kErrorSubCode_BufferDeviceAddress_Alignment = 2;
 
-// Ray Query
-//
-const int kErrorSubCode_RayQuery_NegativeMin = 1;
-const int kErrorSubCode_RayQuery_NegativeMax = 2;
-const int kErrorSubCode_RayQuery_BothSkip = 3;
-const int kErrorSubCode_RayQuery_SkipCull = 4;
-const int kErrorSubCode_RayQuery_Opaque = 5;
-const int kErrorSubCode_RayQuery_MinMax = 6;
-const int kErrorSubCode_RayQuery_MinNaN = 7;
-const int kErrorSubCode_RayQuery_MaxNaN = 8;
-const int kErrorSubCode_RayQuery_OriginNaN = 9;
-const int kErrorSubCode_RayQuery_DirectionNaN = 10;
-const int kErrorSubCode_RayQuery_OriginFinite = 11;
-const int kErrorSubCode_RayQuery_DirectionFinite = 12;
-
-// Ray Hit Object (VK_EXT_ray_tracing_invocation_reorder)
-// OpHitObjectTraceRayEXT, OpHitObjectTraceReorderExecuteEXT, OpHitObjectTraceRayMotionEXT,
-// OpHitObjectTraceMotionReorderExecuteEXT, OpHitObjectSetShaderBindingTableRecordIndexEXT
+// Ray Tracing
 //
 const int kErrorSubCode_RayHitObject_NegativeMin = 1;
 const int kErrorSubCode_RayHitObject_NegativeMax = 2;
@@ -118,10 +115,42 @@ const int kErrorSubCode_RayHitObject_SkipTrianglesWithPipelineSkipAABBs = 13;
 const int kErrorSubCode_RayHitObject_SkipAABBsWithPipelineSkipTriangles = 14;
 const int kErrorSubCode_RayHitObject_TimeOutOfRange = 15;
 const int kErrorSubCode_RayHitObject_SBTIndexExceedsLimit = 16;
+const int kErrorSubCode_TraceRay_TrianglesFlags = 17;
+const int kErrorSubCode_TraceRay_OpaqueFlags = 18;
+const int kErrorSubCode_TraceRay_BothSkip = 19;
+const int kErrorSubCode_TraceRay_OriginNaNOrInf = 20;
+const int kErrorSubCode_TraceRay_DirectionNaNOrInf = 21;
+const int kErrorSubCode_TraceRay_TNegative = 22;
+const int kErrorSubCode_TraceRay_TMaxLessThanTMin = 23;
+const int kErrorSubCode_TraceRay_RayParametersNans = 24;
+const int kErrorSubCode_TraceRay_TlasNotBuilt = 25;
+const int kErrorSubCode_TraceRay_SkipTrianglesWithPipelineSkipAABBs = 26;
+const int kErrorSubCode_TraceRay_SkipAABBsWithPipelineSkipTriangles = 27;
+const int kErrorSubCode_RayQuery_NegativeMin = 28;
+const int kErrorSubCode_RayQuery_NegativeMax = 29;
+const int kErrorSubCode_RayQuery_BothSkip = 30;
+const int kErrorSubCode_RayQuery_SkipCull = 31;
+const int kErrorSubCode_RayQuery_Opaque = 32;
+const int kErrorSubCode_RayQuery_MinMax = 33;
+const int kErrorSubCode_RayQuery_MinNaN = 34;
+const int kErrorSubCode_RayQuery_MaxNaN = 35;
+const int kErrorSubCode_RayQuery_OriginNaN = 36;
+const int kErrorSubCode_RayQuery_DirectionNaN = 37;
+const int kErrorSubCode_RayQuery_OriginFinite = 38;
+const int kErrorSubCode_RayQuery_DirectionFinite = 39;
+const int kErrorSubCode_RayQuery_TlasNotBuilt = 40;
+const int kErrorSubCode_ReportIntersection_HitKindOutOfRange = 41;
+
+// Shared Memory Data Race
+const int kErrorSubCode_SharedMemoryDataRace_RaceOnStore = 1;
+const int kErrorSubCode_SharedMemoryDataRace_RaceOnLoad = 2;
+const int kErrorSubCode_SharedMemoryDataRace_RaceOnLoadStoreVsAtomic = 3;
+const int kErrorSubCode_SharedMemoryDataRace_RaceOnAtomic = 4;
 
 // MeshShading
 //
 const int kErrorSubCode_MeshShading_SetMeshOutputs = 1;
+const int kErrorSubCode_MeshShading_TaskPayloadAlways = 2;
 
 // Indexed Draw
 //
@@ -136,7 +165,8 @@ const int kErrorSubCode_Sanitizer_ImageGather = 2;
 const int kErrorSubCode_Sanitizer_Pow = 3;
 const int kErrorSubCode_Sanitizer_Atan2 = 4;
 const int kErrorSubCode_Sanitizer_Fminmax = 5;
-const int kErrorSubCode_Sanitizer_Count = 6;  // update when adding new item
+const int kErrorSubCode_Sanitizer_CoopMatAlignment = 6;
+const int kErrorSubCode_Sanitizer_Count = 7;  // update when adding new item
 
 // Pre Draw
 //
@@ -197,6 +227,9 @@ const int kErrorSubCode_PreBuildAccelerationStructures_MinMaxAabb_X = 8;
 const int kErrorSubCode_PreBuildAccelerationStructures_MinMaxAabb_Y = 9;
 const int kErrorSubCode_PreBuildAccelerationStructures_MinMaxAabb_Z = 10;
 const int kErrorSubCode_PreBuildAccelerationStructures_Transform = 11;
+const int kErrorSubCode_PreBuildAccelerationStructures_IndexBufferUpdated = 12;
+const int kErrorSubCode_PreBuildAccelerationStructures_VertexBufferActiveStatusUpdated = 13;
+const int kErrorSubCode_PreBuildAccelerationStructures_AabbBufferActiveStatusUpdated = 14;
 
 #ifdef __cplusplus
 }  // namespace glsl

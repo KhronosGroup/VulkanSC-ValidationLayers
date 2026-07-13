@@ -2,8 +2,8 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023-2025 LunarG, Inc.
- * Copyright (c) 2023-2025 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class PositiveShaderImageAccess : public VkLayerTest {};
 
@@ -23,7 +23,7 @@ TEST_F(PositiveShaderImageAccess, FunctionParameterToVariable) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : enable
         layout(set = 0, binding = 0) uniform texture2D texture_image;
@@ -51,7 +51,7 @@ TEST_F(PositiveShaderImageAccess, MultipleFunctionParameterToVariable) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : enable
         layout(set = 0, binding = 0) uniform texture2D texture_image;
@@ -84,7 +84,7 @@ TEST_F(PositiveShaderImageAccess, DifferentFunctionParameterToVariable) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : enable
 
@@ -118,7 +118,7 @@ TEST_F(PositiveShaderImageAccess, FunctionParameterToLoad) {
     //    int foo(texture2D func_texture) { return textureSize(func_texture, 0).x; }
     //    void main() {  int x = foo(texture_image); }
     // But replaced so the OpFunctionCall takes a OpLoad instead of OpVariable
-    const char *csSource = R"(
+    const char* csSource = R"(
                OpCapability Shader
                OpCapability ImageQuery
                OpMemoryModel Logical GLSL450
@@ -171,7 +171,7 @@ TEST_F(PositiveShaderImageAccess, FunctionParameterToVariableSampledImage) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : enable
 
@@ -205,7 +205,7 @@ TEST_F(PositiveShaderImageAccess, FunctionParameterToLoadSampledImage) {
     //    int foo(texture2D func_texture) { return texture(sampler2D(func_texture,  func_sampler), vec2(0.0)); }
     //    void main() {  vec4 x = foo(texture_image, sampler_descriptor); }
     // But replaced so the OpFunctionCall takes a OpLoad instead of OpVariable
-    const char *csSource = R"(
+    const char* csSource = R"(
                 OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main"
@@ -268,7 +268,7 @@ TEST_F(PositiveShaderImageAccess, CopyObjectFromLoad) {
     // This is simple
     //    int x = textureSize(texture_image, 0).x;
     // but with inserted OpCopyObject calls
-    const char *csSource = R"(
+    const char* csSource = R"(
                OpCapability Shader
                OpCapability ImageQuery
                OpMemoryModel Logical GLSL450
@@ -314,7 +314,7 @@ TEST_F(PositiveShaderImageAccess, UndefImage) {
 
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"(
+    const char* csSource = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main"
@@ -365,7 +365,7 @@ TEST_F(PositiveShaderImageAccess, ComponentTypeMismatchFunctionTwoArgs) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform isampler2D s; // not accessed (so ignored)
         layout(set=0, binding=1) uniform usampler2D u; // accessed
@@ -447,7 +447,7 @@ TEST_F(PositiveShaderImageAccess, SamplerNeverAccessed) {
     sampler_ci.compareEnable = VK_FALSE;
     vkt::Sampler sampler(*m_device, sampler_ci);
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout (set=0, binding=0) uniform sampler2D bad; // never accessed
         layout (set=0, binding=1) uniform sampler2D good;
@@ -492,7 +492,7 @@ TEST_F(PositiveShaderImageAccess, DISABLED_ExtraUnusedInvalidDescriptor) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 460
         layout (set = 1, binding = 0) uniform textureCube kTexturesCube[2];
         layout (set = 0, binding = 1) uniform sampler kSamplers;
@@ -550,7 +550,7 @@ TEST_F(PositiveShaderImageAccess, FunctionDescriptorIndexing) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 460
         layout (set = 0, binding = 0) uniform sampler2D tex[3];
         layout (location=0) out vec4 color;
@@ -603,7 +603,7 @@ TEST_F(PositiveShaderImageAccess, AliasImageBinding) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7677");
     RETURN_IF_SKIP(Init());
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
 

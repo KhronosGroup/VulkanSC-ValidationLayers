@@ -15,11 +15,11 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/shader_object_helper.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/gpu_av_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "shader_object_helper.h"
+#include "descriptor_helper.h"
+#include "gpu_av_helper.h"
 
 class NegativeGpuAV : public GpuAVTest {};
 
@@ -128,12 +128,12 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersRegex) {
     AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
     std::vector<VkLayerSettingEXT> layer_settings(2);
     layer_settings[0] = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
-    std::array<const char *, 2> shader_regexes = {{"vertex_foo", "fragment_.*"}};
+    std::array<const char*, 2> shader_regexes = {{"vertex_foo", "fragment_.*"}};
     layer_settings[1] = {OBJECT_LAYER_NAME, "gpuav_shaders_to_instrument", VK_LAYER_SETTING_TYPE_STRING_EXT, size32(shader_regexes),
                          shader_regexes.data()};
 
     RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
-    InitState();
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     vkt::Buffer write_buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
@@ -189,6 +189,228 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersRegex) {
 }
 
 // Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedComputePipelineRegex) {
+    TEST_DESCRIPTION("Selectively instrument a compute pipeline for validation, using regexes");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    std::vector<VkLayerSettingEXT> layer_settings(2);
+    layer_settings[0] = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
+    std::array<const char*, 1> shader_regexes = {{"pipeline_foo"}};
+    layer_settings[1] = {OBJECT_LAYER_NAME, "gpuav_shaders_to_instrument", VK_LAYER_SETTING_TYPE_STRING_EXT, size32(shader_regexes),
+                         shader_regexes.data()};
+
+    RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Buffer write_buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorBufferInfo(0, write_buffer, 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char cs_source[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;
+        void main() {
+                Data.data[4] = 0xdeadca71;
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main");
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
+    name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
+    name_info.pObjectName = "pipeline_foo";
+    name_info.objectHandle = uint64_t(pipe.Handle());
+    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDispatch-storageBuffers-06936", "pipeline_foo");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedPipelineLibrariesRegex) {
+    TEST_DESCRIPTION(
+        "Use one library to link two pipelines. Destroy first one before creating second one. Second one should be instrumented.");
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    std::vector<VkLayerSettingEXT> layer_settings(2);
+    layer_settings[0] = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
+    std::array<const char*, 1> shader_regexes = {{"pipeline_foo"}};
+    layer_settings[1] = {OBJECT_LAYER_NAME, "gpuav_shaders_to_instrument", VK_LAYER_SETTING_TYPE_STRING_EXT, size32(shader_regexes),
+                         shader_regexes.data()};
+
+    RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                  {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorBufferInfo(0, offset_buffer, 0, VK_WHOLE_SIZE);
+    descriptor_set.WriteDescriptorBufferInfo(1, write_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    uint32_t* data = (uint32_t*)offset_buffer.Memory().Map();
+    *data = 8;
+
+    const char vertshader[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform Foo { uint index[]; };
+        layout(set = 0, binding = 1) buffer StorageBuffer { uint data[]; };
+        void main() {
+            uint index = index[0];
+            data[index] = 0xdeadca71;
+        }
+    )glsl";
+
+    // Create VkShaderModule to pass in
+    VkShaderObj vs(*m_device, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper vertex_input_lib(*this);
+    vertex_input_lib.InitVertexInputLibInfo();
+    vertex_input_lib.CreateGraphicsPipeline(false);
+
+    // For GPU-AV tests this shrinks things so only a single fragment is executed
+    VkViewport viewport = {0, 0, 1, 1, 0, 1};
+    VkRect2D scissor = {{0, 0}, {1, 1}};
+
+    CreatePipelineHelper pre_raster_lib(*this);
+    {
+        pre_raster_lib.InitPreRasterLibInfo(&vs.GetStageCreateInfo());
+        pre_raster_lib.vp_state_ci_.pViewports = &viewport;
+        pre_raster_lib.vp_state_ci_.pScissors = &scissor;
+        pre_raster_lib.gp_ci_.layout = pipeline_layout;
+        pre_raster_lib.CreateGraphicsPipeline();
+    }
+
+    CreatePipelineHelper frag_shader_lib(*this);
+    {
+        frag_shader_lib.InitFragmentLibInfo(&fs.GetStageCreateInfo());
+        frag_shader_lib.gp_ci_.layout = pipeline_layout;
+        frag_shader_lib.CreateGraphicsPipeline(false);
+    }
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo();
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    VkPipeline libraries[4] = {
+        vertex_input_lib,
+        pre_raster_lib,
+        frag_shader_lib,
+        frag_out_lib,
+    };
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = size32(libraries);
+    link_info.pLibraries = libraries;
+
+    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
+    exe_pipe_ci.layout = pipeline_layout;
+    { vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci); }
+    vkt::Pipeline exe_pipe_2(*m_device, exe_pipe_ci);
+
+    VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
+    name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
+    name_info.pObjectName = "pipeline_foo";
+    name_info.objectHandle = uint64_t(exe_pipe_2.handle());
+    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe_2);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDraw-storageBuffers-06936", "pipeline_foo", 3);
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedGraphicsPipelineRegex) {
+    TEST_DESCRIPTION("Selectively instrument a pipeline for validation, using regexes");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    std::vector<VkLayerSettingEXT> layer_settings(2);
+    layer_settings[0] = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
+    std::array<const char*, 1> shader_regexes = {{"pipeline_foo"}};
+    layer_settings[1] = {OBJECT_LAYER_NAME, "gpuav_shaders_to_instrument", VK_LAYER_SETTING_TYPE_STRING_EXT, size32(shader_regexes),
+                         shader_regexes.data()};
+
+    RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::Buffer write_buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorBufferInfo(0, write_buffer, 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+    const char vertshader[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;
+        void main() {
+                Data.data[4] = 0xdeadca71;
+        }
+        )glsl";
+
+    VkShaderObj vs(*m_device, vertshader, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main");
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr,
+                   "main");
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+
+    pipe.gp_ci_.layout = pipeline_layout;
+    pipe.CreateGraphicsPipeline();
+
+    VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
+    name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
+
+    name_info.pObjectName = "pipeline_foo";
+    name_info.objectHandle = uint64_t(pipe.Handle());
+    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDraw-storageBuffers-06936", "pipeline_foo", 3);
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersRegexDestroyedShaders) {
     TEST_DESCRIPTION(
         "Selectively instrument shaders for validation, using regexes: all shaders matching regexes must be instrumented. Here it "
@@ -198,12 +420,12 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersRegexDestroyedShaders) {
     AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
     std::vector<VkLayerSettingEXT> layer_settings(2);
     layer_settings[0] = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
-    std::array<const char *, 2> shader_regexes = {{"vertex_foo", "fragment_.*"}};
+    std::array<const char*, 2> shader_regexes = {{"vertex_foo", "fragment_.*"}};
     layer_settings[1] = {OBJECT_LAYER_NAME, "gpuav_shaders_to_instrument", VK_LAYER_SETTING_TYPE_STRING_EXT, size32(shader_regexes),
                          shader_regexes.data()};
 
     RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
-    InitState();
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     vkt::Buffer write_buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
@@ -329,6 +551,103 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersShaderObject) {
 }
 
 // Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShadersShaderObjectDrawIndexedIndirect2KHR) {
+    TEST_DESCRIPTION("GPU validation: Validate selection of which shaders get instrumented for GPU-AV");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::deviceAddressCommands);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+
+    std::vector<VkLayerSettingEXT> layer_settings = {
+        {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue}};
+    RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
+    RETURN_IF_SKIP(InitState());
+    InitDynamicRenderTarget();
+
+    OneOffDescriptorSet vert_descriptor_set(m_device,
+                                            {
+                                                {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
+                                            });
+    vkt::PipelineLayout pipeline_layout(*m_device, {&vert_descriptor_set.layout_});
+
+    const char vert_src[] = R"glsl(
+        #version 460
+        layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;
+        void main() {
+            Data.data[4] = 0xdeadca71;
+        }
+    )glsl";
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert_src);
+    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    VkDescriptorSetLayout descriptor_set_layouts[] = {vert_descriptor_set.layout_};
+
+    VkShaderCreateInfoEXT vert_create_info = ShaderCreateInfo(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, 1, descriptor_set_layouts);
+    VkShaderCreateInfoEXT frag_create_info = ShaderCreateInfo(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT, 1, descriptor_set_layouts);
+
+    VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT};
+    VkValidationFeaturesEXT features = vku::InitStructHelper();
+    features.enabledValidationFeatureCount = 1;
+    features.pEnabledValidationFeatures = enabled;
+    vert_create_info.pNext = &features;
+    frag_create_info.pNext = &features;
+
+    const vkt::Shader vert_shader(*m_device, vert_create_info);
+    const vkt::Shader frag_shader(*m_device, frag_create_info);
+
+    vkt::Buffer buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    vert_descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    vert_descriptor_set.UpdateDescriptorSets();
+
+    vkt::Buffer index_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, vkt::device_address);
+    uint32_t* index_data = reinterpret_cast<uint32_t*>(index_buffer.Memory().Map());
+    index_data[0] = 0u;
+    index_data[1] = 1u;
+    index_data[2] = 2u;
+
+    vkt::Buffer indirect_buffer(*m_device, 32, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
+    VkDrawIndexedIndirectCommand* draw_command = reinterpret_cast<VkDrawIndexedIndirectCommand*>(indirect_buffer.Memory().Map());
+    draw_command->indexCount = 3u;
+    draw_command->instanceCount = 1u;
+    draw_command->firstIndex = 0u;
+    draw_command->vertexOffset = 0u;
+    draw_command->firstInstance = 0u;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0u, 1u, &vert_descriptor_set.set_,
+                              0u, nullptr);
+
+    VkBindIndexBuffer3InfoKHR index_buffer_info = vku::InitStructHelper();
+    index_buffer_info.addressRange = index_buffer.AddressRange();
+    index_buffer_info.addressFlags = VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR;
+    index_buffer_info.indexType = VK_INDEX_TYPE_UINT32;
+    vk::CmdBindIndexBuffer3KHR(m_command_buffer, &index_buffer_info);
+
+    VkDrawIndirect2InfoKHR draw_indirect_info = vku::InitStructHelper();
+    draw_indirect_info.addressRange = indirect_buffer.StridedAddressRange();
+    draw_indirect_info.addressFlags = VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR;
+    draw_indirect_info.drawCount = 1u;
+    vk::CmdDrawIndexedIndirect2KHR(m_command_buffer, &draw_indirect_info);
+
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    // Should get a warning since shader was instrumented
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexedIndirect2KHR-None-08613", 3);
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
     TEST_DESCRIPTION("Don't reserve a descriptor slot and proceed to use them all so GPU-AV can't");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -350,7 +669,7 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
@@ -364,7 +683,7 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
         m_errorMonitor->SetDesiredWarning(
             "This Pipeline Layout has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
             "pipelines created with it");
-        std::vector<const vkt::DescriptorSetLayout *> empty_layouts(set_limit);
+        std::vector<const vkt::DescriptorSetLayout*> empty_layouts(set_limit);
         for (uint32_t i = 0; i < set_limit; i++) {
             empty_layouts[i] = &descriptor_set.layout_;
         }
@@ -373,13 +692,13 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
     }
 
     // Reduce by one (so there is room now) and do something invalid. (To make sure things still work as expected)
-    std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit - 1);
+    std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit - 1);
     for (uint32_t i = 0; i < set_limit - 1; i++) {
         layouts[i] = &descriptor_set.layout_;
     }
     vkt::PipelineLayout pipe_layout(*m_device, layouts);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -424,7 +743,7 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineReserved) {
 
     vkt::Buffer index_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer storage_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(storage_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(storage_buffer.Memory().Map());
     data[0] = index_buffer.Address();
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
@@ -439,7 +758,7 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineReserved) {
         m_errorMonitor->SetDesiredWarning(
             "This Pipeline Layout has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
             "pipelines created with it");
-        std::vector<const vkt::DescriptorSetLayout *> empty_layouts(set_limit);
+        std::vector<const vkt::DescriptorSetLayout*> empty_layouts(set_limit);
         for (uint32_t i = 0; i < set_limit; i++) {
             empty_layouts[i] = &descriptor_set.layout_;
         }
@@ -448,13 +767,13 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineReserved) {
     }
 
     // Reduce by one (so there is room now) and do something invalid. (To make sure things still work as expected)
-    std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit - 1);
+    std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit - 1);
     for (uint32_t i = 0; i < set_limit - 1; i++) {
         layouts[i] = &descriptor_set.layout_;
     }
     vkt::PipelineLayout pipe_layout(*m_device, layouts);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -540,7 +859,7 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineLayout) {
     // Add one to use the descriptor slot we tried to reserve
     const uint32_t set_limit = m_device->Physical().limits_.maxBoundDescriptorSets + 1;
 
-    std::vector<const vkt::DescriptorSetLayout *> empty_layouts(set_limit);
+    std::vector<const vkt::DescriptorSetLayout*> empty_layouts(set_limit);
     for (uint32_t i = 0; i < set_limit; i++) {
         empty_layouts[i] = &descriptor_set.layout_;
     }
@@ -548,7 +867,7 @@ TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineLayout) {
     m_errorMonitor->SetAllowedFailureMsg("This Pipeline Layout has too many descriptor sets");
     vkt::PipelineLayout bad_pipe_layout(*m_device, empty_layouts);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer foo {
             int x;
@@ -661,7 +980,7 @@ TEST_F(NegativeGpuAV, DISABLED_LeakedResource) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout (set = 0, binding = 0) uniform sampler2D samplerColor[2];
         void main() {

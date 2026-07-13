@@ -149,16 +149,15 @@ class Tracker : public Logger {
     bool is_device_maintenance4_enabled_ = false;
 };
 
-class Instance : public vvl::base::Instance {
+class Instance : public vvl::BaseInstance {
   public:
-    using BaseClass = vvl::base::Instance;
     using Func = vvl::Func;
     using Struct = vvl::Struct;
     using Field = vvl::Field;
 
     Tracker tracker;
 
-    Instance(vvl::dispatch::Instance *dispatch);
+    Instance(vvl::DispatchInstance* dispatch);
     ~Instance();
 
     void DestroyLeakedObjects();
@@ -191,8 +190,7 @@ class Instance : public vvl::base::Instance {
 #include "generated/object_tracker_instance_methods.h"
 };
 
-class Device : public vvl::base::Device {
-    using BaseClass = vvl::base::Device;
+class Device : public vvl::BaseDevice {
     using Func = vvl::Func;
     using Struct = vvl::Struct;
     using Field = vvl::Field;
@@ -212,7 +210,7 @@ class Device : public vvl::base::Device {
     ObjectMapGPL linked_graphics_pipeline_map;
 
     // Constructor for object lifetime tracking
-    Device(vvl::dispatch::Device *dev, Instance *instance);
+    Device(vvl::DispatchDevice *dev, Instance *instance);
     ~Device();
 
     void FinishDeviceSetup(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) override;

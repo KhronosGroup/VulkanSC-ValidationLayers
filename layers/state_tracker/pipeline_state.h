@@ -26,6 +26,8 @@
 #include "state_tracker/state_tracker.h"
 #include "state_tracker/shader_stage_state.h"
 
+#include "gpuav/spirv/instrumentation_status.h"
+
 // Fwd declarations -- including descriptor_set.h creates an ugly include loop
 namespace vvl {
 class DescriptorSetLayoutDef;
@@ -149,18 +151,6 @@ class Pipeline : public StateObject, public SubStateManager<PipelineSubState> {
     mutable bool binary_data_released = false;
 
     const uint32_t descriptor_heap_embedded_samplers_count;
-
-    // TODO - Because we have hack to create a pipeline at PreCallValidate time (for GPL) we have no proper way to create inherited
-    // state objects of the pipeline This is to make it clear that while currently everyone has to allocate this memory, it is only
-    // meant for GPU-AV
-    struct InstrumentationData {
-        // We create a VkShaderModule that is instrumented and it needs to be destroyed before leaving the pipeline call
-        std::vector<VkShaderModule> shader_modules;
-        bool was_instrumented = false;
-        // When we instrument GPL at link time, we need to hold the libraries created by GPU-AV
-        // so they can be re-used
-        VkPipeline instrumented_pipeline_lib = VK_NULL_HANDLE;
-    } instrumentation_data;
 
     Pipeline(const DeviceState &state_data, const VkGraphicsPipelineCreateInfo *pCreateInfo,
              std::shared_ptr<const vvl::PipelineCache> pipe_cache, std::shared_ptr<const vvl::RenderPass> &&rpstate,
@@ -557,6 +547,15 @@ class Pipeline : public StateObject, public SubStateManager<PipelineSubState> {
         return false;
     }
     static uint32_t CountDescriptorHeapEmbeddedSamplers(const Pipeline& pipe_state);
+
+    const ShaderStageState* GetShaderStageState(VkShaderStageFlagBits stage) const {
+        for (const ShaderStageState& shader_stage_state : stage_states) {
+            if (shader_stage_state.GetStage() == stage) {
+                return &shader_stage_state;
+            }
+        }
+        return nullptr;
+    }
 
   protected:
     static std::shared_ptr<VertexInputState> CreateVertexInputState(const Pipeline &p, const DeviceState &state,

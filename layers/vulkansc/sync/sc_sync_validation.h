@@ -28,7 +28,7 @@ class Instance : public vvl::sc::InstanceProxy<syncval::Instance> {
     using BaseClass = vvl::sc::InstanceProxy<syncval::Instance>;
 
   public:
-    Instance(vvl::dispatch::Instance *dispatch) : BaseClass(dispatch) {}
+    Instance(vvl::DispatchInstance *dispatch) : BaseClass(dispatch) {}
 };
 
 class Device : public vvl::sc::DeviceProxy<SyncValidator> {
@@ -36,7 +36,7 @@ class Device : public vvl::sc::DeviceProxy<SyncValidator> {
     using BaseClass = vvl::sc::DeviceProxy<SyncValidator>;
 
   public:
-    Device(vvl::dispatch::Device *dev, syncval::sc::Instance *instance_vo) : BaseClass(dev, instance_vo) {}
+    Device(vvl::DispatchDevice *dev, syncval::sc::Instance *instance_vo) : BaseClass(dev, instance_vo) {}
 };
 
 }  // namespace syncval::sc

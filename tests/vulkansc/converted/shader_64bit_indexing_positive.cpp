@@ -11,9 +11,9 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/shader_object_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "shader_object_helper.h"
 
 class PositiveShader64BitIndexing : public VkLayerTest {};
 
@@ -25,7 +25,7 @@ TEST_F(PositiveShader64BitIndexing, PragmaEnableLength64) {
     AddRequiredExtensions(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_64bit_indexing : enable
         #pragma shader_64bit_indexing
@@ -47,7 +47,7 @@ TEST_F(PositiveShader64BitIndexing, PipelineEnableLength64) {
     AddRequiredExtensions(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_64bit_indexing : enable
         layout(set = 0, binding = 0) readonly buffer B { float x[]; } b;
@@ -75,7 +75,7 @@ TEST_F(PositiveShader64BitIndexing, ShaderObjectEnableLength64) {
     AddRequiredExtensions(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_shader_64bit_indexing : enable
         layout(set = 0, binding = 0) readonly buffer B { float x[]; } b;
@@ -103,7 +103,7 @@ TEST_F(PositiveShader64BitIndexing, UntypedPointerLength64) {
     AddRequiredFeature(vkt::Feature::shaderUntypedPointers);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"(
+    const char* cs_source = R"(
                OpCapability Shader
                OpCapability UntypedPointersKHR
                OpCapability Int64
@@ -156,7 +156,7 @@ TEST_F(PositiveShader64BitIndexing, CoopVecMul) {
     AddRequiredExtensions(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_NV_cooperative_vector : enable
         #extension GL_EXT_shader_explicit_arithmetic_types : enable
@@ -191,7 +191,7 @@ TEST_F(PositiveShader64BitIndexing, CoopVecLoad) {
     AddRequiredExtensions(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_NV_cooperative_vector : enable
         #extension GL_EXT_shader_explicit_arithmetic_types : enable
@@ -224,7 +224,7 @@ TEST_F(PositiveShader64BitIndexing, ConstantSizeOfLength64) {
     AddRequiredFeature(vkt::Feature::shaderUntypedPointers);
     RETURN_IF_SKIP(Init());
 
-    const char *cs_source = R"(
+    const char* cs_source = R"(
                OpCapability Shader
                OpCapability UntypedPointersKHR
                OpCapability DescriptorHeapEXT

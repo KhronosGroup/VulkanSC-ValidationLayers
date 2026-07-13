@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
- * Copyright (c) 2023-2025 Collabora, Inc.
+ * Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
+ * Copyright (c) 2023-2026 Collabora, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 
 class PositiveSparseImage : public VkLayerTest {};
 
@@ -212,8 +212,8 @@ TEST_F(PositiveSparseImage, DISABLED_BindMetadata) {
     vk::GetImageSparseMemoryRequirements(device(), image, &sparse_reqs_count, sparse_reqs.data());
 
     // Find requirements for metadata aspect
-    const VkSparseImageMemoryRequirements *metadata_reqs = nullptr;
-    for (auto const &aspect_sparse_reqs : sparse_reqs) {
+    const VkSparseImageMemoryRequirements* metadata_reqs = nullptr;
+    for (auto const& aspect_sparse_reqs : sparse_reqs) {
         if ((aspect_sparse_reqs.formatProperties.aspectMask & VK_IMAGE_ASPECT_METADATA_BIT) != 0) {
             metadata_reqs = &aspect_sparse_reqs;
         }
@@ -288,7 +288,7 @@ TEST_F(PositiveSparseImage, DISABLED_OpImageSparse) {
     ds.WriteDescriptorImageInfo(0, image_view, sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     ds.UpdateDescriptorSets();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         #extension GL_ARB_sparse_texture2 : enable
 
@@ -360,7 +360,7 @@ TEST_F(PositiveSparseImage, DISABLED_BindImage) {
     bind_info.imageBindCount = 1;
     bind_info.pImageBinds = &image_memory_bind_info;
 
-    vkt::Queue *sparse_queue = m_device->QueuesWithSparseCapability()[0];
+    vkt::Queue* sparse_queue = m_device->QueuesWithSparseCapability()[0];
     vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, VK_NULL_HANDLE);
     sparse_queue->Wait();
 }

@@ -35,7 +35,7 @@
 #pragma pop_macro("Bool")
 #endif
 
-static void ProcessConfigFile(const VkPhysicalDeviceLimits &device_limits, TBuiltInResource &out_resources) {
+static void ProcessConfigFile(const VkPhysicalDeviceLimits& device_limits, TBuiltInResource& out_resources) {
     // These are the default resources for TBuiltInResources.
     out_resources.maxLights = 32;
     out_resources.maxClipPlanes = 6;
@@ -261,8 +261,8 @@ struct GlslangTargetEnv {
 // Compile a given string containing GLSL into SPV for use by VK
 // Return value of false means an error was encountered.
 //
-bool GLSLtoSPV(const VkPhysicalDeviceLimits &device_limits, const VkShaderStageFlagBits shader_type, const char *p_shader,
-               std::vector<uint32_t> &spirv, const spv_target_env spv_env) {
+bool GLSLtoSPV(const VkPhysicalDeviceLimits& device_limits, const VkShaderStageFlagBits shader_type, const char* p_shader,
+               std::vector<uint32_t>& spirv, const spv_target_env spv_env) {
 #ifdef VULKANSC
     // Force using Vulkan 1.2 environment (SPIR-V 1.5) instead of pre-Vulkan 1.2 in order to avoid glslang
     // generating SPIR-V code that may depend on SPIR-V capabilities not available in Vulkan SC
@@ -284,7 +284,7 @@ bool GLSLtoSPV(const VkPhysicalDeviceLimits &device_limits, const VkShaderStageF
 #else
     spv_target_env used_spv_env = spv_env;
 #endif
-    
+
     TBuiltInResource resources;
     ProcessConfigFile(device_limits, resources);
 
@@ -295,7 +295,7 @@ bool GLSLtoSPV(const VkPhysicalDeviceLimits &device_limits, const VkShaderStageF
     shader.setEnvTarget(glslang::EshTargetSpv, glslang_env);
     shader.setEnvClient(glslang::EShClientVulkan, glslang_env);
 
-    const char *shader_strings[1];
+    const char* shader_strings[1];
     shader_strings[0] = p_shader;
     shader.setStrings(shader_strings, 1);
 
@@ -324,7 +324,7 @@ bool GLSLtoSPV(const VkPhysicalDeviceLimits &device_limits, const VkShaderStageF
 // Compile a given string containing SPIR-V assembly into SPV for use by VK
 // Return value of false means an error was encountered.
 //
-bool ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char *p_asm, std::vector<uint32_t> &spv) {
+bool ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char* p_asm, std::vector<uint32_t>& spv) {
     spv_binary binary;
     spv_diagnostic diagnostic = nullptr;
     spv_context context = spvContextCreate(target_env);
@@ -412,7 +412,7 @@ bool SlangToSPV(const spv_target_env target_env, const char* slang_shader, const
     Slang::ComPtr<slang::IModule> slang_module;
     slang_module = session->loadModuleFromSourceString("my_shader", "my_shader.slang", slang_shader, diagnostics.writeRef());
     if (slang_module == NULL) {
-        ADD_FAILURE() << "Slang failure: loadModuleFromSourceString()\n" << ((const char *)diagnostics->getBufferPointer());
+        ADD_FAILURE() << "Slang failure: loadModuleFromSourceString()\n" << ((const char*)diagnostics->getBufferPointer());
         return false;
     }
 
@@ -446,7 +446,7 @@ bool SlangToSPV(const spv_target_env target_env, const char* slang_shader, const
     // other pieces, and that is what we are going to do with our module
     // and entry points.
     //
-    std::vector<slang::IComponentType *> componentTypes;
+    std::vector<slang::IComponentType*> componentTypes;
     componentTypes.emplace_back(slang_module);
     componentTypes.emplace_back(entry_point);
 
@@ -461,7 +461,7 @@ bool SlangToSPV(const spv_target_env target_env, const char* slang_shader, const
         result = session->createCompositeComponentType(componentTypes.data(), (SlangInt)componentTypes.size(),
                                                        composedProgram.writeRef(), diagnostics.writeRef());
         if (result != 0) {
-            ADD_FAILURE() << "Slang failure: createCompositeComponentType()\n" << ((const char *)diagnostics->getBufferPointer());
+            ADD_FAILURE() << "Slang failure: createCompositeComponentType()\n" << ((const char*)diagnostics->getBufferPointer());
             return false;
         }
     }
@@ -473,7 +473,7 @@ bool SlangToSPV(const spv_target_env target_env, const char* slang_shader, const
     {
         result = composedProgram->getEntryPointCode(0, 0, spirvCode.writeRef(), diagnostics.writeRef());
         if (result != 0) {
-            ADD_FAILURE() << "Slang failure: createCompositeComponentType()\n" << ((const char *)diagnostics->getBufferPointer());
+            ADD_FAILURE() << "Slang failure: createCompositeComponentType()\n" << ((const char*)diagnostics->getBufferPointer());
             return false;
         }
     }
@@ -485,7 +485,16 @@ bool SlangToSPV(const spv_target_env target_env, const char* slang_shader, const
 #endif
 }
 
-VkPipelineShaderStageCreateInfo const &VkShaderObj::GetStageCreateInfo() const { return m_stage_info; }
+const VkPipelineShaderStageCreateInfo& VkShaderObj::GetStageCreateInfo(void* update_pnext) {
+    // With things (but not limited to) descriptor heap, it is desired to have a pNext chain, but instead of trying to put it when
+    // creating a VkShaderObj (which already has way too many parameters) just apply it when we grab it as we want the pNext
+    // per-pipeline, not per-shaderModule in practice.
+    if (update_pnext) {
+        m_stage_info.pNext = update_pnext;
+    }
+
+    return m_stage_info;
+}
 
 VkShaderObj::VkShaderObj(vkt::Device& device, const char* source, VkShaderStageFlagBits stage, const spv_target_env env,
                          SpvSourceType source_type, const VkSpecializationInfo* spec_info, const char* entry_point,
@@ -524,7 +533,7 @@ bool VkShaderObj::InitFromGLSL(const void* shader_module_ci_pNext) {
 // Because shaders are currently validated at pipeline creation time, there are test cases that might fail shader module
 // creation due to supplying an invalid/unknown SPIR-V capability/operation. This is called after VkShaderObj creation when
 // tests are found to crash on a CI device
-VkResult VkShaderObj::InitFromGLSLTry(const vkt::Device *custom_device) {
+VkResult VkShaderObj::InitFromGLSLTry(const vkt::Device* custom_device) {
     std::vector<uint32_t> spv;
     // 99% of tests just use the framework's VkDevice, but this allows for tests to use custom device object
     // Can't set at contructor time since all reference members need to be initialized then.
@@ -576,7 +585,7 @@ bool VkShaderObj::InitFromSlang() {
     }
     VkShaderModuleCreateInfo module_ci = vku::InitStructHelper();
     module_ci.codeSize = bytes.size();
-    module_ci.pCode = (uint32_t *)bytes.data();
+    module_ci.pCode = (uint32_t*)bytes.data();
 
     const auto result = InitTry(*m_device, module_ci);
     m_stage_info.module = handle();
@@ -585,9 +594,9 @@ bool VkShaderObj::InitFromSlang() {
 }
 
 // static
-VkShaderObj VkShaderObj::CreateFromGLSL(VkRenderFramework *framework, const char *source, VkShaderStageFlagBits stage,
-                                        const spv_target_env spv_env, const VkSpecializationInfo *spec_info,
-                                        const char *entry_point) {
+VkShaderObj VkShaderObj::CreateFromGLSL(VkRenderFramework* framework, const char* source, VkShaderStageFlagBits stage,
+                                        const spv_target_env spv_env, const VkSpecializationInfo* spec_info,
+                                        const char* entry_point) {
     auto shader = VkShaderObj(*framework->DeviceObj(), source, stage, spv_env, SPV_SOURCE_GLSL_TRY, spec_info, entry_point);
     if (VK_SUCCESS == shader.InitFromGLSLTry()) {
         return shader;
@@ -596,9 +605,9 @@ VkShaderObj VkShaderObj::CreateFromGLSL(VkRenderFramework *framework, const char
 }
 
 // static
-VkShaderObj VkShaderObj::CreateFromASM(VkRenderFramework *framework, const char *source, VkShaderStageFlagBits stage,
-                                       const spv_target_env spv_env, const VkSpecializationInfo *spec_info,
-                                       const char *entry_point) {
+VkShaderObj VkShaderObj::CreateFromASM(VkRenderFramework* framework, const char* source, VkShaderStageFlagBits stage,
+                                       const spv_target_env spv_env, const VkSpecializationInfo* spec_info,
+                                       const char* entry_point) {
     auto shader = VkShaderObj(*framework->DeviceObj(), source, stage, spv_env, SPV_SOURCE_ASM_TRY, spec_info, entry_point);
     if (VK_SUCCESS == shader.InitFromASMTry()) {
         return shader;

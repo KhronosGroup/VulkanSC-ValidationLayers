@@ -1,9 +1,9 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
 // See vksc_convert_tests.py for modifications
 
-/* Copyright (c) 2024-2025 The Khronos Group Inc.
- * Copyright (c) 2024-2025 Valve Corporation
- * Copyright (c) 2024-2025 LunarG, Inc.
+/* Copyright (c) 2024-2026 The Khronos Group Inc.
+ * Copyright (c) 2024-2026 Valve Corporation
+ * Copyright (c) 2024-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@
  * limitations under the License.
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 
 class PositiveGpuAVSpirv : public GpuAVTest {};
 
@@ -33,7 +33,7 @@ TEST_F(PositiveGpuAVSpirv, LoopPhi) {
     vkt::Buffer buffer_uniform(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
     vkt::Buffer buffer_storage(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    uint32_t *data = (uint32_t *)buffer_uniform.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_uniform.Memory().Map();
     data[0] = 4;  // Scene.lightCount
 
     OneOffDescriptorSet descriptor_set(m_device, {
@@ -81,7 +81,7 @@ TEST_F(PositiveGpuAVSpirv, LoopPhi) {
     // OpBranch %2
     //
     // %4 = OpLabel
-    const char *fs_source = R"(
+    const char* fs_source = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -187,7 +187,7 @@ TEST_F(PositiveGpuAVSpirv, LoopHeaderPhi) {
     //         data[0] += i;
     //     }
     // }
-    const char *cs_source = R"(
+    const char* cs_source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main" %data
@@ -239,7 +239,7 @@ TEST_F(PositiveGpuAVSpirv, LoopHeaderPhi) {
     pipe.CreateComputePipeline();
 
     vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *data = (uint32_t *)buffer.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer.Memory().Map();
     data[0] = 1;  // data[0]
     data[1] = 2;  // data[1]
     data[2] = 3;  // data[2]
@@ -271,7 +271,7 @@ TEST_F(PositiveGpuAVSpirv, VulkanMemoryModelDeviceScope) {
 
     vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    uint32_t *data = (uint32_t *)buffer.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer.Memory().Map();
     data[0] = 1;
 
     OneOffDescriptorSet descriptor_set(m_device, {
@@ -290,7 +290,7 @@ TEST_F(PositiveGpuAVSpirv, VulkanMemoryModelDeviceScope) {
     // void main() {
     //     foo.bar[0] = foo.bar[foo.x];
     // }
-    const char *cs_source = R"(
+    const char* cs_source = R"(
                OpCapability Shader
                OpCapability VulkanMemoryModel
                OpCapability PhysicalStorageBufferAddresses
@@ -345,7 +345,6 @@ TEST_F(PositiveGpuAVSpirv, VulkanMemoryModelDeviceScope) {
 
 TEST_F(PositiveGpuAVSpirv, FindMultipleStores) {
     TEST_DESCRIPTION("Catches bug when various OpStore are in top of a function");
-
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -353,6 +352,7 @@ TEST_F(PositiveGpuAVSpirv, FindMultipleStores) {
       #version 450
       layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;  // data[4]
 
+      layout(local_size_x = 1) in;
       int foo() {
             return (gl_WorkGroupSize.x > 1) ? 1 : 0;
       }

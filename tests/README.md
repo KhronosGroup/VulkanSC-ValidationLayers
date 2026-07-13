@@ -3,7 +3,7 @@
 The Validation Layers use [Google Test (gtest)](https://github.com/google/googletest) for testing the
 Validation Layers. This helps make sure all new changes are correct and prevent regressions.
 
-The following is information how to setup and run the tests. There is seperate documentation for [creating tests](../docs/creating_tests.md).
+The following is information how to setup and run the tests. There is separate documentation for [creating tests](../docs/creating_tests.md).
 
 ## Building the tests
 
@@ -50,7 +50,7 @@ cd build
 ./tests/vk_layer_validation_tests --device-index 1
 
 # Run a single test
-./tests/vk_layer_validation_tests --gtest_filter=PositiveBuffer.OwnershipTranfers
+./tests/vk_layer_validation_tests --gtest_filter=PositiveBuffer.OwnershipTransfers
 
 # Run a multiple tests with a pattern
 ./tests/vk_layer_validation_tests --gtest_filter=*Buffer*
@@ -77,7 +77,7 @@ REM see --help for more options
 vk_layer_validation_tests --device-index 1
 
 REM Run a single test
-vk_layer_validation_tests --gtest_filter=PositiveBuffer.OwnershipTranfers
+vk_layer_validation_tests --gtest_filter=PositiveBuffer.OwnershipTransfers
 
 REM Run a multiple tests with a pattern
 vk_layer_validation_tests --gtest_filter=*Buffer*

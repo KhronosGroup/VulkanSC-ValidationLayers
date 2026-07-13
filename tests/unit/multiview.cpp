@@ -2,7 +2,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2021 ARM, Inc. All rights reserved.
  *
@@ -14,10 +14,10 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/render_pass_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
+#include "render_pass_helper.h"
 #include "binding.h"
 #include "utils/convert_utils.h"
 
@@ -192,7 +192,7 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
     std::vector<VkSubpassDependency> dependencies;
     dependencies.resize(extra_subpass_count);
     for (unsigned i = 0; i < dependencies.size(); ++i) {
-        auto &subpass_dep = dependencies[i];
+        auto& subpass_dep = dependencies[i];
         subpass_dep.srcSubpass = i;
         subpass_dep.dstSubpass = i + 1;
 
@@ -318,7 +318,7 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
 
     // Push constants
     {
-        const char *const vsSource = R"glsl(
+        const char* const vsSource = R"glsl(
         #version 450
         layout(push_constant, std430) uniform foo {
            mat3 m;
@@ -328,15 +328,15 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
         }
     )glsl";
 
-        VkShaderObj const vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-        VkShaderObj const fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+        VkShaderObj vs(*m_device, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+        VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, 36};
         VkPipelineLayoutCreateInfo pipeline_layout_info = vku::InitStructHelper();
         pipeline_layout_info.pushConstantRangeCount = 1;
         pipeline_layout_info.pPushConstantRanges = &push_constant_range;
 
-        vkt::PipelineLayout layout(*m_device, pipeline_layout_info, std::vector<const vkt::DescriptorSetLayout *>{});
+        vkt::PipelineLayout layout(*m_device, pipeline_layout_info, std::vector<const vkt::DescriptorSetLayout*>{});
 
         CreatePipelineHelper pipe(*this);
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -360,7 +360,7 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
         m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
         vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
-        m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-maintenance4-08602");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08601");
         vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
 
@@ -371,7 +371,7 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
             m_command_buffer.NextSubpass();
             vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[i]);
 
-            m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-maintenance4-08602");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08601");
             vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
             m_errorMonitor->VerifyFound();
         }
@@ -393,10 +393,10 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
         pipeline_layout_info.setLayoutCount = 1;
         pipeline_layout_info.pSetLayouts = &descriptor_set.layout_.handle();
 
-        vkt::PipelineLayout layout(*m_device, pipeline_layout_info, std::vector<vkt::DescriptorSetLayout const *>{});
+        vkt::PipelineLayout layout(*m_device, pipeline_layout_info, std::vector<vkt::DescriptorSetLayout const*>{});
 
-        VkShaderObj const vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-        VkShaderObj const fs(*m_device, kFragmentUniformGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+        VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+        VkShaderObj fs(*m_device, kFragmentUniformGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         CreatePipelineHelper pipe(*this);
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -457,7 +457,7 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
         input_attribs.format = VK_FORMAT_R32G32_SFLOAT;
         input_attribs.offset = 0;
 
-        const char *const vsSource = R"glsl(
+        const char* const vsSource = R"glsl(
         #version 450
         layout(location = 0) in vec2 input0;
         void main(){
@@ -532,7 +532,7 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
         input_attribs.format = VK_FORMAT_R32G32_SFLOAT;
         input_attribs.offset = 0;
 
-        const char *const vsSource = R"glsl(
+        const char* const vsSource = R"glsl(
         #version 450
         layout(location = 0) in vec2 input0;
         void main(){
@@ -652,7 +652,7 @@ TEST_F(NegativeMultiview, Features) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
-    std::vector<const char *> extension_list;
+    std::vector<const char*> extension_list;
     if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
         extension_list.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     }
@@ -1066,7 +1066,7 @@ TEST_F(NegativeMultiview, FeaturesDisabled) {
 
     // tessellationShader
     {
-        const char *tcsSource = R"glsl(
+        const char* tcsSource = R"glsl(
         #version 450
         layout(vertices=3) out;
         void main(){
@@ -1074,7 +1074,7 @@ TEST_F(NegativeMultiview, FeaturesDisabled) {
            gl_TessLevelInner[0] = 1;
         }
         )glsl";
-        const char *tesSource = R"glsl(
+        const char* tesSource = R"glsl(
         #version 450
         layout(triangles, equal_spacing, cw) in;
         void main(){
@@ -1106,7 +1106,7 @@ TEST_F(NegativeMultiview, FeaturesDisabled) {
     }
     // geometryShader
     {
-        const char *gsSource = R"glsl(
+        const char* gsSource = R"glsl(
         #version 450
         layout (points) in;
         layout (triangle_strip) out;
@@ -1191,7 +1191,7 @@ TEST_F(NegativeMultiview, ShaderLayerBuiltInRenderPass) {
     AddRequiredFeature(vkt::Feature::multiviewGeometryShader);
     RETURN_IF_SKIP(Init());
 
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (triangles) in;
         layout (triangle_strip) out;
@@ -1250,7 +1250,7 @@ TEST_F(NegativeMultiview, ShaderLayerBuiltInDynamicRendering) {
     AddRequiredFeature(vkt::Feature::multiviewGeometryShader);
     RETURN_IF_SKIP(Init());
 
-    const char *gsSource = R"glsl(
+    const char* gsSource = R"glsl(
         #version 450
         layout (triangles) in;
         layout (triangle_strip) out;
@@ -1380,7 +1380,7 @@ TEST_F(NegativeMultiview, MeshShader) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         layout(max_vertices=81) out;
@@ -1526,8 +1526,9 @@ TEST_F(NegativeMultiview, MultiviewPerViewViewportsDraw) {
     pipe.vp_state_ci_.scissorCount = 0u;
     pipe.CreateGraphicsPipeline();
 
-    vkt::Image image(*m_device, m_width, m_height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    vkt::ImageView image_view = image.CreateView();
+    auto image_ci = vkt::Image::ImageCreateInfo2D(m_width, m_height, 1, 2, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, image_ci);
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 2);
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageView = image_view;
@@ -1537,7 +1538,6 @@ TEST_F(NegativeMultiview, MultiviewPerViewViewportsDraw) {
 
     VkRenderingInfo rendering_info = vku::InitStructHelper();
     rendering_info.renderArea = {{0, 0}, {100u, 100u}};
-    rendering_info.layerCount = 1u;
     rendering_info.colorAttachmentCount = 1u;
     rendering_info.pColorAttachments = &color_attachment;
     rendering_info.viewMask = 0x2;
@@ -1556,5 +1556,78 @@ TEST_F(NegativeMultiview, MultiviewPerViewViewportsDraw) {
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeMultiview, DynamicRenderingColorViewLayerCount) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12015");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::multiview);
+    RETURN_IF_SKIP(Init());
+
+    // Color attachment, 1 layer
+    vkt::Image color_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView color_image_view = color_image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY);
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.imageView = color_image_view;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment;
+    begin_rendering_info.viewMask = 0x3;  // MSB index = 1
+    begin_rendering_info.renderArea = {{0, 0}, {32, 32}};
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-viewMask-12403");
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeMultiview, DynamicRenderingColorResolveViewLayerCount) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12015");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::multiview);
+    RETURN_IF_SKIP(Init());
+
+    VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
+
+    // Color attachment, 2 layers
+    auto color_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 2, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    color_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    vkt::Image color_image(*m_device, color_ci, vkt::set_layout);
+    vkt::ImageView color_image_view = color_image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 2);
+
+    // Resolve attachment, 1 layer
+    vkt::Image resolve_image(*m_device, 32, 32, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView resolve_image_view = resolve_image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY);
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.imageView = color_image_view;
+    color_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+    color_attachment.resolveImageView = resolve_image_view;
+    color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment;
+    begin_rendering_info.viewMask = 0x3;  // MSB index = 1
+    begin_rendering_info.renderArea = {{0, 0}, {32, 32}};
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-viewMask-12403");
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }

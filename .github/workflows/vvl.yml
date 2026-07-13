@@ -1,6 +1,6 @@
-# Copyright (c) 2021-2025 Valve Corporation
-# Copyright (c) 2021-2025 LunarG, Inc.
-# Copyright (c) 2023-2025 RasterGrid Kft.
+# Copyright (c) 2021-2026 Valve Corporation
+# Copyright (c) 2021-2026 LunarG, Inc.
+# Copyright (c) 2023-2026 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,19 +36,42 @@ permissions:
   contents: read
 
 jobs:
-  code-format:
-    runs-on: ubuntu-24.04
+  check_vvl:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: '0'
       - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
+      - name: install python packages
+        run: python3 -m pip install pyparsing
+      - name: Install clang-format 22
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          sudo apt-get install -y clang-format-22
+          sudo ln -sf /usr/bin/clang-format-22 /usr/bin/clang-format
+      - name: Alias clang-format
+        run: |
+          mkdir -p bin
+          ln -s /usr/bin/clang-format-22 ./bin/clang-format
+          echo "$(pwd)/bin" >> $GITHUB_PATH
       - name: clang-format version
         run: clang-format --version
       - name: Execute Source Code Format Checking Script
         run: python3 scripts/check_code_format.py --fetch-main --target-refspec=FETCH_HEAD
+      # This saves about 20 seconds for every run
+      - name: Create subset so we only clone what we need
+        run: |
+          jq '.repos |= map(select(.name == "Vulkan-Headers" or .name == "SPIRV-Headers"))' \
+          scripts/known_good.json > $RUNNER_TEMP/known_good.json
+      - name: Clone in Vulkan/SPIR-V headers
+        run: scripts/update_deps.py --api vulkansc --dir ext --no-build --known_good_dir $RUNNER_TEMP
+      - name: Run the script to generate the code and compare it with what is checked in
+        run: scripts/generate_source.py --verify ext/Vulkan-Headers/registry/ ext/SPIRV-Headers/include/spirv/unified1/ --api vulkansc
 
   linux:
     needs: check_vvl
@@ -63,7 +86,7 @@ jobs:
         # Chromium build, and some package managers don't use it.
         custom_hash_map: [ "ON", "OFF" ]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ matrix.config }}-address-${{matrix.custom_hash_map}}
@@ -106,7 +129,7 @@ jobs:
         custom_hash_map: [ "ON" ]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ matrix.config }}-thread-${{matrix.custom_hash_map}}
@@ -134,7 +157,7 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: linux-ubsan
@@ -155,7 +178,7 @@ jobs:
     if: "!contains(github.head_ref || github.ref, 'SKIP-CI')"
     name: "Ubuntu Backcompat"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Test Minimum CMake Version
         uses: lukka/get-cmake@latest
         with:
@@ -180,13 +203,10 @@ jobs:
     if: "!contains(github.head_ref || github.ref, 'SKIP-CI')"
     strategy:
       matrix:
-        arch: [ amd64, amd64_x86 ]
+        arch: [ amd64 ]
         config: [ debug, release ]
-        exclude:
-          - arch: amd64_x86
-            config: debug
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
@@ -195,7 +215,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Cache known_good.json installations
         id: cache-deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ${{ github.workspace }}/external/glslang/build/install
@@ -226,7 +246,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -246,15 +266,32 @@ jobs:
       - run: cmake --build build
       - run: cmake --install build --prefix /tmp
 
-  check_vvl:
-    needs: code-format
+  # "Collector Job" to funnel the requirements to a single action
+  # This allows branches with SKIP-CI to skip down here, and still "pass"
+  all-tests-passed:
     runs-on: ubuntu-latest
+    if: always()
+    # List of all jobs required
+    # Add 'chromium' back when google servers are working again
+    needs: [android, linux, windows]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.10'
-      - run: python3 -m pip install pyparsing
-      - run: scripts/update_deps.py --dir ext --no-build
-      - run: scripts/generate_source.py --verify ext/Vulkan-Headers/registry/ ext/SPIRV-Headers/include/spirv/unified1/
-      - run: scripts/vk_validation_stats.py ext/Vulkan-Headers/registry/validusage.json -summary -c
+      - name: Check status of jobs
+        run: |
+          # If any dependency failed, we fail.
+          # If they were skipped or succeeded, we pass.
+
+          # JSON hack to check results of all 'needs'
+          RESULTS='${{ toJSON(needs) }}'
+
+          if echo "$RESULTS" | grep -q '"result": "failure"'; then
+            echo "One of the required jobs failed."
+            exit 1
+          fi
+
+          if echo "$RESULTS" | grep -q '"result": "cancelled"'; then
+            echo "Job was cancelled."
+            exit 1
+          fi
+
+          echo "MERGE AWAY!"
+          exit 0

@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,9 +16,9 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 
 class NegativeShaderStorageImage : public VkLayerTest {
   public:
@@ -43,7 +43,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatRead) {
     }
 
     // Make sure compute pipeline has a compute shader stage set
-    const char *csSource = R"(
+    const char* csSource = R"(
                OpCapability Shader
                OpCapability StorageImageReadWithoutFormat
           %1 = OpExtInstImport "GLSL.std.450"
@@ -108,7 +108,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWrite) {
     }
 
     // Make sure compute pipeline has a compute shader stage set
-    const char *csSource = R"(
+    const char* csSource = R"(
                   OpCapability Shader
                   OpCapability StorageImageWriteWithoutFormat
              %1 = OpExtInstImport "GLSL.std.450"
@@ -159,39 +159,35 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
 
     struct {
         VkFormat format;
-        VkFormatProperties3 props;
+        VkFormatFeatureFlags2 props;
     } tests[2] = {};
     int n_tests = 0;
     bool has_without_format_test = false, has_with_format_test = false;
 
     // Find storage formats with & without read without format support
-    for (uint32_t fmt = VK_FORMAT_R4G4_UNORM_PACK8; fmt < VK_FORMAT_D16_UNORM; fmt++) {
+    for (uint32_t i = VK_FORMAT_R4G4_UNORM_PACK8; i < VK_FORMAT_D16_UNORM; i++) {
+        VkFormat format = (VkFormat)i;
         if (has_without_format_test && has_with_format_test) break;
-        if (!vkuFormatIsSampledFloat((VkFormat)fmt)) continue;
+        if (!vkuFormatIsSampledFloat(format)) continue;
 
-        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
-        VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
-
-        vk::GetPhysicalDeviceFormatProperties2(Gpu(), (VkFormat)fmt, &fmt_props);
-
-        const bool has_storage = (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT) != 0;
-        const bool has_read_without_format =
-            (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR) != 0;
+        const auto fmt_props = m_device->FormatFeaturesOptimal(format);
+        const bool has_storage = (fmt_props & VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT) != 0;
+        const bool has_read_without_format = (fmt_props & VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR) != 0;
 
         if (!has_storage) continue;
 
         if (has_read_without_format) {
             if (has_without_format_test) continue;
 
-            tests[n_tests].format = (VkFormat)fmt;
-            tests[n_tests].props = fmt_props_3;
+            tests[n_tests].format = format;
+            tests[n_tests].props = fmt_props;
             has_without_format_test = true;
             n_tests++;
         } else {
             if (has_with_format_test) continue;
 
-            tests[n_tests].format = (VkFormat)fmt;
-            tests[n_tests].props = fmt_props_3;
+            tests[n_tests].format = format;
+            tests[n_tests].props = fmt_props;
             has_with_format_test = true;
             n_tests++;
         }
@@ -202,7 +198,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
     }
 
     // Make sure compute pipeline has a compute shader stage set
-    const char *csSource = R"(
+    const char* csSource = R"(
                OpCapability Shader
                OpCapability StorageImageReadWithoutFormat
           %1 = OpExtInstImport "GLSL.std.450"
@@ -289,7 +285,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
         vk::CmdDispatch(m_command_buffer, 1, 1, 1);
         m_command_buffer.End();
 
-        if ((tests[t].props.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR) == 0) {
+        if ((tests[t].props & VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR) == 0) {
             m_errorMonitor->VerifyFound();
         }
     }
@@ -305,39 +301,35 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
 
     struct {
         VkFormat format;
-        VkFormatProperties3 props;
+        VkFormatFeatureFlags2 props;
     } tests[2] = {};
     int n_tests = 0;
     bool has_without_format_test = false, has_with_format_test = false;
 
     // Find storage formats with & without write without format support
-    for (uint32_t fmt = VK_FORMAT_R4G4_UNORM_PACK8; fmt < VK_FORMAT_D16_UNORM; fmt++) {
+    for (uint32_t i = VK_FORMAT_R4G4_UNORM_PACK8; i < VK_FORMAT_D16_UNORM; i++) {
+        VkFormat format = (VkFormat)i;
         if (has_without_format_test && has_with_format_test) break;
-        if (!vkuFormatIsSampledFloat((VkFormat)fmt)) continue;
+        if (!vkuFormatIsSampledFloat(format)) continue;
 
-        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
-        VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
-
-        vk::GetPhysicalDeviceFormatProperties2(Gpu(), (VkFormat)fmt, &fmt_props);
-
-        const bool has_storage = (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT) != 0;
-        const bool has_write_without_format =
-            (fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) != 0;
+        const auto fmt_props = m_device->FormatFeaturesOptimal(format);
+        const bool has_storage = (fmt_props & VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT) != 0;
+        const bool has_write_without_format = (fmt_props & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) != 0;
 
         if (!has_storage) continue;
 
         if (has_write_without_format) {
             if (has_without_format_test) continue;
 
-            tests[n_tests].format = (VkFormat)fmt;
-            tests[n_tests].props = fmt_props_3;
+            tests[n_tests].format = format;
+            tests[n_tests].props = fmt_props;
             has_without_format_test = true;
             n_tests++;
         } else {
             if (has_with_format_test) continue;
 
-            tests[n_tests].format = (VkFormat)fmt;
-            tests[n_tests].props = fmt_props_3;
+            tests[n_tests].format = format;
+            tests[n_tests].props = fmt_props;
             has_with_format_test = true;
             n_tests++;
         }
@@ -348,7 +340,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
     }
 
     // Make sure compute pipeline has a compute shader stage set
-    const char *csSource = R"(
+    const char* csSource = R"(
                   OpCapability Shader
                   OpCapability StorageImageWriteWithoutFormat
              %1 = OpExtInstImport "GLSL.std.450"
@@ -427,13 +419,13 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
         vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, cs_pipeline.pipeline_layout_, 0, 1, &ds.set_, 0,
                                   nullptr);
 
-        if ((tests[t].props.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
+        if ((tests[t].props & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
             m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-OpTypeImage-07027");
         }
         vk::CmdDispatch(m_command_buffer, 1, 1, 1);
         m_command_buffer.End();
 
-        if ((tests[t].props.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
+        if ((tests[t].props & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
             m_errorMonitor->VerifyFound();
         }
     }
@@ -456,7 +448,7 @@ TEST_F(NegativeShaderStorageImage, MissingNonReadableDecorationFormatRead) {
     }
 
     // Make sure compute pipeline has a compute shader stage set
-    const char *csSource = R"(
+    const char* csSource = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -515,7 +507,7 @@ TEST_F(NegativeShaderStorageImage, MissingNonWritableDecorationFormatWrite) {
     }
 
     // Make sure compute pipeline has a compute shader stage set
-    const char *csSource = R"(
+    const char* csSource = R"(
                   OpCapability Shader
              %1 = OpExtInstImport "GLSL.std.450"
                   OpMemoryModel Logical GLSL450
@@ -564,7 +556,7 @@ TEST_F(NegativeShaderStorageImage, WriteLessComponent) {
     // imageStore(storageImage, ivec2(1, 1), uvec3(1, 1, 1));
     //
     // Rgba8ui == 4-component but only writing 3 texels to it
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main" %var
@@ -596,7 +588,7 @@ TEST_F(NegativeShaderStorageImage, WriteLessComponent) {
     if (!FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
         helper.cs_ = VkShaderObj(*m_device, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
         helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     };
@@ -616,7 +608,7 @@ TEST_F(NegativeShaderStorageImage, WriteLessComponentCopyObject) {
     // imageStore(storageImage, ivec2(1, 1), uvec3(1, 1, 1));
     //
     // Rgba8ui == 4-component but only writing 3 texels to it
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main" %var
@@ -652,7 +644,7 @@ TEST_F(NegativeShaderStorageImage, WriteLessComponentCopyObject) {
     if (!FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
         helper.cs_ = VkShaderObj(*m_device, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
         helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     };
@@ -673,7 +665,7 @@ TEST_F(NegativeShaderStorageImage, WriteSpecConstantLessComponent) {
     // imageStore(storageImage, ivec2(1, 1), uvec3(1, sc, sc + 1));
     //
     // Rgba8ui == 4-component but only writing 3 texels to it
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %main "main" %var
@@ -719,7 +711,7 @@ TEST_F(NegativeShaderStorageImage, WriteSpecConstantLessComponent) {
     specialization_info.dataSize = sizeof(uint32_t);
     specialization_info.pData = &data;
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
         helper.cs_ =
             VkShaderObj(*m_device, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM, &specialization_info);
         helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
@@ -741,7 +733,7 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteLessComponent) {
     // imageStore(storageImage, ivec2(1, 1), uvec3(1, 1, 1));
     //
     // Unknown will become a 4-component but writing 3 texels to it
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpCapability StorageImageWriteWithoutFormat
                OpMemoryModel Logical GLSL450
@@ -779,10 +771,8 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteLessComponent) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
-    VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
-    VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
-    vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &fmt_props);
-    if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
+    const auto fmt_props = m_device->FormatFeaturesOptimal(format);
+    if ((fmt_props & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
         GTEST_SKIP() << "Format doesn't support storage write without format";
     }
 
@@ -822,7 +812,7 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
     // imageStore(storageImage, ivec2(1, 1), vec3(1, 1, 1));
     //
     // only have 3 components
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpCapability StorageImageWriteWithoutFormat
                OpMemoryModel Logical GLSL450
@@ -860,10 +850,8 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
-    VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
-    VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
-    vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &fmt_props);
-    if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
+    const auto fmt_props = m_device->FormatFeaturesOptimal(format);
+    if ((fmt_props & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT) == 0) {
         GTEST_SKIP() << "Format doesn't support storage write without format";
     }
 

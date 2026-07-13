@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,9 +15,9 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 
 class NegativeShaderStorageTexel : public VkLayerTest {};
 
@@ -34,7 +34,7 @@ TEST_F(NegativeShaderStorageTexel, WriteLessComponent) {
     // imageStore(storageTexelBuffer, 1, uvec3(1, 1, 1));
     //
     // Rgba8ui == 4-component but only writing 3 texels to it
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpCapability ImageBuffer
                OpCapability StorageImageExtendedFormats
@@ -67,7 +67,7 @@ TEST_F(NegativeShaderStorageTexel, WriteLessComponent) {
         GTEST_SKIP() << "Format doesn't support storage texel buffer";
     }
 
-    const auto set_info = [&](CreateComputePipelineHelper &helper) {
+    const auto set_info = [&](CreateComputePipelineHelper& helper) {
         helper.cs_ = VkShaderObj(*m_device, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
         helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     };
@@ -88,7 +88,7 @@ TEST_F(NegativeShaderStorageTexel, UnknownWriteLessComponent) {
     // imageStore(storageTexelBuffer, 1, uvec3(1, 1, 1));
     //
     // Unknown will become a 4-component but writing 3 texels to it
-    const char *source = R"(
+    const char* source = R"(
                OpCapability Shader
                OpCapability ImageBuffer
                OpCapability StorageImageWriteWithoutFormat
@@ -168,7 +168,7 @@ TEST_F(NegativeShaderStorageTexel, ComponentTypeMismatch) {
         GTEST_SKIP() << "Format doesn't support storage write without format";
     }
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) writeonly uniform iimageBuffer storageTexelBuffer;
         void main() {
@@ -214,7 +214,7 @@ TEST_F(NegativeShaderStorageTexel, FormatComponentTypeMismatch) {
         GTEST_SKIP() << "Format doesn't support storage texel buffer";
     }
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0, R8ui) writeonly uniform uimageBuffer storageTexelBuffer;
         void main() {
@@ -260,7 +260,7 @@ TEST_F(NegativeShaderStorageTexel, FormatComponentTypeMismatch2) {
         GTEST_SKIP() << "Format doesn't support storage texel buffer";
     }
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0, R32ui) writeonly uniform uimageBuffer storageTexelBuffer;
         void main() {
@@ -323,7 +323,7 @@ TEST_F(NegativeShaderStorageTexel, MissingFormatWriteForFormat) {
     fmt_props_3.bufferFeatures &= ~VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT;
     fpvkSetPhysicalDeviceFormatProperties2EXT(Gpu(), format, fmt_props);
 
-    const char *csSource = R"(
+    const char* csSource = R"(
                   OpCapability Shader
                   OpCapability ImageBuffer
                   OpCapability StorageImageWriteWithoutFormat

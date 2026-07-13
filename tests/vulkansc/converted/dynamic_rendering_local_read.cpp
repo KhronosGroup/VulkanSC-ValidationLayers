@@ -5,7 +5,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2021-2022 ARM, Inc. All rights reserved.
  *
@@ -17,8 +17,8 @@
  *
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 #include "utils/convert_utils.h"
 
 class NegativeDynamicRenderingLocalRead : public DynamicRenderingTest {};
@@ -1081,7 +1081,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, InputAttachmentIndexSetToUnused) {
         {VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO_KHR, nullptr, 1, &locations[0], nullptr, nullptr},
         {VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO_KHR, nullptr, 1, &unused, &locations[0], nullptr},
         {VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO_KHR, nullptr, 1, &unused, nullptr, &locations[0]}};
-    const char *vuids[] = {"VUID-VkRenderingInputAttachmentIndexInfo-dynamicRenderingLocalRead-09519",
+    const char* vuids[] = {"VUID-VkRenderingInputAttachmentIndexInfo-dynamicRenderingLocalRead-09519",
                            "VUID-VkRenderingInputAttachmentIndexInfo-dynamicRenderingLocalRead-09520",
                            "VUID-VkRenderingInputAttachmentIndexInfo-dynamicRenderingLocalRead-09521"};
 
@@ -1125,7 +1125,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, InputAttachmentIndexUnique) {
         {VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO_KHR, nullptr, 2, &locations_bad[0], nullptr, nullptr},
         {VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO_KHR, nullptr, 2, &locations_good[0], &locations_bad[0], nullptr},
         {VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO_KHR, nullptr, 2, &locations_good[0], nullptr, &locations_bad[0]}};
-    const char *vuids[] = {"VUID-VkRenderingInputAttachmentIndexInfo-pColorAttachmentInputIndices-09522",
+    const char* vuids[] = {"VUID-VkRenderingInputAttachmentIndexInfo-pColorAttachmentInputIndices-09522",
                            "VUID-VkRenderingInputAttachmentIndexInfo-pColorAttachmentInputIndices-09523",
                            "VUID-VkRenderingInputAttachmentIndexInfo-pColorAttachmentInputIndices-09524"};
 
@@ -1597,7 +1597,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, RenderingInputAttachmentIndexInfoMisma
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment_info;
 
-    const auto begin_record_and_verify_cmd_buffers = [&](const VkCommandBufferBeginInfo &commandBufferBeginInfo) {
+    const auto begin_record_and_verify_cmd_buffers = [&](const VkCommandBufferBeginInfo& commandBufferBeginInfo) {
         secondary_cmd_buffer.Begin(&commandBufferBeginInfo);
         secondary_cmd_buffer.End();
 
@@ -1706,7 +1706,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, CmdDrawColorIndexESOEnabled) {
 TEST_F(NegativeDynamicRenderingLocalRead, InputAttachmentIndexArray) {
     RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x[2];
         layout(location=0) out vec4 color;
@@ -1736,7 +1736,7 @@ TEST_F(NegativeDynamicRenderingLocalRead, InputAttachmentIndexArray) {
 TEST_F(NegativeDynamicRenderingLocalRead, InputAttachmentIndexArray2) {
     RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x[2];
         layout(input_attachment_index=2, set=0, binding=0) uniform subpassInput y;

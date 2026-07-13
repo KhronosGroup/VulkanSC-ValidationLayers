@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2022-2025 The Khronos Group Inc.
- * Copyright (c) 2022-2025 RasterGrid Kft.
+ * Copyright (c) 2022-2026 The Khronos Group Inc.
+ * Copyright (c) 2022-2026 RasterGrid Kft.
  * Modifications Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -10,7 +10,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/video_objects.h"
+#include "video_objects.h"
 #include "utils/math_utils.h"
 
 class NegativeVideo : public VkVideoLayerTest {};
@@ -476,7 +476,8 @@ TEST_F(NegativeVideo, BindVideoSessionMemory) {
         GTEST_SKIP() << "Test can only run if video session needs memory bindings";
     }
 
-    std::vector<VkVideoSessionMemoryRequirementsKHR> mem_reqs(mem_req_count, vku::InitStruct<VkVideoSessionMemoryRequirementsKHR>());
+    std::vector<VkVideoSessionMemoryRequirementsKHR> mem_reqs(mem_req_count,
+                                                              vku::InitStruct<VkVideoSessionMemoryRequirementsKHR>());
     ASSERT_EQ(VK_SUCCESS, vk::GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, mem_reqs.data()));
 
     std::vector<VkDeviceMemory> session_memory;
@@ -1946,7 +1947,7 @@ TEST_F(NegativeVideo, GetQueryPoolResultsVideoQueryDataSize) {
     }
 
     auto feedback_flags = config.EncodeCaps()->supportedEncodeFeedbackFlags;
-    auto feedback_flag_count = GetBitSetCount(feedback_flags);
+    auto feedback_flag_count = CountSetBits(feedback_flags);
     uint32_t total_query_count = 4;
 
     VideoContext context(m_device, config);
@@ -2149,7 +2150,7 @@ TEST_F(NegativeVideoBestPractices, BindVideoSessionMemory) {
     // Create a buffer to get non-video-related memory requirements
     VkBufferCreateInfo buffer_create_info =
         vku::InitStruct<VkBufferCreateInfo>(nullptr, static_cast<VkBufferCreateFlags>(0), static_cast<VkDeviceSize>(4096),
-                                          static_cast<VkBufferUsageFlags>(VK_BUFFER_USAGE_TRANSFER_SRC_BIT));
+                                            static_cast<VkBufferUsageFlags>(VK_BUFFER_USAGE_TRANSFER_SRC_BIT));
     vkt::Buffer buffer(*m_device, buffer_create_info);
     VkMemoryRequirements buf_mem_reqs;
     vk::GetBufferMemoryRequirements(device(), buffer, &buf_mem_reqs);
@@ -2220,5 +2221,129 @@ TEST_F(NegativeVideo, NoQueueSupportForResultStatusOnly) {
     m_errorMonitor->SetDesiredError("VUID-VkQueryPoolCreateInfo-queryType-11839");
     VkQueryPool query_pool;
     vk::CreateQueryPool(device(), &query_pool_create_info, nullptr, &query_pool);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeVideo, DeviceAddressCommandsQueryPoolResultStatusOnly) {
+    AddRequiredExtensions(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME);
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::deviceAddressCommands);
+    RETURN_IF_SKIP(Init());
+
+    if (!HasQueueFamilySupportsResultStatusOnlyQueries()) {
+        GTEST_SKIP() << "Test requires at least one queue family to support result status queries";
+    }
+
+    uint32_t queue_family_index = VK_QUEUE_FAMILY_IGNORED;
+    for (uint32_t qfi = 0; qfi < QueueFamilyCount(); ++qfi) {
+        if (QueueFamilySupportsResultStatusOnlyQueries(qfi)) {
+            queue_family_index = qfi;
+            break;
+        }
+    }
+
+    if (queue_family_index != VK_QUEUE_FAMILY_IGNORED) {
+        GTEST_SKIP() << "Test requires a queue family with support for result status queries";
+    }
+
+    VkQueryPoolCreateInfo query_pool_ci = vku::InitStructHelper();
+    query_pool_ci.queryType = VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR;
+    query_pool_ci.queryCount = 1u;
+    vkt::QueryPool query_pool(*m_device, query_pool_ci);
+
+    vkt::Buffer buffer(*m_device, sizeof(uint64_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
+
+    VkStridedDeviceAddressRangeKHR range = buffer.StridedAddressRange(sizeof(uint64_t));
+    range.stride = 0u;
+
+    vkt::CommandPool cmd_pool(*m_device, queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    vkt::CommandBuffer cb(*m_device, cmd_pool);
+
+    cb.Begin();
+    vk::CmdBeginQuery(cb, query_pool, 0u, 0u);
+    vk::CmdEndQuery(cb, query_pool, 0u);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-queryType-09442");
+    vk::CmdCopyQueryPoolResultsToMemoryKHR(cb, query_pool, 0u, 1u, &range, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+
+    cb.End();
+}
+
+TEST_F(NegativeVideo, DeviceAddressCommandsQueryResultFlags) {
+    AddRequiredExtensions(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME);
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::deviceAddressCommands);
+    RETURN_IF_SKIP(Init());
+
+    if (!HasQueueFamilySupportsResultStatusOnlyQueries()) {
+        GTEST_SKIP() << "Test requires at least one queue family to support result status queries";
+    }
+
+    uint32_t queue_family_index = VK_QUEUE_FAMILY_IGNORED;
+    for (uint32_t qfi = 0; qfi < QueueFamilyCount(); ++qfi) {
+        if (QueueFamilySupportsResultStatusOnlyQueries(qfi)) {
+            queue_family_index = qfi;
+            break;
+        }
+    }
+
+    if (queue_family_index != VK_QUEUE_FAMILY_IGNORED) {
+        GTEST_SKIP() << "Test requires a queue family with support for result status queries";
+    }
+
+    VkQueryPoolCreateInfo query_pool_ci = vku::InitStructHelper();
+    query_pool_ci.queryType = VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR;
+    query_pool_ci.queryCount = 1u;
+    vkt::QueryPool query_pool(*m_device, query_pool_ci);
+
+    vkt::Buffer buffer(*m_device, sizeof(uint64_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
+
+    VkStridedDeviceAddressRangeKHR range = buffer.StridedAddressRange(sizeof(uint64_t));
+    range.stride = 0u;
+
+    vkt::CommandPool cmd_pool(*m_device, queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    vkt::CommandBuffer cb(*m_device, cmd_pool);
+
+    cb.Begin();
+    vk::CmdBeginQuery(cb, query_pool, 0u, 0u);
+    vk::CmdEndQuery(cb, query_pool, 0u);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResults-flags-09443");
+    vk::CmdCopyQueryPoolResultsToMemoryKHR(cb, query_pool, 0u, 1u, &range, 0u,
+                                           VK_QUERY_RESULT_WITH_STATUS_BIT_KHR | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+    m_errorMonitor->VerifyFound();
+
+    cb.End();
+}
+
+TEST_F(NegativeVideo, VideoFormatQueryMissingProfileExtendedFlags) {
+    TEST_DESCRIPTION("vkGetPhysicalDeviceVideoFormatPropertiesKHR with extended flags - missing profile info");
+    AddRequiredExtensions(VK_KHR_EXTENDED_FLAGS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedFlags);
+    RETURN_IF_SKIP(Init());
+
+    if (!GetConfig()) {
+        GTEST_SKIP() << "Test requires video support";
+    }
+
+    VkImageUsageFlags2CreateInfoKHR image_usage_flags_2 = vku::InitStructHelper();
+    image_usage_flags_2.usage = VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR;
+    auto format_info = vku::InitStruct<VkPhysicalDeviceVideoFormatInfoKHR>(&image_usage_flags_2);
+    uint32_t format_count = 0;
+
+    m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoFormatPropertiesKHR-pNext-06812");
+    vk::GetPhysicalDeviceVideoFormatPropertiesKHR(Gpu(), &format_info, &format_count, nullptr);
+    m_errorMonitor->VerifyFound();
+
+    auto profile_list = vku::InitStruct<VkVideoProfileListInfoKHR>();
+    image_usage_flags_2.pNext = &profile_list;
+
+    m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoFormatPropertiesKHR-pNext-06812");
+    vk::GetPhysicalDeviceVideoFormatPropertiesKHR(Gpu(), &format_info, &format_count, nullptr);
     m_errorMonitor->VerifyFound();
 }

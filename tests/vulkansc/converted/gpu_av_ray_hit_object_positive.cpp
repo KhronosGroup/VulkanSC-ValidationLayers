@@ -18,9 +18,9 @@
  * limitations under the License.
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/ray_tracing_objects.h"
+#include "layer_validation_tests.h"
+#include "descriptor_helper.h"
+#include "ray_tracing_objects.h"
 
 // Positive tests for VK_EXT_ray_tracing_invocation_reorder hit object operations
 
@@ -59,7 +59,7 @@ TEST_F(PositiveGpuAVRayHitObject, TraceRayBasic) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -106,7 +106,7 @@ TEST_F(PositiveGpuAVRayHitObject, DynamicTminTmax) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -138,7 +138,7 @@ TEST_F(PositiveGpuAVRayHitObject, DynamicTminTmax) {
 
     pipeline.Build();
 
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = 0.1f;    // tmin
     ptr[1] = 100.0f;  // tmax
 
@@ -161,7 +161,7 @@ TEST_F(PositiveGpuAVRayHitObject, DynamicRayFlags) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -194,7 +194,7 @@ TEST_F(PositiveGpuAVRayHitObject, DynamicRayFlags) {
     pipeline.Build();
 
     // Test with valid flag combination: OpaqueKHR | CullBackFacingTrianglesKHR
-    auto *ptr = static_cast<uint32_t *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     ptr[0] = 0x1 | 0x10;  // OpaqueKHR | CullBackFacingTrianglesKHR
 
     m_command_buffer.Begin();
@@ -216,7 +216,7 @@ TEST_F(PositiveGpuAVRayHitObject, DynamicRayFlagsSkipTriangles) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -250,7 +250,7 @@ TEST_F(PositiveGpuAVRayHitObject, DynamicRayFlagsSkipTriangles) {
     pipeline.Build();
 
     // SkipTrianglesKHR alone is valid (no pipeline SKIP_AABBS flag)
-    auto *ptr = static_cast<uint32_t *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     ptr[0] = 0x100;  // SkipTrianglesKHR
 
     m_command_buffer.Begin();
@@ -272,7 +272,7 @@ TEST_F(PositiveGpuAVRayHitObject, TraceReorderExecuteBasic) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -319,7 +319,7 @@ TEST_F(PositiveGpuAVRayHitObject, TraceRayMotionValidTime) {
     vkt::rt::Pipeline pipeline(*this, m_device);
     pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_ALLOW_MOTION_BIT_NV);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -353,7 +353,7 @@ TEST_F(PositiveGpuAVRayHitObject, TraceRayMotionValidTime) {
     pipeline.Build();
 
     // Test with time = 0.5 (valid)
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = 0.5f;
 
     m_command_buffer.Begin();
@@ -386,7 +386,7 @@ TEST_F(PositiveGpuAVRayHitObject, TraceMotionReorderExecuteValidTime) {
     vkt::rt::Pipeline pipeline(*this, m_device);
     pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_ALLOW_MOTION_BIT_NV);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_shader_invocation_reorder : require
@@ -420,7 +420,7 @@ TEST_F(PositiveGpuAVRayHitObject, TraceMotionReorderExecuteValidTime) {
     pipeline.Build();
 
     // Test with time = 0.5 (valid)
-    auto *ptr = static_cast<float *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     ptr[0] = 0.5f;
 
     m_command_buffer.Begin();
@@ -453,7 +453,7 @@ TEST_F(PositiveGpuAVRayHitObject, SBTIndexWithinLimit) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         #extension GL_EXT_ray_query : require
@@ -483,7 +483,7 @@ TEST_F(PositiveGpuAVRayHitObject, SBTIndexWithinLimit) {
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
     vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto *ptr = static_cast<uint32_t *>(uniform_buffer.Memory().Map());
+    auto* ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     // Use 0 which is always valid
     ptr[0] = 0;
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE);

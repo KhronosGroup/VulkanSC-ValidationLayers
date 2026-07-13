@@ -27,6 +27,7 @@ struct DeviceExtensions;
 
 namespace vvl {
 class CommandBuffer;
+class Buffer;
 }  // namespace vvl
 
 struct SyncMemoryBarrier {
@@ -55,6 +56,11 @@ struct SyncMemoryBarrier {
           srcAccessMask(barrier.srcAccessMask),
           dstStageMask(barrier.dstStageMask),
           dstAccessMask(barrier.dstAccessMask) {}
+    explicit SyncMemoryBarrier(const VkMemoryRangeBarrierKHR& barrier)
+        : srcStageMask(barrier.srcStageMask),
+          srcAccessMask(barrier.srcAccessMask),
+          dstStageMask(barrier.dstStageMask),
+          dstAccessMask(barrier.dstAccessMask) {}
     SyncMemoryBarrier(const VkMemoryBarrier& barrier, VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask)
         : srcStageMask(src_stage_mask),
           srcAccessMask(barrier.srcAccessMask),
@@ -72,6 +78,12 @@ struct SyncMemoryBarrier {
           dstStageMask(dst_stage_mask),
           dstAccessMask(barrier.dstAccessMask) {}
     SyncMemoryBarrier(const VkTensorMemoryBarrierARM& barrier, VkPipelineStageFlags src_stage_mask,
+                      VkPipelineStageFlags dst_stage_mask)
+        : srcStageMask(src_stage_mask),
+          srcAccessMask(barrier.srcAccessMask),
+          dstStageMask(dst_stage_mask),
+          dstAccessMask(barrier.dstAccessMask) {}
+    SyncMemoryBarrier(const VkMemoryRangeBarrierKHR& barrier, VkPipelineStageFlags src_stage_mask,
                       VkPipelineStageFlags dst_stage_mask)
         : srcStageMask(src_stage_mask),
           srcAccessMask(barrier.srcAccessMask),
@@ -109,6 +121,10 @@ struct OwnershipTransferBarrier : SyncMemoryBarrier {
         : SyncMemoryBarrier(barrier),
           srcQueueFamilyIndex(barrier.srcQueueFamilyIndex),
           dstQueueFamilyIndex(barrier.dstQueueFamilyIndex) {}
+    OwnershipTransferBarrier(const VkMemoryRangeBarrierKHR& barrier)
+        : SyncMemoryBarrier(barrier),
+          srcQueueFamilyIndex(barrier.srcQueueFamilyIndex),
+          dstQueueFamilyIndex(barrier.dstQueueFamilyIndex) {}
 
     OwnershipTransferOp TransferOp(uint32_t command_pool_queue_family) const {
         if (srcQueueFamilyIndex != dstQueueFamilyIndex) {
@@ -129,6 +145,7 @@ struct BufferBarrier : OwnershipTransferBarrier {
 
     explicit BufferBarrier(const VkBufferMemoryBarrier2& barrier)
         : OwnershipTransferBarrier(barrier), buffer(barrier.buffer), offset(barrier.offset), size(barrier.size) {}
+    explicit BufferBarrier(const VkMemoryRangeBarrierKHR& barrier, const vvl::Buffer& buffer);
     BufferBarrier(const VkBufferMemoryBarrier& barrier, VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask)
         : OwnershipTransferBarrier(barrier, src_stage_mask, dst_stage_mask),
           buffer(barrier.buffer),
@@ -256,17 +273,6 @@ template <typename TransferBarrier>
 using GlobalQFOTransferBarrierMap =
     vvl::concurrent_unordered_map<typename TransferBarrier::HandleType, QFOTransferBarrierSet<TransferBarrier>>;
 
-// Submit queue uses the Scoreboard to track all release/acquire operations in a batch.
-template <typename TransferBarrier>
-using QFOTransferCBScoreboard =
-    vvl::unordered_map<TransferBarrier, const vvl::CommandBuffer*, QFOTransferBarrierHash<TransferBarrier>>;
-
-template <typename TransferBarrier>
-struct QFOTransferCBScoreboards {
-    QFOTransferCBScoreboard<TransferBarrier> acquire;
-    QFOTransferCBScoreboard<TransferBarrier> release;
-};
-
 namespace sync_utils {
 VkPipelineStageFlags2 DisabledPipelineStages(const DeviceFeatures& features, const DeviceExtensions& device_extensions);
 VkAccessFlags2 DisabledAccesses(const DeviceExtensions& device_extensions);
@@ -277,6 +283,9 @@ std::string StringPipelineStageFlags(VkPipelineStageFlags2 mask, bool sync1 = fa
 // and ALL_GRAPHICS_BIT will be limited to what is supported.
 VkPipelineStageFlags2 ExpandPipelineStages(VkPipelineStageFlags2 stage_mask, VkQueueFlags queue_flags,
                                            const VkPipelineStageFlags2 disabled_feature_mask = 0);
+
+VkPipelineStageFlags2 AddEarlierPipelineStages(VkPipelineStageFlags2 stage_mask);
+VkPipelineStageFlags2 AddLaterPipelineStages(VkPipelineStageFlags2 stage_mask);
 
 VkAccessFlags2 CompatibleAccessMask(VkPipelineStageFlags2 stage_mask);
 

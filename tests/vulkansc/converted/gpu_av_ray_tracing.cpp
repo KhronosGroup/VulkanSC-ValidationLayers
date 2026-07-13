@@ -14,16 +14,19 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/ray_tracing_objects.h"
-#include "../framework/gpu_av_helper.h"
+#include <cmath>
+#include <vulkan/utility/vk_format_utils.h>
+#include "layer_validation_tests.h"
+#include "descriptor_helper.h"
+#include "ray_tracing_objects.h"
+#include "gpu_av_helper.h"
 #include "utils/math_utils.h"
 
 class NegativeGpuAVRayTracing : public GpuAVRayTracingTest {};
 
-TEST_F(NegativeGpuAVRayTracing, CmdTraceRaysIndirect) {
-    TEST_DESCRIPTION("Test debug printf in raygen shader.");
+// In practice, tracing more rays than the driver allows will likely crash it
+// so disable this test
+TEST_F(NegativeGpuAVRayTracing, DISABLED_CmdTraceRaysIndirect) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::rayTracingPipeline);
@@ -39,7 +42,7 @@ TEST_F(NegativeGpuAVRayTracing, CmdTraceRaysIndirect) {
 
     vkt::rt::Pipeline pipeline(*this, m_device);
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
         layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
@@ -77,21 +80,21 @@ TEST_F(NegativeGpuAVRayTracing, CmdTraceRaysIndirect) {
 
     VkTraceRaysIndirectCommandKHR trace_rays_dim{rt_pipeline_props.maxRayDispatchInvocationCount + 1, 1, 1};
 
-    uint8_t *ray_query_dimensions_buffer_1_ptr = (uint8_t *)trace_rays_big_width.Memory().Map();
+    uint8_t* ray_query_dimensions_buffer_1_ptr = (uint8_t*)trace_rays_big_width.Memory().Map();
     std::memcpy(ray_query_dimensions_buffer_1_ptr, &trace_rays_dim, sizeof(trace_rays_dim));
 
     trace_rays_dim = {1, rt_pipeline_props.maxRayDispatchInvocationCount + 1, 1};
 
     vkt::Buffer trace_rays_big_height(*m_device, 4096, buffer_usage, vkt::device_address);
 
-    uint8_t *ray_query_dimensions_buffer_2_ptr = (uint8_t *)trace_rays_big_height.Memory().Map();
+    uint8_t* ray_query_dimensions_buffer_2_ptr = (uint8_t*)trace_rays_big_height.Memory().Map();
     std::memcpy(ray_query_dimensions_buffer_2_ptr, &trace_rays_dim, sizeof(trace_rays_dim));
 
     trace_rays_dim = {1, 1, rt_pipeline_props.maxRayDispatchInvocationCount + 1};
 
     vkt::Buffer trace_ray_big_depth(*m_device, 4096, buffer_usage, vkt::device_address);
 
-    uint8_t *ray_query_dimensions_buffer_3_ptr = (uint8_t *)trace_ray_big_depth.Memory().Map();
+    uint8_t* ray_query_dimensions_buffer_3_ptr = (uint8_t*)trace_ray_big_depth.Memory().Map();
     std::memcpy(ray_query_dimensions_buffer_3_ptr, &trace_rays_dim, sizeof(trace_rays_dim));
 
     m_command_buffer.Begin();
@@ -156,7 +159,7 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
 
     // Set shaders
 
-    const char *ray_gen = R"glsl(
+    const char* ray_gen = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require // Requires SPIR-V 1.5 (Vulkan 1.2)
         #extension GL_EXT_buffer_reference : enable
@@ -180,7 +183,7 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
     )glsl";
     pipeline.SetGlslRayGenShader(ray_gen);
 
-    const char *miss = R"glsl(
+    const char* miss = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
 
@@ -192,7 +195,7 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
     )glsl";
     pipeline.AddGlslMissShader(miss);
 
-    const char *closest_hit = R"glsl(
+    const char* closest_hit = R"glsl(
         #version 460
         #extension GL_EXT_ray_tracing : require
 
@@ -217,7 +220,7 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
     // Create uniform_buffer
     vkt::Buffer rt_params_buffer(*m_device, 4 * sizeof(float), 0, vkt::device_address);  // missing space for Tmin and Tmax
     vkt::Buffer uniform_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(uniform_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     data[0] = rt_params_buffer.Address();
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, 16, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
@@ -231,7 +234,7 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
         m_errorMonitor->SetDesiredWarning(
             "This Pipeline Layout has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
             "pipelines created with it");
-        std::vector<const vkt::DescriptorSetLayout *> desc_set_layouts(max_bound_desc_sets);
+        std::vector<const vkt::DescriptorSetLayout*> desc_set_layouts(max_bound_desc_sets);
         for (uint32_t i = 0; i < max_bound_desc_sets; i++) {
             desc_set_layouts[i] = &pipeline.GetDescriptorSet().layout_;
         }
@@ -240,7 +243,7 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
     }
 
     // Then use the maximum allowed number of sets
-    std::vector<const vkt::DescriptorSetLayout *> des_set_layouts(max_bound_desc_sets - 1);
+    std::vector<const vkt::DescriptorSetLayout*> des_set_layouts(max_bound_desc_sets - 1);
     for (uint32_t i = 0; i < max_bound_desc_sets - 1; i++) {
         des_set_layouts[i] = &pipeline.GetDescriptorSet().layout_;
     }
@@ -303,7 +306,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferRayGenShader) {
     vkt::as::BuildGeometryInfoKHR cubes_tlas =
         vkt::as::blueprint::GetCubesTLAS(*m_device, m_command_buffer, *m_default_queue, cube_blas);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         struct UniformBuffer {
             uint ray_payload_i;
@@ -391,7 +394,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferRayGenShader) {
 
         m_command_buffer.End();
 
-        uint32_t *uniform_buffer_ptr = (uint32_t *)uniform_buffer.Memory().Map();
+        uint32_t* uniform_buffer_ptr = (uint32_t*)uniform_buffer.Memory().Map();
 
         {
             uniform_buffer_ptr[0] = 25;
@@ -445,7 +448,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferMissShader) {
     vkt::as::BuildGeometryInfoKHR cubes_tlas =
         vkt::as::blueprint::GetCubesTLAS(*m_device, m_command_buffer, *m_default_queue, cube_blas);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         struct UniformBuffer {
             uint ray_payload_i;
@@ -531,7 +534,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferMissShader) {
 
         m_command_buffer.End();
 
-        uint32_t *uniform_buffer_ptr = (uint32_t *)uniform_buffer.Memory().Map();
+        uint32_t* uniform_buffer_ptr = (uint32_t*)uniform_buffer.Memory().Map();
 
         {
             uniform_buffer_ptr[0] = 25;
@@ -584,7 +587,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferClosetHitShader) {
     std::shared_ptr<vkt::as::BuildGeometryInfoKHR> cube_blas;
     vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::GetCubesTLAS(*m_device, m_command_buffer, *m_default_queue, cube_blas);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         struct UniformBuffer {
             uint ray_payload_i;
@@ -671,7 +674,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferClosetHitShader) {
 
         m_command_buffer.End();
 
-        uint32_t *uniform_buffer_ptr = (uint32_t *)uniform_buffer.Memory().Map();
+        uint32_t* uniform_buffer_ptr = (uint32_t*)uniform_buffer.Memory().Map();
 
         {
             uniform_buffer_ptr[0] = 25;
@@ -723,7 +726,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferTwoClosetHitShader) {
     std::shared_ptr<vkt::as::BuildGeometryInfoKHR> cube_blas;
     vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::GetCubesTLAS(*m_device, m_command_buffer, *m_default_queue, cube_blas);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         struct UniformBuffer {
             uint ray_payload_i;
@@ -830,7 +833,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferTwoClosetHitShader) {
 
         m_command_buffer.End();
 
-        uint32_t *uniform_buffer_ptr = (uint32_t *)uniform_buffer.Memory().Map();
+        uint32_t* uniform_buffer_ptr = (uint32_t*)uniform_buffer.Memory().Map();
 
         {
             uniform_buffer_ptr[0] = 25;
@@ -889,7 +892,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferRayGenShaderGPL) {
     vkt::as::BuildGeometryInfoKHR cubes_tlas =
         vkt::as::blueprint::GetCubesTLAS(*m_device, m_command_buffer, *m_default_queue, cube_blas);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         struct UniformBuffer {
             uint ray_payload_i;
@@ -971,7 +974,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferRayGenShaderGPL) {
     }
     vkt::Buffer debug_buffer(*m_device, 16 * sizeof(uint32_t),
                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, kHostVisibleMemProps);
-    uint32_t *debug_buffer_ptr = (uint32_t *)debug_buffer.Memory().Map();
+    uint32_t* debug_buffer_ptr = (uint32_t*)debug_buffer.Memory().Map();
     memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
     pipeline.GetDescriptorIndexingSet().WriteDescriptorBufferInfo(10, debug_buffer, 0, VK_WHOLE_SIZE,
@@ -996,7 +999,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferRayGenShaderGPL) {
 
         m_command_buffer.End();
 
-        uint32_t *uniform_buffer_ptr = (uint32_t *)uniform_buffer.Memory().Map();
+        uint32_t* uniform_buffer_ptr = (uint32_t*)uniform_buffer.Memory().Map();
         {
             uniform_buffer_ptr[0] = 42;
             SCOPED_TRACE("Out of Bounds");
@@ -1056,7 +1059,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferMissShaderGPL) {
     vkt::as::BuildGeometryInfoKHR cubes_tlas =
         vkt::as::blueprint::GetCubesTLAS(*m_device, m_command_buffer, *m_default_queue, cube_blas);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         struct UniformBuffer {
             uint ray_payload_i;
@@ -1139,7 +1142,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferMissShaderGPL) {
     }
     vkt::Buffer debug_buffer(*m_device, 16 * sizeof(uint32_t),
                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, kHostVisibleMemProps);
-    uint32_t *debug_buffer_ptr = (uint32_t *)debug_buffer.Memory().Map();
+    uint32_t* debug_buffer_ptr = (uint32_t*)debug_buffer.Memory().Map();
     memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
     pipeline.GetDescriptorIndexingSet().WriteDescriptorBufferInfo(10, debug_buffer, 0, VK_WHOLE_SIZE,
@@ -1164,7 +1167,7 @@ TEST_F(NegativeGpuAVRayTracing, ArrayOOBBufferMissShaderGPL) {
 
         m_command_buffer.End();
 
-        uint32_t *uniform_buffer_ptr = (uint32_t *)uniform_buffer.Memory().Map();
+        uint32_t* uniform_buffer_ptr = (uint32_t*)uniform_buffer.Memory().Map();
         {
             uniform_buffer_ptr[0] = 42;
             SCOPED_TRACE("Out of Bounds");
@@ -1249,7 +1252,7 @@ TEST_F(NegativeGpuAVRayTracing, InvalidBlasReference1) {
 
     cube_instances[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_2);
 
-    cube_instances[0].UpdateAccelerationStructureInstance(0, [](VkAccelerationStructureInstanceKHR &instance) {
+    cube_instances[0].UpdateAccelerationStructureInstance(0, [](VkAccelerationStructureInstanceKHR& instance) {
         instance.accelerationStructureReference = static_cast<uint64_t>(0xbaadbeef);
     });
 
@@ -1271,10 +1274,10 @@ TEST_F(NegativeGpuAVRayTracing, InvalidBlasReference1) {
     // Buffer used to count invocations for the 3 shaders
     vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              kHostVisibleMemProps);
-    auto debug_buffer_ptr = static_cast<uint32_t *>(debug_buffer.Memory().Map());
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
     std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
 
@@ -1416,7 +1419,7 @@ TEST_F(NegativeGpuAVRayTracing, InvalidBlasReference2) {
 
     tlas_1[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_2);
 
-    tlas_1[0].UpdateAccelerationStructureInstance(0, [](VkAccelerationStructureInstanceKHR &instance) {
+    tlas_1[0].UpdateAccelerationStructureInstance(0, [](VkAccelerationStructureInstanceKHR& instance) {
         instance.accelerationStructureReference = static_cast<uint64_t>(0x10);
     });
 
@@ -1470,10 +1473,10 @@ TEST_F(NegativeGpuAVRayTracing, InvalidBlasReference2) {
     // Buffer used to count invocations for the 3 shaders
     vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              kHostVisibleMemProps);
-    auto debug_buffer_ptr = static_cast<uint32_t *>(debug_buffer.Memory().Map());
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
     std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
 
@@ -1660,10 +1663,10 @@ TEST_F(NegativeGpuAVRayTracing, InvalidBlasReference3) {
     // Buffer used to count invocations for the 3 shaders
     vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              kHostVisibleMemProps);
-    auto debug_buffer_ptr = static_cast<uint32_t *>(debug_buffer.Memory().Map());
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
     std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
 
@@ -1823,10 +1826,10 @@ TEST_F(NegativeGpuAVRayTracing, InvalidBlasReference4) {
     // Buffer used to count invocations for the 3 shaders
     vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              kHostVisibleMemProps);
-    auto debug_buffer_ptr = static_cast<uint32_t *>(debug_buffer.Memory().Map());
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
     std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
 
@@ -2001,10 +2004,10 @@ TEST_F(NegativeGpuAVRayTracing, BLASBuiltAndUsedInTLAS) {
     // Buffer used to count invocations for the 3 shaders
     vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              kHostVisibleMemProps);
-    auto debug_buffer_ptr = static_cast<uint32_t *>(debug_buffer.Memory().Map());
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
     std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
 
@@ -2165,10 +2168,10 @@ TEST_F(NegativeGpuAVRayTracing, BLASUpdatedAndUsedInTLAS) {
     // Buffer used to count invocations for the 3 shaders
     vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              kHostVisibleMemProps);
-    auto debug_buffer_ptr = static_cast<uint32_t *>(debug_buffer.Memory().Map());
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
     std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
 
@@ -2343,10 +2346,10 @@ TEST_F(NegativeGpuAVRayTracing, TLASinBLASlist) {
     // Buffer used to count invocations for the 3 shaders
     vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              kHostVisibleMemProps);
-    auto debug_buffer_ptr = static_cast<uint32_t *>(debug_buffer.Memory().Map());
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
     std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
-    const char *slang_shader = R"slang(
+    const char* slang_shader = R"slang(
         [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
         [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
 
@@ -2443,8 +2446,8 @@ TEST_F(NegativeGpuAVRayTracing, OutOfBoundsIndex) {
 
     vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
 
-    vkt::Buffer &cube_index_buffer = cube.GetTrianglesDeviceIndexBuffer();
-    auto index_buffer_ptr = static_cast<uint32_t *>(cube_index_buffer.Memory().Map());
+    vkt::Buffer& cube_index_buffer = cube.GetTrianglesDeviceIndexBuffer();
+    auto index_buffer_ptr = static_cast<uint32_t*>(cube_index_buffer.Memory().Map());
     index_buffer_ptr[0] = 30;
     index_buffer_ptr[6] = 42;
     index_buffer_ptr[35] = 666;
@@ -2541,7 +2544,7 @@ TEST_F(NegativeGpuAVRayTracing, OutOfBoundsIndex3) {
 
     vkt::Buffer index_buffer(*m_device, sizeof(indices[0]) * indices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
 
-    auto index_buffer_ptr = static_cast<uint32_t *>(index_buffer.Memory().Map());
+    auto index_buffer_ptr = static_cast<uint32_t*>(index_buffer.Memory().Map());
     std::copy(indices.begin(), indices.end(), index_buffer_ptr);
     index_buffer.Memory().Unmap();
 
@@ -2603,7 +2606,7 @@ TEST_F(NegativeGpuAVRayTracing, IllFormedAabb) {
 
     vkt::Buffer aabbs_buffer(*m_device, sizeof(aabbs[0]) * aabbs.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
 
-    auto aabbs_buffer_ptr = static_cast<VkAabbPositionsKHR *>(aabbs_buffer.Memory().Map());
+    auto aabbs_buffer_ptr = static_cast<VkAabbPositionsKHR*>(aabbs_buffer.Memory().Map());
     std::copy(aabbs.begin(), aabbs.end(), aabbs_buffer_ptr);
     aabbs_buffer.Memory().Unmap();
 
@@ -2657,7 +2660,7 @@ TEST_F(NegativeGpuAVRayTracing, BuildAccelerationStructuresList2) {
     }};
     // clang-format on
 
-    auto transform_buffer_ptr = static_cast<VkTransformMatrixKHR *>(transform_buffer.Memory().Map());
+    auto transform_buffer_ptr = static_cast<VkTransformMatrixKHR*>(transform_buffer.Memory().Map());
     std::memcpy(transform_buffer_ptr + 64, &transform_matrix, sizeof(transform_matrix));
     transform_buffer.Memory().Unmap();
 
@@ -2673,4 +2676,1729 @@ TEST_F(NegativeGpuAVRayTracing, BuildAccelerationStructuresList2) {
     m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, InvalidIndexBufferUpdate) {
+    TEST_DESCRIPTION("Use an updated index buffer in an AS build update.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+
+    std::array<uint32_t, 3 * 2 * 6> indices = {
+        {3, 0, 4, 4, 7, 3, 0, 4, 5, 0, 5, 1, 4, 5, 6, 4, 6, 7, 1, 6, 5, 1, 2, 6, 2, 6, 7, 2, 7, 3, 0, 1, 3, 1, 3, 2}};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    vkt::Buffer index_buffer(*m_device, sizeof(indices[0]) * indices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+    auto index_buffer_ptr = static_cast<uint32_t*>(index_buffer.Memory().Map());
+    std::copy(indices.begin(), indices.end(), index_buffer_ptr);
+    index_buffer.Memory().Unmap();
+
+    cube.SetTrianglesDeviceIndexBuffer(std::move(index_buffer));
+
+    vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
+    cube_blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    cube_blas.SetSrcAS(cube_blas.GetDstAS());
+    cube_blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    {
+        SCOPED_TRACE("Update index buffer values");
+        index_buffer_ptr = static_cast<uint32_t*>(cube_blas.GetGeometries()[0].GetTrianglesDeviceIndexBuffer().Memory().Map());
+
+        index_buffer_ptr[0] = 0;
+        index_buffer_ptr[5] = 2;
+        index_buffer_ptr[indices.size() - 1] = 1;
+
+        cube_blas.GetGeometries()[0].GetTrianglesDeviceIndexBuffer().Memory().Unmap();
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 0.*was 3, but.*is 0");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 5.*was 3, but.*is 2");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 35.*was 2, but.*is 1");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        SCOPED_TRACE("Change index buffer, use it an offset through using primitiveOffset, and also update index values");
+        constexpr uint32_t index_buffer_2_byte_offset = 64;
+        constexpr uint32_t index_buffer_2_dword_offset = index_buffer_2_byte_offset / sizeof(uint32_t);
+        vkt::Buffer index_buffer_2(*m_device, sizeof(indices[0]) * indices.size() + index_buffer_2_byte_offset, buffer_usage,
+                                   kHostVisibleMemProps, &alloc_flags);
+        auto index_buffer_2_ptr = static_cast<uint32_t*>(index_buffer_2.Memory().Map());
+        std::copy(indices.begin(), indices.end(), index_buffer_2_ptr + index_buffer_2_dword_offset);
+
+        index_buffer_2_ptr[0 + index_buffer_2_dword_offset] = 0;
+        index_buffer_2_ptr[5 + index_buffer_2_dword_offset] = 2;
+        index_buffer_2_ptr[indices.size() - 1 + index_buffer_2_dword_offset] = 1;
+
+        index_buffer_2.Memory().Unmap();
+
+        cube_blas.GetGeometries()[0].SetTrianglesDeviceIndexBuffer(std::move(index_buffer_2));
+        auto build_range_infos = cube_blas.GetBuildRangeInfosFromGeometries();
+        build_range_infos[0].primitiveOffset = index_buffer_2_byte_offset;
+        cube_blas.SetBuildRanges(build_range_infos);
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 0.*was 3, but.*is 0");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 5.*was 3, but.*is 2");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 35.*was 2, but.*is 1");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+
+        build_range_infos = cube_blas.GetBuildRangeInfosFromGeometries();
+        build_range_infos[0].primitiveOffset = 0;
+        cube_blas.SetBuildRanges(build_range_infos);
+    }
+}
+
+TEST_F(NegativeGpuAVRayTracing, InvalidIndexBufferUpdate2) {
+    TEST_DESCRIPTION("Use an updated index buffer in an AS build update.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    constexpr std::array<uint32_t, 3 * 2 * 6> indices = {
+        {3, 0, 4, 4, 7, 3, 0, 4, 5, 0, 5, 1, 4, 5, 6, 4, 6, 7, 1, 6, 5, 1, 2, 6, 2, 6, 7, 2, 7, 3, 0, 1, 3, 1, 3, 2}};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    auto get_cube = [&]() {
+        vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+
+        vkt::Buffer index_buffer(*m_device, sizeof(indices[0]) * indices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+        auto index_buffer_ptr = static_cast<uint32_t*>(index_buffer.Memory().Map());
+        std::copy(indices.begin(), indices.end(), index_buffer_ptr);
+        index_buffer.Memory().Unmap();
+
+        cube.SetTrianglesDeviceIndexBuffer(std::move(index_buffer));
+
+        return cube;
+    };
+
+    vkt::as::GeometryKHR cube_0 = get_cube();
+    vkt::as::GeometryKHR cube_1 = get_cube();
+
+    vkt::as::BuildGeometryInfoKHR cube_blas =
+        vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube_0));
+    cube_blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+    cube_blas.GetGeometries().emplace_back(std::move(cube_1));
+    cube_blas.SetBuildRanges(cube_blas.GetBuildRangeInfosFromGeometries());
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    cube_blas.SetSrcAS(cube_blas.GetDstAS());
+    cube_blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    {
+        SCOPED_TRACE("Update index buffer values");
+        auto index_buffer_ptr = static_cast<uint32_t*>(cube_blas.GetGeometries()[1].GetTrianglesDeviceIndexBuffer().Memory().Map());
+        index_buffer_ptr[0] = 0;
+        index_buffer_ptr[5] = 2;
+        index_buffer_ptr[indices.size() - 1] = 1;
+        cube_blas.GetGeometries()[1].GetTrianglesDeviceIndexBuffer().Memory().Unmap();
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 0.*was 3, but.*is 0");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 5.*was 3, but.*is 2");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 35.*was 2, but.*is 1");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        SCOPED_TRACE("Change index buffer, use it an offset through using primitiveOffset, and also update index values");
+        constexpr uint32_t index_buffer_2_byte_offset = 64;
+        constexpr uint32_t index_buffer_2_dword_offset = index_buffer_2_byte_offset / sizeof(uint32_t);
+        vkt::Buffer index_buffer_2(*m_device, sizeof(indices[0]) * indices.size() + index_buffer_2_byte_offset, buffer_usage,
+                                   kHostVisibleMemProps, &alloc_flags);
+        auto index_buffer_2_ptr = static_cast<uint32_t*>(index_buffer_2.Memory().Map());
+        std::copy(indices.begin(), indices.end(), index_buffer_2_ptr + index_buffer_2_dword_offset);
+
+        index_buffer_2_ptr[0 + index_buffer_2_dword_offset] = 0;
+        index_buffer_2_ptr[5 + index_buffer_2_dword_offset] = 2;
+        index_buffer_2_ptr[indices.size() - 1 + index_buffer_2_dword_offset] = 1;
+
+        index_buffer_2.Memory().Unmap();
+
+        cube_blas.GetGeometries()[1].SetTrianglesDeviceIndexBuffer(std::move(index_buffer_2));
+        auto build_range_infos = cube_blas.GetBuildRangeInfosFromGeometries();
+        build_range_infos[1].primitiveOffset = index_buffer_2_byte_offset;
+        cube_blas.SetBuildRanges(build_range_infos);
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 0.*was 3, but.*is 0");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 5.*was 3, but.*is 2");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 35.*was 2, but.*is 1");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+
+        build_range_infos = cube_blas.GetBuildRangeInfosFromGeometries();
+        build_range_infos[1].primitiveOffset = 0;
+        cube_blas.SetBuildRanges(build_range_infos);
+    }
+
+    {
+        SCOPED_TRACE(
+            "Change index buffer, use it an offset through changing base index data address, and also update index values");
+        constexpr uint32_t index_buffer_2_byte_offset = 64;
+        constexpr uint32_t index_buffer_2_dword_offset = index_buffer_2_byte_offset / sizeof(uint32_t);
+        vkt::Buffer index_buffer_2(*m_device, sizeof(indices[0]) * indices.size() + index_buffer_2_byte_offset, buffer_usage,
+                                   kHostVisibleMemProps, &alloc_flags);
+        auto index_buffer_2_ptr = static_cast<uint32_t*>(index_buffer_2.Memory().Map());
+        std::copy(indices.begin(), indices.end(), index_buffer_2_ptr + index_buffer_2_dword_offset);
+
+        index_buffer_2_ptr[0 + index_buffer_2_dword_offset] = 0;
+        index_buffer_2_ptr[5 + index_buffer_2_dword_offset] = 2;
+        index_buffer_2_ptr[indices.size() - 1 + index_buffer_2_dword_offset] = 1;
+
+        index_buffer_2.Memory().Unmap();
+
+        cube_blas.GetGeometries()[1].SetTrianglesDeviceIndexBuffer(std::move(index_buffer_2));
+        const VkDeviceAddress index_buffer_addr = cube_blas.GetGeometries()[1].GetTrianglesDeviceIndexBuffer().Address();
+        cube_blas.GetGeometries()[1].SetTrianglesIndexBufferDeviceAddress(index_buffer_addr + index_buffer_2_byte_offset);
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 0.*was 3, but.*is 0");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 5.*was 3, but.*is 2");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 35.*was 2, but.*is 1");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeGpuAVRayTracing, InvalidIndexBufferUpdate2Uint16) {
+    TEST_DESCRIPTION("Use an updated index buffer in an AS build update. Use uint16");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    constexpr std::array<uint16_t, 3 * 2 * 6> indices = {
+        {3, 0, 4, 4, 7, 3, 0, 4, 5, 0, 5, 1, 4, 5, 6, 4, 6, 7, 1, 6, 5, 1, 2, 6, 2, 6, 7, 2, 7, 3, 0, 1, 3, 1, 3, 2}};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    auto get_cube = [&]() {
+        vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+
+        vkt::Buffer index_buffer(*m_device, sizeof(indices[0]) * indices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+        auto index_buffer_ptr = static_cast<uint16_t*>(index_buffer.Memory().Map());
+        std::copy(indices.begin(), indices.end(), index_buffer_ptr);
+        index_buffer.Memory().Unmap();
+
+        cube.SetTrianglesDeviceIndexBuffer(std::move(index_buffer), VK_INDEX_TYPE_UINT16);
+
+        return cube;
+    };
+
+    vkt::as::GeometryKHR cube_0 = get_cube();
+    vkt::as::GeometryKHR cube_1 = get_cube();
+
+    vkt::as::BuildGeometryInfoKHR cube_blas =
+        vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube_0));
+    cube_blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+    cube_blas.GetGeometries().emplace_back(std::move(cube_1));
+    cube_blas.SetBuildRanges(cube_blas.GetBuildRangeInfosFromGeometries());
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    cube_blas.SetSrcAS(cube_blas.GetDstAS());
+    cube_blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    {
+        SCOPED_TRACE("Update index buffer values");
+        auto index_buffer_ptr = static_cast<uint16_t*>(cube_blas.GetGeometries()[1].GetTrianglesDeviceIndexBuffer().Memory().Map());
+        index_buffer_ptr[5] = 2;
+        index_buffer_ptr[indices.size() - 1] = 1;
+        cube_blas.GetGeometries()[1].GetTrianglesDeviceIndexBuffer().Memory().Unmap();
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 5.*was 3, but.*is 2");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 35.*was 2, but.*is 1");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        SCOPED_TRACE("Change index buffer, use it an offset through using primitiveOffset, and also update index values");
+        constexpr uint32_t index_buffer_2_byte_offset = 64;
+        constexpr uint32_t index_buffer_2_word_offset = index_buffer_2_byte_offset / sizeof(uint16_t);
+        vkt::Buffer index_buffer_2(*m_device, sizeof(indices[0]) * indices.size() + index_buffer_2_byte_offset, buffer_usage,
+                                   kHostVisibleMemProps, &alloc_flags);
+        auto index_buffer_2_ptr = static_cast<uint16_t*>(index_buffer_2.Memory().Map());
+        std::copy(indices.begin(), indices.end(), index_buffer_2_ptr + index_buffer_2_word_offset);
+
+        index_buffer_2_ptr[5 + index_buffer_2_word_offset] = 2;
+        index_buffer_2_ptr[indices.size() - 1 + index_buffer_2_word_offset] = 1;
+
+        index_buffer_2.Memory().Unmap();
+
+        cube_blas.GetGeometries()[1].SetTrianglesDeviceIndexBuffer(std::move(index_buffer_2), VK_INDEX_TYPE_UINT16);
+        auto build_range_infos = cube_blas.GetBuildRangeInfosFromGeometries();
+        build_range_infos[1].primitiveOffset = index_buffer_2_byte_offset;
+        cube_blas.SetBuildRanges(build_range_infos);
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 5.*was 3, but.*is 2");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 35.*was 2, but.*is 1");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+
+        build_range_infos = cube_blas.GetBuildRangeInfosFromGeometries();
+        build_range_infos[1].primitiveOffset = 0;
+        cube_blas.SetBuildRanges(build_range_infos);
+    }
+
+    {
+        SCOPED_TRACE(
+            "Change index buffer, use it an offset through changing base index data address, and also update index values");
+        constexpr uint32_t index_buffer_2_byte_offset = 64;
+        constexpr uint32_t index_buffer_2_word_offset = index_buffer_2_byte_offset / sizeof(uint16_t);
+        vkt::Buffer index_buffer_2(*m_device, sizeof(indices[0]) * indices.size() + index_buffer_2_byte_offset, buffer_usage,
+                                   kHostVisibleMemProps, &alloc_flags);
+        auto index_buffer_2_ptr = static_cast<uint16_t*>(index_buffer_2.Memory().Map());
+        std::copy(indices.begin(), indices.end(), index_buffer_2_ptr + index_buffer_2_word_offset);
+
+        index_buffer_2_ptr[5 + index_buffer_2_word_offset] = 2;
+        index_buffer_2_ptr[indices.size() - 1 + index_buffer_2_word_offset] = 1;
+
+        index_buffer_2.Memory().Unmap();
+
+        cube_blas.GetGeometries()[1].SetTrianglesDeviceIndexBuffer(std::move(index_buffer_2), VK_INDEX_TYPE_UINT16);
+        const VkDeviceAddress index_buffer_addr = cube_blas.GetGeometries()[1].GetTrianglesDeviceIndexBuffer().Address();
+        cube_blas.GetGeometries()[1].SetTrianglesIndexBufferDeviceAddress(index_buffer_addr + index_buffer_2_byte_offset);
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 5.*was 3, but.*is 2");
+        m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03768",
+                                             "At offset 35.*was 2, but.*is 1");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeGpuAVRayTracing, VertexBufferUpdate) {
+    TEST_DESCRIPTION("Invalidly update a vertex from active to inactive, and inactive to active");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    struct Vertex {
+        float x, y, z;
+    };
+    const std::array<Vertex, 9> vertices = {{
+        {1.0f, 2.0f, 3.0f},
+        {NAN, 5.0f, 6.0f},
+        {7.0f, 8.0f, 9.0f},
+
+        {10.0f, 11.0f, 12.0f},
+        {13.0, 14.0f, 15.0f},
+        {16.0f, 17.0f, 18.0f},
+
+        {19.0f, 20.0f, 21.0f},
+        {NAN, 22.0f, 23.0f},
+        {24.0f, 25.0f, 26.0f},
+    }};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    vkt::Buffer vertex_buffer(*m_device, sizeof(vertices[0]) * vertices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+    auto vertex_buffer_ptr = static_cast<Vertex*>(vertex_buffer.Memory().Map());
+    std::copy(vertices.begin(), vertices.end(), vertex_buffer_ptr);
+    vertex_buffer.Memory().Unmap();
+
+    vkt::as::GeometryKHR geom;
+    geom.SetType(vkt::as::GeometryKHR::Type::Triangle);
+    geom.SetFlags(VK_GEOMETRY_OPAQUE_BIT_KHR);
+    geom.SetPrimitiveCount(3);
+    geom.SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer), uint32_t(vertices.size() - 1));
+    geom.SetTrianglesIndexType(VK_INDEX_TYPE_NONE_KHR);
+    // geom.SetTrianglesDeviceIndexBuffer(std::move(index_buffer), VK_INDEX_TYPE_UINT32);
+
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(geom));
+    blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+
+    m_command_buffer.Begin();
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    blas.SetSrcAS(blas.GetDstAS());
+    blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    {
+        auto vertices_copy = vertices;
+        vertices_copy[0].x = NAN;
+        vertices_copy[1].x = 1.0f;
+        vertices_copy[vertices_copy.size() - 1].x = NAN;
+        vertices_copy[7].x = -42.0f;
+        vkt::Buffer vertex_buffer_2(*m_device, sizeof(vertices_copy[0]) * vertices_copy.size(), buffer_usage, kHostVisibleMemProps,
+                                    &alloc_flags);
+        auto vertex_buffer_2_ptr = static_cast<Vertex*>(vertex_buffer_2.Memory().Map());
+        std::copy(vertices_copy.begin(), vertices_copy.end(), vertex_buffer_2_ptr);
+        vertex_buffer_2.Memory().Unmap();
+
+        blas.GetGeometries()[0].SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer_2), uint32_t(vertices_copy.size() - 1));
+
+        m_command_buffer.Begin();
+        blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03664",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 12 bytes, primitive was found at index 0 in vertex buffer");
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03663",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 12 bytes, primitive was found at index 1 in vertex buffer");
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03663",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 12 bytes, primitive was found at index 7 in vertex buffer");
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03664",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 12 bytes, primitive was found at index 8 in vertex buffer");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Vertex buffer 3 identical to vertex_buffer, but starting at an offset
+    {
+        const uint32_t vertex_buffer_3_byte_offset =
+            4 * vkuFormatTexelBlockSize(blas.GetGeometries()[0].GetVkObj().geometry.triangles.vertexFormat);
+        const uint32_t vertex_buffer_3_sizeof_vertex_offset = vertex_buffer_3_byte_offset / sizeof(Vertex);
+        vkt::Buffer vertex_buffer_3(*m_device, sizeof(vertices[0]) * vertices.size() + vertex_buffer_3_byte_offset, buffer_usage,
+                                    kHostVisibleMemProps, &alloc_flags);
+        auto vertex_buffer_3_ptr = static_cast<Vertex*>(vertex_buffer_3.Memory().Map());
+        std::copy(vertices.begin(), vertices.end(), vertex_buffer_3_ptr + vertex_buffer_3_sizeof_vertex_offset);
+        vertex_buffer_3.Memory().Unmap();
+
+        blas.GetGeometries()[0].SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer_3), uint32_t(vertices.size() - 1));
+        auto build_range_infos = blas.GetBuildRangeInfosFromGeometries();
+        build_range_infos[0].primitiveOffset = vertex_buffer_3_byte_offset;
+        blas.SetBuildRanges(build_range_infos);
+
+        m_command_buffer.Begin();
+        blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_default_queue->SubmitAndWait(m_command_buffer);
+    }
+}
+
+TEST_F(NegativeGpuAVRayTracing, VertexBufferUpdateStridedVerticesNoIndexBuffer) {
+    TEST_DESCRIPTION(
+        "Invalidly update a vertex from active to inactive, and inactive to active. Use an unusual vertex stride, and no index "
+        "buffer.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    struct Vertex {
+        float x, y, z;
+    };
+    const std::array<Vertex, 9> vertices = {{
+        {99.0f, 2.0f, 3.0f},
+        {NAN, 5.0f, 6.0f},
+        {7.0f, 8.0f, 9.0f},
+
+        {10.0f, 11.0f, 12.0f},
+        {13.0, 14.0f, 15.0f},
+        {16.0f, 17.0f, 18.0f},
+
+        {19.0f, 20.0f, 21.0f},
+        {NAN, 22.0f, 23.0f},
+        {24.0f, 25.0f, 26.0f},
+    }};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    const uint32_t vertex_stride = 2 * 12;
+
+    vkt::Buffer vertex_buffer(*m_device, vertex_stride * vertices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+    auto vertex_buffer_ptr = static_cast<uint8_t*>(vertex_buffer.Memory().Map());
+
+    for (uint32_t vertex_i = 0; vertex_i < vertices.size(); ++vertex_i) {
+        std::memcpy(vertex_buffer_ptr + vertex_i * vertex_stride, vertices.data() + vertex_i, sizeof(Vertex));
+    }
+
+    vertex_buffer.Memory().Unmap();
+
+    vkt::as::GeometryKHR geom;
+    geom.SetType(vkt::as::GeometryKHR::Type::Triangle);
+    geom.SetFlags(VK_GEOMETRY_OPAQUE_BIT_KHR);
+    geom.SetPrimitiveCount(3);
+    geom.SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer), uint32_t(vertices.size() - 1), VK_FORMAT_R32G32B32_SFLOAT,
+                                        vertex_stride);
+    geom.SetTrianglesIndexType(VK_INDEX_TYPE_NONE_KHR);
+
+    vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(geom));
+    cube_blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    cube_blas.SetSrcAS(cube_blas.GetDstAS());
+    cube_blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    {
+        auto vertices_copy = vertices;
+        vertices_copy[0].x = NAN;
+        vertices_copy[1].x = 1.0f;
+        vertices_copy[7].x = -42.0f;
+        vertices_copy[8].x = NAN;
+        vkt::Buffer vertex_buffer_2(*m_device, vertex_stride * vertices_copy.size(), buffer_usage, kHostVisibleMemProps,
+                                    &alloc_flags);
+        auto vertex_buffer_2_ptr = static_cast<uint8_t*>(vertex_buffer_2.Memory().Map());
+        for (uint32_t vertex_i = 0; vertex_i < vertices_copy.size(); ++vertex_i) {
+            std::memcpy(vertex_buffer_2_ptr + vertex_i * vertex_stride, vertices_copy.data() + vertex_i, sizeof(Vertex));
+        }
+
+        vertex_buffer_2.Memory().Unmap();
+
+        cube_blas.GetGeometries()[0].SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer_2), uint32_t(vertices_copy.size() - 1),
+                                                                    VK_FORMAT_R32G32B32_SFLOAT, vertex_stride);
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03664",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 24 bytes, primitive was found at index 0 in vertex buffer");
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03663",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 24 bytes, primitive was found at index 1 in vertex buffer");
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03663",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 24 bytes, primitive was found at index 7 in vertex buffer");
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03664",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 24 bytes, primitive was found at index 8 in vertex buffer");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeGpuAVRayTracing, VertexBufferUpdateStridedVerticesIndexBuffer) {
+    TEST_DESCRIPTION(
+        "Invalidly update a vertex from active to inactive, and inactive to active. Use an unusual vertex stride, and an index "
+        "buffer.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    struct Vertex {
+        float x, y, z;
+    };
+    const std::array<Vertex, 9> vertices = {{
+        {99.0f, 2.0f, 3.0f},
+        {NAN, 5.0f, 6.0f},
+        {7.0f, 8.0f, 9.0f},
+
+        {10.0f, 11.0f, 12.0f},
+        {13.0, 14.0f, 15.0f},
+        {16.0f, 17.0f, 18.0f},
+
+        {19.0f, 20.0f, 21.0f},
+        {NAN, 22.0f, 23.0f},
+        {24.0f, 25.0f, 26.0f},
+    }};
+
+    const std::array<uint32_t, 9> indices = {{0, 1, 2, 3, 4, 5, 6, 7, 8}};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    const uint32_t vertex_stride = 2 * 12;
+
+    vkt::Buffer vertex_buffer(*m_device, vertex_stride * vertices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+    auto vertex_buffer_ptr = static_cast<uint8_t*>(vertex_buffer.Memory().Map());
+
+    for (uint32_t vertex_i = 0; vertex_i < vertices.size(); ++vertex_i) {
+        std::memcpy(vertex_buffer_ptr + vertex_i * vertex_stride, vertices.data() + vertex_i, sizeof(Vertex));
+    }
+
+    vertex_buffer.Memory().Unmap();
+
+    vkt::Buffer index_buffer(*m_device, indices.size() * sizeof(indices[0]), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+    auto index_buffer_ptr = index_buffer.Memory().Map();
+
+    std::memcpy(index_buffer_ptr, indices.data(), indices.size() * sizeof(indices[0]));
+
+    index_buffer.Memory().Unmap();
+
+    vkt::as::GeometryKHR geom;
+    geom.SetType(vkt::as::GeometryKHR::Type::Triangle);
+    geom.SetFlags(VK_GEOMETRY_OPAQUE_BIT_KHR);
+    geom.SetPrimitiveCount(3);
+    geom.SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer), uint32_t(vertices.size() - 1), VK_FORMAT_R32G32B32_SFLOAT,
+                                        vertex_stride);
+    geom.SetTrianglesDeviceIndexBuffer(std::move(index_buffer), VK_INDEX_TYPE_UINT32);
+
+    vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(geom));
+    cube_blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    cube_blas.SetSrcAS(cube_blas.GetDstAS());
+    cube_blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    {
+        auto vertices_copy = vertices;
+        vertices_copy[0].x = NAN;
+        vertices_copy[1].x = 1.0f;
+        vertices_copy[7].x = -42.0f;
+        vertices_copy[8].x = NAN;
+        vkt::Buffer vertex_buffer_2(*m_device, vertex_stride * vertices_copy.size(), buffer_usage, kHostVisibleMemProps,
+                                    &alloc_flags);
+        auto vertex_buffer_2_ptr = static_cast<uint8_t*>(vertex_buffer_2.Memory().Map());
+        for (uint32_t vertex_i = 0; vertex_i < vertices_copy.size(); ++vertex_i) {
+            std::memcpy(vertex_buffer_2_ptr + vertex_i * vertex_stride, vertices_copy.data() + vertex_i, sizeof(Vertex));
+        }
+
+        vertex_buffer_2.Memory().Unmap();
+
+        cube_blas.GetGeometries()[0].SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer_2), uint32_t(vertices_copy.size() - 1),
+                                                                    VK_FORMAT_R32G32B32_SFLOAT, vertex_stride);
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03664",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 24 bytes, primitive was found at index 0 in vertex buffer");
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03663",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 24 bytes, primitive was found at index 1 in vertex buffer");
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03663",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 24 bytes, primitive was found at index 7 in vertex buffer");
+        m_errorMonitor->SetDesiredErrorRegex(
+            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03664",
+            "vertices of format VK_FORMAT_R32G32B32_SFLOAT strided by 24 bytes, primitive was found at index 8 in vertex buffer");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeGpuAVRayTracing, AabbStatusUpdate) {
+    TEST_DESCRIPTION("Change the active/inactive status of AABBs between a build and an update.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayQuery);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    // Build Bottom Level Acceleration Structure
+    auto geometry = vkt::as::blueprint::GeometrySimpleOnDeviceAABBInfo(*m_device);
+    VkAabbPositionsKHR active_aabb;
+    active_aabb.minX = -1.0f;
+    active_aabb.maxX = 1.0f;
+    active_aabb.minY = -1.0f;
+    active_aabb.maxY = 1.0f;
+    active_aabb.minZ = -1.0f;
+    active_aabb.maxZ = 1.0f;
+    VkAabbPositionsKHR inactive_aabb = active_aabb;
+    inactive_aabb.minX = NAN;
+    std::array<VkAabbPositionsKHR, 6> aabbs = {
+        {active_aabb, inactive_aabb, inactive_aabb, active_aabb, active_aabb, inactive_aabb}};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    vkt::Buffer aabbs_buffer(*m_device, sizeof(aabbs[0]) * aabbs.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+    auto aabbs_buffer_ptr = static_cast<VkAabbPositionsKHR*>(aabbs_buffer.Memory().Map());
+    std::copy(aabbs.begin(), aabbs.end(), aabbs_buffer_ptr);
+
+    geometry.SetAABBsDeviceBuffer(std::move(aabbs_buffer));
+    geometry.SetPrimitiveCount(size32(aabbs));
+
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(geometry));
+    blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+    m_command_buffer.Begin();
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+    m_errorMonitor->VerifyFound();
+
+    blas.SetSrcAS(blas.GetDstAS());
+    blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    aabbs = {{inactive_aabb, inactive_aabb, active_aabb, inactive_aabb, active_aabb, active_aabb}};
+    std::copy(aabbs.begin(), aabbs.end(), aabbs_buffer_ptr);
+
+    blas.GetGeometries()[0].GetAABBs().device_buffer.Memory().Unmap();
+
+    m_command_buffer.Begin();
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03664",
+                                         "AABB primitive at index 0 strided by 24 bytes");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03663",
+                                         "AABB primitive at index 2 strided by 24 bytes");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03664",
+                                         "AABB primitive at index 3 strided by 24 bytes");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03663",
+                                         "AABB primitive at index 5 strided by 24 bytes");
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayMultipleTrianglesFlags) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // Multiple triangles flags, invalid
+            traceRayEXT(tlas, gl_RayFlagsCullBackFacingTrianglesEXT | gl_RayFlagsCullFrontFacingTrianglesEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06892",
+                                         "CullBackFacingTrianglesKHR|CullFrontFacingTrianglesKHR");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayMultipleOpaqueFlags) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // Multiple opaque flags, invalid
+            traceRayEXT(tlas, gl_RayFlagsCullOpaqueEXT | gl_RayFlagsCullNoOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTraceRayKHR-06893");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayMultipleTrianglesFlagsSlang) {
+    RETURN_IF_SKIP(CheckSlangSupport());
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* slang_shader = R"slang(
+        [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
+
+        struct RayPayload { float hit; };
+
+        [shader("raygeneration")]
+        void rayGenShader()
+        {
+            RayPayload ray_payload = {};
+            RayDesc ray;
+            ray.Origin = float3(0, 0, 1);
+            ray.Direction = float3(0, 0, 1);
+            ray.TMin = 0.1;
+            ray.TMax = 1000.0;
+            // Multiple triangles flags, invalid
+            TraceRay(tlas, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_CULL_FRONT_FACING_TRIANGLES, 0xff, 0, 0, 0, ray, ray_payload);
+        }
+
+        [shader("miss")]
+        void missShader(inout RayPayload payload) { payload.hit = 1.0; }
+
+        [shader("closesthit")]
+        void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) { payload.hit = 1.0; }
+    )slang";
+    pipeline.AddSlangRayGenShader(slang_shader, "rayGenShader");
+    pipeline.AddSlangMissShader(slang_shader, "missShader");
+    pipeline.AddSlangClosestHitShader(slang_shader, "closestHitShader");
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06892",
+                                         "CullBackFacingTrianglesKHR|CullFrontFacingTrianglesKHR");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayBothSkipFlags) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+        #extension GL_EXT_ray_flags_primitive_culling : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // SkipTrianglesKHR and SkipAABBKHR are mutually exclusive, invalid
+            traceRayEXT(tlas, gl_RayFlagsSkipTrianglesEXT | gl_RayFlagsSkipAABBEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06552", "SkipTrianglesKHR|SkipAABBsKHR");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayOriginNonFinite) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(binding = 1, set = 0) uniform Params { float zero; };
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // 1.0 / 0.0 produces +infinity, invalid
+            float infinity = 1.0 / zero;
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,infinity,0), 0.1, vec3(0,0,1), 1000.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+
+    vkt::Buffer uniform_buffer(*m_device, sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    *static_cast<float*>(uniform_buffer.Memory().Map()) = 0.0f;
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06355", "0, inf, 0");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayDirectionNonFinite) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(binding = 1, set = 0) uniform Params { float zero; };
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // 1.0 / 0.0 produces +infinity, invalid
+            float infinity = 1.0 / zero;
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,infinity,2), 1000.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+
+    vkt::Buffer uniform_buffer(*m_device, sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    *static_cast<float*>(uniform_buffer.Memory().Map()) = 0.0f;
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06355", "0, inf, 2");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayNegativeTmin) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(binding = 1, set = 0) uniform Params { float negative; };
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // negative Tmin, invalid
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), negative, vec3(0,0,1), 1000.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+
+    vkt::Buffer uniform_buffer(*m_device, sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    *static_cast<float*>(uniform_buffer.Memory().Map()) = -1.0f;
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06356", "Tmin: -1, Tmax: 1000");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayNegativeTmax) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(binding = 1, set = 0) uniform Params { float negative; };
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // negative Tmax, invalid
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), negative, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+
+    vkt::Buffer uniform_buffer(*m_device, sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    *static_cast<float*>(uniform_buffer.Memory().Map()) = -1.0f;
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06356", "Tmin: 0.1, Tmax: -1");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayTminGreaterThanTmax) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(binding = 1, set = 0) uniform Params { float t_min; float t_max; };
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // Tmin > Tmax, invalid
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), t_min, vec3(0,0,1), t_max, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+
+    vkt::Buffer uniform_buffer(*m_device, 2 * sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    auto* uniform_buffer_ptr = static_cast<float*>(uniform_buffer.Memory().Map());
+    uniform_buffer_ptr[0] = 2.0f;  // t_min
+    uniform_buffer_ptr[1] = 1.0f;  // t_max
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06357",
+                                         "Ray Tmin \\(2\\) is greater than Ray Tmax \\(1\\)");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayTminAndTmaxNaNs) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(binding = 1, set = 0) uniform Params { float t_min; float t_max; };
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // Tmin and Tmax are NaNs, invalid
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), t_min, vec3(0,0,1), t_max, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+
+    vkt::Buffer uniform_buffer(*m_device, 2 * sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    auto* uniform_buffer_ptr = static_cast<float*>(uniform_buffer.Memory().Map());
+    uniform_buffer_ptr[0] = NAN;  // t_min
+    uniform_buffer_ptr[1] = NAN;  // t_max
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06358", "Ray Tmin \\(nan\\) or Ray Tmax \\(nan\\)");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRayTlasNotBuilt) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 8, set = 0) uniform accelerationStructureEXT tlas;
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            // tlas not yet built
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 100.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 8);
+    pipeline.CreateDescriptorSet();
+
+    m_command_buffer.Begin();
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    // Record TLAS build, but don't submit it
+    m_command_buffer.Begin();
+    vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, *blas.GetDstAS());
+    tlas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(8, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06359", "set = 0, binding = 8, index 0");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRaySkipTrianglesWithPipelineSkipAABBs) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::rayTraversalPrimitiveCulling);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+    pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_SKIP_AABBS_BIT_KHR);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+        #extension GL_EXT_ray_flags_primitive_culling : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            traceRayEXT(tlas, gl_RayFlagsSkipTrianglesEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06553", "SkipTrianglesKHR");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpTraceRaySkipAABBsWithPipelineSkipTriangles) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::rayTraversalPrimitiveCulling);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+    pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_SKIP_TRIANGLES_BIT_KHR);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+        #extension GL_EXT_ray_flags_primitive_culling : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            traceRayEXT(tlas, gl_RayFlagsSkipAABBEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+    pipeline.AddGlslClosestHitShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpTraceRayKHR-06554", "SkipAABBsKHR");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVRayTracing, OpReportIntersectionKHRHitKindOutOfRange) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::rayTraversalPrimitiveCulling);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+    pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_SKIP_TRIANGLES_BIT_KHR);
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+        layout(location = 0) rayPayloadEXT vec3 hit;
+
+        void main() {
+            traceRayEXT(tlas, 0, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
+        }
+    )glsl";
+    pipeline.SetGlslRayGenShader(ray_gen);
+
+    const char* intersection = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+
+        layout(binding = 1, set = 0) buffer DbgBuffer {
+            uint intersection_invocation_count;
+        };
+
+        void main() {
+            atomicAdd(intersection_invocation_count, 1);
+            reportIntersectionEXT(1.0f, 128);
+        }
+    )glsl";
+    pipeline.AddGlslHitGroupShader(kRayTracingPayloadMinimalGlsl, intersection);
+    pipeline.AddGlslMissShader(kRayTracingPayloadMinimalGlsl);
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
+    pipeline.CreateDescriptorSet();
+
+    vkt::Buffer debug_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                             kHostVisibleMemProps);
+    m_command_buffer.Begin();
+    vk::CmdFillBuffer(m_command_buffer, debug_buffer, 0, debug_buffer.CreateInfo().size, 0);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    // Create acceleration structure
+    m_command_buffer.Begin();
+    // Build Bottom Level Acceleration Structure
+    vkt::as::BuildGeometryInfoKHR blas =
+        vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    m_command_buffer.Begin();
+    // Build Top Level Acceleration Structure
+    vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, *blas.GetDstAS());
+    tlas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    pipeline.Build();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_command_buffer.End();
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-OpReportIntersectionKHR-06998", "Hit Kind is 128");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
+    ASSERT_GT(debug_buffer_ptr[0], 0u) << "Intersection shader was never invoked";
+    debug_buffer.Memory().Unmap();
 }

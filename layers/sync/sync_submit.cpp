@@ -23,11 +23,9 @@
 namespace syncval {
 
 AcquiredImage::AcquiredImage(const PresentedImage& presented, ResourceUsageTag acq_tag)
-    : image(presented.image), generator(presented.range_gen), present_tag(presented.tag), acquire_tag(acq_tag) {}
+    : image(presented.image), generator(presented.range_gen), acquire_tag(acq_tag), present_tag(presented.tag) {}
 
-bool AcquiredImage::Invalid() const { return vvl::StateObject::Invalid(image); }
-
-SignalInfo::SignalInfo(const std::shared_ptr<const vvl::Semaphore>& semaphore_state, const QueueBatchContext::Ptr& batch,
+SignalInfo::SignalInfo(const std::shared_ptr<const vvl::Semaphore>& semaphore_state, const BatchContextPtr& batch,
                        const SyncExecScope& exec_scope, uint64_t timeline_value)
     : semaphore_state(semaphore_state),
       batch(batch),
@@ -44,7 +42,7 @@ SignalInfo::SignalInfo(const std::shared_ptr<const vvl::Semaphore>& semaphore_st
       first_scope(),
       acquired_image(std::make_shared<AcquiredImage>(presented, acquire_tag)) {}
 
-void SignalsUpdate::OnBinarySignal(const vvl::Semaphore& semaphore_state, const QueueBatchContext::Ptr& batch,
+void SignalsUpdate::OnBinarySignal(const vvl::Semaphore& semaphore_state, const BatchContextPtr& batch,
                                    const VkSemaphoreSubmitInfo& submit_signal) {
     const VkSemaphore semaphore = semaphore_state.VkHandle();
     // Signal can't be registered in both lists at the same time.
@@ -60,12 +58,12 @@ void SignalsUpdate::OnBinarySignal(const vvl::Semaphore& semaphore_state, const 
         }
     }
     // Register signal
-    const VkQueueFlags queue_flags = batch->GetQueueSyncState()->GetQueueFlags();
+    const VkQueueFlags queue_flags = batch->GetQueueFlags();
     const auto exec_scope = SyncExecScope::MakeSrc(queue_flags, submit_signal.stageMask, VK_PIPELINE_STAGE_2_HOST_BIT);
     binary_signal_requests.emplace(semaphore, SignalInfo(semaphore_state.shared_from_this(), batch, exec_scope, 0));
 }
 
-bool SignalsUpdate::OnTimelineSignal(const vvl::Semaphore& semaphore_state, const std::shared_ptr<QueueBatchContext>& batch,
+bool SignalsUpdate::OnTimelineSignal(const vvl::Semaphore& semaphore_state, const BatchContextPtr& batch,
                                      const VkSemaphoreSubmitInfo& submit_signal) {
     const VkSemaphore semaphore = semaphore_state.VkHandle();
     std::vector<SignalInfo>& signals = timeline_signals[semaphore];
@@ -75,15 +73,8 @@ bool SignalsUpdate::OnTimelineSignal(const vvl::Semaphore& semaphore_state, cons
         return false;  // [core validation check]: strictly increasing signal values
     }
 
-    // Do not register signal for external semaphore - external wait-before-signals are skipped
-    // since there is no guarantee we can track the signal. Because of that it's possible that
-    // signals have no way to be released (resolving waits can be wait-before-signals and are skipped)
-    if (semaphore_state.Scope() != vvl::Semaphore::Scope::kInternal) {
-        return false;
-    }
-
     // Register signal
-    const VkQueueFlags queue_flags = batch->GetQueueSyncState()->GetQueueFlags();
+    const VkQueueFlags queue_flags = batch->GetQueueFlags();
     const auto exec_scope = SyncExecScope::MakeSrc(queue_flags, submit_signal.stageMask, VK_PIPELINE_STAGE_2_HOST_BIT);
     signals.emplace_back(SignalInfo(semaphore_state.shared_from_this(), batch, exec_scope, submit_signal.value));
     return true;
@@ -182,7 +173,7 @@ PresentedImage SwapchainSubState::MovePresentedImage(uint32_t image_index) {
     return ret_val;
 }
 
-void SwapchainSubState::GetPresentBatches(std::vector<QueueBatchContext::Ptr>& batches) const {
+void SwapchainSubState::GetPresentBatches(std::vector<BatchContextPtr>& batches) const {
     for (const auto& presented_image : presented) {
         if (presented_image.batch) {
             batches.push_back(presented_image.batch);
@@ -225,9 +216,10 @@ class ApplyAcquireNextSemaphoreAction {
     // and initialization of globals between compilation units is undefined. Instead they get initialized
     // on the first use (it's important to ensure this first use is also not initialization of some global!).
     static const SyncExecScope& getPresentSrcScope() {
-        static const SyncExecScope kPresentSrcScope{VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL,  // mask_param (unused)
+        static const SyncExecScope kPresentSrcScope{VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL,  // stage_mask (unused)
                                                     VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL,  // exec_scope
-                                                    getPresentValidAccesses()};                      // valid_accesses
+                                                    getPresentValidAccesses(),                       // stage_mask_accesses
+                                                    getPresentValidAccesses()};                      // exec_scope_accesses
         return kPresentSrcScope;
     }
     static const SyncAccessFlags& getPresentValidAccesses() {
@@ -268,8 +260,8 @@ void LastSynchronizedPresent::OnDestroySwapchain(VkSwapchainKHR swapchain) {
     }
 }
 
-QueueBatchContext::QueueBatchContext(const SyncValidator& sync_state, const QueueSyncState& queue_state)
-    : CommandExecutionContext(sync_state, queue_state.GetQueueFlags()),
+QueueBatchContext::QueueBatchContext(const SyncValidator& sync_state, const QueueState& queue_state)
+    : CommandExecutionContext(sync_state, queue_state.GetQueue()->GetQueueFlags()),
       queue_state_(&queue_state),
       tag_range_(0, 0),
       access_context_(sync_state),
@@ -304,10 +296,10 @@ void QueueBatchContext::Trim() {
 }
 
 void QueueBatchContext::ResolveSubmittedCommandBuffer(const AccessContext& recorded_context, ResourceUsageTag offset) {
-    GetCurrentAccessContext()->ResolveFromContext(QueueTagOffsetBarrierAction(GetQueueId(), offset), recorded_context);
+    GetCurrentAccessContext().ResolveFromContext(QueueTagOffsetBarrierAction(GetQueueId(), offset), recorded_context);
 }
 
-VulkanTypedHandle QueueBatchContext::Handle() const { return queue_state_->Handle(); }
+VulkanTypedHandle QueueBatchContext::Handle() const { return queue_state_->GetQueue()->Handle(); }
 
 template <typename Predicate>
 void QueueBatchContext::ApplyPredicatedWait(Predicate& predicate, const LastSynchronizedPresent& last_synchronized_present) {
@@ -389,7 +381,7 @@ void QueueBatchContext::ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag,
 
     // SwapChain acquire batch contexts have no queue
     if (queue_state_ && queue_id == GetQueueId()) {
-        events_context_.ApplyTaggedWait(queue_state_->GetQueueFlags(), tag);
+        events_context_.ApplyTaggedWait(GetQueueFlags(), tag);
     }
 }
 
@@ -399,7 +391,7 @@ void QueueBatchContext::ApplyDeviceWait(const LastSynchronizedPresent& last_sync
 
     // SwapChain acquire batch contexts have no queue
     if (queue_state_) {
-        events_context_.ApplyTaggedWait(queue_state_->GetQueueFlags(), ResourceUsageRecord::kMaxIndex);
+        events_context_.ApplyTaggedWait(GetQueueFlags(), ResourceUsageRecord::kMaxIndex);
     }
 }
 
@@ -414,7 +406,7 @@ void QueueBatchContext::OnResourceDestroyed(const AccessRange& resource_range) {
 }
 
 void QueueBatchContext::BeginRenderPassReplaySetup(ReplayState& replay, const SyncOpBeginRenderPass& begin_op) {
-    current_access_context_ = replay.ReplayStateRenderPassBegin(queue_state_->GetQueueFlags(), begin_op, access_context_);
+    current_access_context_ = replay.ReplayStateRenderPassBegin(GetQueueFlags(), begin_op, access_context_);
 }
 
 void QueueBatchContext::NextSubpassReplaySetup(ReplayState& replay) {
@@ -426,13 +418,23 @@ void QueueBatchContext::EndRenderPassReplayCleanup(ReplayState& replay) {
     current_access_context_ = &access_context_;
 }
 
+// Batch barrier ops don't modify in place, and thus don't need to hold pending state, and also are *never* layout transitions.
+struct BatchBarrierOp {
+    SyncBarrier barrier;
+    BarrierScope barrier_scope;
+
+    BatchBarrierOp(QueueId queue_id, const SyncBarrier& barrier) : barrier(barrier), barrier_scope(barrier, queue_id) {}
+
+    void operator()(AccessState* access_state) const { access_state->ApplyBarrier(barrier_scope, barrier); }
+};
+
 void QueueBatchContext::ResolvePresentSemaphoreWait(const SignalInfo& signal_info, const PresentedImages& presented_images) {
     assert(signal_info.batch);
 
     const AccessContext& from_context = signal_info.batch->access_context_;
     const SemaphoreScope& signal_scope = signal_info.first_scope;
     const QueueId queue_id = GetQueueId();
-    const auto queue_flags = queue_state_->GetQueueFlags();
+    const VkQueueFlags queue_flags = GetQueueFlags();
     SemaphoreScope wait_scope{queue_id, SyncExecScope::MakeDst(queue_flags, VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL)};
 
     // If signal queue == wait queue, signal is treated as a memory barrier with an access scope equal to the present accesses
@@ -443,21 +445,36 @@ void QueueBatchContext::ResolvePresentSemaphoreWait(const SignalInfo& signal_inf
     SyncBarrier noop_barrier;
     const BatchBarrierOp noop_barrier_op(wait_scope.queue, noop_barrier);
 
-    // Otherwise apply semaphore rules apply
-    const ApplySemaphoreBarrierAction sem_not_same_queue_op(signal_scope, wait_scope);
-    const SemaphoreScope noop_semaphore_scope(queue_id, noop_barrier.dst_exec_scope);
-    const ApplySemaphoreBarrierAction noop_sem_op(signal_scope, noop_semaphore_scope);
-
     // For each presented image
     for (const auto& presented : presented_images) {
-        if (signal_scope.queue == wait_scope.queue) {
-            // If signal queue == wait queue, signal is treated as a memory barrier with an access scope equal to the
-            // valid accesses for the sync scope.
-            access_context_.ResolveFromContext(sem_same_queue_op, from_context, presented.range_gen);
-            access_context_.ResolveFromContext(noop_barrier_op, from_context);
+        if (signal_info.acquired_image) {
+            const AcquiredImage& acquired_image = *signal_info.acquired_image;
+
+            // Update last synchronized presentation
+            if (acquired_image.present_tag != kInvalidTag) {
+                const VkSwapchainKHR swapchain = acquired_image.image->create_from_swapchain;
+                last_synchronized_present.Update(swapchain, acquired_image.present_tag);
+            }
+
+            ApplyAcquireNextSemaphoreAction apply_acq(wait_scope, acquired_image.acquire_tag);
+            access_context_.ResolveFromContext(apply_acq, from_context, acquired_image.generator);
+
         } else {
-            access_context_.ResolveFromContext(sem_not_same_queue_op, from_context, presented.range_gen);
-            access_context_.ResolveFromContext(noop_sem_op, from_context);
+            if (signal_scope.queue == wait_scope.queue) {
+                // If signal queue == wait queue, signal is treated as a memory barrier with an access scope equal to the
+                // valid accesses for the sync scope.
+                access_context_.ResolveFromContext(sem_same_queue_op, from_context, presented.range_gen);
+                access_context_.ResolveFromContext(noop_barrier_op, from_context);
+            } else {
+                // Otherwise apply semaphore rules apply
+                const ApplySemaphoreBarrierAction sem_not_same_queue_op(signal_scope, wait_scope);
+                access_context_.ResolveFromContext(sem_not_same_queue_op, from_context, presented.range_gen);
+
+                const SemaphoreScope noop_semaphore_scope(queue_id, noop_barrier.dst_exec_scope);
+                const ApplySemaphoreBarrierAction noop_sem_op(signal_scope, noop_semaphore_scope);
+                access_context_.ResolveFromContext(noop_sem_op, from_context);
+            }
+            last_synchronized_present.Merge(signal_info.batch->last_synchronized_present);
         }
     }
 }
@@ -466,7 +483,7 @@ void QueueBatchContext::ResolveSubmitSemaphoreWait(const SignalInfo& signal_info
     assert(signal_info.batch);
 
     const SemaphoreScope& signal_scope = signal_info.first_scope;
-    const auto queue_flags = queue_state_->GetQueueFlags();
+    const VkQueueFlags queue_flags = GetQueueFlags();
     SemaphoreScope wait_scope{GetQueueId(), SyncExecScope::MakeDst(queue_flags, wait_mask)};
 
     const AccessContext& from_context = signal_info.batch->access_context_;
@@ -502,7 +519,7 @@ void QueueBatchContext::ResolveSubmitSemaphoreWait(const SignalInfo& signal_info
     }
 }
 
-void QueueBatchContext::ResolveLastBatch(const QueueBatchContext::ConstPtr& last_batch) {
+void QueueBatchContext::ResolveLastBatch(const BatchContextPtr& last_batch) {
     // Copy in the event state from the previous batch (on this queue)
     events_context_.DeepCopy(last_batch->events_context_);
 
@@ -524,10 +541,10 @@ void QueueBatchContext::ImportTags(const QueueBatchContext& from) {
     }
 }
 
-std::vector<QueueBatchContext::ConstPtr> QueueBatchContext::ResolvePresentWaits(vvl::span<const VkSemaphore> wait_semaphores,
-                                                                                const PresentedImages& presented_images,
-                                                                                SignalsUpdate& signals_update) {
-    std::vector<ConstPtr> batches_resolved;
+std::vector<BatchContextPtr> QueueBatchContext::ResolvePresentWaits(vvl::span<const VkSemaphore> wait_semaphores,
+                                                                    const PresentedImages& presented_images,
+                                                                    SignalsUpdate& signals_update) {
+    std::vector<BatchContextPtr> batches_resolved;
     for (VkSemaphore semaphore : wait_semaphores) {
         auto signal_info = signals_update.OnBinaryWait(semaphore);
         if (!signal_info) {
@@ -550,7 +567,7 @@ bool QueueBatchContext::DoQueuePresentValidate(const Location& loc, const Presen
             const VulkanTypedHandle swapchain_handle = vvl::StateObject::Handle(presented.swapchain_state.lock());
             const VulkanTypedHandle image_handle = vvl::StateObject::Handle(presented.image);
 
-            LogObjectList objlist(queue_state_->Handle(), swapchain_handle, image_handle);
+            LogObjectList objlist(queue_state_->GetQueue()->Handle(), swapchain_handle, image_handle);
 
             std::ostringstream ss;
             ss << "swapchain image " << presented.image_index << " (";
@@ -613,14 +630,10 @@ void QueueBatchContext::SetupAccessContext(const PresentedImage& presented) {
     }
 }
 
-std::vector<QueueBatchContext::ConstPtr> QueueBatchContext::RegisterAsyncContexts(const std::vector<ConstPtr>& batches_resolved) {
+std::vector<BatchContextPtr> QueueBatchContext::RegisterAsyncContexts(const std::vector<BatchContextPtr>& batches_resolved) {
     // Gather async context information for hazard checks and conserve the QBC's for the async batches
     auto skip_resolved_filter = [&batches_resolved](auto& batch) { return !vvl::Contains(batches_resolved, batch); };
-    std::vector<ConstPtr> async_batches = sync_state_.GetLastBatches(skip_resolved_filter);
-    std::vector<ConstPtr> async_pending_batches = sync_state_.GetLastPendingBatches(skip_resolved_filter);
-    if (!async_pending_batches.empty()) {
-        vvl::Append(async_batches, async_pending_batches);
-    }
+    std::vector<BatchContextPtr> async_batches = sync_state_.GetLastBatches(skip_resolved_filter);
     for (const auto& async_batch : async_batches) {
         const QueueId async_queue = async_batch->GetQueueId();
         ResourceUsageTag sync_tag;
@@ -657,10 +670,10 @@ ResourceUsageTag QueueBatchContext::SetupBatchTags(uint32_t tag_count) {
     return tag_range_.begin;
 }
 
-std::vector<BatchContextConstPtr> QueueBatchContext::ResolveSubmitWaits(vvl::span<const VkSemaphoreSubmitInfo> wait_infos,
-                                                                        std::vector<VkSemaphoreSubmitInfo>& unresolved_waits,
-                                                                        SignalsUpdate& signals_update) {
-    std::vector<BatchContextConstPtr> resolved_batches;
+std::vector<BatchContextPtr> QueueBatchContext::ResolveSubmitWaits(vvl::span<const VkSemaphoreSubmitInfo> wait_infos,
+                                                                   std::vector<VkSemaphoreSubmitInfo>& unresolved_waits,
+                                                                   SignalsUpdate& signals_update) {
+    std::vector<BatchContextPtr> resolved_batches;
     for (const auto& wait_info : wait_infos) {
         auto semaphore_state = sync_state_.Get<vvl::Semaphore>(wait_info.semaphore);
         if (!semaphore_state) {
@@ -701,9 +714,6 @@ std::vector<BatchContextConstPtr> QueueBatchContext::ResolveSubmitWaits(vvl::spa
                 } else {
                     // Do not register wait-before-signal for external semaphore.
                     // We might not be able to track the signal. Just assume that wait is satified.
-                    // TODO: current support for external semaphores ensures resources are not
-                    // leaked. It is still possible to get false-positives. Improve how to silence
-                    // validation when signal cannot be tracked properly.
                     continue;
                 }
             }
@@ -738,7 +748,7 @@ bool QueueBatchContext::ValidateSubmit(const std::vector<CommandBufferConstPtr>&
             skip |= ReplayState(*this, access_context, error_obj, uint32_t(index), batch.base_tag).ValidateFirstUse();
             // The barriers have already been applied in ValidatFirstUse
             batch_log_.Import(batch, access_context, current_label_stack);
-            ResolveSubmittedCommandBuffer(*access_context.GetCurrentAccessContext(), batch.base_tag);
+            ResolveSubmittedCommandBuffer(access_context.GetCurrentAccessContext(), batch.base_tag);
             batch.base_tag += access_context.GetTagCount();
         }
         // Apply debug label commands
@@ -764,11 +774,10 @@ VkSwapchainKHR QueueBatchContext::AcquireResourceRecord::GetSwapchainHandle() co
     return presented_.image->create_from_swapchain;
 }
 
-std::vector<QueueBatchContext::ConstPtr> SyncValidator::GetLastBatches(
-    std::function<bool(const QueueBatchContext::ConstPtr&)> filter) const {
-    std::vector<QueueBatchContext::ConstPtr> snapshot;
-    for (const auto& queue_sync_state : queue_sync_states_) {
-        auto batch = queue_sync_state->LastBatch();
+std::vector<BatchContextPtr> SyncValidator::GetLastBatches(std::function<bool(const BatchContextPtr&)> filter) const {
+    std::vector<BatchContextPtr> snapshot;
+    for (const QueueState& queue_state : queue_states_) {
+        auto batch = queue_state.LastBatch();
         if (batch && filter(batch)) {
             snapshot.emplace_back(std::move(batch));
         }
@@ -776,84 +785,21 @@ std::vector<QueueBatchContext::ConstPtr> SyncValidator::GetLastBatches(
     return snapshot;
 }
 
-std::vector<QueueBatchContext::Ptr> SyncValidator::GetLastBatches(std::function<bool(const QueueBatchContext::ConstPtr&)> filter) {
-    std::vector<QueueBatchContext::Ptr> snapshot;
-    for (const auto& queue_sync_state : queue_sync_states_) {
-        auto batch = queue_sync_state->LastBatch();
-        if (batch && filter(batch)) {
-            snapshot.emplace_back(std::move(batch));
-        }
-    }
-    return snapshot;
-}
-
-std::vector<QueueBatchContext::ConstPtr> SyncValidator::GetLastPendingBatches(
-    std::function<bool(const QueueBatchContext::ConstPtr&)> filter) const {
-    std::vector<QueueBatchContext::ConstPtr> snapshot;
-    for (const auto& queue_sync_state : queue_sync_states_) {
-        auto batch = queue_sync_state->PendingLastBatch();
-        if (batch && filter(batch)) {
-            snapshot.emplace_back(std::move(batch));
-        }
-    }
-    return snapshot;
-}
-
-void SyncValidator::ClearPending() const {
-    for (const auto& queue_state : queue_sync_states_) {
-        queue_state->ClearPending();
-    }
-}
-
-// Note that function is const, but updates mutable submit_index to allow Validate to create correct tagging for command invocation
-// scope state.
-// Given that queue submits are supposed to be externally synchronized for the same queue, this should safe without being
-// atomic... but as the ops are per submit, the performance cost is negible for the peace of mind.
-uint64_t QueueSyncState::ReserveSubmitId() const { return submit_index_.fetch_add(1); }
-
-const LastSynchronizedPresent& QueueSyncState::GetLastSynchronizedPresent() const {
+const LastSynchronizedPresent& QueueState::GetLastSynchronizedPresent() const {
     static const LastSynchronizedPresent empty;
     return last_batch_ ? last_batch_->last_synchronized_present : empty;
 }
 
-void QueueSyncState::SetPendingLastBatch(QueueBatchContext::Ptr&& last) const { pending_last_batch_ = std::move(last); }
-
-// Since we're updating the QueueSync state, this is Record phase and the access log needs to point to the global one
-// Batch Contexts saved during signalling have their AccessLog reset when the pending signals are signalled.
-// NOTE: By design, QueueBatchContexts that are neither last, nor referenced by a signal are abandoned as unowned, since
-//       the contexts Resolve all history from previous all contexts when created
-void QueueSyncState::ApplyPendingLastBatch() {
-    // Update the queue to point to the last batch from the submit
-    if (pending_last_batch_) {
-        // Clean up the events data in the previous last batch on queue, as only the subsequent batches have valid use for them
-        // and the QueueBatchContext::Setup calls have be copying them along from batch to batch during submit.
+void QueueState::SetLastBatch(BatchContextPtr&& last) {
+    if (last) {
+        // Clean up the events data in the previous last batch on queue, as only the subsequent
+        // batches have valid use for them and the QueueBatchContext::Setup calls have be copying
+        // them along from batch to batch during submit.
         if (last_batch_) {
             last_batch_->ResetEventsContext();
         }
-        pending_last_batch_->Trim();
-        last_batch_ = std::move(pending_last_batch_);
-    }
-}
-
-void QueueSyncState::SetPendingUnresolvedBatches(std::vector<UnresolvedBatch>&& unresolved_batches) const {
-    pending_unresolved_batches_ = std::move(unresolved_batches);
-    update_unresolved_batches_ = true;
-}
-
-void QueueSyncState::ApplyPendingUnresolvedBatches() {
-    if (update_unresolved_batches_) {
-        unresolved_batches_ = std::move(pending_unresolved_batches_);
-        pending_unresolved_batches_.clear();
-        update_unresolved_batches_ = false;
-    }
-}
-
-void QueueSyncState::ClearPending() const {
-    pending_last_batch_ = nullptr;
-    if (update_unresolved_batches_) {
-        const_cast<std::vector<UnresolvedBatch>&>(unresolved_batches_) = std::move(pending_unresolved_batches_);
-        pending_unresolved_batches_.clear();
-        update_unresolved_batches_ = false;
+        last->Trim();
+        last_batch_ = std::move(last);
     }
 }
 
@@ -963,11 +909,11 @@ BatchAccessLog::CBSubmitLog::CBSubmitLog(const BatchRecord& batch, const Command
                                          const std::vector<std::string>& initial_label_stack)
     : batch_(batch), cbs_(cb.GetCBReferencesShared()), log_(cb.GetAccessLogShared()), initial_label_stack_(initial_label_stack) {}
 
-PresentedImage::PresentedImage(SyncValidator& sync_state, QueueBatchContext::Ptr batch_, VkSwapchainKHR swapchain,
-                               uint32_t image_index_, uint32_t present_index_, ResourceUsageTag tag_)
-    : PresentedImageRecord{tag_, image_index_, present_index_, sync_state.Get<vvl::Swapchain>(swapchain), {}},
-      batch(std::move(batch_)) {
-    SetImage(image_index_);
+PresentedImage::PresentedImage(SyncValidator& sync_state, BatchContextPtr batch, VkSwapchainKHR swapchain, uint32_t image_index,
+                               uint32_t present_index, ResourceUsageTag tag)
+    : PresentedImageRecord{tag, image_index, present_index, sync_state.Get<vvl::Swapchain>(swapchain), {}},
+      batch(std::move(batch)) {
+    SetImage(image_index);
 }
 
 PresentedImage::PresentedImage(std::shared_ptr<vvl::Swapchain>&& swapchain, uint32_t at_index) : PresentedImage() {
@@ -979,10 +925,12 @@ PresentedImage::PresentedImage(std::shared_ptr<vvl::Swapchain>&& swapchain, uint
 bool PresentedImage::Invalid() const { return vvl::StateObject::Invalid(image); }
 
 // Export uses move semantics...
-void PresentedImage::ExportToSwapchain(SyncValidator&) {  // Include this argument to prove the const cast is safe
+void PresentedImage::ExportToSwapchain() {
     // If the swapchain is dead just ignore the present
     auto swap_lock = swapchain_state.lock();
-    if (vvl::StateObject::Invalid(swap_lock)) return;
+    if (vvl::StateObject::Invalid(swap_lock)) {
+        return;
+    }
     auto& sub_state = SubState(*swap_lock);
     sub_state.RecordPresentedImage(std::move(*this));
 }
@@ -991,7 +939,9 @@ void PresentedImage::SetImage(uint32_t at_index) {
     image_index = at_index;
 
     auto swap_lock = swapchain_state.lock();
-    if (vvl::StateObject::Invalid(swap_lock)) return;
+    if (vvl::StateObject::Invalid(swap_lock)) {
+        return;
+    }
 
     image = std::static_pointer_cast<const vvl::Image>(swap_lock->GetSwapChainImageShared(image_index));
     if (Invalid()) {

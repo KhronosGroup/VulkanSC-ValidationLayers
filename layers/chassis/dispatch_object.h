@@ -5,6 +5,7 @@
  * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (c) 2015-2026 Google Inc.
  * Copyright (c) 2023-2024 RasterGrid Kft.
+ * Copyright (C) 2026 Qualcomm Technologies, Inc.
  * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +23,7 @@
 
 #pragma once
 #include <atomic>
+#include <vector>
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vk_enum_string_helper.h>
@@ -32,6 +34,7 @@
 #include "layer_options.h"
 #include "gpuav/core/gpuav_settings.h"
 #include "sync/sync_settings.h"
+#include "gpu_dump/gpu_dump_settings.h"
 #include "generated/device_features.h"
 #include "generated/vk_api_version.h"
 #include "generated/vk_extension_helper.h"
@@ -53,14 +56,10 @@ struct HashedUint64 {
 };
 
 namespace vvl {
-namespace base {
-class Instance;
-class Device;
-}  // namespace base
-namespace dispatch {
-class Instance;
-class Device;
-}  // namespace dispatch
+class BaseInstance;
+class BaseDevice;
+class DispatchInstance;
+class DispatchDevice;
 
 // Device extension properties -- storing properties gathered from VkPhysicalDeviceProperties2::pNext chain
 // TODO: this could be defined and initialized via generated code
@@ -111,6 +110,7 @@ struct DeviceExtensionProperties {
     VkPhysicalDeviceMaintenance10PropertiesKHR maintenance10_props;
     VkPhysicalDeviceTensorPropertiesARM tensor_properties;
     VkPhysicalDeviceCopyMemoryIndirectPropertiesKHR copy_memory_indirect_props;
+    VkPhysicalDeviceOpacityMicromapPropertiesKHR micromap_props;
     VkPhysicalDeviceTileMemoryHeapPropertiesQCOM tile_memory_heap_props;
     VkPhysicalDeviceDescriptorHeapPropertiesEXT descriptor_heap_props;
     VkPhysicalDeviceDescriptorHeapTensorPropertiesARM descriptor_heap_tensor_props;
@@ -121,6 +121,8 @@ struct DeviceExtensionProperties {
     VkPhysicalDevicePerformanceCountersByRegionPropertiesARM renderpass_counter_by_region_props;
     VkPhysicalDeviceRayTracingInvocationReorderPropertiesEXT ray_tracing_invocation_reorder_props;
     VkPhysicalDeviceShaderLongVectorPropertiesEXT shader_long_vector_props;
+    VkPhysicalDeviceTileShadingPropertiesQCOM tile_shading_props;
+    VkPhysicalDeviceImageProcessing2PropertiesQCOM image_processing2_props;
 };
 
 // This object holds all static state for the device (device properties, enabled extensions/features, etc.)
@@ -128,7 +130,7 @@ struct DeviceExtensionProperties {
 // and then used by all downstream users (state tracker, stateless SPIR-V validator, etc.).
 class StatelessDeviceData {
   public:
-    StatelessDeviceData(vvl::dispatch::Instance* instance, VkPhysicalDevice physical_device, const VkDeviceCreateInfo* pCreateInfo);
+    StatelessDeviceData(DispatchInstance* instance, VkPhysicalDevice physical_device, const VkDeviceCreateInfo* pCreateInfo);
 
     APIVersion api_version;
 
@@ -149,23 +151,21 @@ class StatelessDeviceData {
     SpecialSupported special_supported;
 };
 
-namespace dispatch {
+class DispatchInstance;
+void SetDispatchInstance(VkInstance instance, std::unique_ptr<DispatchInstance>&&);
+DispatchInstance* GetDispatchInstance(VkInstance);
+DispatchInstance* GetDispatchInstance(VkPhysicalDevice);
+void FreeDispatchInstance(void* key);
 
-class Instance;
-void SetData(VkInstance instance, std::unique_ptr<Instance>&&);
-Instance* GetData(VkInstance);
-Instance* GetData(VkPhysicalDevice);
-void FreeData(void* key, VkInstance instance);
+class DispatchDevice;
+void SetDispatchDevice(VkDevice dev, std::unique_ptr<DispatchDevice>&&);
+DispatchDevice* GetDispatchDevice(VkDevice);
+DispatchDevice* GetDispatchDevice(VkQueue);
+DispatchDevice* GetDispatchDevice(VkCommandBuffer);
+DispatchDevice* GetDispatchDevice(VkExternalComputeQueueNV);
+void FreeDispatchDevice(void* key);
 
-class Device;
-void SetData(VkDevice dev, std::unique_ptr<Device>&&);
-Device* GetData(VkDevice);
-Device* GetData(VkQueue);
-Device* GetData(VkCommandBuffer);
-Device* GetData(VkExternalComputeQueueNV);
-void FreeData(void* key, VkDevice device);
-
-void FreeAllData();
+void FreeAllDispatchObjects();
 
 struct TemplateState {
     VkDescriptorUpdateTemplate desc_update_template;
@@ -180,6 +180,7 @@ struct Settings {
     GlobalSettings global_settings = {};
     GpuAVSettings gpuav_settings = {};
     SyncValSettings syncval_settings = {};
+    GpuDumpSettings gpu_dump_settings = {};
 
     ValidationDisabled disabled = {};
     ValidationEnabled enabled = {};
@@ -232,17 +233,30 @@ class HandleWrapper : public Logger {
         }
     }
 
+    // Replaces the "driver handle" in the "wrapped handle" to "driver handle" mapping.
+    // Returns the old "driver handle" if found.
+    template <typename HandleType>
+    HandleType Replace(HandleType wrapped_handle, HandleType new_driver_handle) {
+        const HandleType old_driver_handle = Find(wrapped_handle);
+        const uint64_t wrapped_handle_id = CastToUint64(wrapped_handle);
+        assert(wrapped_handle_id != 0);  // can't be 0, otherwise unwrap will apply special rule for VK_NULL_HANDLE
+        unique_id_mapping.insert_or_assign(wrapped_handle_id, CastToUint64(new_driver_handle));
+        return old_driver_handle;
+    }
+
     void UnwrapPnextChainHandles(const void* pNext);
+    void UnwrapComputePipelineCreateInfoHandles(vku::safe_VkComputePipelineCreateInfo& safe_ci);
+    void UnwrapGraphicsPipelineCreateInfoHandles(vku::safe_VkGraphicsPipelineCreateInfo& safe_ci);
 
     static std::atomic<uint64_t> global_unique_id;
     static vvl::concurrent_unordered_map<uint64_t, uint64_t, 4, HashedUint64> unique_id_mapping;
     static bool wrap_handles;
 };
 
-class Instance : public HandleWrapper {
+class DispatchInstance : public HandleWrapper {
   public:
-    Instance(const VkInstanceCreateInfo* pCreateInfo);
-    ~Instance();
+    DispatchInstance(const VkInstanceCreateInfo* pCreateInfo);
+    ~DispatchInstance();
 
     void InitValidationObjects();
     void FindSupportedExtensions();
@@ -260,14 +274,14 @@ class Instance : public HandleWrapper {
         display_id_reverse_mapping.insert_or_assign(handle, unique_id);
         return (VkDisplayKHR)unique_id;
     }
-    base::Instance* GetValidationObject(LayerObjectTypeId object_type) const;
+    BaseInstance* GetValidationObject(LayerObjectTypeId object_type) const;
 
     Settings settings;
 
     APIVersion api_version;
     DeviceExtensions extensions{};
 
-    mutable std::vector<std::unique_ptr<base::Instance>> object_dispatch;
+    mutable std::vector<std::unique_ptr<BaseInstance>> object_dispatch;
 
     VkInstance instance = VK_NULL_HANDLE;
     VkLayerInstanceDispatchTable instance_dispatch_table;
@@ -296,20 +310,20 @@ class Instance : public HandleWrapper {
     void ReportErrorFeatureNotPresent(VkPhysicalDevice gpu, const VkDeviceCreateInfo& create_info);
 };
 
-class Device : public HandleWrapper {
+class DispatchDevice : public HandleWrapper {
   public:
-    Device(Instance* instance, VkPhysicalDevice gpu, const VkDeviceCreateInfo* pCreateInfo);
-    ~Device();
+    DispatchDevice(DispatchInstance* instance, VkPhysicalDevice gpu, const VkDeviceCreateInfo* pCreateInfo);
+    ~DispatchDevice();
 
     void InitObjectDispatchVectors();
     void InitValidationObjects();
     void ReleaseValidationObject(LayerObjectTypeId type_id) const;
-    base::Device* GetValidationObject(LayerObjectTypeId object_type) const;
+    BaseDevice* GetValidationObject(LayerObjectTypeId object_type) const;
 
     bool IsSecondary(VkCommandBuffer cb) const;
 
     Settings& settings;
-    Instance* dispatch_instance;
+    DispatchInstance* dispatch_instance;
 
     const StatelessDeviceData stateless_device_data;
 
@@ -333,9 +347,9 @@ class Device : public HandleWrapper {
     VkDevice device = VK_NULL_HANDLE;
     VkLayerDispatchTable device_dispatch_table;
 
-    mutable std::vector<std::unique_ptr<base::Device>> object_dispatch;
-    mutable std::vector<std::unique_ptr<base::Device>> aborted_object_dispatch;
-    mutable std::vector<std::vector<base::Device*>> intercept_vectors;
+    mutable std::vector<std::unique_ptr<BaseDevice>> object_dispatch;
+    mutable std::vector<std::unique_ptr<BaseDevice>> aborted_object_dispatch;
+    mutable std::vector<std::vector<BaseDevice*>> intercept_vectors;
     // Handle Wrapping Data
     // Wrapping Descriptor Template Update structures requires access to the template createinfo structs
     vvl::unordered_map<uint64_t, std::unique_ptr<TemplateState>> desc_template_createinfo_map;
@@ -362,5 +376,4 @@ class Device : public HandleWrapper {
 
 #include "generated/dispatch_object_device_methods.h"
 };
-}  // namespace dispatch
 }  // namespace vvl

@@ -746,7 +746,7 @@ void DeviceState::PostCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer
 
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
     if (cb_state) {
-        auto cp_state = Get<CommandPool>(cb_state->command_pool->VkHandle());
+        auto cp_state = Get<CommandPool>(cb_state->command_pool.VkHandle());
         cp_state->command_buffers_recording++;
     }
 }
@@ -754,7 +754,7 @@ void DeviceState::PostCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer
 void DeviceState::PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer, const RecordObject& record_obj) {
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
     if (cb_state) {
-        auto cp_state = Get<CommandPool>(cb_state->command_pool->VkHandle());
+        auto cp_state = Get<CommandPool>(cb_state->command_pool.VkHandle());
         cp_state->command_buffers_recording--;
     }
 

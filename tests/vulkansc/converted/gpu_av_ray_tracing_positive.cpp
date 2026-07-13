@@ -14,10 +14,11 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/ray_tracing_objects.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/gpu_av_helper.h"
+#include <cmath>
+#include "layer_validation_tests.h"
+#include "ray_tracing_objects.h"
+#include "descriptor_helper.h"
+#include "gpu_av_helper.h"
 
 class PositiveGpuAVRayTracing : public GpuAVRayTracingTest {};
 
@@ -680,7 +681,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
         float2 uv = float2(0.5, 0.5);
 
         RayDesc ray;
-        ray.Origin = ray.Origin;
+        ray.Origin = float3(0, 0, 0);
         ray.TMin = 0;
         ray.Direction = float3(0.5, 0.5, 0.5);
         ray.TMax = 1e6;
@@ -745,7 +746,6 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
     %v3float = OpTypeVector %float 3
          %27 = OpConstantComposite %v3float %float_0_5 %float_0_5 %float_0_5
 %float_1000000 = OpConstant %float 1000000
-%uint_4294967295 = OpConstant %uint 4294967295
 %_runtimearr_float = OpTypeRuntimeArray %float
 %type_RWStructuredBuffer_float = OpTypeStruct %_runtimearr_float
 %_ptr_StorageBuffer_type_RWStructuredBuffer_float = OpTypePointer StorageBuffer %type_RWStructuredBuffer_float
@@ -769,7 +769,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
     %payload = OpVariable %_ptr_IncomingRayPayloadNV_ColorPayload IncomingRayPayloadNV
   %payload_0 = OpVariable %_ptr_IncomingRayPayloadNV_ColorPayload IncomingRayPayloadNV
   %payload_1 = OpVariable %_ptr_RayPayloadNV_ColorPayload RayPayloadNV
-         %42 = OpUndef %v3float
+         %42 = OpConstantComposite %v3float %float_0 %float_0 %float_0
          %43 = OpUndef %uint
          %44 = OpConstantComposite %ColorPayload %uint_0
          %45 = OpConstantComposite %ColorPayload %uint_1
@@ -789,7 +789,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
          %50 = OpCompositeConstruct %ColorPayload %43
                OpStore %payload_1 %50
          %51 = OpLoad %accelerationStructureNV %_tlas
-               OpTraceRayKHR %51 %uint_4294967295 %uint_0 %uint_0 %uint_0 %uint_0 %42 %float_0 %27 %float_1000000 %payload_1
+               OpTraceRayKHR %51 %uint_0 %uint_0 %uint_0 %uint_0 %uint_0 %42 %float_0 %27 %float_1000000 %payload_1
          %52 = OpLoad %ColorPayload %payload_1
          %53 = OpCompositeExtract %uint %52 0
          %15 = OpCopyObject %uint %53
@@ -960,7 +960,9 @@ TEST_F(PositiveGpuAVRayTracing, TraceRaysInCubes) {
     vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
 
     m_command_buffer.Begin();
-    cube_blas.BuildCmdBuffer(m_command_buffer);
+    for (int i = 0; i < 3; ++i) {
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+    }
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
@@ -1430,4 +1432,394 @@ TEST_F(PositiveGpuAVRayTracing, OutOfBoundsIndex2) {
 
     m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
+}
+
+TEST_F(PositiveGpuAVRayTracing, IndexBufferUpdate) {
+    TEST_DESCRIPTION("Use another index buffer in an AS build update, with a content identical to the original one.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+
+    std::array<uint32_t, 3 * 2 * 6> indices = {
+        {3, 0, 4, 4, 7, 3, 0, 4, 5, 0, 5, 1, 4, 5, 6, 4, 6, 7, 1, 6, 5, 1, 2, 6, 2, 6, 7, 2, 7, 3, 0, 1, 3, 1, 3, 2}};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    vkt::Buffer index_buffer(*m_device, sizeof(indices[0]) * indices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+    auto index_buffer_ptr = static_cast<uint32_t*>(index_buffer.Memory().Map());
+    std::copy(indices.begin(), indices.end(), index_buffer_ptr);
+    index_buffer.Memory().Unmap();
+
+    cube.SetTrianglesDeviceIndexBuffer(std::move(index_buffer));
+
+    vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
+    cube_blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    cube_blas.SetSrcAS(cube_blas.GetDstAS());
+    cube_blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    // Index buffer 2 identical to index_buffer
+    {
+        vkt::Buffer index_buffer_2(*m_device, sizeof(indices[0]) * indices.size(), buffer_usage, kHostVisibleMemProps,
+                                   &alloc_flags);
+        auto index_buffer_2_ptr = static_cast<uint32_t*>(index_buffer_2.Memory().Map());
+        std::copy(indices.begin(), indices.end(), index_buffer_2_ptr);
+        index_buffer_2.Memory().Unmap();
+
+        cube_blas.GetGeometries()[0].SetTrianglesDeviceIndexBuffer(std::move(index_buffer_2));
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_default_queue->SubmitAndWait(m_command_buffer);
+    }
+
+    // Index buffer 3 identical to index_buffer, but starting at an offset
+    {
+        constexpr uint32_t index_buffer_3_byte_offset = 64;
+        constexpr uint32_t index_buffer_3_dword_offset = index_buffer_3_byte_offset / sizeof(uint32_t);
+        vkt::Buffer index_buffer_3(*m_device, sizeof(indices[0]) * indices.size() + index_buffer_3_byte_offset, buffer_usage,
+                                   kHostVisibleMemProps, &alloc_flags);
+        auto index_buffer_3_ptr = static_cast<uint32_t*>(index_buffer_3.Memory().Map());
+        std::copy(indices.begin(), indices.end(), index_buffer_3_ptr + index_buffer_3_dword_offset);
+        index_buffer_3.Memory().Unmap();
+
+        cube_blas.GetGeometries()[0].SetTrianglesDeviceIndexBuffer(std::move(index_buffer_3));
+        auto build_range_infos = cube_blas.GetBuildRangeInfosFromGeometries();
+        build_range_infos[0].primitiveOffset = index_buffer_3_byte_offset;
+        cube_blas.SetBuildRanges(build_range_infos);
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_default_queue->SubmitAndWait(m_command_buffer);
+    }
+}
+
+TEST_F(PositiveGpuAVRayTracing, VertexBufferUpdateStridedVertices) {
+    TEST_DESCRIPTION("In an AS build update, use a different vertex buffer, but having the same data");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    struct Vertex {
+        float x, y, z;
+    };
+    const std::array<Vertex, 9> vertices = {{
+        {99.0f, 2.0f, 3.0f},
+        {NAN, 5.0f, 6.0f},
+        {7.0f, 8.0f, 9.0f},
+
+        {10.0f, 11.0f, 12.0f},
+        {13.0, 14.0f, 15.0f},
+        {16.0f, 17.0f, 18.0f},
+
+        {19.0f, 20.0f, 21.0f},
+        {NAN, 22.0f, 23.0f},
+        {24.0f, 25.0f, 26.0f},
+    }};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    const uint32_t vertex_stride = 2 * 12;
+
+    vkt::Buffer vertex_buffer(*m_device, vertex_stride * vertices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+    auto vertex_buffer_ptr = static_cast<uint8_t*>(vertex_buffer.Memory().Map());
+
+    for (uint32_t vertex_i = 0; vertex_i < vertices.size(); ++vertex_i) {
+        std::memcpy(vertex_buffer_ptr + vertex_i * vertex_stride, vertices.data() + vertex_i, sizeof(Vertex));
+    }
+
+    vertex_buffer.Memory().Unmap();
+
+    vkt::as::GeometryKHR geom;
+    geom.SetType(vkt::as::GeometryKHR::Type::Triangle);
+    geom.SetFlags(VK_GEOMETRY_OPAQUE_BIT_KHR);
+    geom.SetPrimitiveCount(3);
+    geom.SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer), uint32_t(vertices.size() - 1), VK_FORMAT_R32G32B32_SFLOAT,
+                                        vertex_stride);
+    geom.SetTrianglesIndexType(VK_INDEX_TYPE_NONE_KHR);
+
+    vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(geom));
+    cube_blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    cube_blas.SetSrcAS(cube_blas.GetDstAS());
+    cube_blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    // Vertex buffer 3 identical to vertex_buffer, but starting at an offset
+    {
+        uint32_t vertex_buffer_3_byte_offset =
+            4 * vkuFormatTexelBlockSize(cube_blas.GetGeometries()[0].GetVkObj().geometry.triangles.vertexFormat);
+        vertex_buffer_3_byte_offset = 0;
+        vkt::Buffer vertex_buffer_3(*m_device, vertex_stride * vertices.size() + vertex_buffer_3_byte_offset, buffer_usage,
+                                    kHostVisibleMemProps, &alloc_flags);
+        auto vertex_buffer_3_ptr = static_cast<uint8_t*>(vertex_buffer_3.Memory().Map());
+        for (uint32_t vertex_i = 0; vertex_i < vertices.size(); ++vertex_i) {
+            std::memcpy(vertex_buffer_3_ptr + vertex_buffer_3_byte_offset + vertex_i * vertex_stride, vertices.data() + vertex_i,
+                        sizeof(Vertex));
+        }
+
+        vertex_buffer_3.Memory().Unmap();
+
+        cube_blas.GetGeometries()[0].SetTrianglesDeviceVertexBuffer(std::move(vertex_buffer_3), uint32_t(vertices.size() - 1),
+                                                                    VK_FORMAT_R32G32B32_SFLOAT, vertex_stride);
+        auto build_range_infos = cube_blas.GetBuildRangeInfosFromGeometries();
+        build_range_infos[0].primitiveOffset = vertex_buffer_3_byte_offset;
+        cube_blas.SetBuildRanges(build_range_infos);
+
+        m_command_buffer.Begin();
+        cube_blas.BuildCmdBuffer(m_command_buffer);
+        m_command_buffer.End();
+
+        m_default_queue->SubmitAndWait(m_command_buffer);
+    }
+}
+
+TEST_F(PositiveGpuAVRayTracing, AabbStatus) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayQuery);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    // Build Bottom Level Acceleration Structure
+    auto geometry = vkt::as::blueprint::GeometrySimpleOnDeviceAABBInfo(*m_device);
+    VkAabbPositionsKHR active_aabb;
+    active_aabb.minX = -1.0f;
+    active_aabb.maxX = 1.0f;
+    active_aabb.minY = -1.0f;
+    active_aabb.maxY = 1.0f;
+    active_aabb.minZ = -1.0f;
+    active_aabb.maxZ = 1.0f;
+    VkAabbPositionsKHR inactive_aabb = active_aabb;
+    inactive_aabb.minX = NAN;
+    std::array<VkAabbPositionsKHR, 6> aabbs = {
+        {active_aabb, inactive_aabb, active_aabb, inactive_aabb, active_aabb, inactive_aabb}};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    vkt::Buffer aabbs_buffer(*m_device, sizeof(aabbs[0]) * aabbs.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+
+    auto aabbs_buffer_ptr = static_cast<VkAabbPositionsKHR*>(aabbs_buffer.Memory().Map());
+    std::copy(aabbs.begin(), aabbs.end(), aabbs_buffer_ptr);
+
+    geometry.SetAABBsDeviceBuffer(std::move(aabbs_buffer));
+    geometry.SetPrimitiveCount(4);
+    // Offset AABB buffer to read data starting at the 3rd AABB
+    geometry.SetAABBsDeviceAddress(geometry.GetAABBs().device_buffer.Address() + 2 * sizeof(VkAabbPositionsKHR));
+
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(geometry));
+    blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+    m_command_buffer.Begin();
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+    m_errorMonitor->VerifyFound();
+
+    blas.SetSrcAS(blas.GetDstAS());
+    blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    // Use base AABB buffer address in BLAS geometry, but offset using primitiveOffset to read same data
+    // as previously
+    blas.GetGeometries()[0].SetAABBsDeviceAddress(blas.GetGeometries()[0].GetAABBs().device_buffer.Address());
+    auto build_range_infos = blas.GetBuildRangeInfosFromGeometries();
+    build_range_infos[0].primitiveOffset = 2 * sizeof(VkAabbPositionsKHR);
+    blas.SetBuildRanges(build_range_infos);
+
+    m_command_buffer.Begin();
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+}
+
+TEST_F(PositiveGpuAVRayTracing, EmptyTlas) {
+    TEST_DESCRIPTION("Empty TLAS");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::rayQuery);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    m_command_buffer.Begin();
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+
+    m_command_buffer.Begin();
+
+    vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, *blas.GetDstAS());
+    // NULL blas instances address, but primitiveCount is 0 so it's valid
+    tlas.GetGeometries()[0].GetVkObj().geometry.instances.data.deviceAddress = 0;
+    tlas.GetBuildRanges()[0].primitiveCount = 0;
+    tlas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveGpuAVRayTracing, TlasBuildUsingZeroAsBlasAddress) {
+    TEST_DESCRIPTION("A BLAS address of 0 in a TLAS build is valid.");
+
+    RETURN_IF_SKIP(CheckSlangSupport());
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+    vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+
+    std::vector<vkt::as::GeometryKHR> tlas_1(1);
+    tlas_1[0].SetType(vkt::as::GeometryKHR::Type::Instance);
+
+    VkAccelerationStructureInstanceKHR cube_instance_1{};
+    cube_instance_1.transform.matrix[0][0] = 1.0f;
+    cube_instance_1.transform.matrix[1][1] = 1.0f;
+    cube_instance_1.transform.matrix[2][2] = 1.0f;
+    cube_instance_1.transform.matrix[0][3] = 50.0f;
+    cube_instance_1.transform.matrix[1][3] = 0.0f;
+    cube_instance_1.transform.matrix[2][3] = 0.0f;
+    cube_instance_1.mask = 0xff;
+    cube_instance_1.instanceCustomIndex = 0;
+    // Cube instance 1 will be associated to closest hit shader 1
+    cube_instance_1.instanceShaderBindingTableRecordOffset = 0;
+    tlas_1[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_1);
+    tlas_1[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_1);
+
+    VkAccelerationStructureInstanceKHR cube_instance_2{};
+    cube_instance_2.transform.matrix[0][0] = 1.0f;
+    cube_instance_2.transform.matrix[1][1] = 1.0f;
+    cube_instance_2.transform.matrix[2][2] = 1.0f;
+    cube_instance_2.transform.matrix[0][3] = 0.0f;
+    cube_instance_2.transform.matrix[1][3] = 0.0f;
+    cube_instance_2.transform.matrix[2][3] = 50.0f;
+    cube_instance_2.mask = 0xff;
+    cube_instance_2.instanceCustomIndex = 0;
+    // Cube instance 2 will be associated to closest hit shader 1
+    cube_instance_2.instanceShaderBindingTableRecordOffset = 0;
+
+    tlas_1[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_2);
+
+    // First BLAS address is 0, valid per VUID 12281
+    tlas_1[0].UpdateAccelerationStructureInstance(0, [](VkAccelerationStructureInstanceKHR& instance) {
+        instance.accelerationStructureReference = static_cast<uint64_t>(0x0);
+    });
+
+    std::vector<vkt::as::BuildGeometryInfoKHR> tlas_and_blass_build_info_1;
+    {
+        vkt::as::GeometryKHR cube_1(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+        vkt::as::BuildGeometryInfoKHR cube_blas_1 =
+            vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
+        tlas_and_blass_build_info_1.emplace_back(std::move(cube_blas_1));
+
+        vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::CreateTLAS(*m_device, std::move(tlas_1));
+        tlas_and_blass_build_info_1.emplace_back(std::move(tlas));
+
+        vkt::as::GeometryKHR cube_2(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+        vkt::as::BuildGeometryInfoKHR cube_blas_2 =
+            vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
+        tlas_and_blass_build_info_1.emplace_back(std::move(cube_blas_2));
+
+        m_command_buffer.Begin();
+        vkt::as::BuildAccelerationStructuresKHR(m_command_buffer, tlas_and_blass_build_info_1);
+        m_command_buffer.End();
+        m_default_queue->Submit(m_command_buffer);
+        m_device->Wait();
+        m_errorMonitor->VerifyFound();
+    }
 }

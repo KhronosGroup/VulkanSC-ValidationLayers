@@ -2,7 +2,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,8 +11,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 bool QueryTest::HasZeroTimestampValidBits() {
     uint32_t queue_count;
@@ -624,7 +624,8 @@ TEST_F(PositiveQuery, QueryPoolResetBit) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    VkQueryPoolCreateInfo qpci = vkt::QueryPool::CreateInfo(VK_QUERY_TYPE_PIPELINE_STATISTICS, 1, VK_QUERY_POOL_CREATE_RESET_BIT_KHR);
+    VkQueryPoolCreateInfo qpci =
+        vkt::QueryPool::CreateInfo(VK_QUERY_TYPE_PIPELINE_STATISTICS, 1, VK_QUERY_POOL_CREATE_RESET_BIT_KHR);
     qpci.pipelineStatistics = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT;
     vkt::QueryPool query_pool(*m_device, qpci);
 

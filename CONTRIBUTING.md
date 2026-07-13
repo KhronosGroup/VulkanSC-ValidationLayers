@@ -10,7 +10,7 @@ We enjoy external contributions, we often see them in the form of:
 
 ## Quick check list for making a change
 
-- Make sure you run `clang-format` on any C++ code.
+- Make sure you run `clang-format` on any C++ code. (We currently use [clang-format 22.1.x](https://github.com/llvm/llvm-project/releases/tag/llvmorg-22.1.1) for CI)
 - If fixing a bug, we would like a [positive test](./tests/README.md#different-categories-of-tests).
 - If addinga a new VU, we **need** a [negative test](./tests/README.md#different-categories-of-tests).
 - Try to match the code style around the code as best as possible.
@@ -22,7 +22,7 @@ We enjoy external contributions, we often see them in the form of:
 We are reasonable developers, we don't want to bikeshed on code style, but highly encourge to look at the nearby code.
 As maintainer, if we find the style is incredibly different, we will ask you kindly to fix it.
 
-our CI will run **clang-format** (version 14) **FOR EVERY COMMIT**, so make sure your change has been ran with it.
+our CI will run **clang-format** (version 22.1.x) **FOR EVERY COMMIT**, so make sure your change has been ran with it.
 
 ```bash
 # sample git workflow may look like
@@ -34,7 +34,7 @@ git add -u .
 git commit
 ```
 
-## Commit Messsage
+## Commit Message
 
 Some basic rules (enforced by CI)
 
@@ -64,12 +64,23 @@ We will be strict to enforce any new VUs added have a good, well written error m
 
 > Tip - If you make a fork and push to it, it will run CI there before your make a PR!
 
-### **Contributor License Agreement (CLA)**
+### Contributor License Agreement (CLA)
 
 You will be prompted with a one-time "click-through" CLA dialog as part of submitting your pull request
 or other contribution to GitHub.
 
-### **License and Copyrights**
+### AI-Assisted Contributions
+
+By submitting a Contribution to this repository, you additionally represent
+that, to the extent any of Your Contributions were developed with the
+assistance of artificial intelligence tools or AI-generated code, You have
+exercised sufficient review, judgment, and creative direction over such tools
+and resulting material to reasonably consider it Your original creation, and
+You are not aware of any third-party license, intellectual property claim, or
+other restriction arising from such use that is associated with any part of
+Your Contribution or use thereof.
+
+### License and Copyrights
 
 All contributions made to the VulkanSC-ValidationLayers repository are Khronos branded and as such,
 any new files need to have the Khronos license (Apache 2.0 style) and copyright included.

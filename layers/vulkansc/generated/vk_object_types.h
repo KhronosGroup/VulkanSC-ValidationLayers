@@ -26,6 +26,7 @@
 #pragma once
 #include "utils/cast_utils.h"
 #include "utils/hash_util.h"
+#include "containers/range.h"
 
 // Object Type enum for validation layer internal object handling
 typedef enum VulkanObjectType {
@@ -65,30 +66,33 @@ typedef enum VulkanObjectType {
     kVulkanObjectTypeVideoSessionKHR = 33,
     kVulkanObjectTypeVideoSessionParametersKHR = 34,
     kVulkanObjectTypeDeferredOperationKHR = 35,
-    kVulkanObjectTypePipelineBinaryKHR = 36,
-    kVulkanObjectTypeDebugReportCallbackEXT = 37,
-    kVulkanObjectTypeCuModuleNVX = 38,
-    kVulkanObjectTypeCuFunctionNVX = 39,
-    kVulkanObjectTypeDebugUtilsMessengerEXT = 40,
-    kVulkanObjectTypeTensorARM = 41,
-    kVulkanObjectTypeValidationCacheEXT = 42,
-    kVulkanObjectTypeAccelerationStructureNV = 43,
-    kVulkanObjectTypePerformanceConfigurationINTEL = 44,
-    kVulkanObjectTypeIndirectCommandsLayoutNV = 45,
-    kVulkanObjectTypeCudaModuleNV = 46,
-    kVulkanObjectTypeCudaFunctionNV = 47,
-    kVulkanObjectTypeAccelerationStructureKHR = 48,
-    kVulkanObjectTypeBufferCollectionFUCHSIA = 49,
-    kVulkanObjectTypeMicromapEXT = 50,
-    kVulkanObjectTypeTensorViewARM = 51,
-    kVulkanObjectTypeOpticalFlowSessionNV = 52,
-    kVulkanObjectTypeShaderEXT = 53,
-    kVulkanObjectTypeSemaphoreSciSyncPoolNV = 54,
-    kVulkanObjectTypeDataGraphPipelineSessionARM = 55,
-    kVulkanObjectTypeExternalComputeQueueNV = 56,
-    kVulkanObjectTypeIndirectExecutionSetEXT = 57,
-    kVulkanObjectTypeIndirectCommandsLayoutEXT = 58,
-    kVulkanObjectTypeMax = 59
+    kVulkanObjectTypeAccelerationStructureKHR = 36,
+    kVulkanObjectTypePipelineBinaryKHR = 37,
+    kVulkanObjectTypeDebugReportCallbackEXT = 38,
+    kVulkanObjectTypeCuModuleNVX = 39,
+    kVulkanObjectTypeCuFunctionNVX = 40,
+    kVulkanObjectTypeDebugUtilsMessengerEXT = 41,
+    kVulkanObjectTypeGpaSessionAMD = 42,
+    kVulkanObjectTypeTensorARM = 43,
+    kVulkanObjectTypeValidationCacheEXT = 44,
+    kVulkanObjectTypeAccelerationStructureNV = 45,
+    kVulkanObjectTypePerformanceConfigurationINTEL = 46,
+    kVulkanObjectTypeIndirectCommandsLayoutNV = 47,
+    kVulkanObjectTypeCudaModuleNV = 48,
+    kVulkanObjectTypeCudaFunctionNV = 49,
+    kVulkanObjectTypeBufferCollectionFUCHSIA = 50,
+    kVulkanObjectTypeMicromapEXT = 51,
+    kVulkanObjectTypeTensorViewARM = 52,
+    kVulkanObjectTypeOpticalFlowSessionNV = 53,
+    kVulkanObjectTypeShaderEXT = 54,
+    kVulkanObjectTypeSemaphoreSciSyncPoolNV = 55,
+    kVulkanObjectTypeDataGraphPipelineSessionARM = 56,
+    kVulkanObjectTypeExternalComputeQueueNV = 57,
+    kVulkanObjectTypeIndirectExecutionSetEXT = 58,
+    kVulkanObjectTypeIndirectCommandsLayoutEXT = 59,
+    kVulkanObjectTypeShaderInstrumentationARM = 60,
+    kVulkanObjectTypeInternalDeviceRange = 61,
+    kVulkanObjectTypeMax = 62,
 } VulkanObjectType;
 
 VkDebugReportObjectTypeEXT GetDebugReport(VulkanObjectType type);
@@ -168,6 +172,8 @@ static constexpr VkObjectType ConvertVulkanObjectToCoreObject(VulkanObjectType i
             return VK_OBJECT_TYPE_VIDEO_SESSION_PARAMETERS_KHR;
         case kVulkanObjectTypeDeferredOperationKHR:
             return VK_OBJECT_TYPE_DEFERRED_OPERATION_KHR;
+        case kVulkanObjectTypeAccelerationStructureKHR:
+            return VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR;
         case kVulkanObjectTypePipelineBinaryKHR:
             return VK_OBJECT_TYPE_PIPELINE_BINARY_KHR;
         case kVulkanObjectTypeDebugReportCallbackEXT:
@@ -178,6 +184,8 @@ static constexpr VkObjectType ConvertVulkanObjectToCoreObject(VulkanObjectType i
             return VK_OBJECT_TYPE_CU_FUNCTION_NVX;
         case kVulkanObjectTypeDebugUtilsMessengerEXT:
             return VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT;
+        case kVulkanObjectTypeGpaSessionAMD:
+            return VK_OBJECT_TYPE_GPA_SESSION_AMD;
         case kVulkanObjectTypeTensorARM:
             return VK_OBJECT_TYPE_TENSOR_ARM;
         case kVulkanObjectTypeValidationCacheEXT:
@@ -192,8 +200,6 @@ static constexpr VkObjectType ConvertVulkanObjectToCoreObject(VulkanObjectType i
             return VK_OBJECT_TYPE_CUDA_MODULE_NV;
         case kVulkanObjectTypeCudaFunctionNV:
             return VK_OBJECT_TYPE_CUDA_FUNCTION_NV;
-        case kVulkanObjectTypeAccelerationStructureKHR:
-            return VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR;
         case kVulkanObjectTypeBufferCollectionFUCHSIA:
             return VK_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA;
         case kVulkanObjectTypeMicromapEXT:
@@ -214,6 +220,8 @@ static constexpr VkObjectType ConvertVulkanObjectToCoreObject(VulkanObjectType i
             return VK_OBJECT_TYPE_INDIRECT_EXECUTION_SET_EXT;
         case kVulkanObjectTypeIndirectCommandsLayoutEXT:
             return VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_EXT;
+        case kVulkanObjectTypeShaderInstrumentationARM:
+            return VK_OBJECT_TYPE_SHADER_INSTRUMENTATION_ARM;
         default:
             return VK_OBJECT_TYPE_UNKNOWN;
     }
@@ -292,6 +300,8 @@ static constexpr VulkanObjectType ConvertCoreObjectToVulkanObject(VkObjectType v
             return kVulkanObjectTypeVideoSessionParametersKHR;
         case VK_OBJECT_TYPE_DEFERRED_OPERATION_KHR:
             return kVulkanObjectTypeDeferredOperationKHR;
+        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR:
+            return kVulkanObjectTypeAccelerationStructureKHR;
         case VK_OBJECT_TYPE_PIPELINE_BINARY_KHR:
             return kVulkanObjectTypePipelineBinaryKHR;
         case VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT:
@@ -302,6 +312,8 @@ static constexpr VulkanObjectType ConvertCoreObjectToVulkanObject(VkObjectType v
             return kVulkanObjectTypeCuFunctionNVX;
         case VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT:
             return kVulkanObjectTypeDebugUtilsMessengerEXT;
+        case VK_OBJECT_TYPE_GPA_SESSION_AMD:
+            return kVulkanObjectTypeGpaSessionAMD;
         case VK_OBJECT_TYPE_TENSOR_ARM:
             return kVulkanObjectTypeTensorARM;
         case VK_OBJECT_TYPE_VALIDATION_CACHE_EXT:
@@ -316,8 +328,6 @@ static constexpr VulkanObjectType ConvertCoreObjectToVulkanObject(VkObjectType v
             return kVulkanObjectTypeCudaModuleNV;
         case VK_OBJECT_TYPE_CUDA_FUNCTION_NV:
             return kVulkanObjectTypeCudaFunctionNV;
-        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR:
-            return kVulkanObjectTypeAccelerationStructureKHR;
         case VK_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA:
             return kVulkanObjectTypeBufferCollectionFUCHSIA;
         case VK_OBJECT_TYPE_MICROMAP_EXT:
@@ -338,6 +348,8 @@ static constexpr VulkanObjectType ConvertCoreObjectToVulkanObject(VkObjectType v
             return kVulkanObjectTypeIndirectExecutionSetEXT;
         case VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_EXT:
             return kVulkanObjectTypeIndirectCommandsLayoutEXT;
+        case VK_OBJECT_TYPE_SHADER_INSTRUMENTATION_ARM:
+            return kVulkanObjectTypeShaderInstrumentationARM;
         default:
             return kVulkanObjectTypeUnknown;
     }
@@ -408,6 +420,8 @@ static constexpr VkDebugReportObjectTypeEXT ConvertCoreObjectToDebugReportObject
             return VK_DEBUG_REPORT_OBJECT_TYPE_DISPLAY_KHR_EXT;
         case VK_OBJECT_TYPE_DISPLAY_MODE_KHR:
             return VK_DEBUG_REPORT_OBJECT_TYPE_DISPLAY_MODE_KHR_EXT;
+        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR:
+            return VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR_EXT;
         case VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT:
             return VK_DEBUG_REPORT_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT_EXT;
         case VK_OBJECT_TYPE_CU_MODULE_NVX:
@@ -422,8 +436,6 @@ static constexpr VkDebugReportObjectTypeEXT ConvertCoreObjectToDebugReportObject
             return VK_DEBUG_REPORT_OBJECT_TYPE_CUDA_MODULE_NV_EXT;
         case VK_OBJECT_TYPE_CUDA_FUNCTION_NV:
             return VK_DEBUG_REPORT_OBJECT_TYPE_CUDA_FUNCTION_NV_EXT;
-        case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR:
-            return VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR_EXT;
         case VK_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA:
             return VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA_EXT;
         default:
@@ -497,6 +509,8 @@ static constexpr VulkanObjectType ConvertDebugReportObjectToVulkanObject(VkDebug
             return kVulkanObjectTypeDisplayKHR;
         case VK_DEBUG_REPORT_OBJECT_TYPE_DISPLAY_MODE_KHR_EXT:
             return kVulkanObjectTypeDisplayModeKHR;
+        case VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR_EXT:
+            return kVulkanObjectTypeAccelerationStructureKHR;
         case VK_DEBUG_REPORT_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT_EXT:
             return kVulkanObjectTypeDebugReportCallbackEXT;
         case VK_DEBUG_REPORT_OBJECT_TYPE_CU_MODULE_NVX_EXT:
@@ -511,8 +525,6 @@ static constexpr VulkanObjectType ConvertDebugReportObjectToVulkanObject(VkDebug
             return kVulkanObjectTypeCudaModuleNV;
         case VK_DEBUG_REPORT_OBJECT_TYPE_CUDA_FUNCTION_NV_EXT:
             return kVulkanObjectTypeCudaFunctionNV;
-        case VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR_EXT:
-            return kVulkanObjectTypeAccelerationStructureKHR;
         case VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA_EXT:
             return kVulkanObjectTypeBufferCollectionFUCHSIA;
         default:
@@ -633,6 +645,23 @@ struct VkHandleInfo<VkExternalComputeQueueNV> {
 template <>
 struct VulkanObjectTypeInfo<kVulkanObjectTypeExternalComputeQueueNV> {
     typedef VkExternalComputeQueueNV Type;
+};
+
+// This is for tracking BufferAddressRange state object
+namespace vvl {
+struct InternalDeviceRange;
+}
+template <>
+struct VkHandleInfo<vvl::InternalDeviceRange*> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeInternalDeviceRange;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_UNKNOWN_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_UNKNOWN;
+    static const char* Typename() { return "InternalDeviceRange"; }
+};
+
+template <>
+struct VulkanObjectTypeInfo<kVulkanObjectTypeInternalDeviceRange> {
+    typedef vvl::InternalDeviceRange* Type;
 };
 #ifdef TYPESAFE_NONDISPATCHABLE_HANDLES
 
@@ -997,6 +1026,18 @@ struct VulkanObjectTypeInfo<kVulkanObjectTypeDeferredOperationKHR> {
 };
 
 template <>
+struct VkHandleInfo<VkAccelerationStructureKHR> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeAccelerationStructureKHR;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR;
+    static const char* Typename() { return "VkAccelerationStructureKHR"; }
+};
+template <>
+struct VulkanObjectTypeInfo<kVulkanObjectTypeAccelerationStructureKHR> {
+    typedef VkAccelerationStructureKHR Type;
+};
+
+template <>
 struct VkHandleInfo<VkPipelineBinaryKHR> {
     static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypePipelineBinaryKHR;
     static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_UNKNOWN_EXT;
@@ -1054,6 +1095,18 @@ struct VkHandleInfo<VkDebugUtilsMessengerEXT> {
 template <>
 struct VulkanObjectTypeInfo<kVulkanObjectTypeDebugUtilsMessengerEXT> {
     typedef VkDebugUtilsMessengerEXT Type;
+};
+
+template <>
+struct VkHandleInfo<VkGpaSessionAMD> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeGpaSessionAMD;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_UNKNOWN_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_GPA_SESSION_AMD;
+    static const char* Typename() { return "VkGpaSessionAMD"; }
+};
+template <>
+struct VulkanObjectTypeInfo<kVulkanObjectTypeGpaSessionAMD> {
+    typedef VkGpaSessionAMD Type;
 };
 
 template <>
@@ -1141,18 +1194,6 @@ struct VulkanObjectTypeInfo<kVulkanObjectTypeCudaFunctionNV> {
     typedef VkCudaFunctionNV Type;
 };
 #endif  // VK_ENABLE_BETA_EXTENSIONS
-
-template <>
-struct VkHandleInfo<VkAccelerationStructureKHR> {
-    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeAccelerationStructureKHR;
-    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR_EXT;
-    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR;
-    static const char* Typename() { return "VkAccelerationStructureKHR"; }
-};
-template <>
-struct VulkanObjectTypeInfo<kVulkanObjectTypeAccelerationStructureKHR> {
-    typedef VkAccelerationStructureKHR Type;
-};
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 template <>
@@ -1264,6 +1305,18 @@ struct VkHandleInfo<VkIndirectCommandsLayoutEXT> {
 template <>
 struct VulkanObjectTypeInfo<kVulkanObjectTypeIndirectCommandsLayoutEXT> {
     typedef VkIndirectCommandsLayoutEXT Type;
+};
+
+template <>
+struct VkHandleInfo<VkShaderInstrumentationARM> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeShaderInstrumentationARM;
+    static const VkDebugReportObjectTypeEXT kDebugReportObjectType = VK_DEBUG_REPORT_OBJECT_TYPE_UNKNOWN_EXT;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_SHADER_INSTRUMENTATION_ARM;
+    static const char* Typename() { return "VkShaderInstrumentationARM"; }
+};
+template <>
+struct VulkanObjectTypeInfo<kVulkanObjectTypeShaderInstrumentationARM> {
+    typedef VkShaderInstrumentationARM Type;
 };
 #endif  // TYPESAFE_NONDISPATCHABLE_HANDLES
 

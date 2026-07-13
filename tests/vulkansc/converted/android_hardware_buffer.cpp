@@ -15,8 +15,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/android_hardware_buffer.h"
+#include "layer_validation_tests.h"
+#include "android_hardware_buffer.h"
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 
@@ -761,7 +761,7 @@ TEST_F(NegativeAndroidHardwareBuffer, CreateImageView) {
     RETURN_IF_SKIP(Init());
 
     // Allocate an AHB and fetch its properties
-    AHardwareBuffer *ahb = nullptr;
+    AHardwareBuffer* ahb = nullptr;
     AHardwareBuffer_Desc ahb_desc = {};
     ahb_desc.format = AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM;
     ahb_desc.usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
@@ -894,7 +894,7 @@ TEST_F(NegativeAndroidHardwareBuffer, CreateImageView) {
     ivci.format = VK_FORMAT_R5G6B5_UNORM_PACK16;
     m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-02399");
     // Also causes "view format different from image format"
-    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-01762");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-12397");
     vk::CreateImageView(device(), &ivci, NULL, &image_view);
     m_errorMonitor->VerifyFound();
 
@@ -955,7 +955,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportBufferHandleType) {
 
     VkMemoryGetAndroidHardwareBufferInfoANDROID mgahbi = vku::InitStructHelper();
     mgahbi.memory = memory;
-    AHardwareBuffer *ahb = nullptr;
+    AHardwareBuffer* ahb = nullptr;
     m_errorMonitor->SetDesiredError("VUID-VkMemoryGetAndroidHardwareBufferInfoANDROID-handleTypes-01882");
     vk::GetMemoryAndroidHardwareBufferANDROID(device(), &mgahbi, &ahb);
     m_errorMonitor->VerifyFound();
@@ -1044,7 +1044,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportImageNonBound) {
     mgahbi.memory = memory;
 
     m_errorMonitor->SetDesiredError("VUID-VkMemoryGetAndroidHardwareBufferInfoANDROID-pNext-01883");
-    AHardwareBuffer *ahb = nullptr;
+    AHardwareBuffer* ahb = nullptr;
     vk::GetMemoryAndroidHardwareBufferANDROID(device(), &mgahbi, &ahb);
     m_errorMonitor->VerifyFound();
 }

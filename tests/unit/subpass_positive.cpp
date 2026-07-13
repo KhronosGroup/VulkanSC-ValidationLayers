@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/render_pass_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "render_pass_helper.h"
 #include "utils/convert_utils.h"
 
 class PositiveSubpass : public VkLayerTest {};
@@ -201,8 +201,7 @@ TEST_F(PositiveSubpass, InputAttachmentMissingSpecConstant) {
     uint32_t data = 0;
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.gp_ci_.renderPass = rp;
@@ -223,7 +222,7 @@ TEST_F(PositiveSubpass, InputAttachmentMissingSpecConstant2) {
     rp.AddInputAttachment(1, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const int index = 4; // over VkDescriptorSetLayoutBinding::descriptorCount
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[index];
@@ -236,8 +235,7 @@ TEST_F(PositiveSubpass, InputAttachmentMissingSpecConstant2) {
     uint32_t data = 2;
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.gp_ci_.renderPass = rp;

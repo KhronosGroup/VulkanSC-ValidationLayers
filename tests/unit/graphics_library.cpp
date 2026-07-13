@@ -12,9 +12,9 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 
 class NegativeGraphicsLibrary : public GraphicsLibraryTest {};
 
@@ -709,10 +709,10 @@ TEST_F(NegativeGraphicsLibrary, ImmutableSamplersIncompatibleDSL) {
     OneOffDescriptorSet ds2(m_device, {
                                           {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                       });
-    OneOffDescriptorSet ds_immutable_sampler(m_device,
-                                             {
-                                                 {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler.handle()},
-                                             });
+    OneOffDescriptorSet ds_immutable_sampler(
+        m_device, {
+                      {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler.handle()},
+                  });
 
     // We _vs and _fs layouts are identical, but we want them to be separate handles handles for the sake layout merging
     vkt::PipelineLayout pipeline_layout_vs(*m_device, {&ds.layout_, &ds2.layout_}, {},
@@ -1119,7 +1119,7 @@ TEST_F(NegativeGraphicsLibrary, Tessellation) {
     const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
     vkt::GraphicsPipelineLibraryStage fs_stage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    const char *tcs_src = R"glsl(
+    const char* tcs_src = R"glsl(
         #version 450
         layout(vertices=3) out;
         void main(){
@@ -1130,7 +1130,7 @@ TEST_F(NegativeGraphicsLibrary, Tessellation) {
     const auto tcs_spv = GLSLToSPV(VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, tcs_src);
     vkt::GraphicsPipelineLibraryStage tcs_stage(tcs_spv, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
 
-    const char *tes_src = R"glsl(
+    const char* tes_src = R"glsl(
         #version 450
         layout(triangles, equal_spacing, cw) in;
         void main(){
@@ -1375,9 +1375,10 @@ TEST_F(NegativeGraphicsLibrary, BindEmptyDS) {
     OneOffDescriptorSet ds(m_device, {
                                          {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
                                      });
-    OneOffDescriptorSet ds1(m_device, {
-                                         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-                                     });
+    OneOffDescriptorSet ds1(
+        m_device, {
+                      {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+                  });
     OneOffDescriptorSet ds2(m_device, {
                                           {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                       });
@@ -2497,10 +2498,8 @@ TEST_F(NegativeGraphicsLibrary, NullDSL) {
                                           {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                       });
 
-    vkt::PipelineLayout pipeline_layout_vs(*m_device, {&ds.layout_, nullptr, &ds2.layout_}, {},
-                                           VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
-    vkt::PipelineLayout pipeline_layout_fs(*m_device, {&ds.layout_, nullptr, &ds2.layout_}, {},
-                                           VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
+    vkt::PipelineLayout pipeline_layout_vs(*m_device, {&ds.layout_, nullptr, &ds2.layout_});
+    vkt::PipelineLayout pipeline_layout_fs(*m_device, {&ds.layout_, nullptr, &ds2.layout_});
 
     CreatePipelineHelper pre_raster_lib(*this);
     {
@@ -2541,10 +2540,8 @@ TEST_F(NegativeGraphicsLibrary, NullDSLLinking) {
                                           {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                       });
 
-    vkt::PipelineLayout pipeline_layout_vs(*m_device, {&ds.layout_, nullptr, &ds2.layout_}, {},
-                                           VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
-    vkt::PipelineLayout pipeline_layout_fs(*m_device, {&ds.layout_, nullptr, &ds2.layout_}, {},
-                                           VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
+    vkt::PipelineLayout pipeline_layout_vs(*m_device, {&ds.layout_, nullptr, &ds2.layout_});
+    vkt::PipelineLayout pipeline_layout_fs(*m_device, {&ds.layout_, nullptr, &ds2.layout_});
 
     CreatePipelineHelper pre_raster_lib(*this);
     {
@@ -3979,4 +3976,72 @@ TEST_F(NegativeGraphicsLibrary, IndependentSetLayoutNullMismatch) {
         frag_shader_lib.CreateGraphicsPipeline(false);
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(NegativeGraphicsLibrary, InvalidDescriptorSet) {
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
+    InitRenderTarget();
+
+    const char* const vs_source = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform buff {
+            float x;
+        };
+        void main() {
+            gl_Position = vec4(x);
+        }
+    )glsl";
+
+    OneOffDescriptorSet ds1(m_device, {
+                                          {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
+                                      });
+    OneOffDescriptorSet ds2(m_device, {
+                                          {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+                                      });
+    vkt::Buffer uniform_buffer(*m_device, sizeof(float), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    ds1.WriteDescriptorBufferInfo(0, uniform_buffer, 0, sizeof(float));
+    ds1.UpdateDescriptorSets();
+    ds2.WriteDescriptorBufferInfo(0, uniform_buffer, 0, sizeof(float));
+    ds2.UpdateDescriptorSets();
+
+    vkt::PipelineLayout pipeline_layout1(*m_device, {&ds1.layout_});
+    vkt::PipelineLayout pipeline_layout2(*m_device, {&ds2.layout_});
+
+    CreatePipelineHelper vertex_input_lib(*this);
+    vertex_input_lib.InitVertexInputLibInfo();
+    vertex_input_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper pre_raster_lib(*this);
+    {
+        const auto spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source);
+        vkt::GraphicsPipelineLibraryStage vs_stage(spv, VK_SHADER_STAGE_VERTEX_BIT);
+        pre_raster_lib.InitPreRasterLibInfo(&vs_stage.stage_ci);
+        pre_raster_lib.gp_ci_.layout = pipeline_layout1;
+        pre_raster_lib.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
+        pre_raster_lib.CreateGraphicsPipeline(false);
+    }
+
+    VkPipeline libraries[2] = {
+        vertex_input_lib,
+        pre_raster_lib,
+        // Missing fragment shader/output
+    };
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = 2u;
+    link_info.pLibraries = libraries;
+
+    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
+    exe_pipe_ci.layout = pipeline_layout1;
+    exe_pipe_ci.renderPass = RenderPass();
+    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout2, 0, 1, &ds2.set_, 0, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08600");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

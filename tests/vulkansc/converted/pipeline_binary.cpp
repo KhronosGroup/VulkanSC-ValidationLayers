@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +15,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class NegativePipelineBinary : public VkLayerTest {};
 
@@ -75,13 +75,13 @@ TEST_F(NegativePipelineBinary, ReleaseCapturedDataAllocator) {
     RETURN_IF_SKIP(Init());
 
     struct Alloc {
-        static VKAPI_ATTR void *VKAPI_CALL alloc(void *, size_t size, size_t, VkSystemAllocationScope) { return malloc(size); };
-        static VKAPI_ATTR void *VKAPI_CALL reallocFunc(void *, void *original, size_t size, size_t, VkSystemAllocationScope) {
+        static VKAPI_ATTR void* VKAPI_CALL alloc(void*, size_t size, size_t, VkSystemAllocationScope) { return malloc(size); };
+        static VKAPI_ATTR void* VKAPI_CALL reallocFunc(void*, void* original, size_t size, size_t, VkSystemAllocationScope) {
             return realloc(original, size);
         };
-        static VKAPI_ATTR void VKAPI_CALL freeFunc(void *, void *ptr) { free(ptr); };
-        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
-        static VKAPI_ATTR void VKAPI_CALL internalFree(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+        static VKAPI_ATTR void VKAPI_CALL freeFunc(void*, void* ptr) { free(ptr); };
+        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+        static VKAPI_ATTR void VKAPI_CALL internalFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
     };
     const VkAllocationCallbacks allocator = {nullptr, Alloc::alloc, Alloc::reallocFunc, Alloc::freeFunc, nullptr, nullptr};
 
@@ -177,13 +177,13 @@ TEST_F(NegativePipelineBinary, Destroy) {
     pipe.CreateComputePipeline(true, true);
 
     struct Alloc {
-        static VKAPI_ATTR void *VKAPI_CALL alloc(void *, size_t size, size_t, VkSystemAllocationScope) { return malloc(size); };
-        static VKAPI_ATTR void *VKAPI_CALL reallocFunc(void *, void *original, size_t size, size_t, VkSystemAllocationScope) {
+        static VKAPI_ATTR void* VKAPI_CALL alloc(void*, size_t size, size_t, VkSystemAllocationScope) { return malloc(size); };
+        static VKAPI_ATTR void* VKAPI_CALL reallocFunc(void*, void* original, size_t size, size_t, VkSystemAllocationScope) {
             return realloc(original, size);
         };
-        static VKAPI_ATTR void VKAPI_CALL freeFunc(void *, void *ptr) { free(ptr); };
-        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
-        static VKAPI_ATTR void VKAPI_CALL internalFree(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+        static VKAPI_ATTR void VKAPI_CALL freeFunc(void*, void* ptr) { free(ptr); };
+        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+        static VKAPI_ATTR void VKAPI_CALL internalFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
     };
     const VkAllocationCallbacks allocator = {nullptr, Alloc::alloc, Alloc::reallocFunc, Alloc::freeFunc, nullptr, nullptr};
 

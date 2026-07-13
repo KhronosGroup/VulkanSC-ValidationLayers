@@ -2,7 +2,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,8 +11,8 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 void DynamicRenderingTest::InitBasicDynamicRenderingLocalRead() {
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -41,8 +41,7 @@ TEST_F(PositiveDynamicRenderingLocalRead, BasicUsage) {
 
     CreatePipelineHelper pipe1(*this);
     CreatePipelineHelper pipe2(*this);
-    for (uint32_t i = 0; i < 2; i++)
-    {
+    for (uint32_t i = 0; i < 2; i++) {
         CreatePipelineHelper* pipe = (i == 0) ? &pipe1 : &pipe2;
         VkFormat color_formats[] = {VK_FORMAT_UNDEFINED, VK_FORMAT_UNDEFINED};
 

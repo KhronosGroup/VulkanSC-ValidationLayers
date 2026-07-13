@@ -22,6 +22,25 @@
 
 namespace threadsafety {
 
+static std::atomic_uint32_t next_thread_id{1};  // 0 is reserved as default state (no thread)
+static vvl::concurrent_unordered_map<uint32_t, std::thread::id, 4> thread_id_map;
+
+static uint32_t RegisterCurrentThread() {
+    const uint32_t id = next_thread_id.fetch_add(1);
+    thread_id_map.insert(id, std::this_thread::get_id());
+    return id;
+}
+
+uint32_t GetCurrentInternalThreadId() {
+    thread_local uint32_t tls_id = RegisterCurrentThread();  // this runs once per thread
+    return tls_id;
+}
+
+std::thread::id GetStdThreadIdFromInternal(uint32_t internal_thread_id) {
+    auto it = thread_id_map.find(internal_thread_id);
+    return it != thread_id_map.end() ? it->second : std::thread::id{};
+}
+
 ReadLockGuard Device::ReadLock() const { return ReadLockGuard(validation_object_mutex, std::defer_lock); }
 
 WriteLockGuard Device::WriteLock() { return WriteLockGuard(validation_object_mutex, std::defer_lock); }
@@ -475,9 +494,28 @@ void Device::PostCallRecordDestroySwapchainKHR(VkDevice device, VkSwapchainKHR s
     DestroyObject(swapchain);
     // Host access to swapchain must be externally synchronized
     auto lock = WriteLockGuard(thread_safety_lock);
-    for (auto& image_handle : swapchain_wrapped_image_handle_map[swapchain]) {
+    for (VkImage image_handle : swapchain_wrapped_image_handle_map[swapchain]) {
         FinishWriteObject(image_handle, record_obj.location);
-        DestroyObject(image_handle);
+
+        // Swapchain can resue images from oldSwapchain.
+        // When deleting either new swapchain or old swapchain we need to check
+        // if the image can still be in use by the surviving swapchain
+        bool swapchain_image_reuse = false;
+        for (auto& [current_swapchain, images] : swapchain_wrapped_image_handle_map) {
+            if (current_swapchain == swapchain) {
+                continue;
+            }
+            for (VkImage another_swapchain_image : images) {
+                if (another_swapchain_image == image_handle) {
+                    swapchain_image_reuse = true;
+                    break;
+                }
+            }
+        }
+
+        if (!swapchain_image_reuse) {
+            DestroyObject(image_handle);
+        }
     }
     swapchain_wrapped_image_handle_map.erase(swapchain);
 }
@@ -530,7 +568,9 @@ void Device::PostCallRecordGetDeviceQueue2(VkDevice device, const VkDeviceQueueI
 void Instance::PostCallRecordGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
                                                                    VkDisplayPropertiesKHR* pProperties,
                                                                    const RecordObject& record_obj) {
-    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) return;
+    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) {
+        return;
+    }
     if (pProperties) {
         for (uint32_t i = 0; i < *pPropertyCount; ++i) {
             CreateObject(pProperties[i].display);
@@ -541,7 +581,9 @@ void Instance::PostCallRecordGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDev
 void Instance::PostCallRecordGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
                                                                     VkDisplayProperties2KHR* pProperties,
                                                                     const RecordObject& record_obj) {
-    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) return;
+    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) {
+        return;
+    }
     if (pProperties) {
         for (uint32_t i = 0; i < *pPropertyCount; ++i) {
             CreateObject(pProperties[i].displayProperties.display);
@@ -552,7 +594,9 @@ void Instance::PostCallRecordGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDe
 void Instance::PostCallRecordGetPhysicalDeviceDisplayPlanePropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
                                                                         VkDisplayPlanePropertiesKHR* pProperties,
                                                                         const RecordObject& record_obj) {
-    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) return;
+    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) {
+        return;
+    }
     if (pProperties) {
         for (uint32_t i = 0; i < *pPropertyCount; ++i) {
             CreateObject(pProperties[i].currentDisplay);
@@ -563,7 +607,9 @@ void Instance::PostCallRecordGetPhysicalDeviceDisplayPlanePropertiesKHR(VkPhysic
 void Instance::PostCallRecordGetPhysicalDeviceDisplayPlaneProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
                                                                          VkDisplayPlaneProperties2KHR* pProperties,
                                                                          const RecordObject& record_obj) {
-    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) return;
+    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) {
+        return;
+    }
     if (pProperties) {
         for (uint32_t i = 0; i < *pPropertyCount; ++i) {
             CreateObject(pProperties[i].displayPlaneProperties.currentDisplay);
@@ -580,7 +626,9 @@ void Instance::PreCallRecordGetDisplayPlaneSupportedDisplaysKHR(VkPhysicalDevice
 void Instance::PostCallRecordGetDisplayPlaneSupportedDisplaysKHR(VkPhysicalDevice physicalDevice, uint32_t planeIndex,
                                                                  uint32_t* pDisplayCount, VkDisplayKHR* pDisplays,
                                                                  const RecordObject& record_obj) {
-    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) return;
+    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) {
+        return;
+    }
     if (pDisplays) {
         for (uint32_t index = 0; index < *pDisplayCount; index++) {
             CreateObject(pDisplays[index]);
@@ -598,7 +646,9 @@ void Instance::PostCallRecordGetDisplayModePropertiesKHR(VkPhysicalDevice physic
                                                          uint32_t* pPropertyCount, VkDisplayModePropertiesKHR* pProperties,
                                                          const RecordObject& record_obj) {
     FinishReadObject(display, record_obj.location);
-    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) return;
+    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) {
+        return;
+    }
     if (pProperties != nullptr) {
         for (uint32_t index = 0; index < *pPropertyCount; index++) {
             CreateObject(pProperties[index].displayMode);
@@ -616,7 +666,9 @@ void Instance::PostCallRecordGetDisplayModeProperties2KHR(VkPhysicalDevice physi
                                                           uint32_t* pPropertyCount, VkDisplayModeProperties2KHR* pProperties,
                                                           const RecordObject& record_obj) {
     FinishReadObject(display, record_obj.location);
-    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) return;
+    if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) {
+        return;
+    }
     if (pProperties != nullptr) {
         for (uint32_t index = 0; index < *pPropertyCount; index++) {
             CreateObject(pProperties[index].displayModeProperties.displayMode);
@@ -642,7 +694,9 @@ void Instance::PostCallRecordGetDisplayPlaneCapabilities2KHR(VkPhysicalDevice ph
 
 void Instance::PostCallRecordGetRandROutputDisplayEXT(VkPhysicalDevice physicalDevice, Display* dpy, RROutput rrOutput,
                                                       VkDisplayKHR* pDisplay, const RecordObject& record_obj) {
-    if ((record_obj.result != VK_SUCCESS) || (pDisplay == nullptr)) return;
+    if ((record_obj.result != VK_SUCCESS) || (pDisplay == nullptr)) {
+        return;
+    }
     CreateObject(*pDisplay);
 }
 
@@ -650,7 +704,9 @@ void Instance::PostCallRecordGetRandROutputDisplayEXT(VkPhysicalDevice physicalD
 
 void Instance::PostCallRecordGetDrmDisplayEXT(VkPhysicalDevice physicalDevice, int32_t drmFd, uint32_t connectorId,
                                               VkDisplayKHR* display, const RecordObject& record_obj) {
-    if ((record_obj.result != VK_SUCCESS) || (display == nullptr)) return;
+    if ((record_obj.result != VK_SUCCESS) || (display == nullptr)) {
+        return;
+    }
     CreateObject(*display);
 }
 

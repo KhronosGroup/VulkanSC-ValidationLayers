@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2025 The Khronos Group Inc.
- * Copyright (c) 2025 Valve Corporation
- * Copyright (c) 2025 LunarG, Inc.
+ * Copyright (c) 2025-2026 The Khronos Group Inc.
+ * Copyright (c) 2025-2026 Valve Corporation
+ * Copyright (c) 2025-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  */
 // stype-check off
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 void LegacyTest::CreateRenderPass() {
     vkt::Image image(*m_device, 8, 8, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
@@ -65,7 +65,7 @@ TEST_F(PositiveLegacy, DISABLED_SettingDefault) {
 
 // Not supported in Vulkan SC: legacy/deprecation messages
 TEST_F(PositiveLegacy, DISABLED_MuteMultipleWarnings) {
-    const char *ids[] = {"WARNING-legacy-gpdp2", "WARNING-legacy-renderpass2", "WARNING-legacy-dynamicrendering"};
+    const char* ids[] = {"WARNING-legacy-gpdp2", "WARNING-legacy-renderpass2", "WARNING-legacy-dynamicrendering"};
     VkLayerSettingEXT layer_settings[3] = {{OBJECT_LAYER_NAME, "legacy_detection", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue},
                                            {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 3, ids}};
     VkLayerSettingsCreateInfoEXT layer_setting_ci = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 2, layer_settings};

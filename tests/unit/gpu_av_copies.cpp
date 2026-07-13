@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
- * Copyright (c) 2023-2025 Google, Inc.
+ * Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
+ * Copyright (c) 2023-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 class NegativeGpuAVCopies : public GpuAVTest {};
 
@@ -26,7 +26,7 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32) {
     vkt::Buffer copy_src_buffer(*m_device, sizeof(float) * 64 * 64,
                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
 
-    float *ptr = static_cast<float *>(copy_src_buffer.Memory().Map());
+    float* ptr = static_cast<float*>(copy_src_buffer.Memory().Map());
     for (size_t i = 0; i < 64 * 64; ++i) {
         ptr[i] = 0.1f;
     }
@@ -64,6 +64,56 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeGpuAVCopies, MemoryToImageD32) {
+    TEST_DESCRIPTION(
+        "Copy depth buffer to image with some of its depth value being outside of the [0, 1] legal range. Depth image has format "
+        "VK_FORMAT_D32_SFLOAT.");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::deviceAddressCommands);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Buffer copy_src_buffer(*m_device, sizeof(float) * 64 * 64,
+                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, vkt::device_address);
+
+    float* ptr = static_cast<float*>(copy_src_buffer.Memory().Map());
+    for (size_t i = 0; i < 64 * 64; ++i) {
+        ptr[i] = 0.1f;
+    }
+    ptr[4094] = 42.0f;
+
+    vkt::Image copy_dst_image(*m_device, 64, 64, VK_FORMAT_D32_SFLOAT,
+                              VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    m_command_buffer.Begin();
+    copy_dst_image.SetLayout(m_command_buffer, VK_IMAGE_LAYOUT_GENERAL);
+
+    VkDeviceMemoryImageCopyKHR region = vku::InitStructHelper();
+    region.addressRange = copy_src_buffer.AddressRange();
+    region.addressFlags = VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR;
+    region.addressRowLength = 0u;
+    region.addressImageHeight = 0u;
+    region.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    region.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {64, 64, 1};
+
+    VkCopyDeviceMemoryImageInfoKHR copy_memory_info = vku::InitStructHelper();
+    copy_memory_info.image = copy_dst_image;
+    copy_memory_info.regionCount = 1u;
+    copy_memory_info.pRegions = &region;
+    vk::CmdCopyMemoryToImageKHR(m_command_buffer, &copy_memory_info);
+
+    m_command_buffer.End();
+    // VUID-vkCmdCopyMemoryToImageKHR-None-13022
+    m_errorMonitor->SetDesiredError("has a float value at offset 16376 that is not in the range [0, 1]");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeGpuAVCopies, BufferToImageD32Vk13) {
     TEST_DESCRIPTION(
         "Copy depth buffer to image with some of its depth value being outside of the [0, 1] legal range. Depth image has format "
@@ -77,7 +127,7 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32Vk13) {
     vkt::Buffer copy_src_buffer(*m_device, sizeof(float) * 64 * 64,
                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
 
-    float *ptr = static_cast<float *>(copy_src_buffer.Memory().Map());
+    float* ptr = static_cast<float*>(copy_src_buffer.Memory().Map());
     for (size_t i = 0; i < 64 * 64; ++i) {
         ptr[i] = 0.1f;
     }
@@ -131,10 +181,10 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32U8) {
     vkt::Buffer copy_src_buffer(*m_device, 5 * 64 * 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                 kHostVisibleMemProps);
 
-    auto ptr = static_cast<uint8_t *>(copy_src_buffer.Memory().Map());
+    auto ptr = static_cast<uint8_t*>(copy_src_buffer.Memory().Map());
     std::memset(ptr, 0, static_cast<size_t>(copy_src_buffer.CreateInfo().size));
     for (size_t i = 0; i < 64 * 64; ++i) {
-        auto ptr_float = reinterpret_cast<float *>(ptr + 5 * i);
+        auto ptr_float = reinterpret_cast<float*>(ptr + 5 * i);
         if (i == 64 * 64 - 1) {
             *ptr_float = 42.0f;
         } else {
@@ -177,10 +227,10 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32U8Vk13) {
     vkt::Buffer copy_src_buffer(*m_device, 5 * 64 * 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                 kHostVisibleMemProps);
 
-    auto ptr = static_cast<uint8_t *>(copy_src_buffer.Memory().Map());
+    auto ptr = static_cast<uint8_t*>(copy_src_buffer.Memory().Map());
     std::memset(ptr, 0, static_cast<size_t>(copy_src_buffer.CreateInfo().size));
     for (size_t i = 0; i < 64 * 64; ++i) {
-        auto ptr_float = reinterpret_cast<float *>(ptr + 5 * i);
+        auto ptr_float = reinterpret_cast<float*>(ptr + 5 * i);
         if (i == 64 * 64 - 1) {
             *ptr_float = 42.0f;
         } else {

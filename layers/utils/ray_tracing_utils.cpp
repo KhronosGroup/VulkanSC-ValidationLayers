@@ -1,5 +1,5 @@
-/* Copyright (c) 2025 Valve Corporation
- * Copyright (c) 2025 LunarG, Inc.
+/* Copyright (c) 2025-2026 Valve Corporation
+ * Copyright (c) 2025-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,8 +27,8 @@ namespace rt {
 
 static VkAccelerationStructureBuildSizesInfoKHR ComputeBuildSizes(const VkDevice device,
                                                                   const VkAccelerationStructureBuildTypeKHR build_type,
-                                                                  const VkAccelerationStructureBuildGeometryInfoKHR &build_info,
-                                                                  const VkAccelerationStructureBuildRangeInfoKHR *range_infos) {
+                                                                  const VkAccelerationStructureBuildGeometryInfoKHR& build_info,
+                                                                  const VkAccelerationStructureBuildRangeInfoKHR* range_infos) {
     std::vector<uint32_t> primitive_counts(build_info.geometryCount);
     for (const auto [i, build_range] : vvl::enumerate(range_infos, build_info.geometryCount)) {
         primitive_counts[i] = build_range.primitiveCount;
@@ -40,8 +40,14 @@ static VkAccelerationStructureBuildSizesInfoKHR ComputeBuildSizes(const VkDevice
 }
 
 VkDeviceSize ComputeScratchSize(BuildType build_type, const VkDevice device,
-                                const VkAccelerationStructureBuildGeometryInfoKHR &build_info,
-                                const VkAccelerationStructureBuildRangeInfoKHR *range_infos) {
+                                const VkAccelerationStructureBuildGeometryInfoKHR& build_info,
+                                const VkAccelerationStructureBuildRangeInfoKHR* range_infos) {
+    if (!range_infos) {
+        // range_infos is null for indirect builds (vkCmdBuildAccelerationStructuresIndirectKHR) or VK_GEOMETRY_TYPE_MICROMAP_KHR
+        // but because build ranges are stored in device memory and cannot be accessed during CPU-side validation. In this case, we
+        // cannot compute the actual acceleration structure size, so return 0.
+        return 0;
+    }
     const VkAccelerationStructureBuildSizesInfoKHR size_info =
         ComputeBuildSizes(device,
                           build_type == BuildType::Device ? VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR
@@ -60,14 +66,39 @@ VkDeviceSize ComputeScratchSize(BuildType build_type, const VkDevice device,
 }
 
 VkDeviceSize ComputeAccelerationStructureSize(BuildType build_type, const VkDevice device,
-                                              const VkAccelerationStructureBuildGeometryInfoKHR &build_info,
-                                              const VkAccelerationStructureBuildRangeInfoKHR *range_infos) {
+                                              const VkAccelerationStructureBuildGeometryInfoKHR& build_info,
+                                              const VkAccelerationStructureBuildRangeInfoKHR* range_infos) {
+    if (!range_infos) {
+        // range_infos is null for indirect builds (vkCmdBuildAccelerationStructuresIndirectKHR) or VK_GEOMETRY_TYPE_MICROMAP_KHR
+        // but because build ranges are stored in device memory and cannot be accessed during CPU-side validation. In this case, we
+        // cannot compute the actual acceleration structure size, so return 0.
+        return 0;
+    }
+
     const VkAccelerationStructureBuildSizesInfoKHR size_info =
         ComputeBuildSizes(device,
                           build_type == BuildType::Device ? VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR
                                                           : VK_ACCELERATION_STRUCTURE_BUILD_TYPE_HOST_KHR,
                           build_info, range_infos);
     return size_info.accelerationStructureSize;
+}
+
+uint64_t MicromapUsageTotalTriangleCount(const VkAccelerationStructureBuildGeometryInfoKHR& build_info) {
+    if (build_info.geometryCount == 0) {
+        return 0;
+    }
+
+    const VkAccelerationStructureGeometryKHR& geometry = GetGeometry(build_info, 0);
+    const auto* micromap_data = vku::FindStructInPNextChain<VkAccelerationStructureGeometryMicromapDataKHR>(geometry.pNext);
+    if (!micromap_data) {
+        return 0;
+    }
+
+    uint64_t total = 0;
+    for (uint32_t usage_i = 0; usage_i < micromap_data->usageCountsCount; ++usage_i) {
+        total += GetMicroMapUsage(*micromap_data, usage_i).count;
+    }
+    return total;
 }
 
 }  // namespace rt

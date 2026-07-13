@@ -16,18 +16,20 @@
 #include "module.h"
 #include <cassert>
 #include <spirv/unified1/spirv.hpp>
+#include "containers/container_utils.h"
 #include "containers/custom_containers.h"
+#include "containers/limits.h"
 #include "function_basic_block.h"
+#include "generated/device_features.h"
 #include "generated/spirv_grammar_helper.h"
 #include "gpuav/shaders/gpuav_shaders_constants.h"
 #include "error_message/logging.h"
 #include "error_message/log_message_type.h"
-#include "error_message/error_location.h"
 #include "utils/shader_utils.h"
 
 #include <iostream>
 
-#include "generated/device_features.h"
+#include "utils/vk_api_utils.h"
 
 namespace gpuav {
 namespace spirv {
@@ -37,19 +39,27 @@ static constexpr uint32_t kLinkedInstruction = vvl::kNoIndex32;
 // This constructor is really our "parse incoming SPIR-V" logic for GPU-AV
 // It will build up the Module object which will be modified, and when done, dumpped back out to SPIR-V
 Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const DeviceSettings& settings,
-               const InstrumentationInterface& interface, const DeviceFeatures& enabled_features)
+               const InstrumentationInterface& interface, spirv::InstrumentationStatus& out_status)
     : type_manager_(*this),
       settings_(settings),
       interface_(interface),
-      enabled_features_(enabled_features),
       has_bindless_descriptors_(interface.instrumentation_dsl.has_bindless_descriptors),
-      debug_report_(debug_report) {
+      debug_report_(debug_report),
+      out_status(out_status) {
     spirv_iterator it = words.begin();
     header_.magic_number = *it++;
     header_.version = *it++;
     header_.generator = *it++;
     header_.bound = *it++;
     header_.schema = *it++;
+
+    // We do the equivalent of SetSpecConstantDefaultValuePass and FreezeSpecConstantValuePass spirv-opt pass here. These are simple
+    // and we don't need spirv-opt overhead to do it. Unfortunately this is a bit duplicated from Core Validation, but that code
+    // needs to validate the VkSpecializationInfo struct.
+    //
+    // [OpSpecConstant Result ID -> OpDecorate SpecID value] mapping
+    vvl::unordered_map<uint32_t, uint32_t> id_to_spec_id;
+
     // Parse everything up until the first function and sort into seperate lists
     while (it != words.end()) {
         const uint32_t opcode = *it & 0x0ffffu;
@@ -105,8 +115,8 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
                 // https://github.com/KhronosGroup/SPIRV-Tools/issues/5513
                 types_values_constants_.emplace_back(std::move(new_inst));
                 break;
-            case spv::OpDecorate:
             case spv::OpMemberDecorate:
+            case spv::OpMemberDecorateIdEXT:
             case spv::OpDecorationGroup:
             case spv::OpGroupDecorate:
             case spv::OpGroupMemberDecorate:
@@ -115,6 +125,18 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
             case spv::OpMemberDecorateString:
                 annotations_.emplace_back(std::move(new_inst));
                 break;
+
+            case spv::OpDecorate: {
+                if (new_inst->Word(2) == spv::DecorationSpecId) {
+                    const uint32_t target_id = new_inst->Word(1);
+                    // This will get filled before seeing any spec constant
+                    id_to_spec_id[target_id] = new_inst->Word(3);
+                    // We don't add because after we set/freeze the SpecConstant these can be removed
+                } else {
+                    annotations_.emplace_back(std::move(new_inst));
+                }
+                break;
+            }
 
             case spv::OpUndef:
                 type_manager_.AddUndef(std::move(new_inst));
@@ -125,18 +147,27 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
             case spv::OpConstantTrue:
             case spv::OpConstantFalse: {
                 const Type& type = type_manager_.GetTypeBool();
+                if (opcode == spv::OpSpecConstantTrue || opcode == spv::OpSpecConstantFalse) {
+                    SetSpecConstantValue(new_inst.get(), type, id_to_spec_id);
+                }
                 type_manager_.AddConstant(std::move(new_inst), type);
                 break;
             }
             case spv::OpSpecConstant:
+            case spv::OpSpecConstantComposite:
             case spv::OpConstant:
             case spv::OpConstantNull:
-            case spv::OpConstantComposite: {
+            case spv::OpConstantComposite:
+            case spv::OpConstantSizeOfEXT: {
                 const Type* type = type_manager_.FindTypeById(new_inst->TypeId());
+                if (opcode == spv::OpSpecConstant || opcode == spv::OpSpecConstantComposite) {
+                    SetSpecConstantValue(new_inst.get(), *type, id_to_spec_id);
+                }
                 type_manager_.AddConstant(std::move(new_inst), *type);
                 break;
             }
-            case spv::OpVariable: {
+            case spv::OpVariable:
+            case spv::OpUntypedVariableKHR: {
                 const Type* type = type_manager_.FindTypeById(new_inst->TypeId());
                 const Variable& new_var = type_manager_.AddVariable(std::move(new_inst), *type);
 
@@ -144,8 +175,9 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
                 spv::StorageClass storage_class = new_var.StorageClass();
                 // These are the only storage classes that interface with a descriptor
                 // see vkspec.html#interfaces-resources-descset
-                if (storage_class == spv::StorageClassUniform || storage_class == spv::StorageClassUniformConstant ||
-                    storage_class == spv::StorageClassStorageBuffer) {
+                if (opcode == spv::OpVariable &&
+                    IsValueIn(storage_class,
+                              {spv::StorageClassUniform, spv::StorageClassUniformConstant, spv::StorageClassStorageBuffer})) {
                     const Type* ptr_type = new_var.PointerType(type_manager_);
                     // The shader will also have OpCapability RuntimeDescriptorArray
                     if (ptr_type->spv_type_ == SpvType::kRuntimeArray) {
@@ -156,13 +188,23 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
 
                 break;
             }
+            case spv::OpSpecConstantOp: {
+                const Type* type = type_manager_.FindTypeById(new_inst->TypeId());
+                // If folded, we drop the |new_inst| as we will add it inside the function
+                const bool folded = ConstantFold(new_inst.get(), *type);
+                if (!folded) {
+                    assert(false);
+                    // Even if we can't fold, we need to keep the instruction in the constant section to maintain being valid
+                    types_values_constants_.emplace_back(std::move(new_inst));
+                }
+                break;
+            }
             default: {
                 SpvType spv_type = GetSpvType(new_inst->Opcode());
                 if (spv_type != SpvType::Empty) {
                     type_manager_.AddType(std::move(new_inst), spv_type);
                 } else {
                     // unknown instruction, try and just keep in last section to not just crash
-                    // example: OpSpecConstant
                     types_values_constants_.emplace_back(std::move(new_inst));
                 }
                 break;
@@ -170,6 +212,28 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
         }
 
         it += length;
+    }
+
+    // If multiple entrypoints, need to resolve which is the real push constant for it
+    if (!type_manager_.FindPushConstantVariable() && entry_points_.size() > 1) {
+        const uint32_t spirv_version_1_4 = 0x00010400;
+        if (header_.version < spirv_version_1_4) {
+            // will just use the 2nd one found to not blow up
+            InternalWarning("Module",
+                            "Found 2 different OpVariable, can't determine which entrypoint, can be fixed updating SPIR-V to 1.4+");
+        } else {
+            const Instruction* entry_point = GetTargetEntryPoint();
+            uint32_t word = entry_point->GetEntryPointInterfaceStart();
+            const uint32_t total_words = entry_point->Length();
+            for (; word < total_words; word++) {
+                const uint32_t interface_id = entry_point->Word(word);
+                const Variable* variable = type_manager_.FindVariableById(interface_id);
+                if (variable && variable->StorageClass() == spv::StorageClassPushConstant) {
+                    type_manager_.OverridePushConstantVariable(variable);
+                    break;
+                }
+            }
+        }
     }
 
     // From a dump of 400k production shaders found
@@ -212,8 +276,9 @@ Module::Module(vvl::span<const uint32_t> words, DebugReport* debug_report, const
             current_function->inst_map_[result_id] = new_inst.get();
         }
 
-        if (opcode == spv::OpFunctionCall) {
-            function_call_map[current_function->id_].insert(new_inst->Word(3));
+        const uint32_t called_function_id = new_inst->GetCalledFunctionId();
+        if (called_function_id != 0) {
+            function_call_map[current_function->id_].insert(called_function_id);
         }
 
         if (opcode == spv::OpFunctionEnd) {
@@ -382,6 +447,56 @@ void Module::AddMemberDecoration(uint32_t target_id, uint32_t index, spv::Decora
     annotations_.emplace_back(std::move(new_inst));
 }
 
+const Variable& Module::GetBuiltInVariable(uint32_t built_in) {
+    uint32_t variable_id = 0;
+    for (const auto& annotation : annotations_) {
+        if (annotation->Opcode() == spv::OpDecorate && annotation->Word(2) == spv::DecorationBuiltIn &&
+            annotation->Word(3) == built_in) {
+            variable_id = annotation->Word(1);
+            break;
+        }
+    }
+
+    if (variable_id == 0) {
+        variable_id = TakeNextId();
+        auto new_inst = std::make_unique<Instruction>(4, spv::OpDecorate);
+        new_inst->Fill({variable_id, spv::DecorationBuiltIn, built_in});
+        annotations_.emplace_back(std::move(new_inst));
+    }
+
+    // Currently we only ever needed Input variables and the built-ins we are using are not those that can be used by both Input and
+    // Output storage classes
+    const Variable* built_in_variable = type_manager_.FindVariableById(variable_id);
+    if (!built_in_variable) {
+        const Type& pointer_type = type_manager_.GetTypePointerBuiltInInput(spv::BuiltIn(built_in));
+        auto new_inst = std::make_unique<Instruction>(4, spv::OpVariable);
+        new_inst->Fill({pointer_type.Id(), variable_id, spv::StorageClassInput});
+        built_in_variable = &type_manager_.AddVariable(std::move(new_inst), pointer_type);
+        AddInterfaceVariables(built_in_variable->Id(), spv::StorageClassInput);
+    } else {
+        // Slang with the --preserve-params option will leave built-in variables that aren't in any interface.
+        const uint32_t built_in_variable_id = built_in_variable->Id();
+        const Instruction* entry_point = GetTargetEntryPoint();
+
+        bool found_variable = false;
+        uint32_t word = entry_point->GetEntryPointInterfaceStart();
+        const uint32_t total_words = entry_point->Length();
+        for (; word < total_words; word++) {
+            const uint32_t interface_id = entry_point->Word(word);
+            if (interface_id == built_in_variable_id) {
+                found_variable = true;
+                break;
+            }
+        }
+
+        if (!found_variable) {
+            AddInterfaceVariables(variable_id, spv::StorageClassInput);
+        }
+    }
+
+    return *built_in_variable;
+}
+
 // Found in extreme cases production shaders have maybe 5 entrypoints
 // From 400k shaders dumped, the average was 1.01 entry points per shader
 Instruction* Module::GetTargetEntryPoint() const {
@@ -521,12 +636,12 @@ void Module::LinkFunctions(const LinkInfo& info) {
                 case SpvType::kArray: {
                     const Type* element_type = type_manager_.FindTypeById(id_swap_map[new_inst->Word(2)]);
                     const Constant* element_length = type_manager_.FindConstantById(id_swap_map[new_inst->Word(3)]);
-                    type_id = type_manager_.GetTypeArray(*element_type, *element_length).Id();
+                    type_id = type_manager_.GetTypeArray(*element_type, *element_length, false).Id();
                     break;
                 }
                 case SpvType::kRuntimeArray: {
                     const Type* element_type = type_manager_.FindTypeById(id_swap_map[new_inst->Word(2)]);
-                    type_id = type_manager_.GetTypeRuntimeArray(*element_type).Id();
+                    type_id = type_manager_.GetTypeRuntimeArray(*element_type, false).Id();
                     break;
                 }
                 case SpvType::kVector: {
@@ -557,7 +672,7 @@ void Module::LinkFunctions(const LinkInfo& info) {
                     } else {
                         spv::StorageClass storage_class = spv::StorageClass(new_inst->Word(2));
                         const Type* pointer_type = type_manager_.FindTypeById(id_swap_map[new_inst->Word(3)]);
-                        type_id = type_manager_.GetTypePointer(storage_class, *pointer_type).Id();
+                        type_id = type_manager_.GetTypePointer(storage_class, *pointer_type, false).Id();
                     }
                     break;
                 }
@@ -647,9 +762,9 @@ void Module::LinkFunctions(const LinkInfo& info) {
             // (we want lenght of 4 as that means it is 32-bit)
             if (opcode == spv::OpConstant && new_inst->Length() == 4) {
                 const uint32_t constant_value = new_inst->Word(3);
-                if (type.inst_.Opcode() == spv::OpTypeInt && type.inst_.Word(2) == 32) {
+                if (type.spv_type_ == SpvType::kInt && type.meta_.scalar.bit_width == 32) {
                     constant = type_manager_.FindConstantInt32(type.Id(), constant_value);
-                } else if (type.inst_.Opcode() == spv::OpTypeFloat && type.inst_.Word(2) == 32) {
+                } else if (type.spv_type_ == SpvType::kFloat && type.meta_.scalar.bit_width == 32) {
                     constant = type_manager_.FindConstantFloat32(type.Id(), constant_value);
                 }
             }
@@ -673,9 +788,35 @@ void Module::LinkFunctions(const LinkInfo& info) {
             // Currently we use the fact the only private variable that are struct are for error payload
             if (pointer_type->spv_type_ == SpvType::kStruct && is_private_var &&
                 ((info.module.flags & UseErrorPayloadVariable) != 0)) {
-                // Variable already is in shader, just mark the new result ID
-                AddInterfaceVariables(error_payload_variable_id_, storage_class);
-                id_swap_map[old_result_id] = error_payload_variable_id_;
+                // TODO - This a hack because SharedMemoryDataRace can inject init_shadow, but never have anything to validate, so
+                // we don't actually need the error logging
+                if (error_payload_variable_id_ != 0) {
+                    // Variable already is in shader, just mark the new result ID
+                    AddInterfaceVariables(error_payload_variable_id_, storage_class);
+                    id_swap_map[old_result_id] = error_payload_variable_id_;
+                }
+            } else if (pointer_type->spv_type_ == SpvType::kArray && storage_class == spv::StorageClassWorkgroup &&
+                       ((info.module.flags & SharedMemoryDataRace) != 0)) {
+                assert(shared_memory_shadow_variable_id_ != 0);
+                id_swap_map[old_result_id] = shared_memory_shadow_variable_id_;
+                AddInterfaceVariables(shared_memory_shadow_variable_id_, storage_class);
+            } else if (storage_class == spv::StorageClassInput && ((info.module.flags & SharedMemoryDataRace) != 0)) {
+                uint32_t builtin = 0;
+                for (auto& decoration : decorations) {
+                    if (decoration->Opcode() == spv::OpDecorate && decoration->Word(1) == old_result_id &&
+                        decoration->Word(2) == spv::DecorationBuiltIn &&
+                        (decoration->Word(3) == spv::BuiltInLocalInvocationIndex ||
+                         decoration->Word(3) == spv::BuiltInSubgroupLocalInvocationId ||
+                         decoration->Word(3) == spv::BuiltInSubgroupSize)) {
+                        builtin = decoration->Word(3);
+                        break;
+                    }
+                }
+
+                // Can't have duplicate builtin inputs.
+                // (We need to replace the gl_LocalInvocationIndex/etc for the incoming shader)
+                const Variable& builtin_var = GetBuiltInVariable(builtin);
+                id_swap_map[old_result_id] = builtin_var.Id();
             } else {
                 const uint32_t new_result_id = TakeNextId();
                 AddInterfaceVariables(new_result_id, storage_class);
@@ -754,11 +895,22 @@ void Module::LinkFunctions(const LinkInfo& info) {
                 new_inst->UpdateWord(1, id_swap_map[new_inst->Word(1)]);
                 new_inst->UpdateWord(2, link_function.id);
                 // We originally tried to use DontInline...
-                // - Most drivers don't actually support it
-                // - Fun nasty bugs with those that did (since no CTS is written to use it)
+                // - Most drivers don't actually support it (NVIDIA 553.31+ supports it)
                 // - There is zero way to truely check if it supported or not
                 // - We reworked our functions to be smaller because we have to assume it will be inlined
-                new_inst->UpdateWord(3, spv::FunctionControlMaskNone);
+                //
+                // ... With all of that, we still "try" as it "should" be faster if it is not inlined
+                if (interface_.entry_point_stage & kShaderStageAllRayTracing) {
+                    // Found on NVIDIA there are nasty bugs/behavior using this in RTX stages
+                    // (clearly no CTS is written to use it)
+                    new_inst->UpdateWord(3, spv::FunctionControlMaskNone);
+                } else if (settings_.disable_dontinline) {
+                    // We have found on some drivers (RTX 5090 with 610.62 driver) will crash on some shaders
+                    // This is here to provide a way to turn off DontInline if needed for unblocking people
+                    new_inst->UpdateWord(3, spv::FunctionControlMaskNone);
+                } else {
+                    new_inst->UpdateWord(3, spv::FunctionControlDontInlineMask);
+                }
                 new_inst->UpdateWord(4, function_type_id_map[new_inst->Word(4)]);
             } else if (opcode == spv::OpLabel) {
                 uint32_t new_result_id = id_swap_map[new_inst->ResultId()];
@@ -812,11 +964,39 @@ void Module::LinkFunctions(const LinkInfo& info) {
     }
 
     for (auto& decoration : decorations) {
-        if (decoration->Word(2) == spv::DecorationLinkageAttributes) {
-            continue;  // remove linkage info
-        } else if (decoration->Word(2) == spv::DecorationDescriptorSet) {
-            // only should be one DescriptorSet to update
-            decoration->UpdateWord(3, settings_.output_buffer_descriptor_set);
+        // member decorations have different operand offsets and don't need these checks.
+        if (decoration->Opcode() == spv::OpDecorate) {
+            if (decoration->Word(2) == spv::DecorationRelaxedPrecision) {
+                continue;
+            } else if (decoration->Word(2) == spv::DecorationLinkageAttributes) {
+                continue;  // remove linkage info
+            } else if (decoration->Word(2) == spv::DecorationAliasedPointer) {
+                // The way descriptor_heap.comp has to choose between the heap/sampler causes these to be generated, while we know
+                // they are not going to be aliased and the 'restrict' keyword seems to not be working as desired
+                continue;
+            } else if (decoration->Word(2) == spv::DecorationDescriptorSet) {
+                // only should be one DescriptorSet to update
+                decoration->UpdateWord(3, settings_.output_buffer_descriptor_set);
+            } else if (decoration->Word(2) == spv::DecorationBuiltIn &&
+                       (decoration->Word(3) == spv::BuiltInLocalInvocationIndex ||
+                        decoration->Word(3) == spv::BuiltInSubgroupLocalInvocationId ||
+                        decoration->Word(3) == spv::BuiltInSubgroupSize)) {
+                // look for a duplicate decoration and don't apply it if found
+                auto id = decoration->Word(1);
+                id = id_swap_map[id];
+                bool found = false;
+                for (const auto& annotation : annotations_) {
+                    if (annotation->Opcode() == spv::OpDecorate && annotation->Word(1) == id &&
+                        spv::Decoration(annotation->Word(2)) == decoration->Word(2) &&
+                        spv::Decoration(annotation->Word(3)) == decoration->Word(3)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    continue;
+                }
+            }
         }
 
         decoration->ReplaceLinkedId(id_swap_map);
@@ -849,7 +1029,7 @@ void Module::PostProcess() {
     // Found that QueueFamily was added to mostly solve this, if a device doesn't support Device scope we could use QueueFamily, the
     // issue is that the GLSL we have is static and if we use QueueFamily then we "need" the MemoryModel enabled
     if (HasCapability(spv::CapabilityVulkanMemoryModel)) {
-        if (!enabled_features_.vulkanMemoryModelDeviceScope) {
+        if (!settings_.enabled_features->vulkanMemoryModelDeviceScope) {
             InternalError(
                 "GPU-SHADER-INSTRUMENT-SUPPORT",
                 "vulkanMemoryModelDeviceScope feature is not supported, but need to let us call atomicAdd to the output buffer");

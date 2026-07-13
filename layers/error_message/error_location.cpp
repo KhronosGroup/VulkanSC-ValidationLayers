@@ -30,8 +30,10 @@ void Location::AppendFields(std::ostream& out) const {
         // check if need connector from last item
         const bool prev_loc_struct_not_empty = prev_loc.structure != vvl::Struct::Empty;
         const bool prev_loc_has_unindexed_field = prev_loc.field != vvl::Field::Empty && prev_loc.index == vvl::kNoIndex32;
-        const bool loc_is_array_element_field =
-            prev_loc.index != vvl::kNoIndex32 && field != vvl::Field::Empty;  // eg: this->Fields() would yield "pInfos[42].mode"
+        const bool loc_is_array_element_field = prev_loc.index != vvl::kNoIndex32 &&
+                                                // eg: this->Fields() would yield "pInfos[42].mode"
+                                                // |isPNext| case to handle pCreateInfo[0].pNext<>
+                                                (field != vvl::Field::Empty || isPNext);
         if (prev_loc_struct_not_empty || prev_loc_has_unindexed_field || loc_is_array_element_field) {
             out << ((prev_loc.index == vvl::kNoIndex32 && IsFieldPointer(prev_loc.field)) ? "->" : ".");
         }
@@ -108,8 +110,7 @@ std::string PrintPNextChain(vvl::Struct in_struct, const void* in_pNext) {
 namespace vvl {
 LocationCapture::LocationCapture(const Location& loc) { Capture(loc, 1); }
 
-LocationCapture::LocationCapture(const LocationCapture& other)
-    : capture(other.capture) {
+LocationCapture::LocationCapture(const LocationCapture& other) : capture(other.capture) {
     if (capture.empty()) {
         return;
     }
@@ -119,8 +120,7 @@ LocationCapture::LocationCapture(const LocationCapture& other)
     }
 }
 
-LocationCapture::LocationCapture(LocationCapture&& other)
-    : capture(std::move(other.capture)) {
+LocationCapture::LocationCapture(LocationCapture&& other) : capture(std::move(other.capture)) {
     if (capture.empty()) {
         return;
     }
@@ -209,7 +209,7 @@ bool operator==(const Key& key, const Location& loc) {
         return true;
     }
     if (key.recurse_field) {
-        const Location *prev = loc.prev;
+        const Location* prev = loc.prev;
         while (prev != nullptr) {
             if (key.field == prev->field) {
                 return true;

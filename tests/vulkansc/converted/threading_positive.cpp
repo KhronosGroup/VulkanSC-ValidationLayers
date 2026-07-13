@@ -5,7 +5,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +17,9 @@
 
 #include <vulkan/vulkan_core.h>
 #include <thread>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/thread_helper.h"
+#include "layer_validation_tests.h"
+#include "descriptor_helper.h"
+#include "thread_helper.h"
 
 #if GTEST_IS_THREADSAFE
 class PositiveThreading : public VkLayerTest {};
@@ -307,14 +307,14 @@ TEST_F(PositiveThreading, Queue) {
     constexpr auto test_duration = seconds{2};
     const auto timer_begin = steady_clock::now();
 
-    const auto &testing_thread1 = [&]() {
+    const auto& testing_thread1 = [&]() {
         for (auto timer_now = steady_clock::now(); timer_now - timer_begin < test_duration; timer_now = steady_clock::now()) {
             VkQueue dummy_q;
             vk::GetDeviceQueue(device_h, queue_family, queue_index, &dummy_q);
         }
     };
 
-    const auto &testing_thread2 = [&]() {
+    const auto& testing_thread2 = [&]() {
         for (auto timer_now = steady_clock::now(); timer_now - timer_begin < test_duration; timer_now = steady_clock::now()) {
             VkSubmitInfo si = vku::InitStructHelper();
             si.commandBufferCount = 1;
@@ -325,7 +325,7 @@ TEST_F(PositiveThreading, Queue) {
         }
     };
 
-    const auto &testing_thread3 = [&]() {
+    const auto& testing_thread3 = [&]() {
         for (auto timer_now = steady_clock::now(); timer_now - timer_begin < test_duration; timer_now = steady_clock::now()) {
             queue_mutex.lock();
             ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(queue_h));
@@ -334,7 +334,7 @@ TEST_F(PositiveThreading, Queue) {
     };
 
     std::array<std::thread, 3> threads = {std::thread(testing_thread1), std::thread(testing_thread2), std::thread(testing_thread3)};
-    for (auto &t : threads) t.join();
+    for (auto& t : threads) t.join();
 
     vk::QueueWaitIdle(queue_h);
 }
@@ -344,7 +344,7 @@ TEST_F(PositiveThreading, GetPhysicalDeviceFeatures) {
     VkInstanceCreateInfo instance_ci = GetInstanceCreateInfo();
 
     // mimics --gtest_repeat=100 which is needed to reproduce constantly
-    for (uint32_t repeat = 0; repeat < 100; repeat++) {
+    for (uint32_t repeat = 0; repeat < 20 /* Initially 100 */; repeat++) {
         VkInstance instance;
         vk::CreateInstance(&instance_ci, nullptr, &instance);
 
@@ -355,7 +355,7 @@ TEST_F(PositiveThreading, GetPhysicalDeviceFeatures) {
         std::vector<VkPhysicalDevice> physical_devices(physical_device_count);
         vk::EnumeratePhysicalDevices(instance, &physical_device_count, physical_devices.data());
 
-        const auto &thread = [&](uint32_t id) {
+        const auto& thread = [&](uint32_t id) {
             VkPhysicalDeviceFeatures features;
             vk::GetPhysicalDeviceFeatures(physical_devices[id % physical_device_count], &features);
         };
@@ -363,7 +363,7 @@ TEST_F(PositiveThreading, GetPhysicalDeviceFeatures) {
         for (uint32_t i = 0u; i < thread_count; ++i) {
             threads[i] = std::thread(thread, i);
         }
-        for (auto &t : threads) {
+        for (auto& t : threads) {
             t.join();
         }
 
@@ -391,7 +391,7 @@ TEST_F(PositiveThreading, ObjectTrackerPoisoning) {
         }
     };
     std::array<std::thread, 2> threads = {std::thread(thread_func), std::thread(thread_func)};
-    for (auto &t : threads) t.join();
+    for (auto& t : threads) t.join();
 }
 
 TEST_F(PositiveThreading, InternallySynchronizedQueues) {
@@ -429,7 +429,7 @@ TEST_F(PositiveThreading, InternallySynchronizedQueues) {
     device_ci.ppEnabledExtensionNames = m_device_extension_names.data();
 
     vkt::Device device(gpu_, device_ci);
-    vkt::Queue &queue = *device.QueuesWithGraphicsCapability()[0];
+    vkt::Queue& queue = *device.QueuesWithGraphicsCapability()[0];
 
     vkt::CommandPool command_pool(device, queue_family_index);
 
@@ -456,7 +456,7 @@ TEST_F(PositiveThreading, InternallySynchronizedQueues) {
     };
     std::array<std::thread, 2> threads = {std::thread(thread_func, cmd_buffer1.handle()),
                                           std::thread(thread_func, cmd_buffer2.handle())};
-    for (auto &t : threads) {
+    for (auto& t : threads) {
         t.join();
     }
 

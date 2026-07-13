@@ -4,6 +4,7 @@
  * Copyright (c) 2015-2026 LunarG, Inc.
  * Copyright (c) 2015-2026 Google, Inc.
  * Copyright (C) 2025 Arm Limited.
+ * Copyright (C) 2026 Qualcomm Technologies, Inc.
  * Modifications Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -244,6 +245,8 @@ class GpuAVTest : public virtual VkLayerTest {
 class GpuAVGpuAVShaderSanitizer : public GpuAVTest {
   public:
     void SimpleZeroComputeTest(const char *shader, int source_type, const char *expected_error = nullptr, uint32_t error_count = 1);
+    void InitCoopMatFp16();
+    void CoopMatAlignmentTest(const char* cs_source, const std::vector<uint32_t>& params, bool expect_error);
 };
 
 class GpuAVBufferDeviceAddressTest : public GpuAVTest {
@@ -259,6 +262,12 @@ class GpuAVDescriptorIndexingTest : public GpuAVTest {
 class GpuAVMesh : public GpuAVTest {
   public:
     void InitBasicMeshAndTask(bool safe_mode = true);
+};
+
+class GpuAVDescriptorBuffer : public GpuAVTest {
+  public:
+    void InitBasicDescriptorBuffer(std::vector<VkLayerSettingEXT> layer_settings = {}, bool safe_mode = true);
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
 };
 
 class GpuAVDescriptorClassGeneralBuffer : public GpuAVTest {
@@ -284,10 +293,45 @@ class GpuAVRayQueryTest : public GpuAVTest {
     void InitGpuAVRayQuery(std::vector<VkLayerSettingEXT> layer_settings = {});
 };
 
+class GpuAVDescriptorHeap : public GpuAVTest {
+  public:
+    void InitGpuAVDescriptorHeap(std::vector<VkLayerSettingEXT> layer_settings = {}, bool safe_mode = true);
+
+    void CreateResourceHeap(VkDeviceSize app_size, bool reserved_range_in_front = false);
+    void CreateSamplerHeap(VkDeviceSize app_size, bool reserved_range_in_front = false, bool use_embedded_samplers = false);
+
+    void BindResourceHeap();
+    void BindSamplerHeap();
+
+    void WriteBufferToHeap(const vkt::Buffer& buffer, uint32_t stride = 0,
+                           VkDescriptorType type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    void WriteImageToHeap(const vkt::Image& image, uint32_t stride = 0, VkDescriptorType type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+
+    vkt::Buffer resource_heap_;
+    uint8_t *resource_heap_data_ = nullptr;
+    bool resource_reserved_range_in_front_ = false;
+    vkt::Buffer sampler_heap_;
+    uint8_t *sampler_heap_data_ = nullptr;
+    bool sampler_reserved_range_in_front_ = false;
+
+    VkDeviceSize AlignResource(VkDeviceSize offset);
+    VkDeviceSize AlignSampler(VkDeviceSize offset);
+
+  private:
+    bool embedded_samplers = false;
+};
+
 class GpuAVRayHitObjectTest : public GpuAVTest {
   public:
     void InitHitObjectMotionTest(std::vector<VkLayerSettingEXT> layer_settings = {});
     void InitHitObjectTest(std::vector<VkLayerSettingEXT> layer_settings = {});
+};
+
+class GpuAVSharedMemoryDataRaceTest : public GpuAVTest {
+  public:
+    void InitSharedMemoryDataRace(uint32_t message_limit = 1);
 };
 
 class DebugPrintfTests : public VkLayerTest {
@@ -321,8 +365,9 @@ class DescriptorIndexingTest : public VkLayerTest {
 class DescriptorHeapTest : public VkLayerTest {
   public:
     void InitBasicDescriptorHeap();
-    void CreateResourceHeap(VkDeviceSize app_size);
-    void CreateSamplerHeap(VkDeviceSize app_size, bool use_embedded_samplers = false);
+    void InitUntypedDescriptorHeap();
+    void CreateResourceHeap(VkDeviceSize app_size, bool reserved_range_in_front = false);
+    void CreateSamplerHeap(VkDeviceSize app_size, bool reserved_range_in_front = false, bool use_embedded_samplers = false);
 
     void BindResourceHeap();
     void BindSamplerHeap();
@@ -336,11 +381,18 @@ class DescriptorHeapTest : public VkLayerTest {
 
     vkt::Buffer resource_heap_;
     uint8_t* resource_heap_data_ = nullptr;
+    bool resource_reserved_range_in_front_ = false;
     vkt::Buffer sampler_heap_;
-    uint8_t* sampler_heap_data_ = nullptr;
+    uint8_t *sampler_heap_data_ = nullptr;
+    bool sampler_reserved_range_in_front_ = false;
 
   private:
     bool embedded_samplers = false;
+};
+
+class DeviceAddressCommands : public VkLayerTest {
+  public:
+    void InitBasicDeviceAddressCommands();
 };
 
 class DynamicRenderingTest : public VkLayerTest {
@@ -460,18 +512,19 @@ class TensorTest : public VkLayerTest {
 
 class DataGraphTest : public VkLayerTest {
   public:
-    void InitBasicDataGraph();
-    static void CheckSessionMemory(const vkt::DataGraphPipelineSession& session);
+    void InitBasicDataGraph(bool optical_flow = false);
     static std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> InitSessionBindInfo(const vkt::DataGraphPipelineSession& session, const std::vector<vkt::DeviceMemory>& device_mem);
     static VkTensorDescriptionARM DefaultDesc();
     static VkTensorDescriptionARM DefaultConstantTensorDesc();
     static VkDataGraphPipelineConstantARM GetConstant(const VkTensorDescriptionARM &desc = defaultConstantTensorDesc);
 
-    static const std::string IncorrectSpirvMessage;
     static const VkTensorDescriptionARM defaultConstantTensorDesc;
 };
 
 class WsiTest : public VkLayerTest {
+  public:
+    void GetDisplayAndDisplayMode(VkDisplayKHR* display, VkDisplayModeKHR* display_mode);
+
   protected:
     // Find physical device group that contains physical device selected by the test framework
     std::optional<VkPhysicalDeviceGroupProperties> FindPhysicalDeviceGroup();
@@ -480,6 +533,25 @@ class WsiTest : public VkLayerTest {
 class CooperativeMatrixTest : public VkLayerTest {
   public:
     void InitCooperativeMatrixKHR();
+};
+
+class TileShadingTest : public VkLayerTest {
+  public:
+    struct Config {
+        VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+        VkExtent2D rt_size = {64, 64};
+        VkExtent2D tile_apron_size = {0, 0};
+        bool use_render_pass2 = false;
+        bool block_match_usage = false;
+    } tile_shading_rp_config;
+
+    void InitBasicTileShading();
+    void InitTileShadingRenderTarget();
+
+    vkt::RenderPass m_tile_shading_render_pass;
+    vkt::Framebuffer m_tile_shading_framebuffer;
+    vkt::Image m_color_image;
+    vkt::ImageView m_color_view;
 };
 
 class ParentTest : public VkLayerTest {

@@ -16,6 +16,7 @@
 #include <spirv/unified1/spirv.hpp>
 #include <sstream>
 #include "state_tracker/shader_instruction.h"
+#include <vulkan/vulkan_core.h>
 #include "generated/spirv_grammar_helper.h"
 #include "state_tracker/shader_module.h"
 
@@ -172,6 +173,13 @@ uint32_t Instruction::GetBitWidth() const {
     return bit_width;
 }
 
+spv::FPEncoding Instruction::GetFPEncoding() const {
+    if (Opcode() == spv::Op::OpTypeFloat && Length() > 3) {
+        return static_cast<spv::FPEncoding>(Word(3));
+    }
+    return spv::FPEncoding::FPEncodingMax;
+}
+
 spv::BuiltIn Instruction::GetBuiltIn() const {
     if (Opcode() == spv::OpDecorate) {
         return static_cast<spv::BuiltIn>(Word(3));
@@ -189,22 +197,59 @@ bool Instruction::IsVector() const { return (Opcode() == spv::OpTypeVector || Op
 
 bool Instruction::IsNonPtrAccessChain() const {
     const uint32_t opcode = Opcode();
-    return opcode == spv::OpAccessChain || opcode == spv::OpInBoundsAccessChain;
+    return opcode == spv::OpAccessChain || opcode == spv::OpInBoundsAccessChain || opcode == spv::OpUntypedAccessChainKHR ||
+           opcode == spv::OpUntypedInBoundsAccessChainKHR;
 }
 
 bool Instruction::IsAccessChain() const {
     const uint32_t opcode = Opcode();
-    return opcode == spv::OpAccessChain || opcode == spv::OpPtrAccessChain || opcode == spv::OpInBoundsAccessChain ||
-           opcode == spv::OpInBoundsPtrAccessChain;
+    return IsNonPtrAccessChain() || opcode == spv::OpPtrAccessChain || opcode == spv::OpInBoundsPtrAccessChain ||
+           opcode == spv::OpUntypedPtrAccessChainKHR || opcode == spv::OpUntypedInBoundsPtrAccessChainKHR;
 }
 
-spv::Dim Instruction::FindImageDim() const { return (Opcode() == spv::OpTypeImage) ? (spv::Dim(Word(3))) : spv::DimMax; }
+bool Instruction::IsUntypedAccessChain() const {
+    const uint32_t opcode = Opcode();
+    return opcode == spv::OpUntypedAccessChainKHR || opcode == spv::OpUntypedInBoundsAccessChainKHR ||
+           opcode == spv::OpUntypedPtrAccessChainKHR || opcode == spv::OpUntypedInBoundsPtrAccessChainKHR;
+}
 
-bool Instruction::IsImageArray() const { return (Opcode() == spv::OpTypeImage) && (Word(5) != 0); }
+// These are all things known that do a memory access
+bool Instruction::IsMemoryAccess() const {
+    const uint32_t opcode = Opcode();
+    if (opcode == spv::OpImageTexelPointer || opcode == spv::OpImage) {
+        // OpImageTexelPointer is for image atomics handled at the atomic instruction
+        // OpImage is describing an action, rather than the input to or the output from an action.
+        return false;
+    }
 
-bool Instruction::IsImageMultisampled() const {
-    // spirv-val makes sure that the MS operand is only non-zero when possible to be Multisampled
-    return (Opcode() == spv::OpTypeImage) && (Word(6) != 0);
+    return opcode == spv::OpLoad || opcode == spv::OpStore || opcode == spv::OpCooperativeMatrixLoadKHR ||
+           opcode == spv::OpCooperativeMatrixStoreKHR || AtomicOperation(opcode) || (OpcodeImageAccessPosition(opcode) != 0);
+}
+
+// As defined in https://github.khronos.org/SPIRV-Registry/extensions/EXT/SPV_EXT_descriptor_heap.html
+bool Instruction::IsDescriptorType() const {
+    const uint32_t opcode = Opcode();
+    return opcode == spv::OpTypeSampler || opcode == spv::OpTypeImage || opcode == spv::OpTypeBufferEXT ||
+           opcode == spv::OpTypeAccelerationStructureKHR || opcode == spv::OpTypeTensorARM;
+}
+
+VkDescriptorType Instruction::GetImageType() const {
+    assert(Opcode() == spv::OpTypeImage);
+    const bool is_sampled_without_sampler = Word(7) == 2;
+    spv::Dim image_dim = spv::Dim(Word(3));
+    if (is_sampled_without_sampler) {
+        if (image_dim == spv::DimSubpassData) {
+            return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+        } else if (image_dim == spv::DimBuffer) {
+            return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+        } else {
+            return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        }
+    } else if (image_dim == spv::DimBuffer) {
+        return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+    } else {
+        return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    }
 }
 
 bool Instruction::IsTensor() const { return (Opcode() == spv::OpTypeTensorARM); }
@@ -250,6 +295,7 @@ spv::StorageClass Instruction::StorageClass() const {
         case spv::OpTypePointer:
         case spv::OpTypeForwardPointer:
         case spv::OpTypeUntypedPointerKHR:
+        case spv::OpTypeBufferEXT:
             storage_class = static_cast<spv::StorageClass>(Word(2));
             break;
         case spv::OpVariable:
@@ -359,12 +405,14 @@ void Instruction::ReplaceLinkedId(vvl::unordered_map<uint32_t, uint32_t>& id_swa
     };
 
     // Swap all Reference IDs (ignores Result ID)
-    switch (Opcode()) {
+    const uint32_t op_code = Opcode();
+    switch (op_code) {
         case spv::OpCompositeExtract:
         case spv::OpLoad:
         case spv::OpArrayLength:
         case spv::OpBitcast:
         case spv::OpUConvert:
+        case spv::OpAny:
         case spv::OpLogicalNot:
         case spv::OpIsNan:
         case spv::OpIsInf:
@@ -454,6 +502,7 @@ void Instruction::ReplaceLinkedId(vvl::unordered_map<uint32_t, uint32_t>& id_swa
             break;
         case spv::OpAtomicStore:
         case spv::OpBranchConditional:
+        case spv::OpControlBarrier:
             swap_to_end(1);
             break;
         case spv::OpAtomicLoad:
@@ -499,6 +548,24 @@ void Instruction::ReplaceLinkedId(vvl::unordered_map<uint32_t, uint32_t>& id_swa
             assert(false && "Need to add support for new instruction");
     }
 
+    UpdateDebugInfo();
+}
+
+void Instruction::FreezeSpecConstant() {
+    const uint32_t opcode = Opcode();
+    if (opcode == spv::OpSpecConstant) {
+        SetNewOpcode(spv::OpConstant);
+    } else if (opcode == spv::OpSpecConstantTrue) {
+        SetNewOpcode(spv::OpConstantTrue);
+    } else if (opcode == spv::OpSpecConstantFalse) {
+        SetNewOpcode(spv::OpConstantFalse);
+    } else if (opcode == spv::OpSpecConstantComposite) {
+        SetNewOpcode(spv::OpConstantComposite);
+    }
+}
+
+void Instruction::SetNewOpcode(uint32_t opcode) {
+    words_[0] = (words_[0] & 0xffff0000u) | (opcode & 0x0ffffu);
     UpdateDebugInfo();
 }
 
@@ -558,6 +625,50 @@ ImageInstruction::ImageInstruction(const uint32_t* words) {
         case spv::OpImageQueryLod:
         case spv::OpFragmentFetchAMD:
         case spv::OpFragmentMaskFetchAMD:
+        case spv::OpAtomicLoad:
+        case spv::OpAtomicStore:
+        case spv::OpAtomicExchange:
+        case spv::OpAtomicCompareExchange:
+        case spv::OpAtomicCompareExchangeWeak:
+        case spv::OpAtomicIIncrement:
+        case spv::OpAtomicIDecrement:
+        case spv::OpAtomicIAdd:
+        case spv::OpAtomicISub:
+        case spv::OpAtomicSMin:
+        case spv::OpAtomicUMin:
+        case spv::OpAtomicSMax:
+        case spv::OpAtomicUMax:
+        case spv::OpAtomicAnd:
+        case spv::OpAtomicOr:
+        case spv::OpAtomicXor:
+        case spv::OpAtomicFMinEXT:
+        case spv::OpAtomicFMaxEXT:
+        case spv::OpAtomicFAddEXT:
+            break;
+
+        case spv::OpImageSampleWeightedQCOM:
+            image_proc_usage_mask |= ImageProcUsageBit::kSampleWeighted;
+            break;
+        case spv::OpImageBoxFilterQCOM:
+            image_proc_usage_mask |= ImageProcUsageBit::kBoxFilter;
+            break;
+        case spv::OpImageBlockMatchSADQCOM:
+            image_proc_usage_mask |= ImageProcUsageBit::kBlockMatchSad;
+            break;
+        case spv::OpImageBlockMatchSSDQCOM:
+            image_proc_usage_mask |= ImageProcUsageBit::kBlockMatchSsd;
+            break;
+        case spv::OpImageBlockMatchGatherSADQCOM:
+            image_proc_usage_mask |= ImageProcUsageBit::kBlockMatchGatherSad;
+            break;
+        case spv::OpImageBlockMatchGatherSSDQCOM:
+            image_proc_usage_mask |= ImageProcUsageBit::kBlockMatchGatherSsd;
+            break;
+        case spv::OpImageBlockMatchWindowSADQCOM:
+            image_proc_usage_mask |= ImageProcUsageBit::kBlockMatchWindowSad;
+            break;
+        case spv::OpImageBlockMatchWindowSSDQCOM:
+            image_proc_usage_mask |= ImageProcUsageBit::kBlockMatchWindowSsd;
             break;
 
         case spv::OpImageSparseTexelsResident:
@@ -572,7 +683,7 @@ ImageInstruction::ImageInstruction(const uint32_t* words) {
     // Find any optional Image Operands
     const uint32_t image_operand_position = OpcodeImageOperandsPosition(image_opcode);
     const uint32_t length = words[0] >> 16;
-    if (length > image_operand_position) {
+    if (image_operand_position != 0 && length > image_operand_position) {
         const uint32_t image_operand_word = words[image_operand_position];
 
         if (is_sampler_sampled) {
@@ -590,6 +701,32 @@ ImageInstruction::ImageInstruction(const uint32_t* words) {
             is_zero_extended = true;
         }
     }
+}
+
+uint32_t Instruction::GetCalledFunctionId() const {
+    const uint32_t opcode = Opcode();
+    if (opcode == spv::OpFunctionCall) {
+        return Word(3);
+    } else if (opcode == spv::OpCooperativeMatrixPerElementOpNV) {
+        return Word(4);
+    } else if (opcode == spv::OpCooperativeMatrixReduceNV) {
+        return Word(5);
+    } else if (opcode == spv::OpCooperativeMatrixLoadTensorNV) {
+        uint32_t idx = 7;
+        const uint32_t mem_operand = Word(6);
+        if (mem_operand & spv::MemoryAccessAlignedMask) idx++;
+        if (mem_operand & spv::MemoryAccessMakePointerAvailableMask) idx++;
+        if (mem_operand & spv::MemoryAccessMakePointerVisibleMask) idx++;
+        if (idx < Length()) {
+            const uint32_t tensor_operand = Word(idx);
+            idx++;
+            if (tensor_operand & spv::TensorAddressingOperandsTensorViewMask) idx++;
+            if ((tensor_operand & spv::TensorAddressingOperandsDecodeFuncMask) && idx < Length()) {
+                return Word(idx);
+            }
+        }
+    }
+    return 0;
 }
 
 }  // namespace spirv

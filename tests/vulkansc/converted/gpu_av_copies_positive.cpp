@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
- * Copyright (c) 2023-2025 Google, Inc.
+ * Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
+ * Copyright (c) 2023-2026 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 class PositiveGpuAVCopies : public GpuAVTest {};
 
@@ -30,7 +30,7 @@ TEST_F(PositiveGpuAVCopies, CopyBufferToImageD32) {
     vkt::Buffer copy_src_buffer(*m_device, sizeof(float) * 64 * 64,
                                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
 
-    float *ptr = static_cast<float *>(copy_src_buffer.Memory().Map());
+    float* ptr = static_cast<float*>(copy_src_buffer.Memory().Map());
     for (size_t i = 0; i < 64 * 64; ++i) {
         if (i % 2) {
             ptr[i] = 1.0f;
@@ -80,10 +80,10 @@ TEST_F(PositiveGpuAVCopies, CopyBufferToImageD32U8) {
     vkt::Buffer copy_src_buffer(*m_device, 5 * 64 * 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                 kHostVisibleMemProps);
 
-    auto ptr = static_cast<uint8_t *>(copy_src_buffer.Memory().Map());
+    auto ptr = static_cast<uint8_t*>(copy_src_buffer.Memory().Map());
     std::memset(ptr, 0, static_cast<size_t>(copy_src_buffer.CreateInfo().size));
     for (size_t i = 0; i < 64 * 64; ++i) {
-        auto ptr_float = reinterpret_cast<float *>(ptr + 5 * i);
+        auto ptr_float = reinterpret_cast<float*>(ptr + 5 * i);
         if (i % 2) {
             *ptr_float = 1.0f;
         } else {
@@ -155,7 +155,7 @@ TEST_F(PositiveGpuAVCopies, Resubmit) {
 
     vkt::Buffer copy_src_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                 kHostVisibleMemProps);
-    auto buffer_ptr = static_cast<uint8_t *>(copy_src_buffer.Memory().Map());
+    auto buffer_ptr = static_cast<uint8_t*>(copy_src_buffer.Memory().Map());
     memset(buffer_ptr, 0, 16);
 
     VkBufferImageCopy2 region2 = vku::InitStructHelper();
@@ -216,7 +216,7 @@ TEST_F(PositiveGpuAVCopies, BatchSubmit) {
 
     vkt::Buffer copy_src_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                 kHostVisibleMemProps);
-    auto buffer_ptr = static_cast<uint8_t *>(copy_src_buffer.Memory().Map());
+    auto buffer_ptr = static_cast<uint8_t*>(copy_src_buffer.Memory().Map());
     memset(buffer_ptr, 0, 16);
 
     VkBufferImageCopy2 region2 = vku::InitStructHelper();

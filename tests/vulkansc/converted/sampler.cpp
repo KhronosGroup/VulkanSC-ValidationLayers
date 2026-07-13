@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,9 +15,9 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
 
 class NegativeSampler : public VkLayerTest {};
 
@@ -187,31 +187,26 @@ TEST_F(NegativeSampler, BasicUsage) {
     sampler_info.mipLodBias = sampler_info_ref.mipLodBias;
 }
 
-TEST_F(NegativeSampler, AllocationCount) {
-    VkResult err = VK_SUCCESS;
-    const int max_samplers = 32;
-    VkSampler samplers[max_samplers + 1];
+// These test cases are not relevant for Vulkan SC as the device object reservation already cross-validate with general max object
+// counts
+TEST_F(NegativeSampler, DISABLED_AllocationCount) {
+    RETURN_IF_SKIP(Init());
 
-    RETURN_IF_SKIP(InitFramework());
+    const uint32_t max_samplers = m_device->Physical().limits_.maxSamplerAllocationCount;
+    if (max_samplers > 4000) {
+        GTEST_SKIP() << "maxSamplerAllocationCount is too high";
+    }
 
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    if (props.limits.maxSamplerAllocationCount > max_samplers) {
-        props.limits.maxSamplerAllocationCount = max_samplers;
-        fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    }
-    RETURN_IF_SKIP(InitState());
+    std::vector<VkSampler> samplers;
+    samplers.resize(max_samplers + 1);
+
     m_errorMonitor->SetDesiredError("VUID-vkCreateSampler-maxSamplerAllocationCount-04110");
 
     VkSamplerCreateInfo sampler_create_info = SafeSaneSamplerCreateInfo();
 
-    int i;
-    for (i = 0; i <= max_samplers; i++) {
+    VkResult err = VK_SUCCESS;
+    uint32_t i;
+    for (i = 0; i < (uint32_t)samplers.size(); i++) {
         err = vk::CreateSampler(device(), &sampler_create_info, NULL, &samplers[i]);
         if (err != VK_SUCCESS) {
             break;
@@ -219,7 +214,7 @@ TEST_F(NegativeSampler, AllocationCount) {
     }
     m_errorMonitor->VerifyFound();
 
-    for (int j = 0; j < i; j++) {
+    for (uint32_t j = 0; j < i; j++) {
         vk::DestroySampler(device(), samplers[j], NULL);
     }
 }
@@ -321,7 +316,7 @@ TEST_F(NegativeSampler, ImageViewFormatUnsupportedFilter) {
     tests[1].required_format_feature = VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_CUBIC_BIT_IMG;
     tests[1].err_msg = "VUID-vkCmdDraw-None-02692";
 
-    for (auto &test_struct : tests) {
+    for (auto& test_struct : tests) {
         for (std::pair<VkFormat, FormatTypes> cur_format_pair : formats_to_check) {
             VkFormatProperties props = {};
             vk::GetPhysicalDeviceFormatProperties(Gpu(), cur_format_pair.first, &props);
@@ -364,7 +359,7 @@ TEST_F(NegativeSampler, ImageViewFormatUnsupportedFilter) {
 
     InitRenderTarget();
 
-    for (const auto &test_struct : tests) {
+    for (const auto& test_struct : tests) {
         if (test_struct.format == VK_FORMAT_UNDEFINED) {
             printf("Could not find a testable format for filter %d.  Skipping test for said filter.\n", test_struct.filter);
             continue;
@@ -392,7 +387,7 @@ TEST_F(NegativeSampler, ImageViewFormatUnsupportedFilter) {
         vkt::ImageView view = mpimage.CreateView();
 
         CreatePipelineHelper pipe(*this);
-        VkShaderObj *fs = nullptr;
+        VkShaderObj* fs = nullptr;
 
         if (test_struct.format_type == FLOAT) {
             fs = new VkShaderObj(*m_device, kFragmentSamplerGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -459,7 +454,7 @@ TEST_F(NegativeSampler, LinearReductionModeMinMax) {
     sampler_ci.compareEnable = VK_FALSE;
     vkt::Sampler sampler(*m_device, sampler_ci);
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout (set=0, binding=0) uniform sampler2D bad;
         layout(location=0) out vec4 color;
@@ -826,7 +821,7 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
     descriptor_set.WriteDescriptorImageInfo(0, view, sampler);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler2D s;
         layout(location=0) out vec4 x;
@@ -881,7 +876,7 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefinedNonCombined) {
     descriptor_set.WriteDescriptorImageInfo(1, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler s;
         layout(set=0, binding=1) uniform texture2D t;
@@ -940,7 +935,7 @@ TEST_F(NegativeSampler, DISABLED_CustomBorderColorFormatUndefinedNonCombinedMult
     descriptor_set1.WriteDescriptorImageInfo(3, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
     descriptor_set1.UpdateDescriptorSets();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set=0, binding=2) uniform sampler s;
         layout(set=1, binding=3) uniform texture2D t;
@@ -984,12 +979,8 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesCombinedSampler) {
     // Verify that it is allowed on this implementation if
     // VK_KHR_format_feature_flags2 is available.
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
-        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
-        VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
-
-        vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);
-
-        if (!(fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT)) {
+        const auto fmt_props = m_device->FormatFeaturesOptimal(VK_FORMAT_R8G8B8A8_UNORM);
+        if (!(fmt_props & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT)) {
             GTEST_SKIP() << "R8G8B8A8_UNORM does not support OpImage*Dref* operations";
         }
     }
@@ -1079,12 +1070,8 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSampler) {
     // Verify that it is allowed on this implementation if
     // VK_KHR_format_feature_flags2 is available.
     if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
-        VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
-        VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
-
-        vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);
-
-        if (!(fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT)) {
+        const auto fmt_props = m_device->FormatFeaturesOptimal(VK_FORMAT_R8G8B8A8_UNORM);
+        if (!(fmt_props & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT)) {
             GTEST_SKIP() << "R8G8B8A8_UNORM does not support OpImage*Dref* operations";
         }
     }
@@ -1396,7 +1383,7 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesInBoundsAccess) {
     // }
     //
     // but with OpInBoundsAccessChain instead of normal generated OpAccessChain
-    const char *fsSource = R"(
+    const char* fsSource = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -1489,7 +1476,7 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesCopyObject) {
     // void main() {
     //     vec4 x = textureLodOffset(tex, vec2(0), 0, ivec2(0));
     // }
-    const char *fsSource = R"(
+    const char* fsSource = R"(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -1632,7 +1619,7 @@ TEST_F(NegativeSampler, ShareOpSampledImage) {
     //     color = texture(sampler2D(si_good, s1), vec2(0));
     //     color += texture(sampler2D(si_good, s1), vec2(color.x));
     // }
-    const char *fsSource = R"(
+    const char* fsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Fragment %main "main" %color

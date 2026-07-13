@@ -17,8 +17,8 @@
 #include <vulkan/vulkan_core.h>
 #include "utils/cast_utils.h"
 #include "utils/math_utils.h"
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class NegativeDynamicRendering : public DynamicRenderingTest {};
 
@@ -230,8 +230,7 @@ TEST_F(NegativeDynamicRendering, CmdClearAttachmentTests) {
     inheritance_rendering_info.colorAttachmentCount = 1;
     inheritance_rendering_info.pColorAttachmentFormats = &render_target_ci.format;
     inheritance_rendering_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    VkCommandBufferInheritanceInfo secondary_cmd_buffer_inheritance_info =
-        vku::InitStructHelper(&inheritance_rendering_info);
+    VkCommandBufferInheritanceInfo secondary_cmd_buffer_inheritance_info = vku::InitStructHelper(&inheritance_rendering_info);
 
     VkCommandBufferBeginInfo secondary_cmd_buffer_begin_info = vku::InitStructHelper();
     secondary_cmd_buffer_begin_info.flags =
@@ -1504,8 +1503,7 @@ TEST_F(NegativeDynamicRendering, AttachmentInfo) {
     depth_attachment.resolveMode = resolve_mode;
     depth_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-    VkRenderingFragmentDensityMapAttachmentInfoEXT fragment_density_map =
-        vku::InitStructHelper();
+    VkRenderingFragmentDensityMapAttachmentInfoEXT fragment_density_map = vku::InitStructHelper();
     fragment_density_map.imageView = depth_image_view;
     fragment_density_map.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
@@ -1632,19 +1630,13 @@ TEST_F(NegativeDynamicRendering, SecondaryCommandBuffer) {
 
 TEST_F(NegativeDynamicRendering, PipelineMissingFlags) {
     TEST_DESCRIPTION("Test dynamic rendering with pipeline missing flags.");
-
-    AddOptionalExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
-    AddOptionalExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    bool fragment_density = IsExtensionsEnabled(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
-    bool shading_rate = IsExtensionsEnabled(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
-
     VkPhysicalDeviceFragmentShadingRatePropertiesKHR fsr_properties = vku::InitStructHelper();
-    if (IsExtensionsEnabled(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME)) {
-        GetPhysicalDeviceProperties2(fsr_properties);
-    }
-
+    GetPhysicalDeviceProperties2(fsr_properties);
     InitRenderTarget();
 
     VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
@@ -1652,23 +1644,15 @@ TEST_F(NegativeDynamicRendering, PipelineMissingFlags) {
     // Mostly likely will only find support for this on a custom profiles
     if (!FormatFeaturesAreSupported(Gpu(), ds_format, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
-        shading_rate = false;
-    }
-    if (!FormatFeaturesAreSupported(Gpu(), ds_format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
-        fragment_density = false;
-    }
-    if (!fragment_density && !shading_rate) {
-        GTEST_SKIP() << "shading rate / fragment shading not supported";
+        GTEST_SKIP() << "Not Depth support for FSR";
+    } else if (!FormatFeaturesAreSupported(Gpu(), ds_format, VK_IMAGE_TILING_OPTIMAL,
+                                           VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
+        GTEST_SKIP() << "Not Depth support for FDM";
     }
 
     auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-
-    if (shading_rate) {
-        image_ci.usage |= VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
-    }
-    if (fragment_density) {
-        image_ci.usage |= VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT;
-    }
+    image_ci.usage |= VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
+    image_ci.usage |= VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT;
 
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView depth_image_view = image.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
@@ -1676,10 +1660,9 @@ TEST_F(NegativeDynamicRendering, PipelineMissingFlags) {
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    if (shading_rate) {
+    {
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-imageView-06183");
-        VkRenderingFragmentShadingRateAttachmentInfoKHR fragment_shading_rate =
-            vku::InitStructHelper();
+        VkRenderingFragmentShadingRateAttachmentInfoKHR fragment_shading_rate = vku::InitStructHelper();
         fragment_shading_rate.imageView = depth_image_view;
         fragment_shading_rate.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
         fragment_shading_rate.shadingRateAttachmentTexelSize = fsr_properties.minFragmentShadingRateAttachmentTexelSize;
@@ -1710,10 +1693,9 @@ TEST_F(NegativeDynamicRendering, PipelineMissingFlags) {
         m_errorMonitor->VerifyFound();
     }
 
-    if (fragment_density) {
+    {
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-imageView-06184");
-        VkRenderingFragmentDensityMapAttachmentInfoEXT fragment_density_map =
-            vku::InitStructHelper();
+        VkRenderingFragmentDensityMapAttachmentInfoEXT fragment_density_map = vku::InitStructHelper();
         fragment_density_map.imageView = depth_image_view;
         fragment_density_map.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
@@ -1868,6 +1850,7 @@ TEST_F(NegativeDynamicRendering, MismatchedSamplesColorsNV) {
 TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRate) {
     TEST_DESCRIPTION("Test BeginRenderingInfo with FragmentShadingRateAttachment.");
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     AddRequiredFeature(vkt::Feature::multiview);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
@@ -1996,6 +1979,7 @@ TEST_F(NegativeDynamicRendering, DeviceGroupRenderPassBeginInfo) {
 TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImage) {
     TEST_DESCRIPTION("Test BeginRendering with FragmentShadingRateAttachmentInfo with missing image usage bit.");
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
     if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_TILING_OPTIMAL,
@@ -2830,7 +2814,9 @@ TEST_F(NegativeDynamicRendering, SecondaryCommandBufferIncompatibleSubpass) {
 }
 
 TEST_F(NegativeDynamicRendering, SecondaryCommandBufferContents) {
-    TEST_DESCRIPTION("Execute secondary command buffers within active render pass that was not begun with VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS");
+    TEST_DESCRIPTION(
+        "Execute secondary command buffers within active render pass that was not begun with "
+        "VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
@@ -2864,7 +2850,7 @@ TEST_F(NegativeDynamicRendering, InputAttachmentCapability) {
 
     InitRenderTarget();
 
-    const char *fs_source = R"(
+    const char* fs_source = R"(
                OpCapability Shader
                OpCapability InputAttachment
           %1 = OpExtInstImport "GLSL.std.450"
@@ -3086,7 +3072,7 @@ TEST_F(NegativeDynamicRendering, LibraryRenderPass) {
 
     CreatePipelineHelper lib(*this);
     lib.cb_ci_ = color_blend_state_create_info;
-    lib.InitFragmentOutputLibInfo(&pipeline_rendering_info);
+    lib.InitFragmentOutputLibInfo();
     lib.CreateGraphicsPipeline();
 
     VkPipelineLibraryCreateInfoKHR library_create_info = vku::InitStructHelper(&pipeline_rendering_info);
@@ -3147,6 +3133,7 @@ TEST_F(NegativeDynamicRendering, RenderingFragmentDensityMapAttachment) {
     AddRequiredExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::multiview);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
     if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
@@ -3287,6 +3274,7 @@ TEST_F(NegativeDynamicRendering, PNextImageView) {
     AddRequiredExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::multiview);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
     if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
@@ -3789,7 +3777,7 @@ TEST_F(NegativeDynamicRendering, AttachmentImageViewShadingRateLayout) {
     m_command_buffer.Begin();
 
     // SHADING_RATE_OPTIMAL_NV is aliased FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR so VU depends on which extensions
-    const char *vuid =
+    const char* vuid =
         khr_fragment_shading ? "VUID-VkRenderingAttachmentInfo-imageView-06143" : "VUID-VkRenderingAttachmentInfo-imageView-06138";
     m_errorMonitor->SetDesiredError(vuid);
     m_command_buffer.BeginRendering(begin_rendering_info);
@@ -3843,7 +3831,7 @@ TEST_F(NegativeDynamicRendering, ResolveImageViewShadingRateLayout) {
     m_command_buffer.Begin();
 
     // SHADING_RATE_OPTIMAL_NV is aliased FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR so VU depends on which extensions
-    const char *vuid =
+    const char* vuid =
         khr_fragment_shading ? "VUID-VkRenderingAttachmentInfo-imageView-06144" : "VUID-VkRenderingAttachmentInfo-imageView-06139";
     m_errorMonitor->SetDesiredError(vuid);
     m_command_buffer.BeginRendering(begin_rendering_info);
@@ -3969,6 +3957,7 @@ TEST_F(NegativeDynamicRendering, ResolveImageViewReadOnlyOptimalLayout) {
 TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImageView) {
     TEST_DESCRIPTION("Test BeginRenderingInfo image view with FragmentShadingRateAttachment.");
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
     if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
@@ -4084,7 +4073,7 @@ TEST_F(NegativeDynamicRendering, RenderingInfoColorAttachment) {
 
     const uint32_t max_color_attachments = m_device->Physical().limits_.maxColorAttachments + 1;
     std::vector<VkRenderingAttachmentInfo> color_attachments(max_color_attachments);
-    for (auto &attachment : color_attachments) {
+    for (auto& attachment : color_attachments) {
         attachment = vku::InitStructHelper();
         attachment.imageView = image_view;
         attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -4419,13 +4408,13 @@ TEST_F(NegativeDynamicRendering, Pipeline) {
 
 TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateAttachmentSize) {
     TEST_DESCRIPTION("Test FragmentShadingRateAttachment size.");
-
     SetTargetApiVersion(VK_API_VERSION_1_0);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     AddRequiredFeature(vkt::Feature::multiview);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     RETURN_IF_SKIP(Init());
 
     if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
@@ -4470,13 +4459,13 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateAttachmentSize
 
 TEST_F(NegativeDynamicRendering, FragmentShadingRateAttachmentSizeWithDeviceGroupExt) {
     TEST_DESCRIPTION("Test FragmentShadingRateAttachment size with device group extension.");
-
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::multiview);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     RETURN_IF_SKIP(Init());
 
     if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
@@ -6455,7 +6444,7 @@ TEST_F(NegativeDynamicRendering, CreateGraphicsPipeline) {
     TEST_DESCRIPTION("Test for a creating a pipeline with VK_KHR_dynamic_rendering enabled");
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
         layout(location=0) out vec4 color;
@@ -6486,7 +6475,7 @@ TEST_F(NegativeDynamicRendering, CreateGraphicsPipelineNoInfo) {
     TEST_DESCRIPTION("Test for a creating a pipeline with VK_KHR_dynamic_rendering enabled but no rendering info struct.");
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
         layout(location=0) out vec4 color;
@@ -6793,6 +6782,7 @@ TEST_F(NegativeDynamicRendering, IdentitySwizzleDepthStencil) {
 
 TEST_F(NegativeDynamicRendering, IdentitySwizzleFragmentShadingRate) {
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
     VkPhysicalDeviceFragmentShadingRatePropertiesKHR fsr_properties = vku::InitStructHelper();
@@ -8229,8 +8219,8 @@ TEST_F(NegativeDynamicRendering, CountersByRegionARM) {
     auto render_pass_create_info = vku::InitStruct<VkRenderPassCreateInfo2>(nullptr, 0u, 0u, nullptr, 1u, &subpass, 0u, nullptr);
     vkt::RenderPass render_pass(*m_device, render_pass_create_info);
     vkt::Framebuffer framebuffer(*m_device, render_pass, 0, nullptr, ra_extent.width, ra_extent.height);
-    auto rp_begin =
-        vku::InitStruct<VkRenderPassBeginInfo>(&perf_begin_info, render_pass.handle(), framebuffer.handle(), render_area, 0u, nullptr);
+    auto rp_begin = vku::InitStruct<VkRenderPassBeginInfo>(&perf_begin_info, render_pass.handle(), framebuffer.handle(),
+                                                           render_area, 0u, nullptr);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper(&perf_begin_info);
     rendering_info.layerCount = 1;
@@ -8240,7 +8230,7 @@ TEST_F(NegativeDynamicRendering, CountersByRegionARM) {
         perf_begin_info.counterAddressCount = 2;
 
         CreateRenderPassBeginTest(m_command_buffer, &rp_begin, false,
-                            "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-counterAddressCount-11815", nullptr);
+                                  "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-counterAddressCount-11815", nullptr);
 
         m_command_buffer.Begin();
         m_errorMonitor->SetDesiredError("VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-counterAddressCount-11815");
@@ -8255,7 +8245,7 @@ TEST_F(NegativeDynamicRendering, CountersByRegionARM) {
         counter_buffer.Memory().Destroy();
 
         CreateRenderPassBeginTest(m_command_buffer, &rp_begin, false,
-                            "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-pCounterAddresses-11816", nullptr);
+                                  "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-pCounterAddresses-11816", nullptr);
 
         m_command_buffer.Begin();
         m_errorMonitor->SetDesiredError("VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-pCounterAddresses-11816");
@@ -8268,11 +8258,12 @@ TEST_F(NegativeDynamicRendering, CountersByRegionARM) {
     }
 
     {
-        vkt::Buffer counter_buffer_too_small(*m_device, counter_buffer_size - 1, VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
+        vkt::Buffer counter_buffer_too_small(*m_device, counter_buffer_size - 1, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                             vkt::device_address);
         counter_addresses[0] = counter_buffer_too_small.Address();
 
         CreateRenderPassBeginTest(m_command_buffer, &rp_begin, false,
-                            "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-pCounterAddresses-11817", nullptr);
+                                  "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-pCounterAddresses-11817", nullptr);
 
         m_command_buffer.Begin();
         m_errorMonitor->SetDesiredError("VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-pCounterAddresses-11817");
@@ -8298,7 +8289,7 @@ TEST_F(NegativeDynamicRendering, CountersByRegionARM) {
         counter_addresses[0] = extended_counter_buffer.Address();
 
         CreateRenderPassBeginTest(m_command_buffer, &rp_begin, false,
-                            "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-counterIndexCount-11818", nullptr);
+                                  "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-counterIndexCount-11818", nullptr);
 
         m_command_buffer.Begin();
         m_errorMonitor->SetDesiredError("VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-counterIndexCount-11818");
@@ -8353,8 +8344,8 @@ TEST_F(NegativeDynamicRendering, MultiviewCountersByRegionARM) {
     auto render_pass_create_info = vku::InitStruct<VkRenderPassCreateInfo2>(nullptr, 0u, 0u, nullptr, 1u, &subpass, 0u, nullptr);
     vkt::RenderPass render_pass(*m_device, render_pass_create_info);
     vkt::Framebuffer framebuffer(*m_device, render_pass, 0, nullptr, ra_extent.width, ra_extent.height);
-    auto rp_begin =
-        vku::InitStruct<VkRenderPassBeginInfo>(&perf_begin_info, render_pass.handle(), framebuffer.handle(), render_area, 0u, nullptr);
+    auto rp_begin = vku::InitStruct<VkRenderPassBeginInfo>(&perf_begin_info, render_pass.handle(), framebuffer.handle(),
+                                                           render_area, 0u, nullptr);
 
     VkRenderingInfo rendering_info = vku::InitStructHelper(&perf_begin_info);
     rendering_info.layerCount = 1;
@@ -8364,7 +8355,7 @@ TEST_F(NegativeDynamicRendering, MultiviewCountersByRegionARM) {
         perf_begin_info.counterAddressCount = 2;
 
         CreateRenderPassBeginTest(m_command_buffer, &rp_begin, false,
-                            "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-counterAddressCount-11815", nullptr);
+                                  "VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-counterAddressCount-11815", nullptr);
 
         m_command_buffer.Begin();
         m_errorMonitor->SetDesiredError("VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-counterAddressCount-11815");
@@ -8374,4 +8365,117 @@ TEST_F(NegativeDynamicRendering, MultiviewCountersByRegionARM) {
 
         perf_begin_info.counterAddressCount = 1;
     }
+}
+
+TEST_F(NegativeDynamicRendering, DynamicRenderingTilePropertiesWithTooMuchTileMemory) {
+    TEST_DESCRIPTION("Try to query dynamic rendering tile properties with a tile memory size "
+                     "that is greater than the largest tile memory heap.");
+    AddRequiredExtensions(VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME);
+    AddRequiredExtensions(VK_QCOM_TILE_MEMORY_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tileProperties);
+    AddRequiredFeature(vkt::Feature::tileMemoryHeap);
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    VkPhysicalDeviceMemoryProperties memory_info{};
+    vk::GetPhysicalDeviceMemoryProperties(Gpu(), &memory_info);
+    uint64_t max_tile_memory_heap_size = 0;
+    for (uint32_t index = 0; index < memory_info.memoryHeapCount; ++index) {
+        if (memory_info.memoryHeaps[index].flags & VK_MEMORY_HEAP_TILE_MEMORY_BIT_QCOM) {
+            max_tile_memory_heap_size = std::max(memory_info.memoryHeaps[index].size, max_tile_memory_heap_size);
+        }
+    }
+    if (max_tile_memory_heap_size == std::numeric_limits<uint64_t>::max()) {
+        GTEST_SKIP() << "Tile Memory heap exposes max 64 bit value, skipping test.";
+    }
+
+    const auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                                                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image color_image{*m_device, image_ci};
+    vkt::ImageView color_image_view = color_image.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = color_image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkTileMemorySizeInfoQCOM tile_memory_size_info = vku::InitStructHelper();
+    tile_memory_size_info.size = max_tile_memory_heap_size + 1;
+    VkRenderingInfo rendering_info = vku::InitStructHelper(&tile_memory_size_info);
+    rendering_info.renderArea = {{0, 0}, {64, 64}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkTilePropertiesQCOM tile_properties = vku::InitStructHelper();
+    m_errorMonitor->SetDesiredError("VUID-VkTileMemorySizeInfoQCOM-size-10729");
+    vk::GetDynamicRenderingTilePropertiesQCOM(device(), &rendering_info, &tile_properties);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDynamicRendering, DynamicRenderingTilePropertiesWithTileShadingButFeatureNotEnabled) {
+    TEST_DESCRIPTION("Try to query dynamic rendering tile properties with tile shading information, "
+                     "but tileShading feature isn't enabled.");
+    AddRequiredExtensions(VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME);
+    AddRequiredExtensions(VK_QCOM_TILE_SHADING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tileProperties);
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    const auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                                                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image color_image{*m_device, image_ci};
+    vkt::ImageView color_image_view = color_image.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = color_image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderPassTileShadingCreateInfoQCOM tile_shading_info = vku::InitStructHelper();
+    tile_shading_info.flags = VK_TILE_SHADING_RENDER_PASS_ENABLE_BIT_QCOM;
+    tile_shading_info.tileApronSize = {0, 0};
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper(&tile_shading_info);
+    rendering_info.renderArea = {{0, 0}, {64, 64}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkTilePropertiesQCOM tile_properties = vku::InitStructHelper();
+    m_errorMonitor->SetDesiredError("VUID-VkRenderPassTileShadingCreateInfoQCOM-tileShading-10658");
+    vk::GetDynamicRenderingTilePropertiesQCOM(device(), &rendering_info, &tile_properties);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDynamicRendering, DynamicRenderingTilePropertiesWithPerViewRenderAreasButFeatureNotEnabled) {
+    TEST_DESCRIPTION("Try to query dynamic rendering tile properties with per-view render areas information, "
+                     "but multiviewPerViewRenderAreas feature isn't enabled.");
+    AddRequiredExtensions(VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME);
+    AddRequiredExtensions(VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tileProperties);
+    AddRequiredFeature(vkt::Feature::multiview);
+    RETURN_IF_SKIP(InitBasicDynamicRendering());
+
+    const auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                                                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image color_image{*m_device, image_ci};
+    vkt::ImageView color_image_view = color_image.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = color_image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    const VkRect2D per_view_render_area = {{0, 0}, {64, 64}};
+    VkMultiviewPerViewRenderAreasRenderPassBeginInfoQCOM per_view_render_areas_info = vku::InitStructHelper();
+    per_view_render_areas_info.perViewRenderAreaCount = 1;
+    per_view_render_areas_info.pPerViewRenderAreas = &per_view_render_area;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper(&per_view_render_areas_info);
+    rendering_info.renderArea = {{0, 0}, {64, 64}};
+    rendering_info.layerCount = 1;
+    rendering_info.viewMask = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkTilePropertiesQCOM tile_properties = vku::InitStructHelper();
+    m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-perViewRenderAreaCount-07857");
+    vk::GetDynamicRenderingTilePropertiesQCOM(device(), &rendering_info, &tile_properties);
+    m_errorMonitor->VerifyFound();
 }

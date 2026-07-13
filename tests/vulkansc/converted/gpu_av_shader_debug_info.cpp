@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2024-2025 The Khronos Group Inc.
- * Copyright (c) 2024-2025 Valve Corporation
- * Copyright (c) 2024-2025 LunarG, Inc.
+ * Copyright (c) 2024-2026 The Khronos Group Inc.
+ * Copyright (c) 2024-2026 Valve Corporation
+ * Copyright (c) 2024-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,19 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
+#include "buffer_helper.h"
+#include "utils/math_utils.h"
 
 class NegativeGpuAVShaderDebugInfo : public GpuAVBufferDeviceAddressTest {
   public:
-    void BasicSingleStorageBufferComputeOOB(const char *shader, const char *error);
+    void BasicSingleStorageBufferComputeOOB(const char* shader, const char* error);
 };
 
 // shader must have a SSBO at (set = 0, binding = 0)
-void NegativeGpuAVShaderDebugInfo::BasicSingleStorageBufferComputeOOB(const char *shader, const char *error) {
+void NegativeGpuAVShaderDebugInfo::BasicSingleStorageBufferComputeOOB(const char* shader, const char* error) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
@@ -39,7 +41,7 @@ void NegativeGpuAVShaderDebugInfo::BasicSingleStorageBufferComputeOOB(const char
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
     pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipe.descriptor_set_.UpdateDescriptorSets();
@@ -60,7 +62,7 @@ void NegativeGpuAVShaderDebugInfo::BasicSingleStorageBufferComputeOOB(const char
 TEST_F(NegativeGpuAVShaderDebugInfo, OpLine) {
     TEST_DESCRIPTION("Make sure basic OpLine works");
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -110,9 +112,9 @@ TEST_F(NegativeGpuAVShaderDebugInfo, OpLine) {
 }
 
 TEST_F(NegativeGpuAVShaderDebugInfo, OpLineColumn) {
-    TEST_DESCRIPTION("Make sure the column in OpLine will add value to show which part the error occured");
+    TEST_DESCRIPTION("Make sure the column in OpLine will add value to show which part the error occurred");
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -171,7 +173,7 @@ void main() {
 TEST_F(NegativeGpuAVShaderDebugInfo, OpSourceContinued) {
     TEST_DESCRIPTION("Make sure can find source in OpSourceContinued");
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -181,9 +183,11 @@ TEST_F(NegativeGpuAVShaderDebugInfo, OpSourceContinued) {
           %1 = OpString "a.comp"
                OpSource GLSL 450 %1 "#version 450
 #extension GL_EXT_buffer_reference : enable
-layout(buffer_reference, std430) readonly buffer IndexBuffer { int indices[]; };"
+layout(buffer_reference, std430) readonly buffer IndexBuffer { int indices[]; };
+"
                OpSourceContinued "layout(set = 0, binding = 0) buffer foo { IndexBuffer data; int x; };"
-               OpSourceContinued "void main() {
+               OpSourceContinued "
+void main() {
     x = data.indices[16];
 }"
                OpMemberDecorate %foo 0 Offset 0
@@ -230,7 +234,7 @@ layout(buffer_reference, std430) readonly buffer IndexBuffer { int indices[]; };
 TEST_F(NegativeGpuAVShaderDebugInfo, BadLineNumber) {
     TEST_DESCRIPTION("OpLine gives a line number not in the source");
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -291,7 +295,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslang) {
 
     // Manually ran:
     //   glslangValidator -V -g in.comp -o out.spv --target-env vulkan1.2
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -368,7 +372,7 @@ void main() {
 TEST_F(NegativeGpuAVShaderDebugInfo, GlslLineDerective) {
     TEST_DESCRIPTION("Use the #line derective in GLSL");
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
           %2 = OpExtInstImport "GLSL.std.450"
@@ -440,7 +444,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslangShaderDebugInfo) {
 
     // Manually ran:
     //   glslangValidator -V -gV in.comp -o out.spv --target-env vulkan1.2
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                        OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -550,7 +554,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslangShaderDebugInfo) {
 
 // Manually ran:
 //   glslangValidator -V -gVS in.comp -o out.spv --target-env vulkan1.2
-static const char *kBasicGlslShaderSource = R"(
+static const char* kBasicGlslShaderSource = R"(
               OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -692,7 +696,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslangShaderDebugInfoWithSourceShader
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
@@ -721,7 +725,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderDebugInfoColumns) {
     TEST_DESCRIPTION("DebugLine has a Column Start and Column End");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -799,7 +803,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderDebugSourceContinued) {
     TEST_DESCRIPTION("Make sure can find source in DebugSourceContinued");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -814,11 +818,13 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderDebugSourceContinued) {
 #extension GL_EXT_buffer_reference : enable
 layout(buffer_reference, std430) readonly buffer IndexBuffer {
     int indices[];
-};"
+};
+"
          %s2 = OpString "layout(set = 0, binding = 0) buffer foo {
     IndexBuffer data;
     int x;
-};"
+};
+"
          %s3 = OpString "void main() {
     x = data.indices[16];
 }"
@@ -879,7 +885,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderDebugLineMultiLine) {
     TEST_DESCRIPTION("DebugLine has a Line Start and Line End");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -915,6 +921,7 @@ void main() {
           %5 = OpTypeFunction %void
        %uint = OpTypeInt 32 0
      %uint_0 = OpConstant %uint 0
+     %uint_2 = OpConstant %uint 2
      %uint_3 = OpConstant %uint 3
          %18 = OpExtInst %void %1 DebugSource %2 %19
     %uint_10 = OpConstant %uint 10
@@ -938,7 +945,7 @@ void main() {
 %_ptr_StorageBuffer_int = OpTypePointer StorageBuffer %int
        %main = OpFunction %void None %5
          %15 = OpLabel
-         %64 = OpExtInst %void %1 DebugLine %18 %uint_10 %uint_12 %uint_11 %uint_11
+         %64 = OpExtInst %void %1 DebugLine %18 %uint_10 %uint_12 %uint_11 %uint_2
          %63 = OpAccessChain %_ptr_StorageBuffer__ptr_PhysicalStorageBuffer_IndexBuffer %_ %int_0
          %65 = OpLoad %_ptr_PhysicalStorageBuffer_IndexBuffer %63
          %69 = OpAccessChain %_ptr_PhysicalStorageBuffer_int %65 %int_0 %int_16
@@ -950,160 +957,6 @@ void main() {
     )";
 
     BasicSingleStorageBufferComputeOOB(shader_source, "10: void main() {\n11:     x = data.indices[16];\n12: }");
-}
-
-TEST_F(NegativeGpuAVShaderDebugInfo, BadShaderDebugLineStart) {
-    TEST_DESCRIPTION("DebugLine Line Start has bad value");
-    AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
-
-    const char *shader_source = R"(
-               OpCapability Shader
-               OpCapability PhysicalStorageBufferAddresses
-               OpExtension "SPV_KHR_non_semantic_info"
-          %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
-          %3 = OpExtInstImport "GLSL.std.450"
-               OpMemoryModel PhysicalStorageBuffer64 GLSL450
-               OpEntryPoint GLCompute %main "main" %_
-               OpExecutionMode %main LocalSize 1 1 1
-          %2 = OpString "a.comp"
-         %16 = OpString "main"
-         %19 = OpString "#version 450
-#extension GL_EXT_buffer_reference : enable
-layout(buffer_reference, std430) readonly buffer IndexBuffer {
-    int indices[];
-};
-layout(set = 0, binding = 0) buffer foo {
-    IndexBuffer data;
-    int x;
-};
-void main() {
-    x = data.indices[16];
-}"
-               OpDecorate %foo Block
-               OpMemberDecorate %foo 0 Offset 0
-               OpMemberDecorate %foo 1 Offset 8
-               OpDecorate %_runtimearr_int ArrayStride 4
-               OpDecorate %IndexBuffer Block
-               OpMemberDecorate %IndexBuffer 0 NonWritable
-               OpMemberDecorate %IndexBuffer 0 Offset 0
-               OpDecorate %_ Binding 0
-               OpDecorate %_ DescriptorSet 0
-       %void = OpTypeVoid
-          %5 = OpTypeFunction %void
-       %uint = OpTypeInt 32 0
-     %uint_0 = OpConstant %uint 0
-     %uint_3 = OpConstant %uint 3
-         %18 = OpExtInst %void %1 DebugSource %2 %19
-    %uint_11 = OpConstant %uint 11
-    %uint_20 = OpConstant %uint 20
-     %uint_1 = OpConstant %uint 1
-               OpTypeForwardPointer %_ptr_PhysicalStorageBuffer_IndexBuffer PhysicalStorageBuffer
-  %uint_5349 = OpConstant %uint 5349
-        %int = OpTypeInt 32 1
-        %foo = OpTypeStruct %_ptr_PhysicalStorageBuffer_IndexBuffer %int
-%_runtimearr_int = OpTypeRuntimeArray %int
-%IndexBuffer = OpTypeStruct %_runtimearr_int
-%_ptr_PhysicalStorageBuffer_IndexBuffer = OpTypePointer PhysicalStorageBuffer %IndexBuffer
-%_ptr_StorageBuffer_foo = OpTypePointer StorageBuffer %foo
-          %_ = OpVariable %_ptr_StorageBuffer_foo StorageBuffer
-      %int_1 = OpConstant %int 1
-      %int_0 = OpConstant %int 0
-%_ptr_StorageBuffer__ptr_PhysicalStorageBuffer_IndexBuffer = OpTypePointer StorageBuffer %_ptr_PhysicalStorageBuffer_IndexBuffer
-     %int_16 = OpConstant %int 16
-%_ptr_PhysicalStorageBuffer_int = OpTypePointer PhysicalStorageBuffer %int
-%_ptr_StorageBuffer_int = OpTypePointer StorageBuffer %int
-       %main = OpFunction %void None %5
-         %15 = OpLabel
-         %64 = OpExtInst %void %1 DebugLine %18 %uint_20 %uint_20 %uint_11 %uint_11
-         %63 = OpAccessChain %_ptr_StorageBuffer__ptr_PhysicalStorageBuffer_IndexBuffer %_ %int_0
-         %65 = OpLoad %_ptr_PhysicalStorageBuffer_IndexBuffer %63
-         %69 = OpAccessChain %_ptr_PhysicalStorageBuffer_int %65 %int_0 %int_16
-         %70 = OpLoad %int %69 Aligned 4
-         %73 = OpAccessChain %_ptr_StorageBuffer_int %_ %int_1
-               OpStore %73 %70
-               OpReturn
-               OpFunctionEnd
-    )";
-
-    BasicSingleStorageBufferComputeOOB(shader_source, "20: [No line found in source]");
-}
-
-TEST_F(NegativeGpuAVShaderDebugInfo, BadShaderDebugLineEnd) {
-    TEST_DESCRIPTION("DebugLine Line End has bad value");
-    AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
-
-    const char *shader_source = R"(
-               OpCapability Shader
-               OpCapability PhysicalStorageBufferAddresses
-               OpExtension "SPV_KHR_non_semantic_info"
-          %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
-          %3 = OpExtInstImport "GLSL.std.450"
-               OpMemoryModel PhysicalStorageBuffer64 GLSL450
-               OpEntryPoint GLCompute %main "main" %_
-               OpExecutionMode %main LocalSize 1 1 1
-          %2 = OpString "a.comp"
-         %16 = OpString "main"
-         %19 = OpString "#version 450
-#extension GL_EXT_buffer_reference : enable
-layout(buffer_reference, std430) readonly buffer IndexBuffer {
-    int indices[];
-};
-layout(set = 0, binding = 0) buffer foo {
-    IndexBuffer data;
-    int x;
-};
-void main() {
-    x = data.indices[16];
-}"
-               OpDecorate %foo Block
-               OpMemberDecorate %foo 0 Offset 0
-               OpMemberDecorate %foo 1 Offset 8
-               OpDecorate %_runtimearr_int ArrayStride 4
-               OpDecorate %IndexBuffer Block
-               OpMemberDecorate %IndexBuffer 0 NonWritable
-               OpMemberDecorate %IndexBuffer 0 Offset 0
-               OpDecorate %_ Binding 0
-               OpDecorate %_ DescriptorSet 0
-       %void = OpTypeVoid
-          %5 = OpTypeFunction %void
-       %uint = OpTypeInt 32 0
-     %uint_0 = OpConstant %uint 0
-     %uint_3 = OpConstant %uint 3
-         %18 = OpExtInst %void %1 DebugSource %2 %19
-    %uint_10 = OpConstant %uint 10
-    %uint_11 = OpConstant %uint 11
-    %uint_20 = OpConstant %uint 20
-     %uint_1 = OpConstant %uint 1
-               OpTypeForwardPointer %_ptr_PhysicalStorageBuffer_IndexBuffer PhysicalStorageBuffer
-  %uint_5349 = OpConstant %uint 5349
-        %int = OpTypeInt 32 1
-        %foo = OpTypeStruct %_ptr_PhysicalStorageBuffer_IndexBuffer %int
-%_runtimearr_int = OpTypeRuntimeArray %int
-%IndexBuffer = OpTypeStruct %_runtimearr_int
-%_ptr_PhysicalStorageBuffer_IndexBuffer = OpTypePointer PhysicalStorageBuffer %IndexBuffer
-%_ptr_StorageBuffer_foo = OpTypePointer StorageBuffer %foo
-          %_ = OpVariable %_ptr_StorageBuffer_foo StorageBuffer
-      %int_1 = OpConstant %int 1
-      %int_0 = OpConstant %int 0
-%_ptr_StorageBuffer__ptr_PhysicalStorageBuffer_IndexBuffer = OpTypePointer StorageBuffer %_ptr_PhysicalStorageBuffer_IndexBuffer
-     %int_16 = OpConstant %int 16
-%_ptr_PhysicalStorageBuffer_int = OpTypePointer PhysicalStorageBuffer %int
-%_ptr_StorageBuffer_int = OpTypePointer StorageBuffer %int
-       %main = OpFunction %void None %5
-         %15 = OpLabel
-         %64 = OpExtInst %void %1 DebugLine %18 %uint_10 %uint_20 %uint_11 %uint_11
-         %63 = OpAccessChain %_ptr_StorageBuffer__ptr_PhysicalStorageBuffer_IndexBuffer %_ %int_0
-         %65 = OpLoad %_ptr_PhysicalStorageBuffer_IndexBuffer %63
-         %69 = OpAccessChain %_ptr_PhysicalStorageBuffer_int %65 %int_0 %int_16
-         %70 = OpLoad %int %69 Aligned 4
-         %73 = OpAccessChain %_ptr_StorageBuffer_int %_ %int_1
-               OpStore %73 %70
-               OpReturn
-               OpFunctionEnd
-    )";
-
-    BasicSingleStorageBufferComputeOOB(shader_source,
-                                       "10: void main() {\n11:     x = data.indices[16];\n12: }\n13: [No line found in source]");
 }
 
 TEST_F(NegativeGpuAVShaderDebugInfo, BasicDXC) {
@@ -1119,7 +972,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicDXC) {
     // Manually ran:
     //   dxc -spirv -T cs_6_0 -E main -fspv-target-env=vulkan1.2 -fspv-extension=SPV_KHR_non_semantic_info
     //   -fspv-debug=vulkan-with-source in.hlsl
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
           %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
@@ -1229,7 +1082,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, NoLineInFunctionFirst) {
     TEST_DESCRIPTION("Test if first function listed, has no debug info, we don't use the functions after it");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -1356,7 +1209,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, NoLineInFunctionLast) {
     TEST_DESCRIPTION("Test if last function listed, has no debug info, we don't use the functions before it");
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
                OpExtension "SPV_KHR_non_semantic_info"
@@ -1489,7 +1342,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PipelineHandles) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1509,14 +1362,14 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PipelineHandles) {
     pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     pipe.CreateComputePipeline();
 
-    const char *pipe_name = "bad_pipeline";
+    const char* pipe_name = "bad_pipeline";
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
     name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
     name_info.objectHandle = (uint64_t)pipe.Handle();
     name_info.pObjectName = pipe_name;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
 
-    const char *cb_name = "bad_command_buffer";
+    const char* cb_name = "bad_command_buffer";
     name_info.objectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
     name_info.objectHandle = (uint64_t)m_command_buffer.handle();
     name_info.pObjectName = cb_name;
@@ -1524,7 +1377,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PipelineHandles) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1573,7 +1426,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderObjectHandle) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
@@ -1585,7 +1438,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderObjectHandle) {
     VkShaderStageFlagBits shader_stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
     const vkt::Shader comp_shader(*m_device, shader_stages[0], GLSLToSPV(shader_stages[0], comp_src), &descriptorSetLayout);
 
-    const char *object_name = "bad_shader_object";
+    const char* object_name = "bad_shader_object";
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
     name_info.objectType = VK_OBJECT_TYPE_SHADER_EXT;
     name_info.objectHandle = (uint64_t)comp_shader.handle();
@@ -1606,7 +1459,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderObjectHandle) {
 }
 
 TEST_F(NegativeGpuAVShaderDebugInfo, CommandBufferCommandIndex) {
-    TEST_DESCRIPTION("Make sure we print which index in the command buffer the issue occured");
+    TEST_DESCRIPTION("Make sure we print which index in the command buffer the issue occurred");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
@@ -1616,7 +1469,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, CommandBufferCommandIndex) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1638,7 +1491,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, CommandBufferCommandIndex) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     bad_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1680,7 +1533,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfo) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1704,7 +1557,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfo) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     bad_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1734,7 +1587,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel1) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1758,7 +1611,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel1) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     bad_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1795,7 +1648,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel2) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1819,7 +1672,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel2) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     bad_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1858,7 +1711,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel3) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1882,7 +1735,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel3) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     bad_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1935,7 +1788,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel4) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -1959,7 +1812,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel4) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     bad_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -2022,7 +1875,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, DISABLED_StageInfoWithDebugLabel5) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -2046,7 +1899,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, DISABLED_StageInfoWithDebugLabel5) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     bad_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -2116,7 +1969,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel6) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -2140,7 +1993,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel6) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     bad_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -2206,7 +2059,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel7) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_buffer_reference : enable
         layout(buffer_reference, std430) readonly buffer IndexBuffer {
@@ -2230,7 +2083,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, StageInfoWithDebugLabel7) {
 
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    auto data = static_cast<VkDeviceAddress *>(in_buffer.Memory().Map());
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
     data[0] = block_buffer.Address();
 
     bad_pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -2285,7 +2138,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PostProcessingDebugLabelMultipleCommandBuff
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
         #extension GL_EXT_samplerless_texture_functions : require
 
@@ -2376,7 +2229,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, IndirectCommandDebugLabel) {
     RETURN_IF_SKIP(InitState());
 
     vkt::Buffer indirect_buffer(*m_device, 1024, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    VkDispatchIndirectCommand *ptr = static_cast<VkDispatchIndirectCommand *>(indirect_buffer.Memory().Map());
+    VkDispatchIndirectCommand* ptr = static_cast<VkDispatchIndirectCommand*>(indirect_buffer.Memory().Map());
     ptr[0].x = 1;
     ptr[0].y = 1;
     ptr[0].z = 1;
@@ -2425,7 +2278,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderInternalId) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_shader = R"glsl(
+    const char* cs_shader = R"glsl(
         #version 450
         layout(set = 0, binding = 0) uniform Foo { mat4 x; };
         void main() {
@@ -2470,7 +2323,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PostProcess) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *fs_source = R"(
+    const char* fs_source = R"(
                OpCapability Shader
           %2 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
@@ -2601,7 +2454,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PostProcessSlangGPL) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *fs_source = R"(
+    const char* fs_source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
           %2 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
@@ -2807,7 +2660,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ReachMaxActionsCommandValidationLimitUnknow
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
 
         layout(set = 0, binding = 0) buffer foo {
@@ -2867,7 +2720,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ReachMaxErrorLoggerLimitUnkown) {
     RETURN_IF_SKIP(InitState());
 
     vkt::Buffer indirect_buffer(*m_device, 1024, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    VkDispatchIndirectCommand *ptr = static_cast<VkDispatchIndirectCommand *>(indirect_buffer.Memory().Map());
+    VkDispatchIndirectCommand* ptr = static_cast<VkDispatchIndirectCommand*>(indirect_buffer.Memory().Map());
     ptr[0].x = 1;
     ptr[0].y = 1;
     ptr[0].z = 1;
@@ -2889,6 +2742,113 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ReachMaxErrorLoggerLimitUnkown) {
 
     // VUID-VkDispatchIndirectCommand-x-00417
     m_errorMonitor->SetDesiredError("GPUAV-Overflow-Unknown");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVShaderDebugInfo, HeapMultipleDraws) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(heap_props);
+
+    const VkDeviceSize descriptor_size = Align(Align(heap_props.bufferDescriptorAlignment, heap_props.bufferDescriptorAlignment),
+                                               heap_props.imageDescriptorAlignment);
+    const VkDeviceSize heap_size = descriptor_size + heap_props.minResourceHeapReservedRange;
+
+    vkt::Buffer heap(*m_device, heap_size, VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT, vkt::device_address);
+    uint8_t* heap_data = static_cast<uint8_t*>(heap.Memory().Map());
+
+    vkt::Buffer ssbo_buffer(*m_device, 256u, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    VkDeviceAddressRangeEXT address_range = ssbo_buffer.AddressRange();
+
+    VkResourceDescriptorInfoEXT resource_info = vku::InitStructHelper();
+    resource_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    resource_info.data.pAddressRange = &address_range;
+    VkHostAddressRangeEXT host_address = {heap_data, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+    vk::WriteResourceDescriptorsEXT(*m_device, 1u, &resource_info, &host_address);
+
+    const char* vs_source = R"glsl(
+        #version 450
+        layout(location=0) in vec3 pos;
+        layout(set=0, binding=0) buffer SSBO { uint data[]; };
+        void main() {
+            data[gl_VertexIndex] = 0;
+            gl_Position = vec4(pos, 1.0);
+        }
+    )glsl";
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
+    pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
+
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0u, 0u);
+    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mapping.sourceData.constantOffset.heapOffset = 0;
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 1u;
+    mapping_info.pMappings = &mapping;
+
+    CreatePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
+    pipe.gp_ci_.layout = VK_NULL_HANDLE;
+
+    VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
+    VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
+    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
+    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
+    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
+    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(&mapping_info), pipe.fs_->GetStageCreateInfo(&mapping_info)};
+    pipe.gp_ci_.stageCount = pipe.shader_stages_.size();
+    pipe.gp_ci_.pStages = pipe.shader_stages_.data();
+    pipe.CreateGraphicsPipeline(false);
+
+    VkDrawIndexedIndirectCommand draw_params{3, 1, 0, 0, 0};
+    vkt::Buffer draw_params_buffer = vkt::IndirectBuffer<VkDrawIndexedIndirectCommand>(*m_device, {draw_params});
+
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+    m_command_buffer.Begin(&begin_info);
+
+    VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
+    bind_resource_info.heapRange.address = heap.Address();
+    bind_resource_info.heapRange.size = heap_size;
+    bind_resource_info.reservedRangeOffset = descriptor_size;
+    bind_resource_info.reservedRangeSize = heap_props.minResourceHeapReservedRange;
+    vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
+
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    vkt::Buffer index_buffer_good = vkt::IndexBuffer<uint32_t>(*m_device, {0, 1, 2});
+    vkt::Buffer index_buffer_bad = vkt::IndexBuffer<uint32_t>(*m_device, {0, 1, 42});
+    vkt::Buffer vertex_buffer = vkt::VertexBuffer<float>(*m_device, {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f});
+    VkDeviceSize vertex_buffer_offset = 0;
+    vk::CmdBindVertexBuffers(m_command_buffer, 0, 1, &vertex_buffer.handle(), &vertex_buffer_offset);
+
+    VkDebugUtilsLabelEXT label = vku::InitStructHelper();
+    label.pLabelName = "Bad-Draw";
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &label);
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer_bad, 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdDrawIndexedIndirect(m_command_buffer, draw_params_buffer, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+
+    label.pLabelName = "Good-Draw";
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &label);
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer_good, 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdDrawIndexedIndirect(m_command_buffer, draw_params_buffer, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("Bad-Draw");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }

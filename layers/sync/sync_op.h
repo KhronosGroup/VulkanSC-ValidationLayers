@@ -37,7 +37,6 @@ class ReplayState;
 class SyncValidator;
 
 struct SyncEventState {
-    enum IgnoreReason { NotIgnored = 0, ResetWaitRace, Reset2WaitRace, SetRace, MissingStageBits, SetVsWait2, MissingSetEvent };
     using EventPointer = std::shared_ptr<const vvl::Event>;
     EventPointer event;
     vvl::Func last_command;             // Only Event commands are valid here.
@@ -46,7 +45,6 @@ struct SyncEventState {
     VkPipelineStageFlags2 barriers;
     SyncExecScope scope;
     ResourceUsageTag first_scope_tag;
-    bool destroyed;
     std::shared_ptr<const AccessContext> first_scope;
 
     SyncEventState()
@@ -56,8 +54,7 @@ struct SyncEventState {
           unsynchronized_set(vvl::Func::Empty),
           barriers(0U),
           scope(),
-          first_scope_tag(),
-          destroyed(true) {}
+          first_scope_tag() {}
 
     SyncEventState(const SyncEventState &) = default;
     SyncEventState(SyncEventState &&) = default;
@@ -66,7 +63,6 @@ struct SyncEventState {
 
     void ResetFirstScope();
     const AccessContext::ScopeMap &FirstScope() const { return first_scope->GetAccessMap(); }
-    IgnoreReason IsIgnoredByWait(vvl::Func command, VkPipelineStageFlags2 srcStageMask) const;
     bool HasBarrier(VkPipelineStageFlags2 stageMask, VkPipelineStageFlags2 exec_scope) const;
     void AddReferencedTags(ResourceUsageTagSet &referenced) const;
 };
@@ -90,14 +86,13 @@ class SyncEventsContext {
         return find_it->second.get();
     }
 
-    const SyncEventState *Get(const vvl::Event *event_state) const {
-        const auto find_it = map_.find(event_state);
+    const SyncEventState* Get(const SyncEventState::EventPointer& event_state) const {
+        const auto find_it = map_.find(event_state.get());
         if (find_it == map_.end()) {
             return nullptr;
         }
         return find_it->second.get();
     }
-    const SyncEventState *Get(const SyncEventState::EventPointer &event_state) const { return Get(event_state.get()); }
 
     void ApplyBarrier(const SyncExecScope &src, const SyncExecScope &dst, ResourceUsageTag tag);
     void ApplyTaggedWait(VkQueueFlags queue_flags, ResourceUsageTag tag);
@@ -105,7 +100,6 @@ class SyncEventsContext {
     void Destroy(const vvl::Event *event_state) {
         auto sync_it = map_.find(event_state);
         if (sync_it != map_.end()) {
-            sync_it->second->destroyed = true;
             map_.erase(sync_it);
         }
     }
@@ -288,8 +282,8 @@ class SyncOpSetEvent : public SyncOpBase {
 
   private:
     bool DoValidate(const CommandExecutionContext &ex_context, const ResourceUsageTag base_tag) const;
-    void DoRecord(QueueId queue_id, ResourceUsageTag recorded_tag, const std::shared_ptr<const AccessContext> &access_context,
-                  SyncEventsContext *events_context) const;
+    void DoRecord(QueueId queue_id, ResourceUsageTag recorded_tag, const std::shared_ptr<const AccessContext>& access_context,
+                  SyncEventsContext& events_context) const;
     std::shared_ptr<const vvl::Event> event_;
     // The Access context of the command buffer at record set event time.
     std::shared_ptr<const AccessContext> recorded_context_;
@@ -347,16 +341,6 @@ class SyncOpEndRenderPass : public SyncOpBase {
 
   protected:
     vku::safe_VkSubpassEndInfo subpass_end_info_;
-};
-
-// Batch barrier ops don't modify in place, and thus don't need to hold pending state, and also are *never* layout transitions.
-struct BatchBarrierOp {
-    SyncBarrier barrier;
-    BarrierScope barrier_scope;
-
-    BatchBarrierOp(QueueId queue_id, const SyncBarrier &barrier) : barrier(barrier), barrier_scope(barrier, queue_id) {}
-
-    void operator()(AccessState *access_state) const { access_state->ApplyBarrier(barrier_scope, barrier); }
 };
 
 // Allow keep track of the exec contexts replay state

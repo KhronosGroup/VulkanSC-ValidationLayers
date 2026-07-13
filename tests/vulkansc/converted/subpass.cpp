@@ -5,7 +5,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2021 ARM, Inc. All rights reserved.
  *
@@ -16,9 +16,9 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/render_pass_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "render_pass_helper.h"
 #include "utils/convert_utils.h"
 
 class NegativeSubpass : public VkLayerTest {};
@@ -585,7 +585,7 @@ TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
     {
         // input index is wrong, it doesn't exist in supbass input attachments and the set and binding is undefined
         // It causes desired failures.
-        const char *fsSource_fail = R"glsl(
+        const char* fsSource_fail = R"glsl(
             #version 450
             layout(input_attachment_index=1, set=0, binding=1) uniform subpassInput x;
             void main() {
@@ -606,7 +606,7 @@ TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
     }
 
     {  // Binds input attachment
-        const char *fsSource = R"glsl(
+        const char* fsSource = R"glsl(
             #version 450
             layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
             void main() {
@@ -897,7 +897,7 @@ TEST_F(NegativeSubpass, InputAttachmentMissing) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
         layout(location=0) out vec4 color;
@@ -908,7 +908,7 @@ TEST_F(NegativeSubpass, InputAttachmentMissing) {
 
     VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     };
@@ -925,7 +925,7 @@ TEST_F(NegativeSubpass, InputAttachmentMissingArray) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[1];
         layout(location=0) out vec4 color;
@@ -936,7 +936,7 @@ TEST_F(NegativeSubpass, InputAttachmentMissingArray) {
 
     VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     };
@@ -957,7 +957,7 @@ TEST_F(NegativeSubpass, InputAttachmentMissingArray2) {
     rp.AddInputAttachment(1, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const int index = 2;
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[2];
@@ -970,8 +970,7 @@ TEST_F(NegativeSubpass, InputAttachmentMissingArray2) {
     uint32_t data = 4;  // over VkDescriptorSetLayoutBinding::descriptorCount
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.gp_ci_.renderPass = rp;
@@ -982,8 +981,7 @@ TEST_F(NegativeSubpass, InputAttachmentMissingArray2) {
     m_errorMonitor->VerifyFound();
 }
 
-// TODO: These tests fail due to some SPIR-V Tools bugs and do not happen to show up upstream as they do spec constant folding and
-// other optimizations on SPIR-V before validation, unlike our device-create-time SPIR-V validation
+// TODO: These tests fail due to a combination of glslang and SPIR-V Tools bugs
 TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingSpecConstant) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::shaderInputAttachmentArrayDynamicIndexing);
@@ -998,7 +996,7 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingSpecConstant) {
     rp.AddInputAttachment(1, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const int index = 1;
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[2];
@@ -1011,8 +1009,7 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingSpecConstant) {
     uint32_t data = 4;  // over VkDescriptorSetLayoutBinding::descriptorCount
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.gp_ci_.renderPass = rp;
@@ -1037,7 +1034,7 @@ TEST_F(NegativeSubpass, InputAttachmentMissingSpecConstant2) {
     rp.AddInputAttachment(1, VK_IMAGE_LAYOUT_GENERAL);
     rp.CreateRenderPass();
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout (constant_id = 0) const int index = 4;
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[index];
@@ -1050,8 +1047,7 @@ TEST_F(NegativeSubpass, InputAttachmentMissingSpecConstant2) {
     uint32_t data = 4;  // over VkDescriptorSetLayoutBinding::descriptorCount
     VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
     VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
-    const VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                         &specialization_info);
+    VkShaderObj fs(*m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
 
     CreatePipelineHelper pipe(*this);
     pipe.gp_ci_.renderPass = rp;
@@ -1105,7 +1101,7 @@ TEST_F(NegativeSubpass, InputAttachmentSharingVariable) {
 
     // There are 2 OpLoad/OpAccessChain that point the same OpVariable
     // Make sure we are not just taking the first load and checking all loads on a variable
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 460
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[2];
         layout(location=0) out vec4 color;
@@ -1116,7 +1112,7 @@ TEST_F(NegativeSubpass, InputAttachmentSharingVariable) {
     )glsl";
     VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL);
 
-    const auto set_info = [&](CreatePipelineHelper &helper) {
+    const auto set_info = [&](CreatePipelineHelper& helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         helper.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
         helper.gp_ci_.renderPass = renderPass;

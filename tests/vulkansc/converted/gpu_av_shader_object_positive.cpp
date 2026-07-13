@@ -2,8 +2,8 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023-2024 Nintendo
- * Copyright (c) 2023-2025 LunarG, Inc.
+ * Copyright (c) 2023-2026 Nintendo
+ * Copyright (c) 2023-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  */
 
 #include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/shader_object_helper.h"
-#include "../framework/pipeline_helper.h"
+#include "layer_validation_tests.h"
+#include "shader_object_helper.h"
+#include "pipeline_helper.h"
 
 class PositiveGpuAVShaderObject : public GpuAVTest {
   public:
@@ -40,7 +40,7 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants) {
 
     vkt::Buffer indirect_draw_parameters_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                                 kHostVisibleMemProps);
-    auto &indirect_draw_parameters = *static_cast<VkDrawIndirectCommand *>(indirect_draw_parameters_buffer.Memory().Map());
+    auto& indirect_draw_parameters = *static_cast<VkDrawIndirectCommand*>(indirect_draw_parameters_buffer.Memory().Map());
     indirect_draw_parameters.vertexCount = 3;
     indirect_draw_parameters.instanceCount = 1;
     indirect_draw_parameters.firstVertex = 0;
@@ -78,7 +78,7 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants) {
     plci.pPushConstantRanges = push_constant_ranges.data();
     vkt::PipelineLayout pipeline_layout(*m_device, plci);
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
             #version 450
             #extension GL_EXT_buffer_reference : enable
 
@@ -107,7 +107,7 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants) {
 
     const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source);
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
             #version 450
             #extension GL_EXT_buffer_reference : enable
 
@@ -157,7 +157,7 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants) {
     m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    auto storage_buffer_ptr = static_cast<int32_t *>(storage_buffer.Memory().Map());
+    auto storage_buffer_ptr = static_cast<int32_t*>(storage_buffer.Memory().Map());
     for (int32_t i = 0; i < int_count; ++i) {
         ASSERT_EQ(storage_buffer_ptr[i], i);
     }
@@ -185,7 +185,7 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants2) {
     // Graphics pipeline
     // ---
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
             #version 450
             #extension GL_EXT_buffer_reference : enable
 
@@ -214,7 +214,7 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants2) {
 
     const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source);
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
             #version 450
             #extension GL_EXT_buffer_reference : enable
 
@@ -256,7 +256,7 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants2) {
 
     vkt::Buffer indirect_draw_parameters_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                                 kHostVisibleMemProps);
-    auto &indirect_draw_parameters = *static_cast<VkDrawIndirectCommand *>(indirect_draw_parameters_buffer.Memory().Map());
+    auto& indirect_draw_parameters = *static_cast<VkDrawIndirectCommand*>(indirect_draw_parameters_buffer.Memory().Map());
     indirect_draw_parameters.vertexCount = 3;
     indirect_draw_parameters.instanceCount = 1;
     indirect_draw_parameters.firstVertex = 0;
@@ -273,7 +273,7 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants2) {
     // Compute pipeline
     // ---
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
             #version 450
             #extension GL_EXT_buffer_reference : enable
 
@@ -319,8 +319,8 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants2) {
 
     vkt::Buffer indirect_dispatch_parameters_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                                     kHostVisibleMemProps);
-    auto &indirect_dispatch_parameters =
-        *static_cast<VkDispatchIndirectCommand *>(indirect_dispatch_parameters_buffer.Memory().Map());
+    auto& indirect_dispatch_parameters =
+        *static_cast<VkDispatchIndirectCommand*>(indirect_dispatch_parameters_buffer.Memory().Map());
     indirect_dispatch_parameters.x = 1;
     indirect_dispatch_parameters.y = 1;
     indirect_dispatch_parameters.z = 1;
@@ -349,12 +349,12 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_RestoreUserPushConstants2) {
     m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
 
-    auto compute_storage_buffer_ptr = static_cast<int32_t *>(compute_storage_buffer.Memory().Map());
+    auto compute_storage_buffer_ptr = static_cast<int32_t*>(compute_storage_buffer.Memory().Map());
     for (int32_t i = 0; i < int_count; ++i) {
         ASSERT_EQ(compute_storage_buffer_ptr[i], int_count + i);
     }
 
-    auto graphics_storage_buffer_ptr = static_cast<int32_t *>(graphics_storage_buffer.Memory().Map());
+    auto graphics_storage_buffer_ptr = static_cast<int32_t*>(graphics_storage_buffer.Memory().Map());
     for (int32_t i = 0; i < int_count; ++i) {
         ASSERT_EQ(graphics_storage_buffer_ptr[i], i);
     }
@@ -396,8 +396,8 @@ TEST_F(PositiveGpuAVShaderObject, DISABLED_DispatchShaderObjectAndPipeline) {
 
     vkt::Buffer indirect_dispatch_parameters_buffer(*m_device, sizeof(VkDispatchIndirectCommand),
                                                     VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    auto &indirect_dispatch_parameters =
-        *static_cast<VkDispatchIndirectCommand *>(indirect_dispatch_parameters_buffer.Memory().Map());
+    auto& indirect_dispatch_parameters =
+        *static_cast<VkDispatchIndirectCommand*>(indirect_dispatch_parameters_buffer.Memory().Map());
     indirect_dispatch_parameters.x = 1u;
     indirect_dispatch_parameters.y = 1u;
     indirect_dispatch_parameters.z = 1u;

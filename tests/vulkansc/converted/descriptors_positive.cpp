@@ -17,11 +17,11 @@
 #include <vulkan/vulkan_core.h>
 #include <cstdint>
 #include <thread>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/render_pass_helper.h"
-#include "../framework/ray_tracing_objects.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "descriptor_helper.h"
+#include "render_pass_helper.h"
+#include "ray_tracing_objects.h"
 #include "error_message/log_message_type.h"
 
 class PositiveDescriptors : public VkLayerTest {};
@@ -130,8 +130,8 @@ TEST_F(PositiveDescriptors, IgnoreUnrelatedDescriptor) {
         // This will most likely produce a crash if the parameter_validation
         // layer
         // does not correctly ignore pBufferInfo.
-        descriptor_write.pBufferInfo = reinterpret_cast<const VkDescriptorBufferInfo *>(invalid_ptr);
-        descriptor_write.pTexelBufferView = reinterpret_cast<const VkBufferView *>(invalid_ptr);
+        descriptor_write.pBufferInfo = reinterpret_cast<const VkDescriptorBufferInfo*>(invalid_ptr);
+        descriptor_write.pTexelBufferView = reinterpret_cast<const VkBufferView*>(invalid_ptr);
 
         vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
     }
@@ -158,8 +158,8 @@ TEST_F(PositiveDescriptors, IgnoreUnrelatedDescriptor) {
         // This will most likely produce a crash if the parameter_validation
         // layer
         // does not correctly ignore pImageInfo.
-        descriptor_write.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo *>(invalid_ptr);
-        descriptor_write.pTexelBufferView = reinterpret_cast<const VkBufferView *>(invalid_ptr);
+        descriptor_write.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo*>(invalid_ptr);
+        descriptor_write.pTexelBufferView = reinterpret_cast<const VkBufferView*>(invalid_ptr);
 
         vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
     }
@@ -187,8 +187,8 @@ TEST_F(PositiveDescriptors, IgnoreUnrelatedDescriptor) {
         // This will most likely produce a crash if the parameter_validation
         // layer
         // does not correctly ignore pImageInfo and pBufferInfo.
-        descriptor_write.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo *>(invalid_ptr);
-        descriptor_write.pBufferInfo = reinterpret_cast<const VkDescriptorBufferInfo *>(invalid_ptr);
+        descriptor_write.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo*>(invalid_ptr);
+        descriptor_write.pBufferInfo = reinterpret_cast<const VkDescriptorBufferInfo*>(invalid_ptr);
 
         vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
     }
@@ -219,7 +219,7 @@ TEST_F(PositiveDescriptors, ImmutableSamplerOnlyDescriptor) {
 
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 x;
         layout(set=0, binding=0) uniform sampler immutableSampler;
@@ -311,7 +311,7 @@ TEST_F(PositiveDescriptors, DynamicOffsetWithInactiveBinding) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     // Create PSO to be used for draw-time errors below
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(location=0) out vec4 x;
         layout(set=0) layout(binding=0) uniform foo1 { int x; int y; } bar1;
@@ -447,7 +447,7 @@ TEST_F(PositiveDescriptors, DescriptorSetCompatibilityMutableDescriptors) {
     descriptor_set_1.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set_1.UpdateDescriptorSets();
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer SSBO {
             uint a;
@@ -646,7 +646,7 @@ TEST_F(PositiveDescriptors, ImageViewAsDescriptorReadAndInputAttachment) {
 
     vkt::Framebuffer framebuffer(*m_device, rp, 1, &image_view_handle);
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
             #version 450
             layout(location = 0) out vec4 color;
             layout(set = 0, binding = 0, rgba8) readonly uniform image2D image1;
@@ -735,7 +735,7 @@ TEST_F(PositiveDescriptors, MultipleThreadsUsingHostOnlyDescriptorSet) {
                                        VK_DESCRIPTOR_SET_LAYOUT_CREATE_HOST_ONLY_POOL_BIT_EXT, nullptr,
                                        VK_DESCRIPTOR_POOL_CREATE_HOST_ONLY_BIT_EXT);
 
-    const auto &testing_thread1 = [&]() {
+    const auto& testing_thread1 = [&]() {
         VkDescriptorImageInfo image_info = {VK_NULL_HANDLE, view1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
         VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
         descriptor_write.dstSet = descriptor_set.set_;
@@ -746,7 +746,7 @@ TEST_F(PositiveDescriptors, MultipleThreadsUsingHostOnlyDescriptorSet) {
 
         vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, nullptr);
     };
-    const auto &testing_thread2 = [&]() {
+    const auto& testing_thread2 = [&]() {
         VkDescriptorImageInfo image_info = {VK_NULL_HANDLE, view2, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
         VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
         descriptor_write.dstSet = descriptor_set.set_;
@@ -760,7 +760,7 @@ TEST_F(PositiveDescriptors, MultipleThreadsUsingHostOnlyDescriptorSet) {
     };
 
     std::array<std::thread, 2> threads = {std::thread(testing_thread1), std::thread(testing_thread2)};
-    for (auto &t : threads) t.join();
+    for (auto& t : threads) t.join();
 }
 
 TEST_F(PositiveDescriptors, BindingEmptyDescriptorSets) {
@@ -799,7 +799,7 @@ TEST_F(PositiveDescriptors, DrawingWithUnboundUnusedSetWithInputAttachments) {
 
     vkt::Framebuffer fb(*m_device, rp, 1, &view_input.handle(), width, height);
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
         void main() {
@@ -908,7 +908,7 @@ TEST_F(PositiveDescriptors, UpdateDescritorSetsNoLongerInUse) {
 
         // Bind set A to a command buffer and submit the command buffer;
         {
-            auto &cb = use_single_command_buffer ? m_command_buffer : cb0;
+            auto& cb = use_single_command_buffer ? m_command_buffer : cb0;
             cb.Begin();
             vk::CmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &set_A, 0, nullptr);
             vk::CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
@@ -924,7 +924,7 @@ TEST_F(PositiveDescriptors, UpdateDescritorSetsNoLongerInUse) {
 
         // Bind set B to a command buffer and submit the command buffer;
         {
-            auto &cb = use_single_command_buffer ? m_command_buffer : cb1;
+            auto& cb = use_single_command_buffer ? m_command_buffer : cb1;
             cb.Begin();
             vk::CmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &set_B, 0, nullptr);
             vk::CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
@@ -1030,7 +1030,7 @@ TEST_F(PositiveDescriptors, AttachmentFeedbackLoopLayout) {
                                             VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *frag_src = R"glsl(
+    const char* frag_src = R"glsl(
         #version 450
         layout(set=0) layout(binding=0) uniform sampler2D tex;
         layout(location=0) out vec4 color;
@@ -1156,7 +1156,7 @@ TEST_F(PositiveDescriptors, ImageSubresourceOverlapBetweenRenderPassAndDescripto
     //     x = vec4(1.0f);
     //     foo(image_1);
     // }
-    const char *fsSource = R"(
+    const char* fsSource = R"(
                OpCapability Shader
                OpMemoryModel Logical GLSL450
                OpEntryPoint Fragment %main "main" %color_attach
@@ -1930,7 +1930,7 @@ TEST_F(PositiveDescriptors, ImmutableSamplerIdenticallyDefined) {
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer StorageBuffer { vec4 dummy; };
         layout(set = 0, binding = 1) uniform sampler s;
@@ -1988,7 +1988,7 @@ TEST_F(PositiveDescriptors, ImmutableSamplerIdenticallyDefinedMaintenance4) {
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer StorageBuffer { vec4 dummy; };
         layout(set = 0, binding = 1) uniform sampler s;
@@ -2049,7 +2049,7 @@ TEST_F(PositiveDescriptors, ImmutableSamplerIdenticallyDefinedMaintenance4_2) {
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer StorageBuffer { vec4 dummy; };
         layout(set = 0, binding = 1) uniform sampler s;
@@ -2116,7 +2116,7 @@ TEST_F(PositiveDescriptors, ImmutableSamplerIdenticallyDefinedFilterMinmax) {
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer StorageBuffer { vec4 dummy; };
         layout(set = 0, binding = 1) uniform sampler s;
@@ -2229,7 +2229,7 @@ TEST_F(PositiveDescriptors, ReuseSetLayoutDefWithImmutableSamplers2) {
         descriptor_write.pImageInfo = &image_info;
         vk::UpdateDescriptorSets(*m_device, 1u, &descriptor_write, 0u, nullptr);
 
-        const char *fsSource = R"glsl(
+        const char* fsSource = R"glsl(
             #version 440
 
             layout(set = 0, binding = 0) uniform sampler2DMS u_ms_image_sampler;
@@ -2320,7 +2320,7 @@ TEST_F(PositiveDescriptors, DummySecondDevice) {
     OneOffDescriptorSet ds_0(m_device, {binding_def});
     const vkt::PipelineLayout pipeline_layout_0(*m_device, {&ds_0.layout_});
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer StorageBuffer { uint x; };
         void main() {
@@ -2362,7 +2362,7 @@ TEST_F(PositiveDescriptors, DummySecondInstance) {
     OneOffDescriptorSet ds_0(m_device, {binding_def});
     const vkt::PipelineLayout pipeline_layout_0(*m_device, {&ds_0.layout_});
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) buffer StorageBuffer { uint x; };
         void main() {
@@ -2428,4 +2428,187 @@ TEST_F(PositiveDescriptors, InputAttachmentDescriptorUpdateGarbageSampler) {
 
     descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_IMAGE_LAYOUT_GENERAL);
     descriptor_set.UpdateDescriptorSets();
+}
+
+TEST_F(PositiveDescriptors, Image1DArray) {
+    RETURN_IF_SKIP(Init());
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform sampler1DArray img;
+        void main(){
+            vec4 value = texelFetch(img, ivec2(0, 0), 0);
+        }
+    )glsl";
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.format = VK_FORMAT_B8G8R8A8_UNORM;
+    image_ci.extent = {32, 1, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_ci.flags = 0;
+    image_ci.imageType = VK_IMAGE_TYPE_1D;
+
+    vkt::Image image(*m_device, image_ci);
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_1D_ARRAY);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                       });
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDescriptors, Image1DArrayAliasSingleLayer) {
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_11_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance11);
+    RETURN_IF_SKIP(Init());
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform sampler1D img;
+        layout(set = 0, binding = 1) uniform sampler1DArray img_array;
+        void main(){
+            vec4 value = texelFetch(img_array, ivec2(0, 0), 0);
+            value += textureLod(img, 0.0, 0.0);
+        }
+    )glsl";
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.format = VK_FORMAT_B8G8R8A8_UNORM;
+    image_ci.extent = {32, 1, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_ci.flags = VK_IMAGE_CREATE_ALIAS_SINGLE_LAYER_DESCRIPTOR_BIT_KHR;
+    image_ci.imageType = VK_IMAGE_TYPE_1D;
+
+    vkt::Image image(*m_device, image_ci);
+    vkt::ImageView image_view_array = image.CreateView(VK_IMAGE_VIEW_TYPE_1D_ARRAY);
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_1D);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                           {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                       });
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorImageInfo(0, image_view_array, sampler);
+    descriptor_set.WriteDescriptorImageInfo(1, image_view, sampler);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDescriptors, TransitionImageUnusedByShader) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5603");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init())
+
+    vkt::Image unused_by_shader_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM,
+                                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::ImageView unused_by_shader_view = unused_by_shader_image.CreateView();
+
+    vkt::Image sampled_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::ImageView sampled_view = sampled_image.CreateView();
+
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    const VkDescriptorSetLayoutBinding s_binding = {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_ALL};
+    const VkDescriptorSetLayoutBinding t_binding = {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, VK_SHADER_STAGE_ALL};
+    OneOffDescriptorSet descriptor_set(m_device, {s_binding, t_binding});
+    descriptor_set.WriteDescriptorImageInfo(0, VK_NULL_HANDLE, sampler, VK_DESCRIPTOR_TYPE_SAMPLER);
+    descriptor_set.WriteDescriptorImageInfo(1, unused_by_shader_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
+    descriptor_set.WriteDescriptorImageInfo(1, sampled_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char* fragment_shader = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform sampler s;
+        layout(set = 0, binding = 1) uniform texture2D t[2];
+        layout(location = 0) out vec4 color;
+        void main() {
+            color = texture(sampler2D(t[1], s), vec2(0));
+        }
+    )glsl";
+
+    VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(*m_device, fragment_shader, VK_SHADER_STAGE_FRAGMENT_BIT);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    const VkFormat attachment_format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 1;
+    pipeline_rendering_info.pColorAttachmentFormats = &attachment_format;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.layout = pipeline_layout;
+    pipe.CreateGraphicsPipeline();
+
+    vkt::Image attachment(*m_device, 32, 32, attachment_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView attachment_view = attachment.CreateView();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = attachment_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea.extent = {32, 32};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    VkImageMemoryBarrier2 transition = vku::InitStructHelper();
+    transition.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    transition.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    transition.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    transition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    transition.image = unused_by_shader_image;
+    transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 1, 0, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.Barrier(transition);
+    m_command_buffer.End();
 }

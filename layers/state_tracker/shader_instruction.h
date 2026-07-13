@@ -16,6 +16,7 @@
  */
 #pragma once
 
+#include <vulkan/vulkan.h>
 #include <cassert>
 #include <cstdint>
 #include <string>
@@ -72,19 +73,23 @@ class Instruction {
     uint32_t GetConstantValue() const;
     uint32_t GetBitWidth() const;
     uint32_t GetByteWidth() const { return (GetBitWidth() + 31) / 32; }
+    spv::FPEncoding GetFPEncoding() const;
     spv::BuiltIn GetBuiltIn() const;
     uint32_t GetPositionOffset() const { return position_offset_; }
     bool IsArray() const;
     bool IsVector() const;
     bool IsNonPtrAccessChain() const;
     bool IsAccessChain() const;
+    bool IsUntypedAccessChain() const;
+    bool IsMemoryAccess() const;
+    bool IsDescriptorType() const;
     // Helpers for OpTypeImage
-    spv::Dim FindImageDim() const;
-    bool IsImageArray() const;
-    bool IsImageMultisampled() const;
+    VkDescriptorType GetImageType() const;
     bool IsTensor() const;
     bool IsConstant() const;
     bool IsSpecConstant() const;
+    // Returns the function ID referenced by this instruction (OpFunctionCall, or coopmat2 callback operands), or 0 if none.
+    uint32_t GetCalledFunctionId() const;
 
     // Auto-generated helper functions
     spv::StorageClass StorageClass() const;
@@ -108,6 +113,10 @@ class Instruction {
     void ReplaceOperandId(uint32_t old_word, uint32_t new_word);
     void ReplaceLinkedId(vvl::unordered_map<uint32_t, uint32_t>& id_swap_map);
 
+    // Used to freeze OpSpecConstant into a OpConstant
+    void FreezeSpecConstant();
+    void SetNewOpcode(uint32_t opcode);
+
     // This is only used for very specific spots that explain why where used.
     // There really should be no need to access the raw bytes
     const uint32_t* GetRawBytes() const { return words_.data(); }
@@ -130,6 +139,7 @@ class Instruction {
     uint32_t operand_index_ = 1;
 
     // used to find original position of instruction in shader, pre-instrumented
+    // Even if we constant fold, this will be preserved when compared to the original SPIR-V
     const uint32_t position_offset_;
     const OperandInfo& operand_info_;
 
@@ -143,6 +153,26 @@ class Instruction {
     uint32_t d_words_[12];
 #endif
 };
+
+namespace ImageProcUsageBit {
+    constexpr uint32_t kNone = 0;
+    // VK_QCOM_image_processing
+    constexpr uint32_t kSampleWeighted = 1 << 0;
+    constexpr uint32_t kBoxFilter = 1 << 1;
+    constexpr uint32_t kBlockMatchSsd = 1 << 2;
+    constexpr uint32_t kBlockMatchSad = 1 << 3;
+    // VK_QCOM_image_processing2
+    constexpr uint32_t kBlockMatchWindowSsd = 1 << 4;
+    constexpr uint32_t kBlockMatchWindowSad = 1 << 5;
+    constexpr uint32_t kBlockMatchGatherSsd = 1 << 6;
+    constexpr uint32_t kBlockMatchGatherSad = 1 << 7;
+    // Aggregate
+    constexpr uint32_t kBlockMatchWindow = kBlockMatchWindowSsd | kBlockMatchWindowSad |
+                                           kBlockMatchGatherSsd | kBlockMatchGatherSad;
+    constexpr uint32_t kBlockMatch = kBlockMatchSsd | kBlockMatchSad | kBlockMatchWindow;
+    constexpr uint32_t kNonBoxFilter = kSampleWeighted | kBlockMatch;
+    constexpr uint32_t kImageSampled = kSampleWeighted | kBoxFilter | kBlockMatch;
+}  // namespace ImageProcUsageBit
 
 // All information about a OpImage* instructions
 //
@@ -158,6 +188,9 @@ struct ImageInstruction {
     // Only need to check if one access has explicit signedness, mixing should be caught in spirv-val
     bool is_sign_extended = false;
     bool is_zero_extended = false;
+
+    // Image processing instruction usage mask
+    uint32_t image_proc_usage_mask = ImageProcUsageBit::kNone;
 
     explicit ImageInstruction(const uint32_t* words);
     ImageInstruction(){};  // used for static variables to set defaults

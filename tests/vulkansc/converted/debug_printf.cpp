@@ -16,15 +16,15 @@
 
 #include <vulkan/vulkan_core.h>
 #include <cstdint>
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/shader_object_helper.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/buffer_helper.h"
-#include "../framework/gpu_av_helper.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "shader_object_helper.h"
+#include "descriptor_helper.h"
+#include "buffer_helper.h"
+#include "gpu_av_helper.h"
 #include "utils/math_utils.h"
 
-void DebugPrintfTests::InitDebugPrintfFramework(void *p_next, bool reserve_slot) {
+void DebugPrintfTests::InitDebugPrintfFramework(void* p_next, bool reserve_slot) {
     VkValidationFeatureEnableEXT enables[] = {VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT,
                                               VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT};
     VkValidationFeaturesEXT features = vku::InitStructHelper(p_next);
@@ -45,11 +45,12 @@ void DebugPrintfTests::InitDebugPrintfFramework(void *p_next, bool reserve_slot)
 
 class NegativeDebugPrintf : public DebugPrintfTests {
   public:
-    void BasicComputeTest(const char *shader, const char *message);
-    void BasicFormattingTest(const char *shader, bool warning = false);
+    void BasicComputeTest(const char* shader, const char* message);
+    void BasicFormattingTest(const char* shader, bool warning = false);
+    void CoopMat2CallbackTest(const char* shader_source, const char* message);
 };
 
-void NegativeDebugPrintf::BasicComputeTest(const char *shader, const char *message) {
+void NegativeDebugPrintf::BasicComputeTest(const char* shader, const char* message) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -69,7 +70,7 @@ void NegativeDebugPrintf::BasicComputeTest(const char *shader, const char *messa
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Float) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -82,7 +83,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntUnsigned) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -95,7 +96,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntUnsigned) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntUnsignedUnderflow) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -108,7 +109,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntUnsignedUnderflow) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntSignedOverflow) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -121,7 +122,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntSignedOverflow) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_TwoFloats) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -134,7 +135,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_TwoFloats) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatPrecision) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -147,7 +148,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatPrecision) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_TextBeforeAndAfter) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -160,7 +161,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_TextBeforeAndAfter) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntOctal) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -173,7 +174,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntOctal) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntOctalNegative) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -186,7 +187,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntOctalNegative) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntNegative) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -199,7 +200,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntNegative) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVector2) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -212,7 +213,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVector2) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVector3) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -225,7 +226,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVector3) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVector4) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -238,7 +239,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVector4) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorPrecision) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -251,7 +252,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorPrecision) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorPrecisionZeroPad) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -264,7 +265,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorPrecisionZeroPad) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorZeroPad) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -277,7 +278,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorZeroPad) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorScientificNotation) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -290,7 +291,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatVectorScientificNotation) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntVector) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -303,7 +304,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntVector) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntVectorUnsigned) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -316,7 +317,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntVectorUnsigned) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntVectorHex) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -329,7 +330,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntVectorHex) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_IntVectorZeroPad) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -342,7 +343,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_IntVectorZeroPad) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_ScientificNotation) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -355,7 +356,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ScientificNotation) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_ScientificNotationPrecision) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -368,7 +369,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ScientificNotationPrecision) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatShortest) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -382,7 +383,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatShortest) {
 // TODO - This prints out  0x1.921cacp+1 vs 0x1.921cac0000000p+1 depending on Windows or not
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_FloatHex) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -395,7 +396,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_FloatHex) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FloatHexPrecision) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -409,7 +410,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatHexPrecision) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -424,7 +425,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64Vector) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -440,7 +441,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64Vector) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64Hex) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -455,7 +456,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64Hex) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64VectorHex) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -472,7 +473,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64VectorHex) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_Int64VectorHexPrecision) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -488,7 +489,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_Int64VectorHexPrecision) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64VectorDecimal) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -504,7 +505,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64VectorDecimal) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Float64) {
     AddRequiredFeature(vkt::Feature::shaderFloat64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
@@ -520,7 +521,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float64) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Float64Vector) {
     AddRequiredFeature(vkt::Feature::shaderFloat64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
@@ -536,7 +537,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float64Vector) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Float64VectorPrecision) {
     AddRequiredFeature(vkt::Feature::shaderFloat64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
@@ -554,7 +555,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatMix) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
     AddRequiredFeature(vkt::Feature::shaderFloat64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
@@ -573,7 +574,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_FloatMix) {
 TEST_F(NegativeDebugPrintf, DISABLED_Float16) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
@@ -590,7 +591,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float16) {
 TEST_F(NegativeDebugPrintf, DISABLED_Float16Vector) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
@@ -607,7 +608,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float16Vector) {
 TEST_F(NegativeDebugPrintf, DISABLED_Float16Precision) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
@@ -623,7 +624,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Float16Precision) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int16) {
     AddRequiredFeature(vkt::Feature::shaderInt16);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -639,7 +640,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int16) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int16Vector) {
     AddRequiredFeature(vkt::Feature::shaderInt16);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -657,7 +658,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int16Vector) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int16Hex) {
     AddRequiredFeature(vkt::Feature::shaderInt16);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int16: enable
@@ -674,7 +675,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int16Hex) {
 TEST_F(NegativeDebugPrintf, DISABLED_Int8) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt8);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -691,7 +692,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int8) {
 TEST_F(NegativeDebugPrintf, DISABLED_Int8Vector) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt8);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -710,7 +711,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int8Vector) {
 TEST_F(NegativeDebugPrintf, DISABLED_Int8Hex) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderInt8);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
@@ -725,7 +726,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int8Hex) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_BoolAsHex) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -739,7 +740,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BoolAsHex) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_BoolVector) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -759,7 +760,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BoolVector) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_BoolNonConstant) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -776,7 +777,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BoolNonConstant) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int32Before) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -792,7 +793,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int32Before) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int32After) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -809,7 +810,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int32After) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64Before) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -828,7 +829,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64Before) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64After) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -846,7 +847,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64After) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64Signed) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -864,7 +865,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64Signed) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Int64SignedMix) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -880,7 +881,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Int64SignedMix) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_FunctionParam) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         int foo(int x, int y) {
@@ -903,7 +904,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Pointers) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_buffer_reference : enable
@@ -931,7 +932,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Pointers) {
     vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
     vkt::Buffer in_buffer(*m_device, 64, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto in_buffer_ptr = (VkDeviceAddress *)in_buffer.Memory().Map();
+    auto in_buffer_ptr = (VkDeviceAddress*)in_buffer.Memory().Map();
     in_buffer_ptr[0] = block_buffer.Address();
     in_buffer_ptr[1] = block_buffer.Address();
 
@@ -962,7 +963,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Empty) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -992,7 +993,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultipleFunctions) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         int data = 0;
@@ -1041,7 +1042,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Fragment) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -1087,7 +1088,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_HLSL) {
     //         printf("launchIndex %v2d", launchIndex);
     //    }
     // }
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
          %29 = OpExtInstImport "NonSemantic.DebugPrintf"
@@ -1169,7 +1170,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultiDraw) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer_in, 0, sizeof(uint32_t));
     descriptor_set.UpdateDescriptorSets();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform ufoo {
@@ -1214,7 +1215,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultiDraw) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    VkDeviceAddress *data = (VkDeviceAddress *)buffer_in.Memory().Map();
+    VkDeviceAddress* data = (VkDeviceAddress*)buffer_in.Memory().Map();
     data[0] = 0;
     for (auto i = 0; i < 3; i++) {
         m_errorMonitor->SetDesiredInfo("Here are two float values 1.000000, 3.141500");
@@ -1223,7 +1224,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultiDraw) {
     m_errorMonitor->VerifyFound();
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-    uint16_t *ptr = static_cast<uint16_t *>(buffer.Memory().Map());
+    uint16_t* ptr = static_cast<uint16_t*>(buffer.Memory().Map());
     ptr[0] = 0;
     ptr[1] = 1;
     ptr[2] = 2;
@@ -1325,7 +1326,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshShaders) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         #extension GL_EXT_debug_printf : enable
@@ -1371,7 +1372,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_TaskShaders) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *task_source = R"glsl(
+    const char* task_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         #extension GL_EXT_debug_printf : enable
@@ -1416,12 +1417,12 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskIndirect) {
 
     vkt::Buffer draw_buffer(*m_device, sizeof(VkDrawMeshTasksIndirectCommandEXT), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                             kHostVisibleMemProps);
-    auto *draw_ptr = static_cast<VkDrawMeshTasksIndirectCommandEXT *>(draw_buffer.Memory().Map());
+    auto* draw_ptr = static_cast<VkDrawMeshTasksIndirectCommandEXT*>(draw_buffer.Memory().Map());
     draw_ptr->groupCountX = 1;
     draw_ptr->groupCountY = 1;
     draw_ptr->groupCountZ = 1;
 
-    const char *task_source = R"glsl(
+    const char* task_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         #extension GL_EXT_debug_printf : enable
@@ -1433,7 +1434,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskIndirect) {
         }
     )glsl";
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 450
         #extension GL_EXT_mesh_shader : require
         #extension GL_EXT_debug_printf : enable
@@ -1452,7 +1453,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskIndirect) {
         }
     )glsl";
 
-    const char *frag_source = R"glsl(
+    const char* frag_source = R"glsl(
         #version 460
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 uFragColor;
@@ -1471,7 +1472,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskIndirect) {
     VkShaderObj fs(*m_device, frag_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3);
 
     vkt::Buffer buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-    ((uint32_t *)buffer.Memory().Map())[0] = 0;
+    ((uint32_t*)buffer.Memory().Map())[0] = 0;
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
@@ -1517,7 +1518,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer_in, 0, sizeof(uint32_t));
     descriptor_set.UpdateDescriptorSets();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform ufoo {
@@ -1581,7 +1582,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    std::vector<const char *> messages;
+    std::vector<const char*> messages;
     messages.emplace_back("Here are two float values 1.000000, 3.141500");
     messages.emplace_back("Here's a smaller float value 3.14");
     messages.emplace_back("Here's an integer -135 with text before and after it");
@@ -1596,7 +1597,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
     messages.emplace_back("First printf with a % and no value");
     messages.emplace_back("Second printf with a value -135");
     for (uint32_t i = 0; i < messages.size(); i++) {
-        VkDeviceAddress *data = (VkDeviceAddress *)buffer_in.Memory().Map();
+        VkDeviceAddress* data = (VkDeviceAddress*)buffer_in.Memory().Map();
         data[0] = i;
         buffer_in.Memory().Unmap();
         m_errorMonitor->SetDesiredInfo(messages[i]);
@@ -1628,7 +1629,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLMultiDraw) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer_in, 0, sizeof(uint32_t));
     descriptor_set.UpdateDescriptorSets();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform ufoo {
@@ -1667,7 +1668,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLMultiDraw) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    VkDeviceAddress *data = (VkDeviceAddress *)buffer_in.Memory().Map();
+    VkDeviceAddress* data = (VkDeviceAddress*)buffer_in.Memory().Map();
     data[0] = 0;
     for (auto i = 0; i < 3; i++) {
         m_errorMonitor->SetDesiredInfo("Here are two float values 1.000000, 3.141500");
@@ -1676,7 +1677,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLMultiDraw) {
     m_errorMonitor->VerifyFound();
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-    uint16_t *ptr = static_cast<uint16_t *>(buffer.Memory().Map());
+    uint16_t* ptr = static_cast<uint16_t*>(buffer.Memory().Map());
     ptr[0] = 0;
     ptr[1] = 1;
     ptr[2] = 2;
@@ -1713,7 +1714,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLInt64) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer_in, 0, sizeof(uint32_t));
     descriptor_set.UpdateDescriptorSets();
 
-    const char *shader_source_int64 = R"glsl(
+    const char* shader_source_int64 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -1751,7 +1752,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLInt64) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 
-    VkDeviceAddress *data = (VkDeviceAddress *)buffer_in.Memory().Map();
+    VkDeviceAddress* data = (VkDeviceAddress*)buffer_in.Memory().Map();
     data[0] = 0;
     m_errorMonitor->SetDesiredInfo("Here's an unsigned long 0x2000000000000001");
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -1793,16 +1794,16 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragment) {
     fragment_set.UpdateDescriptorSets();
 
     {
-        vvl::span<uint32_t> vert_data(static_cast<uint32_t *>(vs_buffer.Memory().Map()),
+        vvl::span<uint32_t> vert_data(static_cast<uint32_t*>(vs_buffer.Memory().Map()),
                                       static_cast<uint32_t>(buffer_size) / sizeof(uint32_t));
-        for (auto &v : vert_data) {
+        for (auto& v : vert_data) {
             v = 0x01030507;
         }
     }
     {
-        vvl::span<uint32_t> frag_data(static_cast<uint32_t *>(fs_buffer.Memory().Map()),
+        vvl::span<uint32_t> frag_data(static_cast<uint32_t*>(fs_buffer.Memory().Map()),
                                       static_cast<uint32_t>(buffer_size) / sizeof(uint32_t));
-        for (auto &v : frag_data) {
+        for (auto& v : frag_data) {
             v = 0x02040608;
         }
     }
@@ -1885,16 +1886,16 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragmentIndependentSets) {
     fragment_set.UpdateDescriptorSets();
 
     {
-        vvl::span<uint32_t> vert_data(static_cast<uint32_t *>(vs_buffer.Memory().Map()),
+        vvl::span<uint32_t> vert_data(static_cast<uint32_t*>(vs_buffer.Memory().Map()),
                                       static_cast<uint32_t>(buffer_size) / sizeof(uint32_t));
-        for (auto &v : vert_data) {
+        for (auto& v : vert_data) {
             v = 0x01030507;
         }
     }
     {
-        vvl::span<uint32_t> frag_data(static_cast<uint32_t *>(fs_buffer.Memory().Map()),
+        vvl::span<uint32_t> frag_data(static_cast<uint32_t*>(fs_buffer.Memory().Map()),
                                       static_cast<uint32_t>(buffer_size) / sizeof(uint32_t));
-        for (auto &v : frag_data) {
+        for (auto& v : frag_data) {
             v = 0x02040608;
         }
     }
@@ -1996,7 +1997,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectsGraphics) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2031,7 +2032,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjects) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2082,7 +2083,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectsInt64) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -2123,7 +2124,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectsMultiDraw) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2158,7 +2159,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectsMultiDraw) {
     m_errorMonitor->VerifyFound();
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-    uint16_t *ptr = static_cast<uint16_t *>(buffer.Memory().Map());
+    uint16_t* ptr = static_cast<uint16_t*>(buffer.Memory().Map());
     ptr[0] = 0;
     ptr[1] = 1;
     ptr[2] = 2;
@@ -2198,7 +2199,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaderObjects) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    const char *taskShaderText = R"glsl(
+    const char* taskShaderText = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require // Requires SPIR-V 1.5 (Vulkan 1.2)
         #extension GL_EXT_debug_printf : enable
@@ -2209,7 +2210,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaderObjects) {
         }
     )glsl";
 
-    const char *meshShaderText = R"glsl(
+    const char* meshShaderText = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : require // Requires SPIR-V 1.5 (Vulkan 1.2)
         #extension GL_EXT_debug_printf : enable
@@ -2308,7 +2309,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_VertexFragmentMultiEntrypoint) {
     //     debugPrintfEXT("Fragment value is %i", 8);
     //     c_out = vec4(0.0);
     // }
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
           %9 = OpExtInstImport "NonSemantic.DebugPrintf"
@@ -2417,7 +2418,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectFragment) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2455,7 +2456,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectCompute) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2504,7 +2505,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_SetupErrorVersion) {
 
     InitRenderTarget();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2532,7 +2533,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_LocalSizeId) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"(
+    const char* shader_source = R"(
                OpCapability Shader
                OpExtension "SPV_KHR_non_semantic_info"
          %30 = OpExtInstImport "NonSemantic.DebugPrintf"
@@ -2617,7 +2618,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Maintenance5) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2660,7 +2661,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineReserved) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2677,7 +2678,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineReserved) {
         m_errorMonitor->SetDesiredWarning(
             "This Pipeline Layout has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
             "pipelines created with it");
-        std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit);
+        std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit);
         for (uint32_t i = 0; i < set_limit; i++) {
             layouts[i] = &descriptor_set.layout_;
         }
@@ -2701,7 +2702,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineReserved) {
 
     // Reduce by one (so there is room now) and print something
     {
-        std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit - 1);
+        std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit - 1);
         for (uint32_t i = 0; i < set_limit - 1; i++) {
             layouts[i] = &descriptor_set.layout_;
         }
@@ -2730,7 +2731,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2746,7 +2747,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
         m_errorMonitor->SetDesiredWarning(
             "This Pipeline Layout has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
             "pipelines created with it");
-        std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit);
+        std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit);
         for (uint32_t i = 0; i < set_limit; i++) {
             layouts[i] = &descriptor_set.layout_;
         }
@@ -2769,7 +2770,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
 
     // Reduce by one (so there is room now) and print something
     {
-        std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit - 1);
+        std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit - 1);
         for (uint32_t i = 0; i < set_limit - 1; i++) {
             layouts[i] = &descriptor_set.layout_;
         }
@@ -2799,7 +2800,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineGraphics) {
     InitRenderTarget();
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2816,7 +2817,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineGraphics) {
         m_errorMonitor->SetDesiredWarning(
             "This Pipeline Layout has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
             "pipelines created with it");
-        std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit);
+        std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit);
         for (uint32_t i = 0; i < set_limit; i++) {
             layouts[i] = &descriptor_set.layout_;
         }
@@ -2841,7 +2842,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineGraphics) {
 
     // Reduce by one (so there is room now) and print something
     {
-        std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit - 1);
+        std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit - 1);
         for (uint32_t i = 0; i < set_limit - 1; i++) {
             layouts[i] = &descriptor_set.layout_;
         }
@@ -2877,7 +2878,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineGPL) {
     InitRenderTarget();
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2893,7 +2894,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineGPL) {
         m_errorMonitor->SetDesiredWarning(
             "This Pipeline Layout has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
             "pipelines created with it");
-        std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit);
+        std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit);
         for (uint32_t i = 0; i < set_limit; i++) {
             layouts[i] = &descriptor_set.layout_;
         }
@@ -2915,7 +2916,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsPipelineGPL) {
 
     // Reduce by one (so there is room now) and print something
     {
-        std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit - 1);
+        std::vector<const vkt::DescriptorSetLayout*> layouts(set_limit - 1);
         for (uint32_t i = 0; i < set_limit - 1; i++) {
             layouts[i] = &descriptor_set.layout_;
         }
@@ -2946,7 +2947,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsShaderObjectReserved) 
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -2986,7 +2987,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsShaderObjectReserved) 
     // Reduce by one (so there is room now) and print something
     {
         uint32_t under_set_limit = set_limit - 1;
-        std::vector<const vkt::DescriptorSetLayout *> vkt_layouts;
+        std::vector<const vkt::DescriptorSetLayout*> vkt_layouts;
         for (uint32_t i = 0; i < under_set_limit; i++) {
             vkt_layouts.push_back(&descriptor_set.layout_);
         }
@@ -3017,7 +3018,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsShaderObjectNotReserve
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3056,7 +3057,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_UseAllDescriptorSlotsShaderObjectNotReserve
     // Reduce by one (so there is room now) and print something
     {
         uint32_t under_set_limit = set_limit - 1;
-        std::vector<const vkt::DescriptorSetLayout *> vkt_layouts;
+        std::vector<const vkt::DescriptorSetLayout*> vkt_layouts;
         for (uint32_t i = 0; i < under_set_limit; i++) {
             vkt_layouts.push_back(&descriptor_set.layout_);
         }
@@ -3089,7 +3090,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectMultiCreate) {
     RETURN_IF_SKIP(InitState());
     InitDynamicRenderTarget();
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         vec2 vertices[3];
@@ -3102,7 +3103,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectMultiCreate) {
         }
     )glsl";
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3155,7 +3156,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectBoundDescriptor) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer SSBO { uint x; };
@@ -3193,7 +3194,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectUnusedBoundDescriptor) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer SSBO { uint x; };
@@ -3229,14 +3230,14 @@ TEST_F(NegativeDebugPrintf, DISABLED_ShaderObjectUnusedBoundDescriptor) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_OverflowBuffer) {
     TEST_DESCRIPTION("go over the VK_LAYER_PRINTF_BUFFER_SIZE limit");
-    uint32_t value = 128;
+    uint32_t value = 100;
     const VkLayerSettingEXT settings = {OBJECT_LAYER_NAME, "printf_buffer_size", VK_LAYER_SETTING_TYPE_UINT32_EXT, 1, &value};
     VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
                                                                &settings};
     RETURN_IF_SKIP(InitDebugPrintfFramework(&layer_settings_create_info));
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -3263,14 +3264,14 @@ TEST_F(NegativeDebugPrintf, DISABLED_OverflowBuffer) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_OverflowBufferLoop) {
     TEST_DESCRIPTION("go over the VK_LAYER_PRINTF_BUFFER_SIZE limit... by a LOT");
-    uint32_t value = 128;
+    uint32_t value = 100;
     const VkLayerSettingEXT settings = {OBJECT_LAYER_NAME, "printf_buffer_size", VK_LAYER_SETTING_TYPE_UINT32_EXT, 1, &value};
     VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
                                                                &settings};
     RETURN_IF_SKIP(InitDebugPrintfFramework(&layer_settings_create_info));
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -3296,7 +3297,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_OverflowBufferLoop) {
     m_errorMonitor->VerifyFound();
 }
 
-void NegativeDebugPrintf::BasicFormattingTest(const char *shader, bool warning) {
+void NegativeDebugPrintf::BasicFormattingTest(const char* shader, bool warning) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -3309,7 +3310,7 @@ void NegativeDebugPrintf::BasicFormattingTest(const char *shader, bool warning) 
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoVectorSize) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3321,7 +3322,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoVectorSize) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedLargeVectorSize) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3334,7 +3335,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedLargeVectorSize) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedSmallVectorSize) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3347,7 +3348,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedSmallVectorSize) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoSpecifier1) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3359,7 +3360,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoSpecifier1) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoSpecifier2) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3371,7 +3372,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoSpecifier2) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown1) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3383,7 +3384,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown1) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown2) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3395,7 +3396,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown2) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown3) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3407,7 +3408,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedUnknown3) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedExtraArguments) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3419,7 +3420,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedExtraArguments) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoModifiers) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3431,7 +3432,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoModifiers) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedIsloatedPercent) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3443,7 +3444,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedIsloatedPercent) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotEnoughArguments) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3455,7 +3456,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotEnoughArguments) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoArguments) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3467,7 +3468,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNoArguments) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotVectorArg) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3480,7 +3481,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotVectorArg) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotVectorParam) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3493,7 +3494,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotVectorParam) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorSmall) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3505,7 +3506,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorSmall) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorLarge) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3517,7 +3518,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorLarge) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloat1) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3530,7 +3531,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloat1) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloat2) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3543,7 +3544,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloat2) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloatVector1) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3556,7 +3557,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloatVector1) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloatVector2) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3570,7 +3571,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedFloatVector2) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Int1) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3585,7 +3586,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Int1) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Int2) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3600,7 +3601,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Int2) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64IntVector1) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3616,7 +3617,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64IntVector1) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64IntVector2) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3631,7 +3632,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64IntVector2) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Bool) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3645,7 +3646,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_Misformatted64Bool) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedEmptyString) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3657,7 +3658,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedEmptyString) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNewLine) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3670,7 +3671,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNewLine) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorNewLine) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3683,7 +3684,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedVectorNewLine) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedPointer) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_buffer_reference : enable
@@ -3704,7 +3705,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MisformattedPointer) {
 
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MisformattedNotPointer) {
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_ARB_gpu_shader_int64 : enable
@@ -3755,7 +3756,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DualPipelines) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3799,7 +3800,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DualCommandBufferHalfPrint) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3844,7 +3845,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DualCommandBufferBothPrint) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(push_constant) uniform PushConstants { int x; } pc;
@@ -3898,7 +3899,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DualCommandBufferEmpty) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3946,7 +3947,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DispatchIndirect) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -3957,7 +3958,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DispatchIndirect) {
 
     vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                 kHostVisibleMemProps);
-    auto indirect_command = static_cast<VkDispatchIndirectCommand *>(indirect_buffer.Memory().Map());
+    auto indirect_command = static_cast<VkDispatchIndirectCommand*>(indirect_buffer.Memory().Map());
     indirect_command->x = 1;
     indirect_command->y = 1;
     indirect_command->z = 1;
@@ -3981,7 +3982,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DispatchBase) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4011,7 +4012,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexed) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
     #version 450
         #extension GL_EXT_debug_printf : enable
         vec2 vertices[3];
@@ -4023,7 +4024,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexed) {
             debugPrintfEXT("gl_VertexIndex %u\n", gl_VertexIndex);
         }
     )glsl";
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -4065,7 +4066,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexedIndirect) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -4087,7 +4088,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexedIndirect) {
 
     vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                 kHostVisibleMemProps);
-    auto indirect_command = static_cast<VkDrawIndexedIndirectCommand *>(indirect_buffer.Memory().Map());
+    auto indirect_command = static_cast<VkDrawIndexedIndirectCommand*>(indirect_buffer.Memory().Map());
     indirect_command->indexCount = 3;
     indirect_command->instanceCount = 1;
     indirect_command->firstIndex = 1;
@@ -4115,7 +4116,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndirectCount) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -4135,7 +4136,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndirectCount) {
 
     vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                 kHostVisibleMemProps);
-    auto indirect_command = static_cast<VkDrawIndexedIndirectCommand *>(indirect_buffer.Memory().Map());
+    auto indirect_command = static_cast<VkDrawIndexedIndirectCommand*>(indirect_buffer.Memory().Map());
     indirect_command->indexCount = 3;
     indirect_command->instanceCount = 1;
     indirect_command->firstIndex = 1;
@@ -4143,7 +4144,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndirectCount) {
     indirect_command->firstInstance = 1;
 
     vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
+    uint32_t* count_ptr = static_cast<uint32_t*>(count_buffer.Memory().Map());
     *count_ptr = 1;
 
     m_command_buffer.Begin();
@@ -4166,7 +4167,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexedIndirectCount) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(location = 0) out vec4 outColor;
@@ -4188,7 +4189,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexedIndirectCount) {
 
     vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                 kHostVisibleMemProps);
-    auto indirect_command = static_cast<VkDrawIndexedIndirectCommand *>(indirect_buffer.Memory().Map());
+    auto indirect_command = static_cast<VkDrawIndexedIndirectCommand*>(indirect_buffer.Memory().Map());
     indirect_command->indexCount = 3;
     indirect_command->instanceCount = 1;
     indirect_command->firstIndex = 1;
@@ -4196,7 +4197,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawIndexedIndirectCount) {
     indirect_command->firstInstance = 1;
 
     vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
+    uint32_t* count_ptr = static_cast<uint32_t*>(count_buffer.Memory().Map());
     *count_ptr = 1;
 
     m_command_buffer.Begin();
@@ -4240,7 +4241,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceGeneratedCommandsCompute) {
     command_layout_ci.pTokens = &token;
     vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4255,9 +4256,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceGeneratedCommandsCompute) {
     VkGeneratedCommandsPipelineInfoEXT pipeline_info = vku::InitStructHelper();
     pipeline_info.pipeline = pipe;
 
-    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
-    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-    vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, kHostVisibleMemProps, &allocate_flag_info);
+    vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
 
     VkDeviceSize pre_process_size = 0;
     {
@@ -4271,12 +4270,10 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceGeneratedCommandsCompute) {
     }
 
     VkBufferUsageFlags2CreateInfo buffer_usage_flags = vku::InitStructHelper();
-    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&buffer_usage_flags);
-    buffer_ci.size = pre_process_size;
-    vkt::Buffer pre_process_buffer(*m_device, buffer_ci, 0, &allocate_flag_info);
+    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT;
+    vkt::Buffer pre_process_buffer(*m_device, pre_process_size, buffer_usage_flags, vkt::device_address);
 
-    VkDispatchIndirectCommand *block_buffer_ptr = (VkDispatchIndirectCommand *)block_buffer.Memory().Map();
+    VkDispatchIndirectCommand* block_buffer_ptr = (VkDispatchIndirectCommand*)block_buffer.Memory().Map();
     block_buffer_ptr->x = 2;
     block_buffer_ptr->y = 1;
     block_buffer_ptr->z = 1;
@@ -4332,7 +4329,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceGeneratedCommandsGraphics) {
     command_layout_ci.pTokens = &token;
     vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4349,9 +4346,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceGeneratedCommandsGraphics) {
     VkGeneratedCommandsPipelineInfoEXT pipeline_info = vku::InitStructHelper();
     pipeline_info.pipeline = pipe;
 
-    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
-    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-    vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, kHostVisibleMemProps, &allocate_flag_info);
+    vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
 
     VkDeviceSize pre_process_size = 0;
     {
@@ -4365,12 +4360,10 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceGeneratedCommandsGraphics) {
     }
 
     VkBufferUsageFlags2CreateInfo buffer_usage_flags = vku::InitStructHelper();
-    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&buffer_usage_flags);
-    buffer_ci.size = pre_process_size;
-    vkt::Buffer pre_process_buffer(*m_device, buffer_ci, 0, &allocate_flag_info);
+    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT;
+    vkt::Buffer pre_process_buffer(*m_device, pre_process_size, buffer_usage_flags, vkt::device_address);
 
-    VkDrawIndirectCommand *block_buffer_ptr = (VkDrawIndirectCommand *)block_buffer.Memory().Map();
+    VkDrawIndirectCommand* block_buffer_ptr = (VkDrawIndirectCommand*)block_buffer.Memory().Map();
     block_buffer_ptr->vertexCount = 3;
     block_buffer_ptr->instanceCount = 1;
     block_buffer_ptr->firstVertex = 0;
@@ -4437,21 +4430,21 @@ TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_DeviceGeneratedCommandsIES) {
     command_layout_ci.pTokens = tokens;
     vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
 
-    const char *shader_source_1 = R"glsl(
+    const char* shader_source_1 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
             debugPrintfEXT("Init Pipeline\n");
         }
     )glsl";
-    const char *shader_source_2 = R"glsl(
+    const char* shader_source_2 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
             debugPrintfEXT("IndirectExecutionSet Pipeline 1\n");
         }
     )glsl";
-    const char *shader_source_3 = R"glsl(
+    const char* shader_source_3 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4483,9 +4476,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_DeviceGeneratedCommandsIES) {
     write_exe_sets[1].pipeline = pipe_2;
     vk::UpdateIndirectExecutionSetPipelineEXT(device(), exe_set, 2, write_exe_sets);
 
-    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
-    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-    vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, kHostVisibleMemProps, &allocate_flag_info);
+    vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
 
     VkDeviceSize pre_process_size = 0;
     {
@@ -4499,14 +4490,12 @@ TEST_F(NegativeDebugPrintf, DISABLED_DISABLED_DeviceGeneratedCommandsIES) {
     }
 
     VkBufferUsageFlags2CreateInfo buffer_usage_flags = vku::InitStructHelper();
-    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&buffer_usage_flags);
-    buffer_ci.size = pre_process_size;
-    vkt::Buffer pre_process_buffer(*m_device, buffer_ci, 0, &allocate_flag_info);
+    buffer_usage_flags.usage = VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT;
+    vkt::Buffer pre_process_buffer(*m_device, pre_process_size, buffer_usage_flags, vkt::device_address);
 
-    uint32_t *block_buffer_ptr = (uint32_t *)block_buffer.Memory().Map();
+    uint32_t* block_buffer_ptr = (uint32_t*)block_buffer.Memory().Map();
     block_buffer_ptr[0] = 2;  // pick pipeline 2
-    VkDispatchIndirectCommand *indirect_command_ptr = (VkDispatchIndirectCommand *)(block_buffer_ptr + 1);
+    VkDispatchIndirectCommand* indirect_command_ptr = (VkDispatchIndirectCommand*)(block_buffer_ptr + 1);
     indirect_command_ptr->x = 1;
     indirect_command_ptr->y = 1;
     indirect_command_ptr->z = 1;
@@ -4538,7 +4527,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultipleComputePasses) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source_1 = R"glsl(
+    const char* shader_source_1 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(binding = 0, set = 0) uniform UBO {
@@ -4548,7 +4537,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MultipleComputePasses) {
             debugPrintfEXT("float x == %f", x);
         }
     )glsl";
-    const char *shader_source_2 = R"glsl(
+    const char* shader_source_2 = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -4592,7 +4581,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_SpecConstant) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(constant_id = 0) const uint value = 22; // default
@@ -4645,7 +4634,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_InlineUniformBlock) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform UBO0 { uint ubo_0; };
@@ -4657,7 +4646,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_InlineUniformBlock) {
     )glsl";
 
     vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    VkDeviceAddress *buffer_ptr = (VkDeviceAddress *)buffer.Memory().Map();
+    VkDeviceAddress* buffer_ptr = (VkDeviceAddress*)buffer.Memory().Map();
     buffer_ptr[0] = 3;
 
     VkDescriptorPoolInlineUniformBlockCreateInfo pool_inline_info = vku::InitStructHelper();
@@ -4714,7 +4703,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_StorageBufferLength) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_scalar_block_layout : enable
@@ -4783,7 +4772,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_StorageBufferLengthUpdateAfterBind) {
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kInformationBit);
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_scalar_block_layout : enable
@@ -4843,7 +4832,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_PushDescriptor) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform Push {
@@ -4859,10 +4848,10 @@ TEST_F(NegativeDebugPrintf, DISABLED_PushDescriptor) {
     )glsl";
 
     vkt::Buffer buffer_a(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto buffer_a_ptr = (uint32_t *)buffer_a.Memory().Map();
+    auto buffer_a_ptr = (uint32_t*)buffer_a.Memory().Map();
     buffer_a_ptr[0] = 5;
     vkt::Buffer buffer_b(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto buffer_b_ptr = (uint32_t *)buffer_b.Memory().Map();
+    auto buffer_b_ptr = (uint32_t*)buffer_b.Memory().Map();
     buffer_b_ptr[0] = 7;
 
     VkDescriptorSetLayoutBinding bindning = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
@@ -4905,7 +4894,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorTemplates) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform UBO {
@@ -4917,7 +4906,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorTemplates) {
     )glsl";
 
     vkt::Buffer buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto buffer_ptr = (uint32_t *)buffer.Memory().Map();
+    auto buffer_ptr = (uint32_t*)buffer.Memory().Map();
     buffer_ptr[0] = 42;
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, VK_SHADER_STAGE_ALL, nullptr}});
@@ -4970,7 +4959,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_PushDescriptorTemplates) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) uniform UBO {
@@ -4982,7 +4971,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_PushDescriptorTemplates) {
     )glsl";
 
     vkt::Buffer buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    auto buffer_ptr = (uint32_t *)buffer.Memory().Map();
+    auto buffer_ptr = (uint32_t*)buffer.Memory().Map();
     buffer_ptr[0] = 42;
 
     vkt::DescriptorSetLayout push_dsl(*m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}},
@@ -5036,7 +5025,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DuplicateMessageLimit) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -5077,7 +5066,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DuplicateMessageLimitExplicit) {
     RETURN_IF_SKIP(InitDebugPrintfFramework(&layer_settings_create_info));
     RETURN_IF_SKIP(InitState());
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
 
@@ -5119,7 +5108,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBuffer) {
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -5138,10 +5127,10 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBuffer) {
                                   vkt::device_address);
 
     vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer_data, 16);
-    void *mapped_descriptor_data = descriptor_buffer.Memory().Map();
+    void* mapped_descriptor_data = descriptor_buffer.Memory().Map();
     vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -5214,7 +5203,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferGPL) {
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -5233,10 +5222,10 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferGPL) {
                                   vkt::device_address);
 
     vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer_data, 16);
-    void *mapped_descriptor_data = descriptor_buffer.Memory().Map();
+    void* mapped_descriptor_data = descriptor_buffer.Memory().Map();
     vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
 
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -5335,7 +5324,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferShaderObject) {
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -5354,10 +5343,10 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferShaderObject) {
                                   vkt::device_address);
 
     vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer_data, 16);
-    void *mapped_descriptor_data = descriptor_buffer.Memory().Map();
+    void* mapped_descriptor_data = descriptor_buffer.Memory().Map();
     vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -5418,7 +5407,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferPushConstantOnly) {
     pipe_layout_ci.pSetLayouts = &ds_layout.handle();
     vkt::PipelineLayout pipeline_layout(*m_device, pipe_layout_ci);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(push_constant) uniform PushConstants {
@@ -5448,6 +5437,45 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferPushConstantOnly) {
 }
 
 // Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_NoPipelineLayout) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Buffer descriptor_buffer(*m_device, 1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout (constant_id = 0) const uint c = 3;
+        #extension GL_EXT_debug_printf : enable
+        void main() {
+            debugPrintfEXT("c == %u\n", c);
+        }
+    )glsl";
+    const vkt::Shader cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source));
+
+    m_command_buffer.Begin();
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
+    vk::CmdBindShadersEXT(m_command_buffer, 1, stages, &cs.handle());
+
+    VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
+    descriptor_buffer_binding_info.address = descriptor_buffer.Address();
+    descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+    // Will still force DescriptorModeBuffer
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &descriptor_buffer_binding_info);
+
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferMixClassic) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
@@ -5459,7 +5487,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferMixClassic) {
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -5476,7 +5504,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferMixClassic) {
 
     const VkDeviceSize offset = 256;  // minStorageBufferOffsetAlignment required to be at most 256
     vkt::Buffer buffer_data(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -5497,7 +5525,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferMixClassic) {
     vkt::Buffer descriptor_buffer(*m_device, ds_layout_size, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
                                   vkt::device_address);
     vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer_data, 16);
-    void *mapped_descriptor_data = descriptor_buffer.Memory().Map();
+    void* mapped_descriptor_data = descriptor_buffer.Memory().Map();
     vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
 
     CreateComputePipelineHelper pipe_db(*this);
@@ -5571,11 +5599,11 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferMultipleCommandBuffers) {
 
     vkt::Buffer buffer1_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
     vkt::Buffer buffer2_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer1_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer1_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
-    data = (uint32_t *)buffer2_data.Memory().Map();
+    data = (uint32_t*)buffer2_data.Memory().Map();
     data[0] = 7;
     data[1] = 3;
     data[2] = 1;
@@ -5593,7 +5621,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferMultipleCommandBuffers) {
     vkt::Buffer descriptor_buffer(*m_device, ds_layout_size * 2, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
                                   vkt::device_address);
 
-    uint8_t *mapped_descriptor_data = (uint8_t *)descriptor_buffer.Memory().Map();
+    uint8_t* mapped_descriptor_data = (uint8_t*)descriptor_buffer.Memory().Map();
     {
         vkt::DescriptorGetInfo get_info(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffer1_data, 16);
         vk::GetDescriptorEXT(device(), get_info, descriptor_buffer_properties.storageBufferDescriptorSize, mapped_descriptor_data);
@@ -5604,7 +5632,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorBufferMultipleCommandBuffers) {
                              mapped_descriptor_data + ds_layout_size);
     }
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -5666,13 +5694,14 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawMeshTasksIndirectCountEXT) {
     AddRequiredFeature(vkt::Feature::shaderDrawParameters);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::drawIndirectCount);
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
     InitRenderTarget();
 
-    const char *mesh_source = R"glsl(
+    const char* mesh_source = R"glsl(
         #version 460
         #extension GL_EXT_mesh_shader : enable
         #extension GL_EXT_debug_printf : enable
@@ -5701,12 +5730,12 @@ TEST_F(NegativeDebugPrintf, DISABLED_DrawMeshTasksIndirectCountEXT) {
                            GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl, SPV_ENV_VULKAN_1_2));
 
     vkt::Buffer count_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
-    uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.Memory().Map());
+    uint32_t* count_ptr = static_cast<uint32_t*>(count_buffer.Memory().Map());
     *count_ptr = 1;
 
     vkt::Buffer draw_buffer(*m_device, sizeof(VkDrawMeshTasksIndirectCommandEXT), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                             kHostVisibleMemProps);
-    auto *draw_ptr = static_cast<VkDrawMeshTasksIndirectCommandEXT *>(draw_buffer.Memory().Map());
+    auto* draw_ptr = static_cast<VkDrawMeshTasksIndirectCommandEXT*>(draw_buffer.Memory().Map());
     draw_ptr->groupCountX = 1;
     draw_ptr->groupCountY = 1;
     draw_ptr->groupCountZ = 1;
@@ -5744,7 +5773,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DisableShaderValidation) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    const char *frag_shader = R"glsl(
+    const char* frag_shader = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer SSBO {
@@ -5817,7 +5846,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DisableShaderValidationShaderObject) {
     ds.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     ds.UpdateDescriptorSets();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(set = 0, binding = 0) buffer SSBO {
@@ -5853,7 +5882,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MidCommandBuffer) {
     // Make sure doing everything inside the command buffer is still ok
     m_command_buffer.Begin();
 
-    const char *shader_source = R"glsl(
+    const char* shader_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         void main() {
@@ -5876,6 +5905,55 @@ TEST_F(NegativeDebugPrintf, DISABLED_MidCommandBuffer) {
 }
 
 // Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_SecondaryCommandBuffer) {
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const char* shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout(push_constant) uniform PushConstants {
+            int x;
+        } pc;
+        void main() {
+            debugPrintfEXT("int == %u", pc.x);
+        }
+    )glsl";
+
+    VkPushConstantRange pc_range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t)};
+    VkPipelineLayoutCreateInfo pipe_layout_ci = vku::InitStructHelper();
+    pipe_layout_ci.pushConstantRangeCount = 1;
+    pipe_layout_ci.pPushConstantRanges = &pc_range;
+    pipe_layout_ci.setLayoutCount = 0;
+    vkt::PipelineLayout pipeline_layout(*m_device, pipe_layout_ci);
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary.Begin();
+    vk::CmdBindPipeline(secondary, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    uint32_t push_data = 4;
+    vk::CmdPushConstants(secondary, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &push_data);
+    vk::CmdDispatch(secondary, 1u, 1u, 1u);
+    push_data = 7;
+    vk::CmdPushConstants(secondary, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &push_data);
+    vk::CmdDispatch(secondary, 1u, 1u, 1u);
+    secondary.End();
+
+    m_command_buffer.Begin();
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("int == 4");
+    m_errorMonitor->SetDesiredInfo("int == 7");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeap) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
@@ -5888,7 +5966,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeap) {
     GetPhysicalDeviceProperties2(heap_props);
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -5899,23 +5977,17 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeap) {
 
     vkt::Buffer descriptor_heap(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT,
                                 vkt::device_address);
-    const auto descriptor_heap_ptr = static_cast<char *>(descriptor_heap.Memory().Map());
+    const auto descriptor_heap_ptr = static_cast<char*>(descriptor_heap.Memory().Map());
 
-    VkHostAddressRangeEXT descriptor_host;
-    descriptor_host.address = descriptor_heap_ptr;
-    descriptor_host.size = static_cast<size_t>(heap_props.bufferDescriptorSize);
-
-    VkDeviceAddressRangeEXT device_range;
-    device_range.address = buffer_data.Address();
-    device_range.size = 16;
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+    VkDeviceAddressRangeEXT device_range = buffer_data.AddressRange();
 
     VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
     descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_info.data.pAddressRange = &device_range;
-
     vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -5930,11 +6002,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeap) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping.descriptorSet = 0;
-    mapping.firstBinding = 0;
-    mapping.bindingCount = 1;
-    mapping.resourceMask = VK_SPIRV_RESOURCE_TYPE_ALL_EXT;
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
     mapping.sourceData.constantOffset.heapOffset = 0;
     mapping.sourceData.constantOffset.heapArrayStride = 0;
@@ -5943,22 +6011,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeap) {
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
 
-    VkShaderObj cs_module = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
-    pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
-
-    CreateComputePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
-    pipe.cp_ci_.stage = cs_module.GetStageCreateInfo();
-    pipe.cp_ci_.stage.pNext = &mapping_info;
-    pipe.cp_ci_.layout = VK_NULL_HANDLE;
-    pipe.CreateComputePipeline(false);
-
-    CreateComputePipelineHelper pipe2(*this, &pipeline_create_flags_2_create_info);
-    pipe2.cp_ci_.stage = cs_module.GetStageCreateInfo();
-    pipe2.cp_ci_.stage.pNext = &mapping_info;
-    pipe2.cp_ci_.layout = VK_NULL_HANDLE;
-    pipe2.CreateComputePipeline(false);
+    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
+    vkt::HeapComputePipeline pipe2(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6006,7 +6060,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapGraphics) {
     GetPhysicalDeviceProperties2(heap_props);
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -6017,23 +6071,17 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapGraphics) {
 
     vkt::Buffer descriptor_heap(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT,
                                 vkt::device_address);
-    const auto descriptor_heap_ptr = static_cast<char *>(descriptor_heap.Memory().Map());
+    const auto descriptor_heap_ptr = static_cast<char*>(descriptor_heap.Memory().Map());
 
-    VkHostAddressRangeEXT descriptor_host;
-    descriptor_host.address = descriptor_heap_ptr;
-    descriptor_host.size = static_cast<size_t>(heap_props.bufferDescriptorSize);
-
-    VkDeviceAddressRangeEXT device_range;
-    device_range.address = buffer_data.Address();
-    device_range.size = 16;
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+    VkDeviceAddressRangeEXT device_range = buffer_data.AddressRange();
 
     VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
     descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_info.data.pAddressRange = &device_range;
-
     vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -6051,11 +6099,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapGraphics) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping.descriptorSet = 0;
-    mapping.firstBinding = 0;
-    mapping.bindingCount = 1;
-    mapping.resourceMask = VK_SPIRV_RESOURCE_TYPE_ALL_EXT;
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
     mapping.sourceData.constantOffset.heapOffset = 0;
     mapping.sourceData.constantOffset.heapArrayStride = 0;
@@ -6070,9 +6114,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapGraphics) {
     VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
     pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
 
-    VkPipelineShaderStageCreateInfo stages[2] = {vs_module.GetStageCreateInfo(), fs_module.GetStageCreateInfo()};
-    stages[0].pNext = &mapping_info;
-    stages[1].pNext = &mapping_info;
+    VkPipelineShaderStageCreateInfo stages[2] = {vs_module.GetStageCreateInfo(&mapping_info),
+                                                 fs_module.GetStageCreateInfo(&mapping_info)};
 
     CreatePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
     pipe.gp_ci_.layout = VK_NULL_HANDLE;
@@ -6116,7 +6159,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapUntypedPointers) {
     const uint32_t size = static_cast<uint32_t>(props2.properties.limits.minStorageBufferOffsetAlignment);
 
     vkt::Buffer buffer_data(*m_device, size * 3, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0 * size / sizeof(uint32_t)] = 8;
     data[1 * size / sizeof(uint32_t)] = 12;
     data[2 * size / sizeof(uint32_t)] = 1;
@@ -6127,15 +6170,10 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapUntypedPointers) {
 
     vkt::Buffer descriptor_heap(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT,
                                 vkt::device_address);
-    const auto descriptor_heap_ptr = static_cast<uint8_t *>(descriptor_heap.Memory().Map());
+    const auto descriptor_heap_ptr = static_cast<uint8_t*>(descriptor_heap.Memory().Map());
 
-    VkHostAddressRangeEXT descriptor_host;
-    descriptor_host.address = descriptor_heap_ptr;
-    descriptor_host.size = static_cast<size_t>(heap_props.bufferDescriptorSize);
-
-    VkDeviceAddressRangeEXT device_range;
-    device_range.address = buffer_data.Address();
-    device_range.size = size;
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+    VkDeviceAddressRangeEXT device_range{buffer_data.Address(), size};
 
     VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
     descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -6147,7 +6185,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapUntypedPointers) {
         vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
     }
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         #extension GL_EXT_descriptor_heap : require
@@ -6160,16 +6198,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapUntypedPointers) {
             debugPrintfEXT("c == %u\n", heapBuffer[2].data);
         }
     )glsl";
-
-    VkShaderObj cs_module = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
-
-    VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
-    pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
-
-    CreateComputePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
-    pipe.cp_ci_.stage = cs_module.GetStageCreateInfo();
-    pipe.cp_ci_.layout = VK_NULL_HANDLE;
-    pipe.CreateComputePipeline(false);
+    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_2);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6205,7 +6234,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapGPL) {
     GetPhysicalDeviceProperties2(heap_props);
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -6216,23 +6245,17 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapGPL) {
 
     vkt::Buffer descriptor_heap(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT,
                                 vkt::device_address);
-    const auto descriptor_heap_ptr = static_cast<char *>(descriptor_heap.Memory().Map());
+    const auto descriptor_heap_ptr = static_cast<char*>(descriptor_heap.Memory().Map());
 
-    VkHostAddressRangeEXT descriptor_host;
-    descriptor_host.address = descriptor_heap_ptr;
-    descriptor_host.size = static_cast<size_t>(heap_props.bufferDescriptorSize);
-
-    VkDeviceAddressRangeEXT device_range;
-    device_range.address = buffer_data.Address();
-    device_range.size = 16;
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+    VkDeviceAddressRangeEXT device_range = buffer_data.AddressRange();
 
     VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
     descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_info.data.pAddressRange = &device_range;
-
     vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -6250,11 +6273,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapGPL) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping.descriptorSet = 0;
-    mapping.firstBinding = 0;
-    mapping.bindingCount = 1;
-    mapping.resourceMask = VK_SPIRV_RESOURCE_TYPE_ALL_EXT;
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
     mapping.sourceData.constantOffset.heapOffset = 0;
     mapping.sourceData.constantOffset.heapArrayStride = 0;
@@ -6345,7 +6364,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapShaderObjects) {
     GetPhysicalDeviceProperties2(heap_props);
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -6356,23 +6375,17 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapShaderObjects) {
 
     vkt::Buffer descriptor_heap(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT,
                                 vkt::device_address);
-    const auto descriptor_heap_ptr = static_cast<char *>(descriptor_heap.Memory().Map());
+    const auto descriptor_heap_ptr = static_cast<char*>(descriptor_heap.Memory().Map());
 
-    VkHostAddressRangeEXT descriptor_host;
-    descriptor_host.address = descriptor_heap_ptr;
-    descriptor_host.size = static_cast<size_t>(heap_props.bufferDescriptorSize);
-
-    VkDeviceAddressRangeEXT device_range;
-    device_range.address = buffer_data.Address();
-    device_range.size = 16;
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+    VkDeviceAddressRangeEXT device_range = buffer_data.AddressRange();
 
     VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
     descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_info.data.pAddressRange = &device_range;
-
     vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -6387,11 +6400,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapShaderObjects) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping.descriptorSet = 0;
-    mapping.firstBinding = 0;
-    mapping.bindingCount = 1;
-    mapping.resourceMask = VK_SPIRV_RESOURCE_TYPE_ALL_EXT;
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
     mapping.sourceData.constantOffset.heapOffset = 0;
     mapping.sourceData.constantOffset.heapArrayStride = 0;
@@ -6401,13 +6410,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapShaderObjects) {
     mapping_info.pMappings = &mapping;
 
     const auto spv = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source);
-    VkShaderCreateInfoEXT shader_create_info = vku::InitStructHelper(&mapping_info);
-    shader_create_info.flags = VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT;
-    shader_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    shader_create_info.codeType = VK_SHADER_CODE_TYPE_SPIRV_EXT;
-    shader_create_info.codeSize = spv.size() * sizeof(spv[0]);
-    shader_create_info.pCode = spv.data();
-    shader_create_info.pName = "main";
+    VkShaderCreateInfoEXT shader_create_info = ShaderCreateInfoHeap(spv, VK_SHADER_STAGE_COMPUTE_BIT, &mapping_info);
     vkt::Shader shader(*m_device, shader_create_info);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
@@ -6436,7 +6439,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapPushConstantOnly) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout(push_constant) uniform PushConstants {
@@ -6446,26 +6449,12 @@ TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapPushConstantOnly) {
             debugPrintfEXT("int == %u", pc.x);
         }
     )glsl";
-
-    VkShaderObj cs_module = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
-    pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
-
-    CreateComputePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
-    pipe.cp_ci_.stage = cs_module.GetStageCreateInfo();
-    pipe.cp_ci_.layout = VK_NULL_HANDLE;
-    pipe.CreateComputePipeline(false);
-
-    uint32_t data = 4;
-    VkPushDataInfoEXT push_data_info = vku::InitStructHelper();
-    push_data_info.offset = 0u;
-    push_data_info.data.address = &data;
-    push_data_info.data.size = sizeof(uint32_t);
+    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0);
 
     m_command_buffer.Begin();
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
-    vk::CmdPushDataEXT(m_command_buffer, &push_data_info);
+    uint32_t data = 4;
+    m_command_buffer.PushData(0, sizeof(uint32_t), &data);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
@@ -6488,7 +6477,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeap) {
     GetPhysicalDeviceProperties2(heap_props);
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -6505,23 +6494,17 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeap) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocate_flag_info);
 
     vkt::Buffer copy_src(*m_device, resource_heap_size_app, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
-    const auto descriptor_heap_ptr = static_cast<char *>(copy_src.Memory().Map());
+    const auto descriptor_heap_ptr = static_cast<char*>(copy_src.Memory().Map());
 
-    VkHostAddressRangeEXT descriptor_host;
-    descriptor_host.address = descriptor_heap_ptr;
-    descriptor_host.size = static_cast<size_t>(heap_props.bufferDescriptorSize);
-
-    VkDeviceAddressRangeEXT device_range;
-    device_range.address = buffer_data.Address();
-    device_range.size = 16;
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+    VkDeviceAddressRangeEXT device_range = buffer_data.AddressRange();
 
     VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
     descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_info.data.pAddressRange = &device_range;
-
     vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -6536,11 +6519,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeap) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping.descriptorSet = 0;
-    mapping.firstBinding = 0;
-    mapping.bindingCount = 1;
-    mapping.resourceMask = VK_SPIRV_RESOURCE_TYPE_ALL_EXT;
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
     mapping.sourceData.constantOffset.heapOffset = 0;
     mapping.sourceData.constantOffset.heapArrayStride = 0;
@@ -6549,16 +6528,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeap) {
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
 
-    VkShaderObj cs_module = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
-    pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
-
-    CreateComputePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
-    pipe.cp_ci_.stage = cs_module.GetStageCreateInfo();
-    pipe.cp_ci_.stage.pNext = &mapping_info;
-    pipe.cp_ci_.layout = VK_NULL_HANDLE;
-    pipe.CreateComputePipeline(false);
+    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6612,7 +6582,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeapGraphics) {
     GetPhysicalDeviceProperties2(heap_props);
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
-    uint32_t *data = (uint32_t *)buffer_data.Memory().Map();
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
     data[0] = 8;
     data[1] = 12;
     data[2] = 1;
@@ -6629,15 +6599,10 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeapGraphics) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocate_flag_info);
 
     vkt::Buffer copy_src(*m_device, resource_heap_size_app, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
-    const auto descriptor_heap_ptr = static_cast<char *>(copy_src.Memory().Map());
+    const auto descriptor_heap_ptr = static_cast<char*>(copy_src.Memory().Map());
 
-    VkHostAddressRangeEXT descriptor_host;
-    descriptor_host.address = descriptor_heap_ptr;
-    descriptor_host.size = static_cast<size_t>(heap_props.bufferDescriptorSize);
-
-    VkDeviceAddressRangeEXT device_range;
-    device_range.address = buffer_data.Address();
-    device_range.size = 16;
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+    VkDeviceAddressRangeEXT device_range = buffer_data.AddressRange();
 
     VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
     descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -6645,7 +6610,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeapGraphics) {
 
     vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 450
         #extension GL_EXT_debug_printf : enable
         layout (set = 0, binding = 0) buffer SSBO_0 {
@@ -6663,11 +6628,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeapGraphics) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping.descriptorSet = 0;
-    mapping.firstBinding = 0;
-    mapping.bindingCount = 1;
-    mapping.resourceMask = VK_SPIRV_RESOURCE_TYPE_ALL_EXT;
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
     mapping.sourceData.constantOffset.heapOffset = 0;
     mapping.sourceData.constantOffset.heapArrayStride = 0;
@@ -6682,9 +6643,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeapGraphics) {
     VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
     pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
 
-    VkPipelineShaderStageCreateInfo stages[2] = {vs_module.GetStageCreateInfo(), fs_module.GetStageCreateInfo()};
-    stages[0].pNext = &mapping_info;
-    stages[1].pNext = &mapping_info;
+    VkPipelineShaderStageCreateInfo stages[2] = {vs_module.GetStageCreateInfo(&mapping_info),
+                                                 fs_module.GetStageCreateInfo(&mapping_info)};
 
     CreatePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
     pipe.gp_ci_.layout = VK_NULL_HANDLE;
@@ -6726,4 +6686,433 @@ TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeapGraphics) {
     m_errorMonitor->SetDesiredInfo("c == 20");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DeviceLocalHeapMesh) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::taskShader);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(heap_props);
+
+    vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
+    data[0] = 8;
+    data[1] = 12;
+    data[2] = 1;
+
+    VkDeviceSize resource_heap_size_app = Align(heap_props.bufferDescriptorSize, heap_props.bufferDescriptorAlignment);
+    resource_heap_size_app = Align(resource_heap_size_app, heap_props.imageDescriptorAlignment);
+    const VkDeviceSize resource_heap_size_driver = resource_heap_size_app + heap_props.minResourceHeapReservedRange;
+
+    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
+    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    vkt::Buffer descriptor_heap(
+        *m_device, resource_heap_size_driver,
+        VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocate_flag_info);
+
+    vkt::Buffer copy_src(*m_device, resource_heap_size_app, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
+    const auto descriptor_heap_ptr = static_cast<char*>(copy_src.Memory().Map());
+
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(heap_props.bufferDescriptorSize)};
+    VkDeviceAddressRangeEXT device_range = buffer_data.AddressRange();
+
+    VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
+    descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_info.data.pAddressRange = &device_range;
+    vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
+
+    const char* task_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : require
+        #extension GL_EXT_debug_printf : enable
+        layout (local_size_x=1, local_size_y=1, local_size_z=1) in;
+        void main() {
+            EmitMeshTasksEXT(1u, 1u, 1u);
+        }
+    )glsl";
+
+    const char* mesh_source = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : require
+        #extension GL_EXT_debug_printf : enable
+        layout(max_vertices = 3, max_primitives=1) out;
+        layout(triangles) out;
+        layout (set = 0, binding = 0) buffer SSBO_0 {
+            uint a;
+            uint b;
+            uint c;
+        };
+        void main() {
+            c = a + b;
+            debugPrintfEXT("c == %u\n", c);
+        }
+    )glsl";
+
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
+    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mapping.sourceData.constantOffset.heapOffset = 0;
+    mapping.sourceData.constantOffset.heapArrayStride = 0;
+
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 1u;
+    mapping_info.pMappings = &mapping;
+
+    VkShaderObj ts_module = VkShaderObj(*m_device, task_source, VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj ms_module = VkShaderObj(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj fs_module = VkShaderObj(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3);
+
+    VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
+    pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
+
+    VkPipelineShaderStageCreateInfo stages[3] = {ts_module.GetStageCreateInfo(&mapping_info),
+                                                 ms_module.GetStageCreateInfo(&mapping_info), fs_module.GetStageCreateInfo()};
+
+    CreatePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
+    pipe.gp_ci_.layout = VK_NULL_HANDLE;
+    pipe.gp_ci_.stageCount = 3;
+    pipe.gp_ci_.pStages = stages;
+    pipe.CreateGraphicsPipeline(false);
+
+    VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
+    bind_resource_info.heapRange.address = descriptor_heap.Address();
+    bind_resource_info.heapRange.size = resource_heap_size_driver;
+    bind_resource_info.reservedRangeOffset = resource_heap_size_app;
+    bind_resource_info.reservedRangeSize = heap_props.minResourceHeapReservedRange;
+
+    VkBufferCopy copy_region;
+    copy_region.srcOffset = 0u;
+    copy_region.dstOffset = 0u;
+    copy_region.size = resource_heap_size_app;
+
+    VkMemoryBarrier2 memory_barrier = vku::InitStructHelper();
+    memory_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    memory_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    memory_barrier.dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    memory_barrier.dstAccessMask = VK_ACCESS_2_RESOURCE_HEAP_READ_BIT_EXT | VK_ACCESS_2_SAMPLER_HEAP_READ_BIT_EXT;
+
+    VkDependencyInfo dependency_info = vku::InitStructHelper();
+    dependency_info.memoryBarrierCount = 1u;
+    dependency_info.pMemoryBarriers = &memory_barrier;
+
+    m_command_buffer.Begin();
+    vk::CmdCopyBuffer(m_command_buffer, copy_src, descriptor_heap, 1u, &copy_region);
+    vk::CmdPipelineBarrier2(m_command_buffer, &dependency_info);
+    vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDrawMeshTasksEXT(m_command_buffer, 1, 1, 1);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("c == 20");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_DescriptorHeapRebindHeap) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(heap_props);
+
+    const VkDeviceSize resource_stride =
+        Align(Align(heap_props.bufferDescriptorAlignment, heap_props.imageDescriptorAlignment), heap_props.resourceHeapAlignment);
+
+    vkt::Buffer ssbo1_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    vkt::Buffer ssbo2_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    vkt::Buffer ssbo3_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
+    uint32_t* data = (uint32_t*)ssbo1_buffer.Memory().Map();
+    data[0] = 8;
+    data[1] = 12;
+    data[2] = 1;
+    data = (uint32_t*)ssbo2_buffer.Memory().Map();
+    data[0] = 5;
+    data[1] = 9;
+    data[2] = 1;
+    data = (uint32_t*)ssbo3_buffer.Memory().Map();
+    data[0] = 9;
+    data[1] = 9;
+    data[2] = 1;
+
+    // 1st heap hold 2 SSBO
+    VkDeviceSize resource_heap_size_app = Align(resource_stride * 2, heap_props.bufferDescriptorAlignment);
+    resource_heap_size_app = Align(resource_heap_size_app, heap_props.imageDescriptorAlignment);
+    const VkDeviceSize resource_heap_size_driver = resource_heap_size_app + heap_props.minResourceHeapReservedRange;
+
+    vkt::Buffer descriptor_heap(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT,
+                                vkt::device_address);
+    const auto descriptor_heap_ptr = static_cast<uint8_t*>(descriptor_heap.Memory().Map());
+
+    // 2nd heap to hold the 3rd SSBO
+    vkt::Buffer descriptor_heap2(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT,
+                                 vkt::device_address);
+    const auto descriptor_heap2_ptr = static_cast<uint8_t*>(descriptor_heap2.Memory().Map());
+
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(resource_stride)};
+    VkDeviceAddressRangeEXT device_range = ssbo1_buffer.AddressRange();
+    VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
+    descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_info.data.pAddressRange = &device_range;
+    vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
+
+    descriptor_host.address = descriptor_heap_ptr + resource_stride;
+    device_range = ssbo2_buffer.AddressRange();
+    vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
+
+    descriptor_host.address = descriptor_heap2_ptr;
+    device_range = ssbo3_buffer.AddressRange();
+    vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
+
+    const char* cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout (set = 0, binding = 0) buffer SSBO_0 {
+            uint a;
+            uint b;
+            uint c;
+        };
+
+        void main() {
+            c = a + b;
+            debugPrintfEXT("c == %u\n", c);
+        }
+    )glsl";
+
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
+    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
+    mapping.sourceData.constantOffset.heapOffset = 0;
+    mapping.sourceData.constantOffset.heapArrayStride = 0;
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = 1u;
+    mapping_info.pMappings = &mapping;
+
+    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
+
+    VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
+    bind_resource_info.heapRange.address = descriptor_heap.Address();
+    bind_resource_info.heapRange.size = resource_heap_size_driver;
+    bind_resource_info.reservedRangeOffset = resource_heap_size_app;
+    bind_resource_info.reservedRangeSize = heap_props.minResourceHeapReservedRange;
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+
+    bind_resource_info.heapRange.address += resource_stride;
+    bind_resource_info.heapRange.size -= resource_stride;
+    bind_resource_info.reservedRangeOffset -= resource_stride;
+    vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+
+    bind_resource_info.heapRange.address = descriptor_heap2.Address();
+    bind_resource_info.heapRange.size = resource_heap_size_driver;
+    bind_resource_info.reservedRangeOffset = resource_heap_size_app;
+    vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("c == 20");  // from first dispatch
+    m_errorMonitor->SetDesiredInfo("c == 14");  // from second dispatch
+    m_errorMonitor->SetDesiredInfo("c == 18");  // from third dispatch
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+void NegativeDebugPrintf::CoopMat2CallbackTest(const char* shader_source, const char* message) {
+    AddRequiredExtensions(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+    AddRequiredExtensions(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::cooperativeMatrix);
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
+    AddRequiredFeature(vkt::Feature::storageBuffer16BitAccess);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    pipe.cs_ = VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3);
+    pipe.CreateComputePipeline();
+
+    vkt::Buffer buffer(*m_device, 256 * 256 * 2, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo(message);
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_CoopMat2PerElementOp) {
+    TEST_DESCRIPTION("debugPrintfEXT inside a coopMatPerElementNV callback function");
+    AddRequiredFeature(vkt::Feature::cooperativeMatrixPerElementOperations);
+
+    const char* shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        #extension GL_KHR_memory_scope_semantics : enable
+        #extension GL_KHR_cooperative_matrix : enable
+        #extension GL_EXT_shader_explicit_arithmetic_types : enable
+        #extension GL_NV_cooperative_matrix2 : enable
+        #extension GL_EXT_buffer_reference : enable
+        layout(local_size_x = 32) in;
+        layout(set = 0, binding = 0) buffer BufType { float16_t x[]; } buf;
+        layout(buffer_reference, std430, buffer_reference_align = 2) buffer fp16Buf { float16_t f; };
+        float16_t myFunc(const in uint32_t row, const in uint32_t col, const in float16_t x) {
+            if (row == 0 && col == 0) {
+                debugPrintfEXT("perelemop callback");
+            }
+            return x;
+        }
+        void main() {
+            coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> m = coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(float16_t(0));
+            coopMatPerElementNV(m, m, myFunc);
+        }
+    )glsl";
+
+    CoopMat2CallbackTest(shader_source, "perelemop callback");
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_CoopMat2Reduce) {
+    TEST_DESCRIPTION("debugPrintfEXT inside a coopMatReduceNV combine callback function");
+    AddRequiredFeature(vkt::Feature::cooperativeMatrixReductions);
+
+    const char* shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        #extension GL_KHR_memory_scope_semantics : enable
+        #extension GL_KHR_cooperative_matrix : enable
+        #extension GL_EXT_shader_explicit_arithmetic_types : enable
+        #extension GL_NV_cooperative_matrix2 : enable
+        #extension GL_EXT_buffer_reference : enable
+        layout(local_size_x = 32) in;
+        layout(set = 0, binding = 0) buffer BufType { float16_t x[]; } buf;
+        layout(buffer_reference, std430, buffer_reference_align = 2) buffer fp16Buf { float16_t f; };
+        shared uint printed;
+        float16_t combineFunc(const in float16_t a, const in float16_t b) {
+            if (atomicExchange(printed, 1u) == 0u) {
+                debugPrintfEXT("reduce callback");
+            }
+            return a + b;
+        }
+        void main() {
+            if (gl_LocalInvocationIndex == 0u) printed = 0u;
+            barrier();
+            coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> m = coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(float16_t(0));
+            coopMatReduceNV(m, m, gl_CooperativeMatrixReduceRowNV, combineFunc);
+        }
+    )glsl";
+
+    CoopMat2CallbackTest(shader_source, "reduce callback");
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_CoopMat2LoadTensorDecode) {
+    TEST_DESCRIPTION("debugPrintfEXT inside a coopMatLoadTensorNV decode callback function");
+    AddRequiredFeature(vkt::Feature::cooperativeMatrixTensorAddressing);
+    AddRequiredFeature(vkt::Feature::cooperativeMatrixBlockLoads);
+
+    const char* shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        #extension GL_KHR_memory_scope_semantics : enable
+        #extension GL_KHR_cooperative_matrix : enable
+        #extension GL_EXT_shader_explicit_arithmetic_types : enable
+        #extension GL_NV_cooperative_matrix2 : enable
+        #extension GL_EXT_buffer_reference : enable
+        layout(local_size_x = 32) in;
+        layout(set = 0, binding = 0) buffer BufType { float16_t x[]; } buf;
+        layout(buffer_reference, std430, buffer_reference_align = 2) buffer fp16Buf { float16_t f; };
+        shared uint printed;
+        float16_t decodeFunc(const in fp16Buf b, const in uint32_t blockCoords[2], const in uint32_t coordInBlock[2]) {
+            if (atomicExchange(printed, 1u) == 0u) {
+                debugPrintfEXT("decode callback");
+            }
+            return b.f;
+        }
+        void main() {
+            if (gl_LocalInvocationIndex == 0u) printed = 0u;
+            barrier();
+            coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> A;
+            tensorLayoutNV<2> t = createTensorLayoutNV(2);
+            t = setTensorLayoutDimensionNV(t, 256, 256);
+            t = setTensorLayoutBlockSizeNV(t, 1, 1);
+            coopMatLoadTensorNV(A, buf.x, 0, t, decodeFunc);
+        }
+    )glsl";
+
+    CoopMat2CallbackTest(shader_source, "decode callback");
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeDebugPrintf, DISABLED_CoopMat2LoadTensorDecodeWithView) {
+    TEST_DESCRIPTION("debugPrintfEXT inside a coopMatLoadTensorNV decode callback with both TensorView and DecodeFunc");
+    AddRequiredFeature(vkt::Feature::cooperativeMatrixTensorAddressing);
+    AddRequiredFeature(vkt::Feature::cooperativeMatrixBlockLoads);
+
+    const char* shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        #extension GL_KHR_memory_scope_semantics : enable
+        #extension GL_KHR_cooperative_matrix : enable
+        #extension GL_EXT_shader_explicit_arithmetic_types : enable
+        #extension GL_NV_cooperative_matrix2 : enable
+        #extension GL_EXT_buffer_reference : enable
+        layout(local_size_x = 32) in;
+        layout(set = 0, binding = 0) buffer BufType { float16_t x[]; } buf;
+        layout(buffer_reference, std430, buffer_reference_align = 2) buffer fp16Buf { float16_t f; };
+        shared uint printed;
+        float16_t decodeFunc(const in fp16Buf b, const in uint32_t blockCoords[2], const in uint32_t coordInBlock[2]) {
+            if (atomicExchange(printed, 1u) == 0u) {
+                debugPrintfEXT("decode with view callback");
+            }
+            return b.f;
+        }
+        void main() {
+            if (gl_LocalInvocationIndex == 0u) printed = 0u;
+            barrier();
+            coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> A;
+            tensorLayoutNV<2> t = createTensorLayoutNV(2);
+            t = setTensorLayoutDimensionNV(t, 256, 256);
+            t = setTensorLayoutBlockSizeNV(t, 1, 1);
+            tensorViewNV<2> v = createTensorViewNV(2);
+            v = setTensorViewDimensionsNV(v, 16, 16);
+            coopMatLoadTensorNV(A, buf.x, 0, t, v, decodeFunc);
+        }
+    )glsl";
+
+    CoopMat2CallbackTest(shader_source, "decode with view callback");
 }

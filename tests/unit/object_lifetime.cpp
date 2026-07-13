@@ -2,7 +2,7 @@
  * Copyright (c) 2015-2026 The Khronos Group Inc.
  * Copyright (c) 2015-2026 Valve Corporation
  * Copyright (c) 2015-2026 LunarG, Inc.
- * Copyright (c) 2015-2025 Google, Inc.
+ * Copyright (c) 2015-2026 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,11 +14,11 @@
 
 #include <vulkan/vulkan_core.h>
 #include "utils/cast_utils.h"
-#include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
-#include "../framework/render_pass_helper.h"
-#include "../framework/descriptor_helper.h"
-#include "../framework/external_memory_sync.h"
+#include "layer_validation_tests.h"
+#include "pipeline_helper.h"
+#include "render_pass_helper.h"
+#include "descriptor_helper.h"
+#include "external_memory_sync.h"
 
 class NegativeObjectLifetime : public VkLayerTest {};
 
@@ -188,7 +188,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferBufferViewDestroyed) {
         descriptor_set.WriteDescriptorBufferView(0, view);
         descriptor_set.UpdateDescriptorSets();
 
-        const char *fsSource = R"glsl(
+        const char* fsSource = R"glsl(
             #version 450
             layout(set=0, binding=0, r32f) uniform readonly imageBuffer s;
             layout(location=0) out vec4 x;
@@ -259,7 +259,7 @@ TEST_F(NegativeObjectLifetime, DescriptorSetStorageBufferDestroyed) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set=0, binding=0) buffer SSBO { uint x; };
         void main(){
@@ -309,7 +309,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_DescriptorSetMutableBufferDestroyed) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set=0, binding=0) buffer SSBO { uint x; };
         void main(){
@@ -360,7 +360,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_DescriptorSetMutableBufferArrayDestroyed
     descriptor_set.WriteDescriptorBufferInfo(0, uniform_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
     descriptor_set.UpdateDescriptorSets();
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 450
         layout(set=0, binding=0) buffer SSBO { uint x; } ssbo[2];
         void main(){
@@ -801,7 +801,7 @@ TEST_F(NegativeObjectLifetime, BufferViewInUseDestroyed) {
     VkResult err = vk::CreateBufferView(device(), &bvci, NULL, &view);
     ASSERT_EQ(VK_SUCCESS, err);
 
-    const char *fsSource = R"glsl(
+    const char* fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0, r32f) uniform readonly imageBuffer s;
         layout(location=0) out vec4 x;
@@ -1156,6 +1156,24 @@ TEST_F(NegativeObjectLifetime, FreeCommandBuffersNull) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeObjectLifetime, FreeSameCommandBuffer) {
+    RETURN_IF_SKIP(Init());
+
+    vkt::CommandPool command_pool(*m_device, m_device->graphics_queue_node_index_);
+
+    VkCommandBuffer command_buffers[2];
+    VkCommandBufferAllocateInfo alloc_info = vku::InitStructHelper();
+    alloc_info.commandPool = command_pool;
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandBufferCount = 2;
+    vk::AllocateCommandBuffers(device(), &alloc_info, command_buffers);
+
+    VkCommandBuffer new_cb[2] = {command_buffers[0], command_buffers[0]};
+    m_errorMonitor->SetDesiredError("VUID-vkFreeCommandBuffers-pCommandBuffers-00048");
+    vk::FreeCommandBuffers(device(), command_pool, 2, new_cb);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeObjectLifetime, FreeDescriptorSetsNull) {
     TEST_DESCRIPTION("Can pass NULL for vkFreeDescriptorSets");
     RETURN_IF_SKIP(Init());
@@ -1231,4 +1249,52 @@ TEST_F(NegativeObjectLifetime, DestroyedImageInImageView) {
     m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-01020");
     vkt::ImageView view(*m_device, view_ci);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeObjectLifetime, DestroyBufferAddressRange) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12246");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::deviceAddressCommands);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
+    buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    buffer_create_info.size = 256;
+
+    VkBuffer buffer = VK_NULL_HANDLE;
+    vk::CreateBuffer(device(), &buffer_create_info, nullptr, &buffer);
+
+    VkMemoryRequirements buffer_mem_reqs;
+    vk::GetBufferMemoryRequirements(device(), buffer, &buffer_mem_reqs);
+
+    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
+    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
+    VkMemoryAllocateInfo buffer_mem_alloc = vku::InitStructHelper(&allocate_flag_info);
+    buffer_mem_alloc.memoryTypeIndex = 0;  // hard assumption
+    buffer_mem_alloc.allocationSize = buffer_mem_reqs.size;
+    VkDeviceMemory device_memory = VK_NULL_HANDLE;
+    vk::AllocateMemory(device(), &buffer_mem_alloc, nullptr, &device_memory);
+    vk::BindBufferMemory(device(), buffer, device_memory, 0);
+
+    VkBufferDeviceAddressInfo bdai = vku::InitStructHelper();
+    bdai.buffer = buffer;
+    VkDeviceAddress buffer_address = vk::GetBufferDeviceAddress(device(), &bdai);
+
+    VkBindVertexBuffer3InfoKHR info = vku::InitStructHelper();
+    info.setStride = VK_TRUE;
+    info.addressRange.address = buffer_address;
+    info.addressRange.size = 256;
+    info.addressRange.stride = 4u;
+    info.addressFlags = 0u;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindVertexBuffers3KHR(m_command_buffer, 0, 1u, &info);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+    monitor_.SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
 }

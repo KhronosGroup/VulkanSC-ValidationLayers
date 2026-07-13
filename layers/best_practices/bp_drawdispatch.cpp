@@ -194,7 +194,7 @@ bool BestPractices::ValidateIndexBufferArm(const bp_state::CommandBufferSubState
 
     // no point checking index buffer if the memory is nonexistant/unmapped, or if there is no graphics pipeline bound to this CB
     if (ib_mem) {
-        const uint32_t scan_stride = IndexTypeSize(ib_type);
+        const uint32_t scan_stride = IndexTypeByteSize(ib_type);
         // Check if all indices are within the memory allocation size, if robustness is enabled they might not be
         if ((firstIndex + indexCount) * scan_stride > ib_memory_state->allocate_info.allocationSize) {
             return skip;
@@ -600,8 +600,7 @@ void BestPractices::UpdateBoundDescriptorSets(bp_state::CommandBufferSubState& c
                         break;
                     }
                     case vvl::DescriptorClass::ImageSampler: {
-                        if (const auto image_sampler_descriptor =
-                                static_cast<const vvl::ImageSamplerDescriptor*>(descriptor)) {
+                        if (const auto image_sampler_descriptor = static_cast<const vvl::ImageSamplerDescriptor*>(descriptor)) {
                             image_view = image_sampler_descriptor->GetImageView();
                         }
                         break;

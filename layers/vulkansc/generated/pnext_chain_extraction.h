@@ -66,9 +66,13 @@ void *PnextChainExtract(const void */*in_pnext_chain*/, T &/*out*/) { assert(fal
 // and add your reference struct to the `target_structs` list at the beginning of the file.
 
 using PnextChainVkPhysicalDeviceImageFormatInfo2 = std::tuple<
+	VkDataGraphOpticalFlowImageFormatInfoARM,
 	VkImageCompressionControlEXT,
+	VkImageCreateFlags2CreateInfoKHR,
 	VkImageFormatListCreateInfo,
+	VkImageStencilUsage2CreateInfoKHR,
 	VkImageStencilUsageCreateInfo,
+	VkImageUsageFlags2CreateInfoKHR,
 	VkOpticalFlowImageFormatInfoNV,
 	VkPhysicalDeviceExternalImageFormatInfo,
 	VkPhysicalDeviceImageDrmFormatModifierInfoEXT,

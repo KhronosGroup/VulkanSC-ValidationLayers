@@ -2,8 +2,8 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2025 Valve Corporation
- * Copyright (c) 2015-2025 LunarG, Inc.
+ * Copyright (c) 2015-2026 Valve Corporation
+ * Copyright (c) 2015-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "../framework/layer_validation_tests.h"
+#include "layer_validation_tests.h"
 
 class PositiveDebugExtensions : public VkLayerTest {};
 
@@ -26,7 +26,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectBuffer) {
     }
 
     DebugUtilsLabelCheckData callback_data;
-    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *, DebugUtilsLabelCheckData *data) { data->count++; };
+    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT*, DebugUtilsLabelCheckData* data) { data->count++; };
     callback_data.count = 0;
     callback_data.callback = empty_callback;
 
@@ -40,7 +40,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectBuffer) {
     vk::CreateDebugUtilsMessengerEXT(instance(), &callback_create_info, nullptr, &my_messenger);
 
     vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-    const char *object_name = "buffer_object";
+    const char* object_name = "buffer_object";
 
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
     name_info.objectType = VK_OBJECT_TYPE_BUFFER;
@@ -61,7 +61,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectDevice) {
     }
 
     DebugUtilsLabelCheckData callback_data;
-    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT *, DebugUtilsLabelCheckData *data) { data->count++; };
+    auto empty_callback = [](const VkDebugUtilsMessengerCallbackDataEXT*, DebugUtilsLabelCheckData* data) { data->count++; };
     callback_data.count = 0;
     callback_data.callback = empty_callback;
 
@@ -74,7 +74,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectDevice) {
     VkDebugUtilsMessengerEXT my_messenger = VK_NULL_HANDLE;
     vk::CreateDebugUtilsMessengerEXT(instance(), &callback_create_info, nullptr, &my_messenger);
 
-    const char *object_name = "device_object";
+    const char* object_name = "device_object";
 
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
     name_info.objectType = VK_OBJECT_TYPE_DEVICE;
@@ -174,7 +174,7 @@ TEST_F(PositiveDebugExtensions, DISABLED_SwapchainImagesDebugMarker) {
     swapchain_create_info.minImageCount = info.surface_capabilities.minImageCount;
     swapchain_create_info.imageFormat = info.surface_formats[0].format;
     swapchain_create_info.imageColorSpace = info.surface_formats[0].colorSpace;
-    swapchain_create_info.imageExtent = info.surface_capabilities.minImageExtent;
+    swapchain_create_info.imageExtent = GetSwapchainExtent(info.surface_capabilities);
     swapchain_create_info.imageArrayLayers = 1;
     swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -206,4 +206,30 @@ TEST_F(PositiveDebugExtensions, DISABLED_SwapchainImagesDebugMarker) {
         name_info.pTag = tags;
         vk::DebugMarkerSetObjectTagEXT(device(), &name_info);
     }
+}
+
+// TODO: These tests check things that are hacked in without spec support the debug utils additions expected here
+TEST_F(PositiveDebugExtensions, DISABLED_VkDebugUtilsObjectNameInfoEXTExtendsCreateInfo) {
+    RETURN_IF_SKIP(Init());
+
+    VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
+    name_info.objectType = VK_OBJECT_TYPE_UNKNOWN;
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&name_info);
+    buffer_ci.size = 16 * sizeof(float);
+    buffer_ci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    vkt::Buffer buffer(*m_device, buffer_ci);
+}
+
+// TODO: These tests check things that are hacked in without spec support the debug utils additions expected here
+TEST_F(PositiveDebugExtensions, DISABLED_VkDebugUtilsObjectTagInfoEXTExtendsCreateInfo) {
+    RETURN_IF_SKIP(Init());
+
+    VkDebugUtilsObjectTagInfoEXT tag_info = vku::InitStructHelper();
+    tag_info.objectType = VK_OBJECT_TYPE_UNKNOWN;
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&tag_info);
+    buffer_ci.size = 16 * sizeof(float);
+    buffer_ci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    vkt::Buffer buffer(*m_device, buffer_ci);
 }

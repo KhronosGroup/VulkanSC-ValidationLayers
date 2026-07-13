@@ -46,14 +46,14 @@ size_t PipelineLayoutCompatDef::hash() const {
     hash_util::HashCombiner hc;
     // The set number is integral to the CompatDef's distinctiveness
     hc << set << push_constant_ranges.get() << is_independent_sets;
-    const auto &descriptor_set_layouts = *set_layouts_id.get();
+    const auto& descriptor_set_layouts = *set_layouts_id.get();
     for (uint32_t i = 0; i <= set; i++) {
         hc << descriptor_set_layouts[i].get();
     }
     return hc.Value();
 }
 
-bool PipelineLayoutCompatDef::operator==(const PipelineLayoutCompatDef &other) const {
+bool PipelineLayoutCompatDef::operator==(const PipelineLayoutCompatDef& other) const {
     if ((set != other.set) || (push_constant_ranges != other.push_constant_ranges) ||
         (is_independent_sets != other.is_independent_sets)) {
         return false;
@@ -65,21 +65,35 @@ bool PipelineLayoutCompatDef::operator==(const PipelineLayoutCompatDef &other) c
     }
 
     // They aren't exactly the same PipelineLayoutSetLayouts, so we need to check if the required subsets match
-    const auto &descriptor_set_layouts = *set_layouts_id.get();
+    const auto& descriptor_set_layouts = *set_layouts_id.get();
     assert(set < descriptor_set_layouts.size());
-    const auto &other_ds_layouts = *other.set_layouts_id.get();
+    const auto& other_ds_layouts = *other.set_layouts_id.get();
     assert(set < other_ds_layouts.size());
     for (uint32_t i = 0; i <= set; i++) {
         if (descriptor_set_layouts[i] != other_ds_layouts[i]) {
+            if (other.is_independent_sets) {
+                // This is hit because the vvl::ShaderObject can have NULL, independent layouts.
+                // This never happens with pipelines because we get |merged_graphics_layout| that occurs during the final linking of
+                // the pipeline which is creating a unified version for us.
+                //
+                // I used to have a check for |other.from_shader_object| but would get random failures
+                //  (https://gitlab.khronos.org/Tracker/vk-gl-cts/-/issues/6512)
+                // because the last DSL might have been created first with vkCreatePipelineLayout
+                continue;
+            }
             return false;
         }
     }
     return true;
 }
 
-std::string PipelineLayoutCompatDef::DescribeDifference(const PipelineLayoutCompatDef &other) const {
+// When comparing from draw time the |other| value is
+//  - when using pipelines, the `vkCmdBindPipeline` layout
+//  - when using shaderObject, the "fake" wrapper around VkShaderCreateInfoEXT::pSetLayouts
+std::string PipelineLayoutCompatDef::DescribeDifference(const PipelineLayoutCompatDef& other) const {
     std::ostringstream ss;
     if (set != other.set) {
+        assert(!other.from_shader_object);
         ss << "The set " << set << " is different from the non-compatible VkPipelineLayout (" << other.set << ")\n";
     } else if (push_constant_ranges != other.push_constant_ranges) {
         ss << "The VkPipelineLayout bound with last call to vkCmdBindDescriptorSets has following push constant ranges:\n";
@@ -90,7 +104,11 @@ std::string PipelineLayoutCompatDef::DescribeDifference(const PipelineLayoutComp
                 ss << "VkPushConstantRange[" << pcr_i << "]: " << string_VkPushConstantRange(pcr) << '\n';
             }
         }
-        ss << "But the VkPipelineLayout layout of last vkCmdBindPipeline/vkCmdBindShader has following push constant ranges:\n";
+        if (other.from_shader_object) {
+            ss << "But the VkShaderCreateInfoEXT::pPushConstantRanges was created with the following push constant ranges:\n";
+        } else {
+            ss << "But the VkPipelineLayout layout of last vkCmdBindPipeline has following push constant ranges:\n";
+        }
         if (other.push_constant_ranges->empty()) {
             ss << "Empty\n";
         } else {
@@ -99,17 +117,25 @@ std::string PipelineLayoutCompatDef::DescribeDifference(const PipelineLayoutComp
             }
         }
     } else if (is_independent_sets != other.is_independent_sets) {
-        ss << "The VkPipelineLayout used to bind set " << set;
-        if (is_independent_sets) {
-            ss << " was created with VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT when the VkPipelineLayout of last bound "
-                  "pipeline was not.";
+        ss << "The VkPipelineLayout used to bind set " << set << " was created " << ((is_independent_sets) ? "with" : "without")
+           << " VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT when the ";
+
+        if (other.from_shader_object) {
+            ss << "VkShaderCreateInfoEXT::flags was";
+            if (is_independent_sets) {
+                ss << " not ";
+            }
+            ss << "created with VK_SHADER_CREATE_INDEPENDENT_SETS_BIT_KHR";
         } else {
-            ss << " was created without VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT when the VkPipelineLayout of last bound "
-                  "pipeline was.";
+            ss << "VkPipelineLayout of last bound pipeline was";
+            if (is_independent_sets) {
+                ss << " not";
+            }
         }
+
     } else {
-        const auto &descriptor_set_layouts = *set_layouts_id.get();
-        const auto &other_ds_layouts = *other.set_layouts_id.get();
+        const auto& descriptor_set_layouts = *set_layouts_id.get();
+        const auto& other_ds_layouts = *other.set_layouts_id.get();
         for (uint32_t i = 0; i <= set; i++) {
             if (descriptor_set_layouts[i] != other_ds_layouts[i]) {
                 if (!descriptor_set_layouts[i] || !other_ds_layouts[i]) {
@@ -123,14 +149,16 @@ std::string PipelineLayoutCompatDef::DescribeDifference(const PipelineLayoutComp
     return ss.str();
 }
 
-static PipelineLayoutCompatId GetCanonicalId(const uint32_t set_index, const PushConstantRangesId &pcr_id,
-                                             const PipelineLayoutSetLayoutsId &set_layouts_id, bool is_independent_sets) {
-    return pipeline_layout_compat_dict.LookUp(PipelineLayoutCompatDef(set_index, pcr_id, set_layouts_id, is_independent_sets));
+static PipelineLayoutCompatId GetCanonicalId(const uint32_t set_index, const PushConstantRangesId& pcr_id,
+                                             const PipelineLayoutSetLayoutsId& set_layouts_id, bool is_independent_sets,
+                                             bool from_shader_object) {
+    return pipeline_layout_compat_dict.LookUp(
+        PipelineLayoutCompatDef(set_index, pcr_id, set_layouts_id, is_independent_sets, from_shader_object));
 }
 
 // For repeatable sorting, not very useful for "memory in range" search
 struct PushConstantRangeCompare {
-    bool operator()(const VkPushConstantRange *lhs, const VkPushConstantRange *rhs) const {
+    bool operator()(const VkPushConstantRange* lhs, const VkPushConstantRange* rhs) const {
         if (lhs->offset == rhs->offset) {
             if (lhs->size == rhs->size) {
                 // The comparison is arbitrary, but avoids false aliasing by comparing all fields.
@@ -143,29 +171,29 @@ struct PushConstantRangeCompare {
     }
 };
 
-PushConstantRangesId GetCanonicalId(uint32_t pushConstantRangeCount, const VkPushConstantRange *pPushConstantRanges) {
+PushConstantRangesId GetCanonicalId(uint32_t pushConstantRangeCount, const VkPushConstantRange* pPushConstantRanges) {
     if (!pPushConstantRanges) {
         // Hand back the empty entry (creating as needed)...
         return push_constant_ranges_dict.LookUp(PushConstantRanges());
     }
 
     // Sort the input ranges to ensure equivalent ranges map to the same id
-    std::set<const VkPushConstantRange *, PushConstantRangeCompare> sorted;
+    std::set<const VkPushConstantRange*, PushConstantRangeCompare> sorted;
     for (uint32_t i = 0; i < pushConstantRangeCount; i++) {
         sorted.insert(pPushConstantRanges + i);
     }
 
     PushConstantRanges ranges;
     ranges.reserve(sorted.size());
-    for (const auto *range : sorted) {
+    for (const auto* range : sorted) {
         ranges.emplace_back(*range);
     }
     return push_constant_ranges_dict.LookUp(std::move(ranges));
 }
 
-static PushConstantRangesId GetPushConstantRangesFromLayouts(const vvl::span<const vvl::PipelineLayout *const> &layouts) {
+static PushConstantRangesId GetPushConstantRangesFromLayouts(const vvl::span<const vvl::PipelineLayout* const>& layouts) {
     PushConstantRangesId ret{};
-    for (const auto *layout : layouts) {
+    for (const auto* layout : layouts) {
         if (layout && layout->push_constant_ranges_layout) {
             ret = layout->push_constant_ranges_layout;
 
@@ -177,9 +205,9 @@ static PushConstantRangesId GetPushConstantRangesFromLayouts(const vvl::span<con
     return ret;
 }
 
-std::vector<PipelineLayoutCompatId> GetCompatForSet(const vvl::DescriptorSetLayoutList &set_layouts,
-                                                    const PushConstantRangesId &push_constant_ranges,
-                                                    VkPipelineLayoutCreateFlags pipeline_layout_create_flags) {
+std::vector<PipelineLayoutCompatId> GetCompatForSet(const vvl::DescriptorSetLayoutList& set_layouts,
+                                                    const PushConstantRangesId& push_constant_ranges, bool is_independent_sets,
+                                                    bool from_shader_object) {
     PipelineLayoutSetLayoutsDef set_layout_ids(set_layouts.list.size());
     for (size_t i = 0; i < set_layouts.list.size(); i++) {
         if (set_layouts.list[i]) {
@@ -191,17 +219,15 @@ std::vector<PipelineLayoutCompatId> GetCompatForSet(const vvl::DescriptorSetLayo
     std::vector<PipelineLayoutCompatId> set_compat_ids;
     set_compat_ids.reserve(set_layouts.list.size());
 
-    // Only current flag to effect pipeline layout compatibility
-    bool is_independent_sets = (pipeline_layout_create_flags & VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT) != 0;
-
     for (uint32_t i = 0; i < set_layouts.list.size(); i++) {
-        set_compat_ids.emplace_back(GetCanonicalId(i, push_constant_ranges, set_layouts_id, is_independent_sets));
+        set_compat_ids.emplace_back(
+            GetCanonicalId(i, push_constant_ranges, set_layouts_id, is_independent_sets, from_shader_object));
     }
     return set_compat_ids;
 }
 
 // This is called when merging the flags from the pipeline layouts in libraries
-VkPipelineLayoutCreateFlags GetCreateFlags(const vvl::span<const vvl::PipelineLayout *const> &layouts) {
+VkPipelineLayoutCreateFlags GetCreateFlags(const vvl::span<const vvl::PipelineLayout* const>& layouts) {
     // from https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9870 and
     // https://gitlab.khronos.org/vulkan/vulkan/-/issues/4264
     // We do not actually combine the flags, instead we only take the flags from the final linked pipeline layout
@@ -210,7 +236,7 @@ VkPipelineLayoutCreateFlags GetCreateFlags(const vvl::span<const vvl::PipelineLa
 
 namespace vvl {
 
-static DescriptorSetLayoutList GetSetLayouts(DeviceState &dev_data, const VkPipelineLayoutCreateInfo *pCreateInfo) {
+static DescriptorSetLayoutList GetSetLayouts(DeviceState& dev_data, const VkPipelineLayoutCreateInfo* pCreateInfo) {
     DescriptorSetLayoutList set_layouts(pCreateInfo->setLayoutCount);
 
     for (uint32_t i = 0; i < pCreateInfo->setLayoutCount; ++i) {
@@ -219,10 +245,10 @@ static DescriptorSetLayoutList GetSetLayouts(DeviceState &dev_data, const VkPipe
     return set_layouts;
 }
 
-static DescriptorSetLayoutList GetSetLayouts(const vvl::span<const PipelineLayout *const> &layouts) {
+static DescriptorSetLayoutList GetSetLayouts(const vvl::span<const PipelineLayout* const>& layouts) {
     DescriptorSetLayoutList set_layouts;
     size_t num_layouts = 0;
-    for (const auto &layout : layouts) {
+    for (const auto& layout : layouts) {
         if (layout && (layout->set_layouts.list.size() > num_layouts)) {
             num_layouts = layout->set_layouts.list.size();
         }
@@ -230,8 +256,8 @@ static DescriptorSetLayoutList GetSetLayouts(const vvl::span<const PipelineLayou
 
     set_layouts.list.reserve(num_layouts);
     for (size_t i = 0; i < num_layouts; ++i) {
-        const PipelineLayout *used_layout = nullptr;
-        for (const auto *layout : layouts) {
+        const PipelineLayout* used_layout = nullptr;
+        for (const auto* layout : layouts) {
             if (layout) {
                 if (layout->set_layouts.list.size() > i) {
                     // This _could_ be the layout we're looking for
@@ -262,8 +288,8 @@ static bool HasDescriptorBuffer(const DescriptorSetLayoutList& set_layouts) {
     return false;
 }
 
-static bool HasImmutableSamplers(const DescriptorSetLayoutList &set_layouts) {
-    for (const auto &set_layout : set_layouts.list) {
+static bool HasImmutableSamplers(const DescriptorSetLayoutList& set_layouts) {
+    for (const auto& set_layout : set_layouts.list) {
         if (set_layout && set_layout->HasImmutableSamplers()) {
             return true;
         }
@@ -276,17 +302,19 @@ PipelineLayout::PipelineLayout(DeviceState& dev_data, VkPipelineLayout handle, c
       set_layouts(GetSetLayouts(dev_data, pCreateInfo)),
       push_constant_ranges_layout(GetCanonicalId(pCreateInfo->pushConstantRangeCount, pCreateInfo->pPushConstantRanges)),
       create_flags(pCreateInfo->flags),
-      set_compat_ids(GetCompatForSet(set_layouts, push_constant_ranges_layout, create_flags)),
+      is_independent_set((create_flags & VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT) != 0),
       has_descriptor_buffer(HasDescriptorBuffer(set_layouts)),
-      has_immutable_samplers(HasImmutableSamplers(set_layouts)) {}
+      has_immutable_samplers(HasImmutableSamplers(set_layouts)),
+      set_compat_ids(GetCompatForSet(set_layouts, push_constant_ranges_layout, is_independent_set, false)) {}
 
 PipelineLayout::PipelineLayout(const vvl::span<const PipelineLayout* const>& layouts)
     : StateObject(static_cast<VkPipelineLayout>(VK_NULL_HANDLE), kVulkanObjectTypePipelineLayout),
       set_layouts(GetSetLayouts(layouts)),
       push_constant_ranges_layout(GetPushConstantRangesFromLayouts(layouts)),  // TODO is this correct?
       create_flags(GetCreateFlags(layouts)),
-      set_compat_ids(GetCompatForSet(set_layouts, push_constant_ranges_layout, create_flags)),
+      is_independent_set((create_flags & VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT) != 0),
       has_descriptor_buffer(HasDescriptorBuffer(set_layouts)),
-      has_immutable_samplers(HasImmutableSamplers(set_layouts)) {}
+      has_immutable_samplers(HasImmutableSamplers(set_layouts)),
+      set_compat_ids(GetCompatForSet(set_layouts, push_constant_ranges_layout, is_independent_set, false)) {}
 
 }  // namespace vvl

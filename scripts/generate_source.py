@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# Copyright (c) 2021-2025 The Khronos Group Inc.
-# Copyright (c) 2021-2025 Valve Corporation
-# Copyright (c) 2021-2025 LunarG, Inc.
-# Copyright (c) 2021-2024 Google Inc.
-# Copyright (c) 2023-2024 RasterGrid Kft.
+# Copyright (c) 2021-2026 The Khronos Group Inc.
+# Copyright (c) 2021-2026 Valve Corporation
+# Copyright (c) 2021-2026 LunarG, Inc.
+# Copyright (c) 2021-2026 Google Inc.
+# Copyright (c) 2023-2026 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,9 +32,10 @@ from xml.etree import ElementTree
 from generate_spec_error_message import GenerateSpecErrorMessage
 
 def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFile: str, targetFilter: str, caching: bool):
+    clang_binary = 'clang-format'
 
     try:
-        code = common_ci.RunShellCmd(f'clang-format --version')
+        code = common_ci.RunShellCmd(f'{clang_binary} --version')
         has_clang_format = True
     except:
         has_clang_format = False
@@ -51,10 +52,15 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
     sys.path.insert(0, registry_headers_path)
     try:
         from reg import Registry
-    except:
-        print("ModuleNotFoundError: No module named 'reg'") # normal python error message
-        print(f'{registry_headers_path} is not pointing to the Vulkan-Headers registry directory.')
-        print("Inside Vulkan-Headers there is a registry/reg.py file that is used.")
+    except Exception as e:
+        reg_path = os.path.join(registry_headers_path, 'reg.py')
+        if not os.path.isfile(reg_path):
+            print("ModuleNotFoundError: No module named 'reg'") # normal python error message
+            print(f'{registry_headers_path} is not pointing to the Vulkan-Headers registry directory.')
+            print("Inside Vulkan-Headers there is a registry/reg.py file that is used.")
+        else:
+            print(f'Found {reg_path}, but failed to import it:')
+            print(f'{type(e).__name__}: {e}')
         sys.exit(1) # Return without call stack so easy to spot error
 
     from base_generator import BaseGeneratorOptions
@@ -87,6 +93,7 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
     from generators.feature_requirements import FeatureRequirementsGenerator
     from generators.feature_not_present import FeatureNotPresentGenerator
     from generators.test_icd_generator import TestIcdGenerator
+    from generators.extended_flags_helper_generator import ExtendedFlagsHelperOutputGenerator
 
     # These set fields that are needed by both OutputGenerator and BaseGenerator,
     # but are uniform and don't need to be set at a per-generated file level
@@ -349,6 +356,14 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
             'generator' : TestIcdGenerator,
             'genCombined': False,
         },
+        'extended_flags_helper_generator.h' : {
+            'generator' : ExtendedFlagsHelperOutputGenerator,
+            'genCombined': True,
+        },
+        'extended_flags_helper_generator.cpp' : {
+            'generator' : ExtendedFlagsHelperOutputGenerator,
+            'genCombined': True,
+        },
     }
 
     unknownTargets = [x for x in (targetFilter if targetFilter else []) if x not in generators.keys()]
@@ -412,7 +427,7 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
 
         # Run clang-format on the file
         if has_clang_format:
-            common_ci.RunShellCmd(f'clang-format -i --style=file:{styleFile} {os.path.join(directory, target)}')
+            common_ci.RunShellCmd(f'{clang_binary} -i --style=file:{styleFile} {os.path.join(directory, target)}')
 
     if os.path.isfile(cachePath):
         os.remove(cachePath)
@@ -519,11 +534,10 @@ def main(argv):
 
     RunGenerators(args.api, registry, grammar, gen_dir, styleFile, args.target, caching)
 
-    # Generate vk_validation_error_messages.h (ignore if targeting a single generator)
+    # Generate vk_validation_error_messages.h/cpp (ignore if targeting a single generator)
     if (not args.target):
         valid_usage_file = os.path.abspath(os.path.join(os.path.dirname(registry), "validusage.json"))
-        error_message_file = os.path.join(gen_dir, 'vk_validation_error_messages.h')
-        GenerateSpecErrorMessage(args.api, valid_usage_file, error_message_file)
+        GenerateSpecErrorMessage(args.api, valid_usage_file, gen_dir)
 
     # optional post-generation steps
     if args.verify:

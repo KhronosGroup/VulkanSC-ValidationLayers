@@ -1,6 +1,6 @@
-/* Copyright (c) 2023-2025 The Khronos Group Inc.
- * Copyright (c) 2023-2025 Valve Corporation
- * Copyright (c) 2023-2025 LunarG, Inc.
+/* Copyright (c) 2023-2026 The Khronos Group Inc.
+ * Copyright (c) 2023-2026 Valve Corporation
+ * Copyright (c) 2023-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,18 +33,17 @@ static_assert(XXH_VERSION_RELEASE == 3);
 namespace hash_util {
 
 uint32_t VuidHash(std::string_view vuid) {
+    // While the XXH32 is known to be slower, unfortunately people are likely relying on the
+    // exact hashes being returned, so we need to keep this stable.
     constexpr uint32_t seed = 8;
     return XXH32(vuid.data(), vuid.size(), seed);
 }
 
-uint32_t Hash32(const void *info, const size_t info_size) {
-    constexpr uint32_t seed = 0;
-    return XXH32(info, info_size, seed);
+uint32_t Hash32(const void* info, const size_t info_size) {
+    // Documentation shows XXH32 is a legacy function and XXH3_64bits is much faster
+    return static_cast<uint32_t>(XXH3_64bits(info, info_size));
 }
 
-uint64_t Hash64(const void *info, const size_t info_size) {
-    constexpr uint64_t seed = 0;
-    return XXH64(info, info_size, seed);
-}
+uint64_t Hash64(const void* info, const size_t info_size) { return XXH3_64bits(info, info_size); }
 
 }  // namespace hash_util
