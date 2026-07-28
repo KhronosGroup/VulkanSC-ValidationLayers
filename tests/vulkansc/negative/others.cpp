@@ -58,7 +58,7 @@ TEST_F(VkSCLayerTest, AllocationCallbacksMustBeNull) {
 
         auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateCommandPool-pAllocator-null");
+        m_errorMonitor->SetDesiredError("VUID-vkCreateCommandPool-pAllocator-null");
         vksc::CreateCommandPool(m_device->handle(), &create_info, &alloc_cb, &handle);
         m_errorMonitor->VerifyFound();
     }
@@ -68,13 +68,13 @@ TEST_F(VkSCLayerTest, AllocationCallbacksMustBeNull) {
         VkFence handle = VK_NULL_HANDLE;
         auto create_info = vku::InitStruct<VkFenceCreateInfo>();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateFence-pAllocator-null");
+        m_errorMonitor->SetDesiredError("VUID-vkCreateFence-pAllocator-null");
         vksc::CreateFence(m_device->handle(), &create_info, &alloc_cb, &handle);
         m_errorMonitor->VerifyFound();
 
         vksc::CreateFence(m_device->handle(), &create_info, nullptr, &handle);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyFence-pAllocator-null");
+        m_errorMonitor->SetDesiredError("VUID-vkDestroyFence-pAllocator-null");
         vksc::DestroyFence(m_device->handle(), handle, &alloc_cb);
         m_errorMonitor->VerifyFound();
 
@@ -86,13 +86,13 @@ TEST_F(VkSCLayerTest, AllocationCallbacksMustBeNull) {
         VkEvent handle = VK_NULL_HANDLE;
         auto create_info = vku::InitStruct<VkEventCreateInfo>();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateEvent-pAllocator-null");
+        m_errorMonitor->SetDesiredError("VUID-vkCreateEvent-pAllocator-null");
         vksc::CreateEvent(m_device->handle(), &create_info, &alloc_cb, &handle);
         m_errorMonitor->VerifyFound();
 
         vksc::CreateEvent(m_device->handle(), &create_info, nullptr, &handle);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyEvent-pAllocator-null");
+        m_errorMonitor->SetDesiredError("VUID-vkDestroyEvent-pAllocator-null");
         vksc::DestroyEvent(m_device->handle(), handle, &alloc_cb);
         m_errorMonitor->VerifyFound();
 
@@ -104,13 +104,13 @@ TEST_F(VkSCLayerTest, AllocationCallbacksMustBeNull) {
         VkSemaphore handle = VK_NULL_HANDLE;
         auto create_info = vku::InitStruct<VkSemaphoreCreateInfo>();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateSemaphore-pAllocator-null");
+        m_errorMonitor->SetDesiredError("VUID-vkCreateSemaphore-pAllocator-null");
         vksc::CreateSemaphore(m_device->handle(), &create_info, &alloc_cb, &handle);
         m_errorMonitor->VerifyFound();
 
         vksc::CreateSemaphore(m_device->handle(), &create_info, nullptr, &handle);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroySemaphore-pAllocator-null");
+        m_errorMonitor->SetDesiredError("VUID-vkDestroySemaphore-pAllocator-null");
         vksc::DestroySemaphore(m_device->handle(), handle, &alloc_cb);
         m_errorMonitor->VerifyFound();
 
@@ -167,48 +167,8 @@ TEST_F(VkSCLayerTest, CreateDescriptorSetLayoutExceededBindingLimit) {
 
     VkDescriptorSetLayout layout = VK_NULL_HANDLE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutBinding-binding-05012");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutBinding-binding-05012");
+    m_errorMonitor->SetDesiredError("VUID-vkCreateDescriptorSetLayout-pCreateInfo-05012", 2);
     vksc::CreateDescriptorSetLayout(m_device->handle(), &create_info, nullptr, &layout);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(VkSCLayerTest, GetDescriptorSetLayoutSupportExceededBindingLimit) {
-    TEST_DESCRIPTION("vkGetDescriptorSetLayoutSupport - binding index cannot exceed descriptorSetLayoutBindingLimit");
-
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info1 = vksc::GetDefaultObjectReservationCreateInfo();
-    auto object_reservation_info2 = vksc::GetDefaultObjectReservationCreateInfo();
-    auto object_reservation_info3 = vksc::GetDefaultObjectReservationCreateInfo();
-
-    object_reservation_info1.pNext = &sc_10_features;
-    object_reservation_info2.pNext = &object_reservation_info1;
-    object_reservation_info3.pNext = &object_reservation_info2;
-
-    object_reservation_info1.descriptorSetLayoutBindingLimit = 1;
-    object_reservation_info2.descriptorSetLayoutBindingLimit = 4;
-    object_reservation_info3.descriptorSetLayoutBindingLimit = 3;
-
-    RETURN_IF_SKIP(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info3));
-
-    VkDescriptorSetLayoutBinding bindings[] = {
-        {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-        {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-        {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-        {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-    };
-
-    auto create_info = vku::InitStruct<VkDescriptorSetLayoutCreateInfo>();
-    create_info.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
-    create_info.pBindings = &bindings[0];
-
-    auto support = vku::InitStruct<VkDescriptorSetLayoutSupport>();
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutBinding-binding-05012");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutBinding-binding-05012");
-    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
     m_errorMonitor->VerifyFound();
 }
 
@@ -239,40 +199,8 @@ TEST_F(VkSCLayerTest, CreateDescriptorSetLayoutExceededBindingCountLimit) {
 
     VkDescriptorSetLayout layout = VK_NULL_HANDLE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-bindingCount-05011");
+    m_errorMonitor->SetDesiredError("VUID-vkCreateDescriptorSetLayout-pCreateInfo-05011");
     vksc::CreateDescriptorSetLayout(m_device->handle(), &create_info, nullptr, &layout);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(VkSCLayerTest, GetDescriptorSetLayoutSupportExceededBindingCountLimit) {
-    TEST_DESCRIPTION("vkGetDescriptorSetLayoutSupport - binding count cannot exceed descriptorSetLayoutBindingLimit");
-
-    RETURN_IF_SKIP(InitFramework());
-
-    const uint32_t limit = GetVulkanSC10Properties().maxDescriptorSetLayoutBindings;
-
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
-
-    object_reservation_info.pNext = &sc_10_features;
-    object_reservation_info.descriptorSetLayoutBindingLimit = limit + 1;
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info));
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-    for (uint32_t i = 0; i <= limit; ++i) {
-        VkDescriptorSetLayoutBinding binding = {i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT};
-        bindings.push_back(binding);
-    }
-
-    auto create_info = vku::InitStruct<VkDescriptorSetLayoutCreateInfo>();
-    create_info.bindingCount = static_cast<uint32_t>(bindings.size());
-    create_info.pBindings = bindings.data();
-
-    auto support = vku::InitStruct<VkDescriptorSetLayoutSupport>();
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-bindingCount-05011");
-    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
     m_errorMonitor->VerifyFound();
 }
 
@@ -318,76 +246,19 @@ TEST_F(VkSCLayerTest, CreateDescriptorSetLayoutExceededImmutableSamplerLimit) {
     VkDescriptorSetLayout layout = VK_NULL_HANDLE;
 
     // Should fail with all bindings
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071");
+    m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071");
     vksc::CreateDescriptorSetLayout(m_device->handle(), &create_info, nullptr, &layout);
     m_errorMonitor->VerifyFound();
 
     // Should still fail if we exclude the last binding
     create_info.bindingCount--;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071");
+    m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071");
     vksc::CreateDescriptorSetLayout(m_device->handle(), &create_info, nullptr, &layout);
     m_errorMonitor->VerifyFound();
 
     // Should succeed if we exclude the last two bindings
     create_info.bindingCount--;
     vkt::DescriptorSetLayout set_layout(*m_device, create_info);
-}
-
-TEST_F(VkSCLayerTest, GetDescriptorSetLayoutSupportExceededImmutableSamplerLimit) {
-    TEST_DESCRIPTION("vkGetDescriptorSetLayoutSupport - immutable sampler limit cannot exceed descriptorSetLayoutBindingLimit");
-
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info1 = vksc::GetDefaultObjectReservationCreateInfo();
-    auto object_reservation_info2 = vksc::GetDefaultObjectReservationCreateInfo();
-    auto object_reservation_info3 = vksc::GetDefaultObjectReservationCreateInfo();
-
-    object_reservation_info1.pNext = &sc_10_features;
-    object_reservation_info2.pNext = &object_reservation_info1;
-    object_reservation_info3.pNext = &object_reservation_info2;
-
-    object_reservation_info1.maxImmutableSamplersPerDescriptorSetLayout = 0;
-    object_reservation_info2.maxImmutableSamplersPerDescriptorSetLayout = 7;
-    object_reservation_info3.maxImmutableSamplersPerDescriptorSetLayout = 5;
-
-    RETURN_IF_SKIP(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info3));
-
-    auto sampler_ci = vku::InitStruct<VkSamplerCreateInfo>();
-    vkt::Sampler sampler(*m_device, sampler_ci);
-
-    std::vector<VkSampler> samplers(10, sampler.handle());
-
-    VkDescriptorSetLayoutBinding bindings[] = {
-        {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
-        {1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
-        {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
-        {3, VK_DESCRIPTOR_TYPE_SAMPLER, 3, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-        {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
-        // The bindings below will cause the limit to be exceeded
-        {5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
-        {6, VK_DESCRIPTOR_TYPE_SAMPLER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, samplers.data()},
-    };
-
-    auto create_info = vku::InitStruct<VkDescriptorSetLayoutCreateInfo>();
-    create_info.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
-    create_info.pBindings = &bindings[0];
-
-    auto support = vku::InitStruct<VkDescriptorSetLayoutSupport>();
-
-    // Should fail with all bindings
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071");
-    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
-    m_errorMonitor->VerifyFound();
-
-    // Should still fail if we exclude the last binding
-    create_info.bindingCount--;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071");
-    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
-    m_errorMonitor->VerifyFound();
-
-    // Should succeed if we exclude the last two bindings
-    create_info.bindingCount--;
-    vksc::GetDescriptorSetLayoutSupport(m_device->handle(), &create_info, &support);
 }
 
 TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
@@ -472,7 +343,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         query_pool_obj.Init(*m_device, create_info);
 
         create_info.queryCount++;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-05046");
+        m_errorMonitor->SetDesiredError("VUID-VkQueryPoolCreateInfo-queryType-05046");
         vksc::CreateQueryPool(m_device->handle(), &create_info, nullptr, &query_pool);
         m_errorMonitor->VerifyFound();
     }
@@ -489,7 +360,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         query_pool_obj.Init(*m_device, create_info);
 
         create_info.queryCount++;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-05047");
+        m_errorMonitor->SetDesiredError("VUID-VkQueryPoolCreateInfo-queryType-05047");
         vksc::CreateQueryPool(m_device->handle(), &create_info, nullptr, &query_pool);
         m_errorMonitor->VerifyFound();
     }
@@ -505,7 +376,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         query_pool_obj.Init(*m_device, create_info);
 
         create_info.queryCount++;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-05048");
+        m_errorMonitor->SetDesiredError("VUID-VkQueryPoolCreateInfo-queryType-05048");
         vksc::CreateQueryPool(m_device->handle(), &create_info, nullptr, &query_pool);
         m_errorMonitor->VerifyFound();
     }
@@ -526,7 +397,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         query_pool_obj.Init(*m_device, create_info);
 
         create_info.queryCount++;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-05049");
+        m_errorMonitor->SetDesiredError("VUID-VkQueryPoolCreateInfo-queryType-05049");
         vksc::CreateQueryPool(m_device->handle(), &create_info, nullptr, &query_pool);
         m_errorMonitor->VerifyFound();
     }
@@ -569,25 +440,25 @@ TEST_F(VkSCLayerTest, CreateImageViewExceededMaxMipLevels) {
     VkImageView image_view = VK_NULL_HANDLE;
 
     create_info.subresourceRange.levelCount++;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05064");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-subresourceRange-05064");
     vksc::CreateImageView(m_device->handle(), &create_info, nullptr, &image_view);
     m_errorMonitor->VerifyFound();
 
     create_info.subresourceRange.levelCount--;
     create_info.subresourceRange.layerCount++;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05066");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-subresourceRange-05066");
     vksc::CreateImageView(m_device->handle(), &create_info, nullptr, &image_view);
     m_errorMonitor->VerifyFound();
 
     create_info.subresourceRange.layerCount--;
     create_info.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05200");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-subresourceRange-05200");
     vksc::CreateImageView(m_device->handle(), &create_info, nullptr, &image_view);
     m_errorMonitor->VerifyFound();
 
     create_info.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05200");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05202");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-subresourceRange-05200");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-subresourceRange-05202");
     vksc::CreateImageView(m_device->handle(), &create_info, nullptr, &image_view);
     m_errorMonitor->VerifyFound();
 
@@ -629,12 +500,12 @@ TEST_F(VkSCLayerTest, CreateImageViewExceededMaxArrayLayers) {
     VkImageView image_view = VK_NULL_HANDLE;
 
     create_info.subresourceRange.layerCount++;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05065");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-subresourceRange-05065");
     vksc::CreateImageView(m_device->handle(), &create_info, nullptr, &image_view);
     m_errorMonitor->VerifyFound();
 
     create_info.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05201");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-subresourceRange-05201");
     vksc::CreateImageView(m_device->handle(), &create_info, nullptr, &image_view);
     m_errorMonitor->VerifyFound();
 
@@ -658,7 +529,7 @@ TEST_F(VkSCLayerTest, CreateBufferUnsupportedFlags) {
 
     for (auto flag : unsupported_flags) {
         create_info.flags = flag;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBufferCreateInfo-flags-05061");
+        m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-flags-05061");
         vksc::CreateBuffer(m_device->handle(), &create_info, nullptr, &buffer);
         m_errorMonitor->VerifyFound();
     }
@@ -667,7 +538,7 @@ TEST_F(VkSCLayerTest, CreateBufferUnsupportedFlags) {
     for (auto flag : unsupported_flags) {
         create_info.flags |= flag;
     }
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBufferCreateInfo-flags-05061");
+    m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-flags-05061");
     vksc::CreateBuffer(m_device->handle(), &create_info, nullptr, &buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -695,12 +566,12 @@ TEST_F(VkSCLayerTest, CreateImageUnsupportedFlags) {
 
     for (auto flag : unsupported_flags) {
         create_info.flags = flag;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-flags-05062");
+        m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-flags-05062");
         vksc::CreateImage(m_device->handle(), &create_info, nullptr, &image);
         m_errorMonitor->VerifyFound();
 
         create_info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-flags-05062");
+        m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-flags-05062");
         vksc::CreateImage(m_device->handle(), &create_info, nullptr, &image);
         m_errorMonitor->VerifyFound();
     }
@@ -709,12 +580,12 @@ TEST_F(VkSCLayerTest, CreateImageUnsupportedFlags) {
     for (auto flag : unsupported_flags) {
         create_info.flags |= flag;
     }
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-flags-05062");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-flags-05062");
     vksc::CreateImage(m_device->handle(), &create_info, nullptr, &image);
     m_errorMonitor->VerifyFound();
 
     create_info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-flags-05062");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-flags-05062");
     vksc::CreateImage(m_device->handle(), &create_info, nullptr, &image);
     m_errorMonitor->VerifyFound();
 }
@@ -761,7 +632,7 @@ TEST_F(VkSCLayerTest, BindImageMemorySplitInstanceBindRegionCount) {
     bind_info.memory = memory;
     bind_info.memoryOffset = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBindImageMemoryDeviceGroupInfo-splitInstanceBindRegionCount-05067");
+    m_errorMonitor->SetDesiredError("VUID-VkBindImageMemoryDeviceGroupInfo-splitInstanceBindRegionCount-05067");
     vksc::BindImageMemory2(m_device->handle(), 1, &bind_info);
     m_errorMonitor->VerifyFound();
 }
@@ -805,7 +676,7 @@ TEST_F(VkSCLayerTest, CreateFramebufferMaxFramebufferAttachmentsExceeded) {
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkFramebufferCreateInfo-flags-02778");
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkFramebufferCreateInfo-attachmentCount-00876");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkFramebufferCreateInfo-attachmentCount-05060");
+    m_errorMonitor->SetDesiredError("VUID-VkFramebufferCreateInfo-attachmentCount-05060");
     vksc::CreateFramebuffer(device(), &create_info, nullptr, &framebuffer);
     m_errorMonitor->VerifyFound();
 }
@@ -819,7 +690,7 @@ TEST_F(VkSCLayerTest, GetFaultDataExceedsMaxQueryFaultCount) {
 
     VkBool32 unrecorded_faults = VK_FALSE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetFaultData-pFaultCount-05020");
+    m_errorMonitor->SetDesiredError("VUID-vkGetFaultData-pFaultCount-05020");
     vksc::GetFaultData(device(), VK_FAULT_QUERY_BEHAVIOR_GET_AND_CLEAR_ALL_FAULTS, &unrecorded_faults, &fault_count, nullptr);
     m_errorMonitor->VerifyFound();
 }
@@ -854,7 +725,7 @@ TEST_F(VkSCLayerTest, FaultCallbackInfoFaultCount) {
 
     VkDevice device = VK_NULL_HANDLE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkFaultCallbackInfo-faultCount-05138");
+    m_errorMonitor->SetDesiredError("VUID-VkFaultCallbackInfo-faultCount-05138");
     vksc::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 }

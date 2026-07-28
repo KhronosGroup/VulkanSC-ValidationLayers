@@ -105,9 +105,6 @@ class Device : public vvl::sc::DeviceProxy<CoreChecks> {
 
     bool ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchainCreateInfoKHR& create_info, const Location& loc) const;
 
-    bool ValidateDescriptorSetLayoutCreateInfoSC(const VkDescriptorSetLayoutCreateInfo& create_info,
-                                                 const Location& create_info_loc) const;
-
     // Functions removed in Vulkan SC
     bool PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
                                            const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule,
@@ -255,9 +252,6 @@ class Device : public vvl::sc::DeviceProxy<CoreChecks> {
                                            const ErrorObject& error_obj) const override;
     bool PreCallValidateGetFaultData(VkDevice device, VkFaultQueryBehavior faultQueryBehavior, VkBool32* pUnrecordedFaults,
                                      uint32_t* pFaultCount, VkFaultData* pFaults, const ErrorObject& error_obj) const override;
-    bool PreCallValidateGetDescriptorSetLayoutSupport(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo,
-                                                      VkDescriptorSetLayoutSupport* pSupport,
-                                                      const ErrorObject& error_obj) const override;
 
     // SPIR-V validation related utilities
     bool ValidatePipelineStageInfo(uint32_t stage_index, const VkPipelineShaderStageCreateInfo& stage_info,

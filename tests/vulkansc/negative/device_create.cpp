@@ -62,7 +62,7 @@ TEST_F(VkSCNegativeDeviceCreate, MaxMemoryAllocationCountExceeded) {
 
         object_reservation_info[used_count / 2].deviceMemoryRequestCount++;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateDevice-deviceMemoryRequestCount-05095");
+        m_errorMonitor->SetDesiredError("VUID-vkCreateDevice-deviceMemoryRequestCount-05095");
         TestCreateDevice(chain);
     }
 }
@@ -96,7 +96,7 @@ TEST_F(VkSCNegativeDeviceCreate, MaxSamplerAllocationCountExceeded) {
 
         object_reservation_info[used_count / 2].samplerRequestCount++;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateDevice-samplerRequestCount-05096");
+        m_errorMonitor->SetDesiredError("VUID-vkCreateDevice-samplerRequestCount-05096");
         TestCreateDevice(chain);
     }
 }
@@ -107,7 +107,7 @@ TEST_F(VkSCNegativeDeviceCreate, MaxImageArrayLayersExceeded) {
     RETURN_IF_SKIP(InitFramework());
 
     ObjectReservation().maxImageViewArrayLayers = GetVulkanProperties().limits.maxImageArrayLayers + 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceObjectReservationCreateInfo-maxImageViewArrayLayers-05014");
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceObjectReservationCreateInfo-maxImageViewArrayLayers-05014");
     TestCreateDevice(&ObjectReservation());
 }
 
@@ -123,12 +123,12 @@ TEST_F(VkSCNegativeDeviceCreate, MaxMipLevelsExceeded) {
                                                   pd_props.limits.maxImageDimension3D, pd_props.limits.maxImageDimensionCube})));
 
     ObjectReservation().maxImageViewMipLevels = max_mip_levels + 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceObjectReservationCreateInfo-maxImageViewMipLevels-05015");
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceObjectReservationCreateInfo-maxImageViewMipLevels-05015");
     TestCreateDevice(&ObjectReservation());
 
     ObjectReservation().maxImageViewMipLevels = max_mip_levels;
     ObjectReservation().maxLayeredImageViewMipLevels = max_mip_levels + 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceObjectReservationCreateInfo-maxLayeredImageViewMipLevels-05016");
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceObjectReservationCreateInfo-maxLayeredImageViewMipLevels-05016");
     TestCreateDevice(&ObjectReservation());
 }
 
@@ -172,10 +172,10 @@ TEST_F(VkSCNegativeDeviceCreate, PipelineCacheCreateMissingRequiredFlags) {
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
     create_info = builder.MakeCreateInfo(VK_PIPELINE_CACHE_CREATE_USE_APPLICATION_STORAGE_BIT);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-flags-05043");
+    m_errorMonitor->SetDesiredError("VUID-VkPipelineCacheCreateInfo-flags-05043");
     TestCreateDevice(&ObjectReservation());
 
     create_info = builder.MakeCreateInfo(VK_PIPELINE_CACHE_CREATE_READ_ONLY_BIT);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-flags-05044");
+    m_errorMonitor->SetDesiredError("VUID-VkPipelineCacheCreateInfo-flags-05044");
     TestCreateDevice(&ObjectReservation());
 }

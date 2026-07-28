@@ -20,7 +20,7 @@ TEST_F(VkSCNegativeShaderSpirv, ComputeEntryPointNameMismatch) {
 
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-pName-05027");
+    m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-pName-05027");
     builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -38,13 +38,13 @@ TEST_F(VkSCNegativeShaderSpirv, GraphicsEntryPointNameMismatch) {
 
     builder.stage_ci[0].pName = "main";
     builder.stage_ci[1].pName = wrong_name;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-pName-05027");
+    m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-pName-05027");
     builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 
     builder.stage_ci[0].pName = wrong_name;
     builder.stage_ci[1].pName = "main";
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-pName-05027");
+    m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-pName-05027");
     builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -122,7 +122,7 @@ TEST_F(VkSCNegativeShaderSpirv, InvalidSpirv) {
 
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08737");
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
     builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -149,7 +149,7 @@ TEST_F(VkSCNegativeShaderSpirv, MissingShaderCapability) {
 
     // TODO: Vulkan SC - this should be triggering VUID 08738, but actually triggers 08737
     // because VVL does not check for 08738 and relies on spirv-val to detect the error
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08737");
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
     builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -207,7 +207,7 @@ TEST_F(VkSCNegativeShaderSpirv, CapabilityRequirementNotMet) {
 
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08740");
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
     builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -236,7 +236,7 @@ TEST_F(VkSCNegativeShaderSpirv, ExtensionNotSupported) {
 
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08741");
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08741");
     builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -265,7 +265,7 @@ TEST_F(VkSCNegativeShaderSpirv, ExtensionRequirementNotMet) {
 
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08742");
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
     builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -284,7 +284,7 @@ TEST_F(VkSCNegativeShaderSpirv, Atomics) {
     vksc10_features.shaderAtomicInstructions = VK_FALSE;
     RETURN_IF_SKIP(InitState(nullptr, &vksc10_features));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpAtomic-05091");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpAtomic-05091");
     builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -298,7 +298,7 @@ TEST_F(VkSCNegativeShaderSpirv, LayoutCrossValidation) {
     AddRequiredFeature(vkt::Feature::shaderAtomicInstructions);
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkComputePipelineCreateInfo-layout-07988");
+    m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-layout-07988");
     builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }

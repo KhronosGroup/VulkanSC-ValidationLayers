@@ -19,7 +19,7 @@ TEST_F(VkSCNegativeCommand, CreateCommandPoolMissingMemoryReservationInfo) {
     auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>();
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandPoolCreateInfo-pNext-05002");
+    m_errorMonitor->SetDesiredError("VUID-VkCommandPoolCreateInfo-pNext-05002");
     vksc::CreateCommandPool(m_device->handle(), &create_info, nullptr, &cmd_pool);
     m_errorMonitor->VerifyFound();
 }
@@ -36,7 +36,7 @@ TEST_F(VkSCNegativeCommand, CreateCommandPoolInvalidReservedSize) {
     auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolReservedSize-05003");
+    m_errorMonitor->SetDesiredError("VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolReservedSize-05003");
     vksc::CreateCommandPool(m_device->handle(), &create_info, nullptr, &cmd_pool);
     m_errorMonitor->VerifyFound();
 }
@@ -91,7 +91,7 @@ TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
     uint32_t avail_cmd_buffers = max_cmd_buffers;
 
     // Cannot allocate more than reserved
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandBufferAllocateInfo-commandPool-05006");
+    m_errorMonitor->SetDesiredError("VUID-VkCommandBufferAllocateInfo-commandPool-05006");
     alloc_info.commandBufferCount = max_cmd_buffers + 1;
     vksc::AllocateCommandBuffers(m_device->handle(), &alloc_info, cmd_buffers);
     m_errorMonitor->VerifyFound();
@@ -102,7 +102,7 @@ TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
         tmp_cmd_buffers[i].Init(*m_device, alloc_info);
         avail_cmd_buffers--;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandBufferAllocateInfo-commandPool-05006");
+        m_errorMonitor->SetDesiredError("VUID-VkCommandBufferAllocateInfo-commandPool-05006");
         alloc_info.commandBufferCount = avail_cmd_buffers + 1;
         vksc::AllocateCommandBuffers(m_device->handle(), &alloc_info, cmd_buffers);
         m_errorMonitor->VerifyFound();
@@ -116,7 +116,7 @@ TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
             avail_cmd_buffers++;
         }
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandBufferAllocateInfo-commandPool-05006");
+        m_errorMonitor->SetDesiredError("VUID-VkCommandBufferAllocateInfo-commandPool-05006");
         alloc_info.commandBufferCount = avail_cmd_buffers + 1;
         vksc::AllocateCommandBuffers(m_device->handle(), &alloc_info, cmd_buffers);
         m_errorMonitor->VerifyFound();
@@ -150,7 +150,7 @@ TEST_F(VkSCNegativeCommand, ResetCommandBufferNotSupported) {
     alloc_info.commandBufferCount = 1;
     vkt::CommandBuffer cmd_buffer(*m_device, alloc_info);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135");
+    m_errorMonitor->SetDesiredError("VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135");
     vksc::ResetCommandBuffer(cmd_buffer.handle(), 0);
     m_errorMonitor->VerifyFound();
 
@@ -158,7 +158,7 @@ TEST_F(VkSCNegativeCommand, ResetCommandBufferNotSupported) {
     vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
     vksc::EndCommandBuffer(cmd_buffer.handle());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136");
+    m_errorMonitor->SetDesiredError("VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136");
     vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
     m_errorMonitor->VerifyFound();
 }
@@ -194,7 +194,7 @@ TEST_F(VkSCNegativeCommand, CommandPoolMultipleRecordingNotSupported) {
     cb1.Begin();
     cb_other_pool.Begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBeginCommandBuffer-commandPoolMultipleCommandBuffersRecording-05007");
+    m_errorMonitor->SetDesiredError("VUID-vkBeginCommandBuffer-commandPoolMultipleCommandBuffersRecording-05007");
     vksc::BeginCommandBuffer(cb2.handle(), &begin_info);
     m_errorMonitor->VerifyFound();
 
@@ -226,7 +226,7 @@ TEST_F(VkSCNegativeCommand, SimulatenousUseNotSupported) {
     auto begin_info = vku::InitStruct<VkCommandBufferBeginInfo>();
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBeginCommandBuffer-commandBufferSimultaneousUse-05008");
+    m_errorMonitor->SetDesiredError("VUID-vkBeginCommandBuffer-commandBufferSimultaneousUse-05008");
     vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
     m_errorMonitor->VerifyFound();
 }
@@ -319,7 +319,7 @@ TEST_F(VkSCNegativeCommand, SecondaryCommandBufferNullOrImagelessFramebuffer) {
                                     : "VUID-VkCommandBufferBeginInfo-flags-05010";
 
     // Check with incompatible render pass
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, expected_vuid);
+    m_errorMonitor->SetDesiredError(expected_vuid);
     vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
     m_errorMonitor->VerifyFound();
 
@@ -327,7 +327,7 @@ TEST_F(VkSCNegativeCommand, SecondaryCommandBufferNullOrImagelessFramebuffer) {
         // Check with no framebuffer
         inherit_info.framebuffer = VK_NULL_HANDLE;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, expected_vuid);
+        m_errorMonitor->SetDesiredError(expected_vuid);
         vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
         m_errorMonitor->VerifyFound();
 
@@ -349,7 +349,7 @@ TEST_F(VkSCNegativeCommand, SecondaryCommandBufferNullOrImagelessFramebuffer) {
             vkt::Framebuffer imageless_framebuffer(*m_device, framebuffer_ci);
             inherit_info.framebuffer = imageless_framebuffer;
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, expected_vuid);
+            m_errorMonitor->SetDesiredError(expected_vuid);
             vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
             m_errorMonitor->VerifyFound();
         }

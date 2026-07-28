@@ -27,7 +27,7 @@ TEST_F(VkSCPortedLayerTest, SpecLinks) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "registry/VulkanSC/specs");
+    m_errorMonitor->SetDesiredError("registry/VulkanSC/specs");
     vksc::GetPhysicalDeviceFeatures(Gpu(), NULL);
     m_errorMonitor->VerifyFound();
 }
@@ -62,7 +62,7 @@ TEST_F(VkSCPortedLayerTest, LeakAnObject) {
     VkFence leaked_fence;
     ASSERT_EQ(VK_SUCCESS, vksc::CreateFence(leaky_device, &fence_ci, nullptr, &leaked_fence));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyDevice-device-05137");
+    m_errorMonitor->SetDesiredError("VUID-vkDestroyDevice-device-05137");
     vksc::DestroyDevice(leaky_device, nullptr);
     m_errorMonitor->VerifyFound();
 
@@ -125,7 +125,7 @@ TEST_F(VkSCPortedNegativeImage, ImageMisc) {
 
         image_ci.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
         image_ci.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-usage-00963");
+        m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-usage-00963");
         CreateImageTest(image_ci, "VUID-VkImageCreateInfo-usage-00966");
     }
 

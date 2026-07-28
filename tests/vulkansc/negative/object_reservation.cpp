@@ -261,7 +261,7 @@ TEST_F(VkSCNegativeObjectReservation, CommandPoolRequestCount) {
             auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateCommandPool-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateCommandPool-device-05068");
                 vksc::CreateCommandPool(device.handle(), &create_info, nullptr, &cmd_pool);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -370,7 +370,7 @@ TEST_F(VkSCNegativeObjectReservation, DescriptorSetLayoutRequestCount) {
             create_info.pBindings = &binding;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateDescriptorSetLayout-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateDescriptorSetLayout-device-05068");
                 vksc::CreateDescriptorSetLayout(device.handle(), &create_info, nullptr, &descriptor_set_layout);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -436,7 +436,7 @@ TEST_F(VkSCNegativeObjectReservation, DescriptorSetLayoutBindingRequestCount) {
             create_info.pBindings = bindings.data();
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateDescriptorSetLayout-layoutbindings-device-05089");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateDescriptorSetLayout-layoutbindings-device-05089");
                 vksc::CreateDescriptorSetLayout(device.handle(), &create_info, nullptr, &descriptor_set_layout);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -511,7 +511,7 @@ TEST_F(VkSCNegativeObjectReservation, PipelineLayoutRequestCount) {
             create_info.pSetLayouts = &data.descriptor_set_layout;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePipelineLayout-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreatePipelineLayout-device-05068");
                 vksc::CreatePipelineLayout(device.handle(), &create_info, nullptr, &pipeline_layout);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -572,7 +572,7 @@ TEST_F(VkSCNegativeObjectReservation, DescriptorPoolRequestCount) {
             create_info.pPoolSizes = &pool_size;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateDescriptorPool-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateDescriptorPool-device-05068");
                 vksc::CreateDescriptorPool(device.handle(), &create_info, nullptr, &descriptor_pool);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -675,7 +675,7 @@ TEST_F(VkSCNegativeObjectReservation, DescriptorSetRequestCount) {
 
             if (alloc_info.descriptorPool != VK_NULL_HANDLE) {
                 if (should_fail) {
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkAllocateDescriptorSets-device-05068");
+                    m_errorMonitor->SetDesiredError("VUID-vkAllocateDescriptorSets-device-05068");
                     vksc::AllocateDescriptorSets(device.handle(), &alloc_info, descriptor_sets.data());
                     m_errorMonitor->VerifyFound();
                 } else {
@@ -730,7 +730,7 @@ TEST_F(VkSCNegativeObjectReservation, DeviceMemoryRequestCount) {
             alloc_info.memoryTypeIndex = 0;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkAllocateMemory-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkAllocateMemory-device-05068");
                 vksc::AllocateMemory(device.handle(), &alloc_info, nullptr, &device_memory);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -780,7 +780,7 @@ TEST_F(VkSCNegativeObjectReservation, PipelineCacheRequestCount) {
             auto create_info = vksc::GetDefaultPipelineCacheCreateInfo();
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePipelineCache-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreatePipelineCache-device-05068");
                 vksc::CreatePipelineCache(device.handle(), &create_info, nullptr, &pipeline_cache);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -873,7 +873,7 @@ TEST_F(VkSCNegativeObjectReservation, ComputePipelineRequestCount) {
             }
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateComputePipelines-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateComputePipelines-device-05068");
                 vksc::CreateComputePipelines(device.handle(), data.pipeline_cache, create_count, create_info.data(), nullptr,
                                              pipelines.data());
                 m_errorMonitor->VerifyFound();
@@ -1000,7 +1000,7 @@ TEST_F(VkSCNegativeObjectReservation, GraphicsPipelineRequestCount) {
             }
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateGraphicsPipelines-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateGraphicsPipelines-device-05068");
                 vksc::CreateGraphicsPipelines(device.handle(), data.pipeline_cache, create_count, create_info.data(), nullptr,
                                               pipelines.data());
                 m_errorMonitor->VerifyFound();
@@ -1062,7 +1062,7 @@ TEST_F(VkSCNegativeObjectReservation, QueryPoolRequestCount) {
             create_info.queryCount = 8;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateQueryPool-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateQueryPool-device-05068");
                 vksc::CreateQueryPool(device.handle(), &create_info, nullptr, &query_pool);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -1120,7 +1120,7 @@ TEST_F(VkSCNegativeObjectReservation, RenderPassRequestCount) {
 
                 if (should_fail) {
                     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-subpasses-device-05089");
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRenderPass2-device-05068");
+                    m_errorMonitor->SetDesiredError("VUID-vkCreateRenderPass2-device-05068");
                     vksc::CreateRenderPass2(device.handle(), &create_info, nullptr, &render_pass);
                     m_errorMonitor->VerifyFound();
                 } else {
@@ -1137,7 +1137,7 @@ TEST_F(VkSCNegativeObjectReservation, RenderPassRequestCount) {
 
                 if (should_fail) {
                     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass-subpasses-device-05089");
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRenderPass-device-05068");
+                    m_errorMonitor->SetDesiredError("VUID-vkCreateRenderPass-device-05068");
                     vksc::CreateRenderPass(device.handle(), &create_info, nullptr, &render_pass);
                     m_errorMonitor->VerifyFound();
                 } else {
@@ -1203,7 +1203,7 @@ TEST_F(VkSCNegativeObjectReservation, SubpassDescriptionRequestCount) {
                 create_info.pSubpasses = subpasses.data();
 
                 if (should_fail) {
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRenderPass2-subpasses-device-05089");
+                    m_errorMonitor->SetDesiredError("VUID-vkCreateRenderPass2-subpasses-device-05089");
                     vksc::CreateRenderPass2(device.handle(), &create_info, nullptr, &render_pass);
                     m_errorMonitor->VerifyFound();
                 } else {
@@ -1221,7 +1221,7 @@ TEST_F(VkSCNegativeObjectReservation, SubpassDescriptionRequestCount) {
                 create_info.pSubpasses = subpasses.data();
 
                 if (should_fail) {
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRenderPass-subpasses-device-05089");
+                    m_errorMonitor->SetDesiredError("VUID-vkCreateRenderPass-subpasses-device-05089");
                     vksc::CreateRenderPass(device.handle(), &create_info, nullptr, &render_pass);
                     m_errorMonitor->VerifyFound();
                 } else {
@@ -1298,7 +1298,7 @@ TEST_F(VkSCNegativeObjectReservation, AttachmentDescriptionRequestCount) {
                 create_info.pSubpasses = &subpass;
 
                 if (should_fail) {
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRenderPass2-attachments-device-05089");
+                    m_errorMonitor->SetDesiredError("VUID-vkCreateRenderPass2-attachments-device-05089");
                     vksc::CreateRenderPass2(device.handle(), &create_info, nullptr, &render_pass);
                     m_errorMonitor->VerifyFound();
                 } else {
@@ -1326,7 +1326,7 @@ TEST_F(VkSCNegativeObjectReservation, AttachmentDescriptionRequestCount) {
                 create_info.pSubpasses = &subpass;
 
                 if (should_fail) {
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRenderPass-attachments-device-05089");
+                    m_errorMonitor->SetDesiredError("VUID-vkCreateRenderPass-attachments-device-05089");
                     vksc::CreateRenderPass(device.handle(), &create_info, nullptr, &render_pass);
                     m_errorMonitor->VerifyFound();
                 } else {
@@ -1402,7 +1402,7 @@ TEST_F(VkSCNegativeObjectReservation, FramebufferRequestCount) {
             create_info.layers = 1;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateFramebuffer-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateFramebuffer-device-05068");
                 vksc::CreateFramebuffer(device.handle(), &create_info, nullptr, &framebuffer);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -1457,7 +1457,7 @@ TEST_F(VkSCNegativeObjectReservation, BufferRequestCount) {
             create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateBuffer-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateBuffer-device-05068");
                 vksc::CreateBuffer(device.handle(), &create_info, nullptr, &buffer);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -1525,7 +1525,7 @@ TEST_F(VkSCNegativeObjectReservation, BufferViewRequestCount) {
             create_info.range = 256;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateBufferView-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateBufferView-device-05068");
                 vksc::CreateBufferView(device.handle(), &create_info, nullptr, &buffer_view);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -1586,7 +1586,7 @@ TEST_F(VkSCNegativeObjectReservation, ImageRequestCount) {
             create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateImage-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateImage-device-05068");
                 vksc::CreateImage(device.handle(), &create_info, nullptr, &image);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -1663,7 +1663,7 @@ TEST_F(VkSCNegativeObjectReservation, ImageViewRequestCount) {
             create_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateImageView-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateImageView-device-05068");
                 vksc::CreateImageView(device.handle(), &create_info, nullptr, &image_view);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -1763,7 +1763,7 @@ TEST_F(VkSCNegativeObjectReservation, LayeredImageViewRequestCount) {
             assert(create_info.subresourceRange.layerCount > 1);
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateImageView-subresourceRange-05063");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateImageView-subresourceRange-05063");
                 vksc::CreateImageView(device.handle(), &create_info, nullptr, &image_view);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -1823,7 +1823,7 @@ TEST_F(VkSCNegativeObjectReservation, SamplerRequestCount) {
             create_info.minFilter = VK_FILTER_LINEAR;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateSampler-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateSampler-device-05068");
                 vksc::CreateSampler(device.handle(), &create_info, nullptr, &sampler);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -1898,7 +1898,7 @@ TEST_F(VkSCNegativeObjectReservation, SamplerYcbcrConversionRequestCount) {
             create_info.format = data.ycbcr_format;
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateSamplerYcbcrConversion-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateSamplerYcbcrConversion-device-05068");
                 vksc::CreateSamplerYcbcrConversion(device.handle(), &create_info, nullptr, &sampler_ycbcr_conversion);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -1951,7 +1951,7 @@ TEST_F(VkSCNegativeObjectReservation, FenceRequestCount) {
             auto create_info = vku::InitStruct<VkFenceCreateInfo>();
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateFence-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateFence-device-05068");
                 vksc::CreateFence(device.handle(), &create_info, nullptr, &fence);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -2004,7 +2004,7 @@ TEST_F(VkSCNegativeObjectReservation, SemaphoreRequestCount) {
             auto create_info = vku::InitStruct<VkSemaphoreCreateInfo>();
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateSemaphore-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateSemaphore-device-05068");
                 vksc::CreateSemaphore(device.handle(), &create_info, nullptr, &semaphore);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -2057,7 +2057,7 @@ TEST_F(VkSCNegativeObjectReservation, EventRequestCount) {
             auto create_info = vku::InitStruct<VkEventCreateInfo>();
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateEvent-device-05068");
+                m_errorMonitor->SetDesiredError("VUID-vkCreateEvent-device-05068");
                 vksc::CreateEvent(device.handle(), &create_info, nullptr, &event);
                 m_errorMonitor->VerifyFound();
             } else {
@@ -2136,7 +2136,7 @@ TEST_F(VkSCNegativeObjectReservation, PrivateDataSlotRequestCount) {
             auto create_info = vku::InitStruct<VkPrivateDataSlotCreateInfoEXT>();
 
             if (should_fail) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePrivateDataSlotEXT-device-05000");
+                m_errorMonitor->SetDesiredError("VUID-vkCreatePrivateDataSlotEXT-device-05000");
                 data.pfn_vkCreatePrivateDataSlotEXT(device.handle(), &create_info, nullptr, &private_data_slot);
                 m_errorMonitor->VerifyFound();
             } else {

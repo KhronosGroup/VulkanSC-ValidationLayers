@@ -24,7 +24,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelinesShaderModuleNotNull) {
         // VkPipelineShaderStageCreateInfo::module must be VK_NULL_HANDLE
         builder.pipeline_ci.stage.module = (VkShaderModule)(size_t)0xBAADF00D;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-module-05026");
+        m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-module-05026");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineShaderStageCreateInfo-module-parameter");
         builder.CreatePipeline(*m_device);
         m_errorMonitor->VerifyFound();
@@ -35,7 +35,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelinesShaderModuleNotNull) {
         // VkPipelineShaderStageCreateInfo::module must be VK_NULL_HANDLE
         builder.stage_ci[0].module = (VkShaderModule)(size_t)0xBAADF00D;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-module-05026");
+        m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageCreateInfo-module-05026");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineShaderStageCreateInfo-module-parameter");
         builder.CreatePipeline(*m_device);
         m_errorMonitor->VerifyFound();
@@ -57,7 +57,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelinesWithBasePipeline) {
             builder.pipeline_ci.basePipelineHandle = (VkPipeline)(size_t)0xBAADF00D;
             builder.pipeline_ci.basePipelineIndex = 0;
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkComputePipelineCreateInfo-basePipelineHandle-05024");
+            m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-basePipelineHandle-05024");
             builder.CreatePipeline(*m_device);
             m_errorMonitor->VerifyFound();
         }
@@ -66,7 +66,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelinesWithBasePipeline) {
             builder.pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
             builder.pipeline_ci.basePipelineIndex = (int32_t)0xBAADF00D;
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkComputePipelineCreateInfo-basePipelineIndex-05025");
+            m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-basePipelineIndex-05025");
             builder.CreatePipeline(*m_device);
             m_errorMonitor->VerifyFound();
         }
@@ -79,7 +79,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelinesWithBasePipeline) {
             // VkPipelineShaderStageCreateInfo::basePipelineHandle must be VK_NULL_HANDLE
             builder.pipeline_ci.basePipelineHandle = (VkPipeline)(size_t)0xBAADF00D;
             builder.pipeline_ci.basePipelineIndex = 0;
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-basePipelineHandle-05024");
+            m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-basePipelineHandle-05024");
             builder.CreatePipeline(*m_device);
             m_errorMonitor->VerifyFound();
         }
@@ -87,7 +87,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelinesWithBasePipeline) {
             // VkPipelineShaderStageCreateInfo::basePipelineIndex must be 0
             builder.pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
             builder.pipeline_ci.basePipelineIndex = (int32_t)0xBAADF00D;
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-basePipelineIndex-05025");
+            m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-basePipelineIndex-05025");
             builder.CreatePipeline(*m_device);
             m_errorMonitor->VerifyFound();
         }
@@ -141,7 +141,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelinePoolSize) {
             }
 
             for (const auto vuid : vuids) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, vuid);
+                m_errorMonitor->SetDesiredError(vuid);
             }
 
             vksc::CreateComputePipelines(device, GetDefaultPipelineCache(), static_cast<uint32_t>(create_info.size()),
@@ -180,7 +180,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelinePoolSize) {
             }
 
             for (const auto vuid : vuids) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, vuid);
+                m_errorMonitor->SetDesiredError(vuid);
             }
 
             vksc::CreateGraphicsPipelines(device, GetDefaultPipelineCache(), static_cast<uint32_t>(create_info.size()),
@@ -318,13 +318,13 @@ TEST_F(VkSCNegativePipeline, CreatePipelineCacheInvalidFlags) {
     auto create_info = vksc::GetDefaultPipelineCacheCreateInfo();
 
     create_info.flags = VK_PIPELINE_CACHE_CREATE_USE_APPLICATION_STORAGE_BIT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-flags-05043");
+    m_errorMonitor->SetDesiredError("VUID-VkPipelineCacheCreateInfo-flags-05043");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
 
     create_info.flags = VK_PIPELINE_CACHE_CREATE_READ_ONLY_BIT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-flags-05044");
+    m_errorMonitor->SetDesiredError("VUID-VkPipelineCacheCreateInfo-flags-05044");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
@@ -350,7 +350,7 @@ TEST_F(VkSCNegativePipeline, CreatePipelineCacheNoMatch) {
 
     // Mismatch in initialDataSize
     create_info.initialDataSize += 8;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePipelineCache-pCreateInfo-05045");
+    m_errorMonitor->SetDesiredError("VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
     create_info.initialDataSize -= 8;
@@ -358,14 +358,14 @@ TEST_F(VkSCNegativePipeline, CreatePipelineCacheNoMatch) {
     // Mismatch in pInitialData pointer (content is otherwise the same)
     auto pipeline_cache_data_copy = pipeline_cache_data;
     create_info.pInitialData = pipeline_cache_data_copy.data();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePipelineCache-pCreateInfo-05045");
+    m_errorMonitor->SetDesiredError("VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
     create_info.pInitialData = pipeline_cache_data.data();
 
     // Mismatch in pInitialData contents (pointer is the same)
     pipeline_cache_data[sizeof(VkPipelineCacheHeaderVersionSafetyCriticalOne)] ^= 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePipelineCache-pCreateInfo-05045");
+    m_errorMonitor->SetDesiredError("VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
     pipeline_cache_data[sizeof(VkPipelineCacheHeaderVersionSafetyCriticalOne)] ^= 1;

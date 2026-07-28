@@ -23,7 +23,7 @@ option(VULKANSC "Build Vulkan SC validation layers" ON)
 #
 # If working with unreleased extensions, make sure the header and validation version are all on the same header version
 if(VULKANSC)
-    project(VVL VERSION 1.0.21 LANGUAGES CXX) # vulkansc
+    project(VVL VERSION 1.0.22 LANGUAGES CXX) # vulkansc
 else()
     project(VVL VERSION 1.4.356 LANGUAGES CXX) # vulkan
 endif()

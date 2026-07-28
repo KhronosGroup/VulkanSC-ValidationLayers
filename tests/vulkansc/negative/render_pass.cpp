@@ -33,7 +33,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxRenderPassSubpassesExceeded) {
         create_info.pSubpasses = subpasses.data();
         create_info.subpassCount = subpasses.size();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo-subpassCount-05050");
+        m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo-subpassCount-05050");
         vksc::CreateRenderPass(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
@@ -47,7 +47,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxRenderPassSubpassesExceeded) {
         create_info.pSubpasses = subpasses.data();
         create_info.subpassCount = subpasses.size();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo2-subpassCount-05055");
+        m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo2-subpassCount-05055");
         vksc::CreateRenderPass2(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
@@ -83,7 +83,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxRenderPassDependenciesExceeded
         create_info.pSubpasses = &subpass;
         create_info.subpassCount = 1;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo-dependencyCount-05051");
+        m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo-dependencyCount-05051");
         vksc::CreateRenderPass(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
@@ -108,7 +108,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxRenderPassDependenciesExceeded
         create_info.pSubpasses = &subpass;
         create_info.subpassCount = 1;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo2-dependencyCount-05056");
+        m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo2-dependencyCount-05056");
         vksc::CreateRenderPass2(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
@@ -145,7 +145,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxFramebufferAttachmentsExceeded
         create_info.pSubpasses = &subpass;
         create_info.subpassCount = 1;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo-attachmentCount-05052");
+        m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo-attachmentCount-05052");
         vksc::CreateRenderPass(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
@@ -169,7 +169,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxFramebufferAttachmentsExceeded
         create_info.pSubpasses = &subpass;
         create_info.subpassCount = 1;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo2-attachmentCount-05057");
+        m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo2-attachmentCount-05057");
         vksc::CreateRenderPass2(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
@@ -215,7 +215,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxSubpassInputAttachmentsExceede
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass-attachments-device-05089");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo-attachmentCount-05052");
         for (uint32_t i = 0; i < subpass_count; ++i)
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription-inputAttachmentCount-05053");
+            m_errorMonitor->SetDesiredError("VUID-VkSubpassDescription-inputAttachmentCount-05053");
         vksc::CreateRenderPass(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
@@ -251,7 +251,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxSubpassInputAttachmentsExceede
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-attachments-device-05089");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo2-attachmentCount-05057");
         for (uint32_t i = 0; i < subpass_count; ++i)
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-inputAttachmentCount-05058");
+            m_errorMonitor->SetDesiredError("VUID-VkSubpassDescription2-inputAttachmentCount-05058");
         vksc::CreateRenderPass2(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
@@ -294,7 +294,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxSubpassPreserveAttachmentsExce
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass-attachments-device-05089");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo-attachmentCount-05052");
         for (uint32_t i = 0; i < subpass_count; ++i)
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription-preserveAttachmentCount-05054");
+            m_errorMonitor->SetDesiredError("VUID-VkSubpassDescription-preserveAttachmentCount-05054");
         vksc::CreateRenderPass(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
@@ -325,7 +325,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxSubpassPreserveAttachmentsExce
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-attachments-device-05089");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo2-attachmentCount-05057");
         for (uint32_t i = 0; i < subpass_count; ++i)
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-preserveAttachmentCount-05059");
+            m_errorMonitor->SetDesiredError("VUID-VkSubpassDescription2-preserveAttachmentCount-05059");
         vksc::CreateRenderPass2(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }

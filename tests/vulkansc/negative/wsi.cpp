@@ -113,7 +113,7 @@ TEST_F(VkSCNegativeWsi, CreateSwapchainSplitInstanceBindRegionsNotAllowed) {
     auto create_info = WSISwapchainCreateInfo();
     create_info.flags |= VK_SWAPCHAIN_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT_KHR;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSwapchainCreateInfoKHR-flags-05072");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainCreateInfoKHR-flags-05072");
     vksc::CreateSwapchainKHR(m_device->handle(), &create_info, nullptr, &swapchain);
     m_errorMonitor->VerifyFound();
 }
@@ -136,7 +136,7 @@ TEST_F(VkSCNegativeWsi, CreateSwapchainOldSwapchainNotNull) {
 
     create_info.oldSwapchain = swapchain;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSwapchainCreateInfoKHR-oldSwapchain-05073");
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainCreateInfoKHR-oldSwapchain-05073");
     vksc::CreateSwapchainKHR(m_device->handle(), &create_info, nullptr, &swapchain);
     m_errorMonitor->VerifyFound();
 }
