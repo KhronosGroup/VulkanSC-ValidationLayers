@@ -33,77 +33,50 @@
         "features": {
             "presets": [
                 {
-                    "label": "Standard",
-                    "description": "Good default validation setup that balance validation coverage and performance.",
-                    "platforms": [ "WINDOWS", "LINUX" ],
-                    "status": "STABLE",
-                    "settings": [
-                        { "key": "validate_core", "value": true },
-                        { "key": "check_image_layout", "value": true },
-                        { "key": "check_command_buffer", "value": true },
-                        { "key": "check_object_in_use", "value": true },
-                        { "key": "check_query", "value": true },
-                        { "key": "check_shaders", "value": true },
-                        { "key": "unique_handles", "value": true },
-                        { "key": "object_lifetime", "value": true },
-                        { "key": "stateless_param", "value": true },
-                        { "key": "thread_safety", "value": false },
-                        { "key": "validate_sync", "value": false },
-                        { "key": "report_flags", "value": [ "error", "warn" ] },
-                        { "key": "debug_action", "value": [ "VK_DBG_LAYER_ACTION_LOG_MSG" ] },
-                        { "key": "enable_message_limit", "value": true }
-                    ]
-                },
-                {
-                    "label": "Reduced-Overhead",
-                    "description": "Disables some checks in the interest of better performance.",
-                    "platforms": [ "WINDOWS", "LINUX" ],
-                    "status": "STABLE",
-                    "settings": [
-                        { "key": "validate_core", "value": true },
-                        { "key": "check_image_layout", "value": false },
-                        { "key": "check_command_buffer", "value": false },
-                        { "key": "check_object_in_use", "value": false },
-                        { "key": "check_query", "value": false },
-                        { "key": "check_shaders", "value": true },
-                        { "key": "unique_handles", "value": false },
-                        { "key": "object_lifetime", "value": true },
-                        { "key": "stateless_param", "value": true },
-                        { "key": "thread_safety", "value": false },
-                        { "key": "validate_sync", "value": false },
-                        { "key": "report_flags", "value": [ "error" ] },
-                        { "key": "debug_action", "value": [ "VK_DBG_LAYER_ACTION_LOG_MSG" ] },
-                        { "key": "enable_message_limit", "value": true }
-                    ]
-                },
-                {
-                    "label": "Synchronization",
+                    "label": "Synchronization Only",
                     "description": "Identify resource access conflicts due to missing or incorrect synchronization operations between actions reading or writing the same regions of memory.",
-                    "platforms": [ "WINDOWS", "LINUX", "MACOS", "ANDROID" ],
+                    "platforms": [ "WINDOWS", "LINUX" ],
                     "status": "STABLE",
                     "settings": [
                         { "key": "validate_core", "value": false },
-                        { "key": "check_image_layout", "value": false },
-                        { "key": "check_command_buffer", "value": false },
-                        { "key": "check_object_in_use", "value": false },
-                        { "key": "check_query", "value": false },
-                        { "key": "check_shaders", "value": false },
-                        { "key": "unique_handles", "value": true },
-                        { "key": "object_lifetime", "value": false },
-                        { "key": "stateless_param", "value": false },
-                        { "key": "thread_safety", "value": true },
                         { "key": "validate_sync", "value": true },
-                        { "key": "report_flags", "value": [ "error" ] },
-                        { "key": "debug_action", "value": [ "VK_DBG_LAYER_ACTION_LOG_MSG" ] },
+                            { "key": "syncval_submit_time_validation", "value": true },
+                            { "key": "syncval_shader_accesses_heuristic", "value": false },
+                            { "key": "syncval_message_extra_properties", "value": false },
+                        { "key": "stateless_param", "value": false },
+                        { "key": "object_lifetime", "value": false },
+                        { "key": "thread_safety", "value": true },
+                        { "key": "unique_handles", "value": true },
+                        { "key": "legacy_detection", "value": false },
+                        { "key": "debug_action", "value": [ "VK_DBG_LAYER_ACTION_LOG_MSG", "VK_DBG_LAYER_ACTION_DEBUG_OUTPUT" ] },
+                        { "key": "report_flags", "value": [ "error", "warn" ] },
                         { "key": "enable_message_limit", "value": true }
+                    ]
+                },
+                {
+                    "label": "Legacy Detection Only",
+                    "description": "Turn off everything but legacy detection.",
+                    "platforms": [ "WINDOWS", "LINUX" ],
+                    "status": "STABLE",
+                    "settings": [
+                        { "key": "validate_core", "value": false },
+                        { "key": "validate_sync", "value": false },
+                        { "key": "stateless_param", "value": false },
+                        { "key": "object_lifetime", "value": false },
+                        { "key": "thread_safety", "value": false },
+                        { "key": "unique_handles", "value": false },
+                        { "key": "legacy_detection", "value": true },
+                        { "key": "debug_action",  "value": [ "VK_DBG_LAYER_ACTION_LOG_MSG", "VK_DBG_LAYER_ACTION_DEBUG_OUTPUT" ] },
+                        { "key": "report_flags",  "value": [ "warn" ] },
+                        { "key": "enable_message_limit", "value": false }
                     ]
                 }
             ],
             "settings": [
                 {
                     "key": "validation_control",
-                    "label": "Validation Areas",
-                    "description": "Control of the Validation layer validation",
+                    "label": "CPU Centric Validation",
+                    "description": "Control the Validation done only on the CPU",
                     "type": "GROUP",
                     "expanded": true,
                     "platforms": [ "WINDOWS", "LINUX" ],
@@ -115,6 +88,7 @@
                             "description": "Enable fine grained locking for Core Validation, which should improve performance in multithreaded applications. This setting allows the optimization to be disabled for debugging.",
                             "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/fine_grained_locking_usage.md",
                             "type": "BOOL",
+                            "view": "HIDDEN",
                             "default": true
                         },
                         {
@@ -130,6 +104,7 @@
                                     "label": "Image Layout",
                                     "description": "Check that the layout of each image subresource is correct whenever it is used by a command buffer. These checks are very CPU intensive for some applications.",
                                     "type": "BOOL",
+                                    "view": "HIDDEN",
                                     "default": true,
                                     "dependence": {
                                         "mode": "ALL",
@@ -143,6 +118,7 @@
                                     "label": "Command Buffer State",
                                     "description": "Check that all Vulkan objects used by a command buffer have not been destroyed. These checks can be CPU intensive for some applications.",
                                     "type": "BOOL",
+                                    "view": "HIDDEN",
                                     "default": true,
                                     "dependence": {
                                         "mode": "ALL",
@@ -156,6 +132,7 @@
                                     "label": "Object in Use",
                                     "description": "Check that Vulkan objects are not in use by a command buffer when they are destroyed.",
                                     "type": "BOOL",
+                                    "view": "HIDDEN",
                                     "default": true,
                                     "dependence": {
                                         "mode": "ALL",
@@ -169,6 +146,7 @@
                                     "label": "Query",
                                     "description": "Checks for commands that use VkQueryPool objects.",
                                     "type": "BOOL",
+                                    "view": "HIDDEN",
                                     "default": true,
                                     "dependence": {
                                         "mode": "ALL",
@@ -180,7 +158,7 @@
                                 {
                                     "key": "check_shaders",
                                     "label": "Shader",
-                                    "description": "This will validate the contents of the SPIR-V which can be CPU intensive during application start up. This does internal checks as well as calling spirv-val.",
+                                    "description": "This will validate the contents of the SPIR-V which can be CPU intensive during application start up. This does internal checks as well as calling spirv-val. (Same effect using VK_VALIDATION_FEATURE_DISABLE_SHADERS_EXT)",
                                     "type": "BOOL",
                                     "default": true,
                                     "expanded": true,
@@ -194,52 +172,27 @@
                                         {
                                             "key": "debug_disable_spirv_val",
                                             "label": "Disable spirv-val",
-                                            "view": "ADVANCED",
+                                            "view": "DEBUG",
                                             "description": "Allows normal shader validation to run, but removes just spirv-val for performance reasons",
                                             "type": "BOOL",
-                                            "default": false
+                                            "default": false,
+                                            "dependence": {
+                                                "mode": "ALL",
+                                                "settings": [
+                                                    { "key": "validate_core", "value": true },
+                                                    { "key": "check_shaders", "value": true }
+                                                ]
+                                            }
                                         }
                                     ]
                                 }
                             ]
                         },
                         {
-                            "key": "unique_handles",
-                            "label": "Handle Wrapping",
-                            "description": "Handle wrapping checks. Disable this feature if you are experiencing crashes when creating new extensions or developing new Vulkan objects/structures.",
-                            "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/handle_wrapping.md",
-                            "type": "BOOL",
-                            "default": true
-                        },
-                        {
-                            "key": "object_lifetime",
-                            "label": "Object Lifetime",
-                            "description": "Object tracking checks. This may not always be necessary late in a development cycle.",
-                            "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/object_lifetimes.md",
-                            "type": "BOOL",
-                            "default": true
-                        },
-                        {
-                            "key": "stateless_param",
-                            "label": "Stateless Parameter",
-                            "description": "Stateless parameter checks. This may not always be necessary late in a development cycle.",
-                            "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/stateless_validation.md",
-                            "type": "BOOL",
-                            "default": true
-                        },
-                        {
-                            "key": "thread_safety",
-                            "label": "Thread Safety",
-                            "description": "Thread checks. In order to not degrade performance, it might be best to run your program with thread-checking disabled most of the time, enabling it occasionally for a quick sanity check or when debugging difficult application behaviors.",
-                            "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/thread_safety.md",
-                            "type": "BOOL",
-                            "default": true
-                        },
-                        {
                             "key": "validate_sync",
                             "label": "Synchronization",
                             "description": "Check for resource access conflicts caused by missing or incorrectly used synchronization operations.",
-                            "url": "${LUNARG_SDK}/synchronization_usage.html",
+                            "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/syncval_usage.html",
                             "type": "BOOL",
                             "default": false,
                             "expanded": true,
@@ -260,7 +213,21 @@
                                 {
                                     "key": "syncval_shader_accesses_heuristic",
                                     "label": "Shader accesses heuristic",
-                                    "description": "Take into account memory accesses performed by the shader based on SPIR-V static analysis. Warning: can produce false-positives, can ignore certain types of accesses.",
+                                    "description": "Take into account memory accesses performed by the shader based on SPIR-V static analysis. Warning: can produce false-positives, can ignore certain types of accesses, does not support VK_EXT_descriptor_buffer.",
+                                    "type": "BOOL",
+                                    "default": false,
+                                    "dependence": {
+                                        "mode": "ALL",
+                                        "settings": [
+                                            { "key": "validate_sync", "value": true }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "key": "syncval_load_op_after_store_op_validation",
+                                    "label": "LoadOp after StoreOp validation",
+                                    "description": "Detect LoadOp after StoreOp hazards between render pass instances.",
+                                    "view": "HIDDEN",
                                     "type": "BOOL",
                                     "default": false,
                                     "dependence": {
@@ -293,6 +260,45 @@
                                     ]
                                 }
                             ]
+                        },
+                        {
+                            "key": "stateless_param",
+                            "label": "Stateless Parameter",
+                            "description": "Stateless parameter checks. This may not always be necessary late in a development cycle.",
+                            "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/stateless_validation.md",
+                            "type": "BOOL",
+                            "default": true
+                        },
+                        {
+                            "key": "object_lifetime",
+                            "label": "Object Lifetime",
+                            "description": "Object tracking checks. This may not always be necessary late in a development cycle.",
+                            "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/object_lifetimes.md",
+                            "type": "BOOL",
+                            "default": true
+                        },
+                        {
+                            "key": "thread_safety",
+                            "label": "Thread Safety",
+                            "description": "Thread checks. In order to not degrade performance, it might be best to run your program with thread-checking disabled most of the time, enabling it occasionally for a quick sanity check or when debugging difficult application behaviors.",
+                            "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/thread_safety.md",
+                            "type": "BOOL",
+                            "default": true
+                        },
+                        {
+                            "key": "unique_handles",
+                            "label": "Handle Wrapping",
+                            "description": "Handle wrapping checks. Disable this feature if you are experiencing crashes when creating new extensions or developing new Vulkan objects/structures.",
+                            "url": "https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/main/docs/handle_wrapping.md",
+                            "type": "BOOL",
+                            "default": true
+                        },
+                        {
+                            "key": "legacy_detection",
+                            "label": "Legacy Detection",
+                            "description": "Give warnings when using legacy parts of the API.",
+                            "type": "BOOL",
+                            "default": false
                         }
                     ]
                 },
@@ -405,11 +411,11 @@
                             "key": "debug",
                             "label": "Debug",
                             "description": "For layer development. Report messages for debugging layer behavior.",
-                            "view": "ADVANCED"
+                            "view": "DEBUG"
                         }
                     ],
                     "default": [
-                        "error"
+                        "error", "warn"
                     ]
                 },
                 {
@@ -442,7 +448,7 @@
                 {
                     "key": "message_id_filter",
                     "label": "Mute Message VUIDs",
-                    "description": "List of VUIDs and VUID identifiers which are to be IGNORED by the validation layer",
+                    "description": "List of VUIDs which are to be IGNORED by the validation layer. The list is comma seperated and can be either the entire VUID string, the hashed value, or the last 5 digit number of a VUID",
                     "platforms": [ "WINDOWS", "LINUX" ],
                     "type": "LIST",
                     "env": "VK_LAYER_MESSAGE_ID_FILTER",
@@ -471,6 +477,14 @@
                             "default": false
                         }
                     ]
+                },
+                {
+                    "key": "custom_stype_list",
+                    "label": "Provide Custom SType",
+                    "type": "LIST",
+                    "description": "specify custom pNext structs using a vector of strings",
+                    "view": "HIDDEN",
+                    "default": []
                 },
                 {
                     "key": "disables",
