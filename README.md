@@ -71,10 +71,6 @@ to the upstream branch point.
 
 The choice of Vulkan or Vulkan SC support is determined at build time.
 
-## Contact Information
-* @KhronosGroup/VVL-CODEOWNERS
-* VVL-CODEOWNERS can also be found on aforementioned Slack channel for direct contact.
-
 ## Version Tagging Scheme
 
 Updates to this repository which correspond to a new Vulkan specification release are tagged using the following format: `v<`_`version`_`>` (e.g., `v1.3.266`).
@@ -97,3 +93,5 @@ While this project has been developed primarily by LunarG, Inc., there are many 
 companies and individuals making this possible: Valve Corporation, funding
 project development; Google providing significant contributions to the validation layers;
 Khronos providing oversight and hosting of the project.
+
+The Vulkan SC version of the validation layers has been developed primarily by RasterGrid Kft.
