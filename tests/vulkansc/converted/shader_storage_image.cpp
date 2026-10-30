@@ -26,8 +26,8 @@ class NegativeShaderStorageImage : public VkLayerTest {
 };
 
 TEST_F(NegativeShaderStorageImage, MissingFormatRead) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Create a shader reading a storage image without an image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -91,8 +91,8 @@ TEST_F(NegativeShaderStorageImage, MissingFormatRead) {
 }
 
 TEST_F(NegativeShaderStorageImage, MissingFormatWrite) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Create a shader writing a storage image without an image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -150,8 +150,6 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWrite) {
 }
 
 TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader reading a storage image without an image format");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
@@ -292,8 +290,6 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
 }
 
 TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader writing a storage image without an image format");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
@@ -432,8 +428,8 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
 }
 
 TEST_F(NegativeShaderStorageImage, MissingNonReadableDecorationFormatRead) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Create a shader with a storage image without an image format not marked as non readable");
 
     // We need to skip this test with VK_KHR_format_feature_flags2 supported,
@@ -491,8 +487,8 @@ TEST_F(NegativeShaderStorageImage, MissingNonReadableDecorationFormatRead) {
 }
 
 TEST_F(NegativeShaderStorageImage, MissingNonWritableDecorationFormatWrite) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Create a shader with a storage image without an image format but not marked a non writable");
 
     // We need to skip this test with VK_KHR_format_feature_flags2 supported,
@@ -797,8 +793,6 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteLessComponent) {
 }
 
 TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test writing to image unknown format with VK_FORMAT_A8_UNORM.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);

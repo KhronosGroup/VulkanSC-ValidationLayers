@@ -2372,8 +2372,8 @@ TEST_F(NegativePipeline, DISABLED_ShaderDrawParametersNotEnabled10) {
 }
 
 TEST_F(NegativePipeline, ShaderDrawParametersNotEnabled11) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Validation using DrawParameters for Vulkan 1.1 without the shaderDrawParameters feature enabled.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);

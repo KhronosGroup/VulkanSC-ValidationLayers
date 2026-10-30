@@ -182,8 +182,8 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisableShaderObject) {
 }
 
 TEST_F(NegativeAtomic, Int64) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test VK_KHR_shader_atomic_int64.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::shaderInt64);
@@ -294,8 +294,8 @@ TEST_F(NegativeAtomic, Int64Slang) {
 }
 
 TEST_F(NegativeAtomic, ImageInt64) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test VK_EXT_shader_image_atomic_int64.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
@@ -571,8 +571,8 @@ TEST_F(NegativeAtomic, ImageInt64Mesh32) {
 }
 
 TEST_F(NegativeAtomic, Float) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test VK_EXT_shader_atomic_float.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
@@ -955,8 +955,8 @@ TEST_F(NegativeAtomic, DISABLED_Float2) {
 }
 
 TEST_F(NegativeAtomic, Float2With16bit) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test VK_EXT_shader_atomic_float2.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::shaderFloat16);
@@ -1127,8 +1127,8 @@ TEST_F(NegativeAtomic, Float2With16bit) {
 }
 
 TEST_F(NegativeAtomic, Float2With64bit) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test VK_EXT_shader_atomic_float2.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1254,8 +1254,8 @@ TEST_F(NegativeAtomic, Float2WidthMismatch) {
 }
 
 TEST_F(NegativeAtomic, FloatOpSource) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
 

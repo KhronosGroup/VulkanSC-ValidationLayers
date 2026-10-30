@@ -1121,8 +1121,8 @@ TEST_F(NegativeSubpass, InputAttachmentSharingVariable) {
 }
 
 TEST_F(NegativeSubpass, SubpassInputWithoutFormat) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Non-InputAttachment shader input with unknown image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);

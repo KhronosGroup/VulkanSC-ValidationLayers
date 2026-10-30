@@ -43,6 +43,8 @@
 #include "vulkansc/state_tracker/sc_pipeline_state.h"
 #include "generated/enum_flag_bits.h"
 #include "generated/dispatch_functions.h"
+#include "chassis/chassis_modification_state.h"
+#include "utils/math_utils.h"
 
 namespace core::sc {
 
@@ -291,45 +293,66 @@ bool Instance::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice,
 
         if (stage_info_valid) {
             for (uint32_t stage_index = 0; stage_index < entry.StageIndexCount(); ++stage_index) {
+                bool code_is_structurally_valid = true;
                 auto stage_info = entry.StageIndexEntry(stage_index);
                 if (!stage_info) {
                     stage_info_valid = false;
                     continue;
                 }
 
-                skip |=
-                    ValidatePipelineCacheSpirv(physicalDevice, stateless_spirv_validator, data, pipeline_index, stage_index, loc);
-                // SPIR-V validation, if used, will already report errors for the warnings below
-                if (skip) {
+                if (stage_info->codeSize == 0) {
+                    skip |= LogError(kVUID_SC_PipelineCacheData_CodeSizeZero, physicalDevice, loc.dot(Field::pInitialData),
+                                     "contains pipeline identifier {%s} for which codeSize for stage index entry #%u is zero.",
+                                     id.toString().c_str(), stage_index);
+                    code_is_structurally_valid = false;
+                }
+
+                if (!IsIntegerMultipleOf(stage_info->codeSize, 4)) {
+                    skip |=
+                        LogError(kVUID_SC_PipelineCacheData_CodeSizeNotMultipleOfFour, physicalDevice, loc.dot(Field::pInitialData),
+                                 "contains pipeline identifier {%s} for which codeSize (%" PRIu64
+                                 ") for stage index entry #%u is not a multiple of 4.",
+                                 id.toString().c_str(), stage_info->codeSize, stage_index);
+                    code_is_structurally_valid = false;
+                }
+
+                if (stage_info->codeOffset + stage_info->codeSize > data.create_info.initialDataSize) {
+                    skip |=
+                        LogError(kVUID_SC_PipelineCacheData_CodeDataOutOfBounds, physicalDevice, loc.dot(Field::initialDataSize),
+                                 "is too small (%zu bytes) to fit the SPIR-V module data for "
+                                 "stage index entry #%u for pipeline identifier {%s} stored at "
+                                 "codeOffset (%" PRIu64 ") with codeSize (%" PRIu64
+                                 ") and thus "
+                                 "it cannot be validated.",
+                                 data.create_info.initialDataSize, stage_index, id.toString().c_str(), stage_info->codeOffset,
+                                 stage_info->codeSize);
+                    code_is_structurally_valid = false;
+                }
+
+                if (!code_is_structurally_valid) {
+                    stage_info_valid = false;
                     continue;
                 }
 
-                if (stage_info->codeSize == 0) {
-                    skip |= LogWarning(kVUID_SC_PipelineCacheData_CodeSizeZero, physicalDevice, loc.dot(Field::pInitialData),
-                                       "contains pipeline identifier {%s} for which codeSize "
-                                       "for stage index entry #%u is zero.",
-                                       id.toString().c_str(), stage_index);
-                    stage_info_valid = false;
+                if (disabled[shader_validation] || global_settings.debug_disable_spirv_val) {
+                    // Do not even check SPIR-V header if shader / SPIR-V validation is disabled
+                    continue;
                 }
 
-                if (stage_info->codeSize % 4 != 0) {
-                    skip |= LogWarning(kVUID_SC_PipelineCacheData_CodeSizeNotMultipleOfFour, physicalDevice,
-                                       loc.dot(Field::pInitialData),
-                                       "contains pipeline identifier {%s} for which codeSize (%" PRIu64
-                                       ") for stage index entry #%u is not a multiple of 4.",
-                                       id.toString().c_str(), stage_info->codeSize, stage_index);
-                    stage_info_valid = false;
+                auto code = entry.StageSPIRV(stage_index);
+
+                if (code.size() <= 1) {
+                    skip |= LogError("VUID-VkShaderModuleCreateInfo-pCode-08736", physicalDevice, loc.dot(Field::pInitialData),
+                                     "contains pipeline identifier {%s} with SPIR-V module data for"
+                                     "index entry #%u that contains an invalid header (too small).",
+                                     id.toString().c_str(), stage_index);
                 }
 
-                if (stage_info->codeOffset + stage_info->codeSize > create_info.initialDataSize) {
-                    skip |=
-                        LogWarning(kVUID_SC_PipelineCacheData_CodeDataOutOfBounds, physicalDevice, loc.dot(Field::initialDataSize),
-                                   "is too small (%zu bytes) to fit the SPIR-V module data for "
-                                   "stage index entry #%u for pipeline identifier {%s} stored at "
-                                   "codeOffset (%" PRIu64 ") with codeSize (%" PRIu64 ").",
-                                   create_info.initialDataSize, stage_index, id.toString().c_str(), stage_info->codeOffset,
-                                   stage_info->codeSize);
-                    stage_info_valid = false;
+                if (code[0] != spv::MagicNumber) {
+                    skip |= LogError("VUID-VkShaderModuleCreateInfo-pCode-08736", physicalDevice, loc.dot(Field::pInitialData),
+                                     "contains pipeline identifier {%s} with SPIR-V module data for"
+                                     "index entry #%u that contains an invalid header (incorrect magic number).",
+                                     id.toString().c_str(), stage_index);
                 }
             }
         }
@@ -816,8 +839,9 @@ bool Device::PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCa
             }
 
             auto offline_create_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pCreateInfos[i].pNext);
-            skip |= ValidatePipelineStageInfo(0, pCreateInfos[i].stage, pipeline_cache_state.get(), offline_create_info,
-                                              error_obj.location.dot(Field::pCreateInfos, i).dot(Field::stage));
+            skip |= ValidatePipelineEntryStage(0, pCreateInfos[i].stage, pipeline_cache_state.get(), offline_create_info,
+                                               error_obj.location.dot(Field::pCreateInfos, i),
+                                               error_obj.location.dot(Field::pCreateInfos, i).dot(Field::stage));
         }
     }
 
@@ -857,9 +881,9 @@ bool Device::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineC
 
             auto offline_create_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pCreateInfos[i].pNext);
             for (uint32_t stage_index = 0; stage_index < pCreateInfos[i].stageCount; ++stage_index) {
-                skip |= ValidatePipelineStageInfo(stage_index, pCreateInfos[i].pStages[stage_index], pipeline_cache_state.get(),
-                                                  offline_create_info,
-                                                  error_obj.location.dot(Field::pCreateInfos, i).dot(Field::pStages, stage_index));
+                skip |= ValidatePipelineEntryStage(stage_index, pCreateInfos[i].pStages[stage_index], pipeline_cache_state.get(),
+                                                   offline_create_info, error_obj.location.dot(Field::pCreateInfos, i),
+                                                   error_obj.location.dot(Field::pCreateInfos, i).dot(Field::pStages, stage_index));
             }
         }
     }
@@ -892,14 +916,6 @@ bool Device::PreCallValidateCreatePipelineCache(VkDevice device, const VkPipelin
                              "the data pointed to by pCreateInfo->pInitialData does not match the data specified in "
                              "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos at device creation time.");
         }
-        // We already validated the pipeline cache data at device creation time, but we could not perform
-        // "stateless" SPIR-V validation there, as that depends on the state only established after device
-        // creation, so we have to re-validate the pipeline cache data here in all cases. In the future we
-        // may be able to avoid re-validation and only do validation if it is a pipeline cache create info
-        // that was not specified at device creation time, but that requires upstream to make "stateless"
-        // SPIR-V validation trully stateless.
-        skip |= instance_vo_->ValidatePipelineCacheData(physical_device, stateless_spirv_validator, *pCreateInfo,
-                                                        error_obj.location.dot(Field::pCreateInfo));
     }
 
     return skip;

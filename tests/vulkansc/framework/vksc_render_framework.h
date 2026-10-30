@@ -109,6 +109,8 @@ class VkSCCompatibilityRenderFramework : public VkSCRenderFramework {
         }
     }
 
+    vkt::Device& GetDevice() const { return *m_device; }
+
     // Create fake shader module object to store SPIR-V data in
     VkShaderModule CreateShaderModuleData(const VkShaderModuleCreateInfo &create_info) {
         std::vector<uint32_t> spirv;
@@ -156,8 +158,21 @@ class VkSCCompatibilityRenderFramework : public VkSCRenderFramework {
         }
     }
 
+    // Marks the test as SPIR-V validation only test (i.e. it only creates VkShaderModule objects to trigger SPIR-V validation)
+    // Such test cases inherently require SPIR-V debug information, so they are skipped if SPIR-V debug information is not enabled
+    // In addition, they also require an explicit vkCreate*Pipeline call to trigger SPIR-V validation, as that's the point
+    // where such validation can happen
+    void SpvValidationOnlyTest() {
+        RequiresSpvDebugInfo();
+        spv_validation_only_test_ = true;
+    }
+
+    bool IsSpvValidationOnlyTest() const { return spv_validation_only_test_; }
+
   private:
     vksc::TestDispatchHelper dispatch_helper_;
+
+    bool spv_validation_only_test_{false};
 
     // Shader module SPIR-V data map to store emulated shader module data
     vvl::unordered_map<VkShaderModule, std::vector<uint32_t>> shader_modules_;

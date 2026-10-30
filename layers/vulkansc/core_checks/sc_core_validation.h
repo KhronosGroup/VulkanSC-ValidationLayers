@@ -49,9 +49,6 @@ class Instance : public vvl::sc::InstanceProxy<core::Instance> {
                                          const VkPipelineCacheCreateInfo& create_info) const;
     bool ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const stateless::SpirvValidator& stateless_spirv_validator,
                                    const VkPipelineCacheCreateInfo& create_info, const Location& loc) const;
-    bool ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, const stateless::SpirvValidator& stateless_spirv_validator,
-                                    const vvl::sc::PipelineCacheData& data, uint32_t pipeline_index, uint32_t stage_index,
-                                    const Location& loc) const;
 
     // Functions requiring additional/modified validation for Vulkan SC
     bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
@@ -254,9 +251,10 @@ class Device : public vvl::sc::DeviceProxy<CoreChecks> {
                                      uint32_t* pFaultCount, VkFaultData* pFaults, const ErrorObject& error_obj) const override;
 
     // SPIR-V validation related utilities
-    bool ValidatePipelineStageInfo(uint32_t stage_index, const VkPipelineShaderStageCreateInfo& stage_info,
-                                   const vvl::sc::PipelineCache* pipeline_cache_state,
-                                   const VkPipelineOfflineCreateInfo* offline_info, const Location& loc) const;
+    bool ValidatePipelineEntryStage(uint32_t stage_index, const VkPipelineShaderStageCreateInfo& stage_info,
+                                    const vvl::sc::PipelineCache* pipeline_cache_state,
+                                    const VkPipelineOfflineCreateInfo* offline_info, const Location& create_info_loc,
+                                    const Location& stage_info_loc) const;
 };
 
 }  // namespace core::sc

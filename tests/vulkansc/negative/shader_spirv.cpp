@@ -98,7 +98,7 @@ TEST_F(VkSCNegativeShaderSpirv, MissingSpecializationInfo) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCNegativeShaderSpirv, InvalidSpirv) {
+TEST_F(VkSCNegativeShaderSpirv, InvalidSpirvExtension) {
     TEST_DESCRIPTION("Expect spirv-val reporting an error due to the use of an invalid SPIR-V extension in OpExtension.");
 
     const char* vertex_source = R"spirv(
@@ -121,9 +121,10 @@ TEST_F(VkSCNegativeShaderSpirv, InvalidSpirv) {
     builder.InitVsFs(vksc::Shader::Vertex(vertex_source), vksc::Shader::Fragment(kSampleFragmentShaderSpv));
 
     RETURN_IF_SKIP(Init());
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
-    builder.CreatePipelineCache(*m_device);
+    builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -146,11 +147,12 @@ TEST_F(VkSCNegativeShaderSpirv, MissingShaderCapability) {
     builder.InitVsFs(vksc::Shader::Vertex(vertex_source), vksc::Shader::Fragment(kSampleFragmentShaderSpv));
 
     RETURN_IF_SKIP(Init());
+    InitRenderTarget();
 
     // TODO: Vulkan SC - this should be triggering VUID 08738, but actually triggers 08737
     // because VVL does not check for 08738 and relies on spirv-val to detect the error
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
-    builder.CreatePipelineCache(*m_device);
+    builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -178,8 +180,8 @@ TEST_F(VkSCNegativeShaderSpirv, CapabilityNotSupported) {
 
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkShaderModuleCreateInfo-pCode-08737");
-    builder.CreatePipelineCache(*m_device);
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
+    builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -208,7 +210,7 @@ TEST_F(VkSCNegativeShaderSpirv, CapabilityRequirementNotMet) {
     RETURN_IF_SKIP(Init());
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-    builder.CreatePipelineCache(*m_device);
+    builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -237,7 +239,7 @@ TEST_F(VkSCNegativeShaderSpirv, ExtensionNotSupported) {
     RETURN_IF_SKIP(Init());
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08741");
-    builder.CreatePipelineCache(*m_device);
+    builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -266,7 +268,7 @@ TEST_F(VkSCNegativeShaderSpirv, ExtensionRequirementNotMet) {
     RETURN_IF_SKIP(Init());
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-    builder.CreatePipelineCache(*m_device);
+    builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -285,7 +287,7 @@ TEST_F(VkSCNegativeShaderSpirv, Atomics) {
     RETURN_IF_SKIP(InitState(nullptr, &vksc10_features));
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpAtomic-05091");
-    builder.CreatePipelineCache(*m_device);
+    builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
 

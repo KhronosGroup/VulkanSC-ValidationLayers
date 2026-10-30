@@ -449,8 +449,8 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGsShaderObject) {
 }
 
 TEST_F(NegativeGeometryTessellation, MaxTessellationControlInputOutputComponents) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of per-vertex input and/or output components to the tessellation control "
         "stage exceeds the device limit");
@@ -550,8 +550,8 @@ TEST_F(NegativeGeometryTessellation, MaxTessellationControlInputOutputComponents
 }
 
 TEST_F(NegativeGeometryTessellation, MaxTessellationEvaluationInputOutputComponents) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of input and/or output components to the tessellation evaluation stage "
         "exceeds the device limit");
@@ -652,8 +652,8 @@ TEST_F(NegativeGeometryTessellation, MaxTessellationEvaluationInputOutputCompone
 }
 
 TEST_F(NegativeGeometryTessellation, MaxGeometryInputOutputComponents) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of input and/or output components to the geometry stage exceeds the device "
         "limit");

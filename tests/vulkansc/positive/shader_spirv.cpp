@@ -11,6 +11,7 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 #include "../framework/vksc_test_pipeline_helper.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(VkSCPositiveShaderSpirv, Atomics) {
     TEST_DESCRIPTION("SPIR-V extension uses atomic instructions with shaderAtomicInstructions enabled.");

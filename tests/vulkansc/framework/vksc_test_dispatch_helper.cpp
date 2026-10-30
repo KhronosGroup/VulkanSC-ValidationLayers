@@ -17,6 +17,7 @@
 
 #include "vksc_test_dispatch_helper.h"
 #include "vksc_test_pipeline_cache_helper.h"
+#include "vksc_test_pipeline_helper.h"
 #include "vksc_render_framework.h"
 #include "vksc_test_environment.h"
 
@@ -237,16 +238,33 @@ static VKAPI_ATTR void VKAPI_CALL DestroySwapchainKHR(VkDevice device, VkSwapcha
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
                                                          const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule) {
-    // Attempt to create a pipeline cache from the SPIR-V data in order to trigger VUs that
-    // would otherwise be triggered in case of Vulkan
-    if (VkSCTestEnvironment::IsSpvDebugInfoEnabled() && pCreateInfo->pCode && (pCreateInfo->codeSize % sizeof(uint32_t) == 0)) {
-        vksc::PipelineCacheBuilder builder{};
-        auto header = builder.AddDefaultHeaderVersionSCOne();
-        auto entry = builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
+    // If this is a SPIR-V validation only test case  (i.e. it only creates VkShaderModule objects to trigger SPIR-V validation)
+    // we also have to instantiate a placeholder pipeline as the pipeline cache entry device compatibility rules only require
+    // actually constructed pipelines to be compatible with the device and therefore SPIR-V validation only happens at
+    // create pipeline call time
+    if (VkSCTestEnvironment::IsSpvDebugInfoEnabled() && RenderFramework().IsSpvValidationOnlyTest() && pCreateInfo->pCode &&
+        (pCreateInfo->codeSize % sizeof(uint32_t) == 0)) {
         std::vector<uint32_t> spirv{};
         spirv.assign(pCreateInfo->pCode, pCreateInfo->pCode + pCreateInfo->codeSize / sizeof(uint32_t));
-        builder.AddStageValidation(entry, nullptr, {spirv});
-        RenderFramework().CreateOnDemandPipelineCache(device, builder.MakeCreateInfo());
+
+        // For simplicity, we will always use a vkCreateComputePipelines call to trigger the SPIR-V validation, even if
+        // the shader module itself is not a compute shader (or does not only contain a compute shader, neither of which we
+        // are equiped to determine here), as standalone SPIR-V validation cases should not depend on this
+        // However, we do have to allow some errors due to the mismatch between the shader and placeholder pipeline info
+        static auto policy =
+            DispatchHelper()
+                ->CreateDispatchPolicy()
+                // We know we construct a pipeline cache here with data that was not specified at device-create time
+                .IgnoreMessage("VUID-vkCreatePipelineCache-pCreateInfo-05045")
+                // We know we did not provide a compatible pipeline layout so ignore related errors
+                .IgnoreMessage("VUID-VkComputePipelineCreateInfo-layout")
+                // We know that the entry point name may not match
+                .IgnoreMessage("VUID-VkPipelineShaderStageCreateInfo-pName-05027");
+        vksc::ComputePipelineBuilder builder(&RenderFramework());
+        builder.Init(vksc::Shader().Binary(spirv).Stage(VK_SHADER_STAGE_COMPUTE_BIT));
+        DispatchHelper()->BeginDispatchPolicy(policy);
+        builder.CreatePipeline(RenderFramework().GetDevice());
+        DispatchHelper()->EndDispatchPolicy(policy);
     }
 
     // Vulkan SC removed shader modules, but we emulate it by storing the shader module
