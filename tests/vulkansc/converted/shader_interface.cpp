@@ -25,8 +25,8 @@
 class NegativeShaderInterface : public VkLayerTest {};
 
 TEST_F(NegativeShaderInterface, MaxVertexComponentsWithBuiltins) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test if the max componenets checks are being checked from OpMemberDecorate built-ins");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -95,8 +95,8 @@ TEST_F(NegativeShaderInterface, MaxVertexComponentsWithBuiltins) {
 }
 
 TEST_F(NegativeShaderInterface, MaxFragmentComponentsWithBuiltins) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test if the max componenets checks are being checked from OpDecorate built-ins");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -154,8 +154,8 @@ TEST_F(NegativeShaderInterface, MaxFragmentComponentsWithBuiltins) {
 }
 
 TEST_F(NegativeShaderInterface, MaxVertexOutputComponents) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION(
         "Test that an error is produced when the number of output components from the vertex stage exceeds the device limit");
 
@@ -219,8 +219,8 @@ TEST_F(NegativeShaderInterface, MaxVertexOutputComponents) {
 }
 
 TEST_F(NegativeShaderInterface, MaxComponentsBlocks) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test if the max componenets checks are done properly when in a single block");
 
     RETURN_IF_SKIP(Init());
@@ -278,8 +278,8 @@ TEST_F(NegativeShaderInterface, MaxComponentsBlocks) {
 }
 
 TEST_F(NegativeShaderInterface, MaxFragmentInputComponents) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION(
         "Test that an error is produced when the number of input components from the fragment stage exceeds the device limit");
 
@@ -537,8 +537,6 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSize) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchLongVectorSize) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("OpTypeVector has larger output than input");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredFeature(vkt::Feature::longVector);
@@ -1195,8 +1193,6 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByComponent) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchShaderObject) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -1237,8 +1233,6 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchShaderObject) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSizeShaderObject) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -1341,8 +1335,6 @@ TEST_F(NegativeShaderInterface, VertexOutputNotConsumed) {
 // Spec doesn't clarify if this is valid or not
 // https://gitlab.khronos.org/vulkan/vulkan/-/issues/3293
 TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test invalid shader layout in and out with different components.");
 
     RETURN_IF_SKIP(Init());
@@ -1710,8 +1702,6 @@ TEST_F(NegativeShaderInterface, MultidimensionalArrayDim) {
 }
 
 TEST_F(NegativeShaderInterface, MultidimensionalArray64bit) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled for 64bits");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1804,8 +1794,6 @@ TEST_F(NegativeShaderInterface, FragmentOutputNotWritten) {
 }
 
 TEST_F(NegativeShaderInterface, FragmentOutputNotWrittenDynamicRendering) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(Init());
@@ -1839,8 +1827,6 @@ TEST_F(NegativeShaderInterface, FragmentOutputNotWrittenDynamicRendering) {
 }
 
 TEST_F(NegativeShaderInterface, FragmentOutputNotWrittenDynamicRenderingShaderObject) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
@@ -1873,8 +1859,6 @@ TEST_F(NegativeShaderInterface, FragmentOutputNotWrittenDynamicRenderingShaderOb
 // TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923
 // also https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
 TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArray) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -1915,8 +1899,6 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArray) {
 // TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923
 // also https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9616
 TEST_F(NegativeShaderInterface, DISABLED_FragmentOutputNotWrittenArrayDynamicRendering) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(Init());
@@ -1997,8 +1979,6 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputTypeMismatch) {
 }
 
 TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRendering) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(Init());
@@ -2035,8 +2015,6 @@ TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRendering) {
 }
 
 TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRenderingLocalRead) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
@@ -2100,8 +2078,6 @@ TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRenderingLocalR
 }
 
 TEST_F(NegativeShaderInterface, FragmentOutputDynamicRenderingUnusedAttachments) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
@@ -2178,8 +2154,6 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotConsumed) {
 }
 
 TEST_F(NegativeShaderInterface, FragmentOutputNotConsumedDynamicRendering) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(Init());
@@ -2216,9 +2190,8 @@ TEST_F(NegativeShaderInterface, FragmentOutputNotConsumedDynamicRendering) {
     m_command_buffer.End();
 }
 
-TEST_F(NegativeShaderInterface, InvalidStaticSpirv) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+// TODO: This test crashes due to some upstream SPIR-V stateless validation issues
+TEST_F(NegativeShaderInterface, DISABLED_InvalidStaticSpirv) {
     TEST_DESCRIPTION(
         "Test that a warning is produced for a fragment shader which provides a spurious output with no matching attachment");
 
@@ -2255,8 +2228,6 @@ TEST_F(NegativeShaderInterface, InvalidStaticSpirv) {
 }
 
 TEST_F(NegativeShaderInterface, InvalidStaticSpirvMaintenance5) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test SPIRV is still checked if using new pNext in VkPipelineShaderStageCreateInfo");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
@@ -2299,8 +2270,6 @@ TEST_F(NegativeShaderInterface, InvalidStaticSpirvMaintenance5) {
 }
 
 TEST_F(NegativeShaderInterface, InvalidStaticSpirvMaintenance5Compute) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test SPIRV is still checked if using new pNext in VkPipelineShaderStageCreateInfo");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
@@ -2345,8 +2314,8 @@ TEST_F(NegativeShaderInterface, InvalidStaticSpirvMaintenance5Compute) {
 }
 
 TEST_F(NegativeShaderInterface, PhysicalStorageBuffer) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Details found in https://gitlab.khronos.org/spirv/SPIR-V/-/issues/779");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
@@ -2439,8 +2408,6 @@ TEST_F(NegativeShaderInterface, MultipleFragmentAttachment) {
 }
 
 TEST_F(NegativeShaderInterface, MultipleFragmentAttachmentDynamicRendering) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(Init());
@@ -2625,8 +2592,6 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndexArray) {
 }
 
 TEST_F(NegativeShaderInterface, MissingInputAttachmentIndexShaderObject) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderObject);
     RETURN_IF_SKIP(Init());
@@ -2683,8 +2648,8 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndexShaderObject) {
 }
 
 TEST_F(NegativeShaderInterface, PhysicalStorageBufferArray) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Details found in https://gitlab.khronos.org/spirv/SPIR-V/-/issues/779");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
@@ -2734,8 +2699,8 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferArray) {
 }
 
 TEST_F(NegativeShaderInterface, PhysicalStorageBufferLinkedList) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Details found in https://gitlab.khronos.org/spirv/SPIR-V/-/issues/779");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
@@ -2786,8 +2751,8 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferLinkedList) {
 }
 
 TEST_F(NegativeShaderInterface, PhysicalStorageBufferNested) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Details found in https://gitlab.khronos.org/spirv/SPIR-V/-/issues/779");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
@@ -2860,8 +2825,6 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferNested) {
 // More interface checks that require deeping spirv matching
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11267
 TEST_F(NegativeShaderInterface, DISABLED_NestedStructInBlock) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     ASSERT_NO_FATAL_FAILURE(Init());
     ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
 
@@ -2900,8 +2863,6 @@ TEST_F(NegativeShaderInterface, DISABLED_NestedStructInBlock) {
 }
 
 TEST_F(NegativeShaderInterface, MeshFragmentPerPrimitive) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::meshShader);
@@ -2958,8 +2919,6 @@ TEST_F(NegativeShaderInterface, MeshFragmentPerPrimitive) {
 }
 
 TEST_F(NegativeShaderInterface, MeshFragmentPerPrimitive2) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::meshShader);
@@ -3010,8 +2969,6 @@ TEST_F(NegativeShaderInterface, MeshFragmentPerPrimitive2) {
 }
 
 TEST_F(NegativeShaderInterface, MeshFragmentPerPrimitiveSlang) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::meshShader);

@@ -582,8 +582,8 @@ TEST_F(NegativeShaderPushConstants, SpecConstantSize) {
 }
 
 TEST_F(NegativeShaderPushConstants, ArrayOf8Bit) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9364");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::shaderInt8);
@@ -610,8 +610,8 @@ TEST_F(NegativeShaderPushConstants, ArrayOf8Bit) {
 }
 
 TEST_F(NegativeShaderPushConstants, StructOf8Bit) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9364");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::shaderInt8);
@@ -645,8 +645,8 @@ TEST_F(NegativeShaderPushConstants, StructOf8Bit) {
 }
 
 TEST_F(NegativeShaderPushConstants, ArrayOfStructOf8Bit) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9364");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::shaderInt8);

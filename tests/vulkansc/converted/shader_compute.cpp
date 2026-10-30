@@ -620,8 +620,8 @@ TEST_F(NegativeShaderCompute, WorkgroupMemoryExplicitLayout) {
 }
 
 TEST_F(NegativeShaderCompute, ZeroInitializeWorkgroupMemory) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test initializing workgroup memory in compute shader");
     RETURN_IF_SKIP(Init());
 

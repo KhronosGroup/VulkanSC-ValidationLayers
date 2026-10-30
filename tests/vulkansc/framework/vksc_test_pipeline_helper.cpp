@@ -45,6 +45,10 @@ void PipelineBuilder::AddStage(const Shader& shader) {
             case Shader::SourceType::GLSL:
                 GLSLtoSPV(framework_.PhysicalDeviceProps().limits, shader.stage_, shader.source_, spv, shader.spirv_env_);
                 break;
+            case Shader::SourceType::BINARY:
+                spv.resize(shader.binary_word_size_);
+                memcpy(spv.data(), shader.source_, shader.binary_word_size_ * sizeof(uint32_t));
+                break;
         }
         spirv_data_.emplace_back(std::move(spv));
     }

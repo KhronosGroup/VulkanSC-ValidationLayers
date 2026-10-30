@@ -131,10 +131,10 @@ PipelineCache::PipelineCache(const DeviceState& state_data, VkPipelineCache pipe
     }
 }
 
-PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const DeviceState& state_data,
-                                                                           const PipelineCacheData::Entry& cache_entry) {
-    Entry::StageModules stage_modules;
-    stage_modules.reserve(cache_entry.StageIndexCount());
+PipelineCache::Entry::ShaderStages PipelineCache::Entry::InitShaderStages(const DeviceState& state_data,
+                                                                          const PipelineCacheData::Entry& cache_entry) {
+    Entry::ShaderStages shader_stages;
+    shader_stages.reserve(cache_entry.StageIndexCount());
 
     for (uint32_t stage_index = 0; stage_index < cache_entry.StageIndexCount(); ++stage_index) {
         auto code = cache_entry.StageSPIRV(stage_index);
@@ -153,7 +153,9 @@ PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const
                 auto result = optimizer.Run(spirv_module->words_.data(), spirv_module->words_.size(), &optimized_binary,
                                             spvtools::ValidatorOptions(), true);
                 if (result) {
-                    spirv_module = std::make_shared<spirv::Module>(optimized_binary);
+                    // Per the changes in upstream logic, we recreate the shader module state from scratch here
+                    spirv_module = CreateSpirvModuleState(optimized_binary.size() * sizeof(uint32_t), optimized_binary.data(),
+                                                          state_data.global_settings, &stateless_data);
                 }
             }
 
@@ -161,12 +163,15 @@ PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const
             auto handle = (VkShaderModule)spirv_module.get();
             auto module_state = std::make_shared<vvl::ShaderModule>(handle, spirv_module);
 
-            stage_modules.emplace_back(std::move(module_state));
+            // We have to store the original SPIR-V code to use later in the delayed SPIR-V validation
+            // First, this would ensure that SPIR-V validation will produce messages with respect to the original SPIR-V code
+            // Second, the decoration flattening stage above will produce SPIR-V that will fail validation (SPIR-V Tools bug)
+            shader_stages.emplace_back(ShaderStage{std::move(code), std::move(module_state), std::move(stateless_data)});
         } else {
-            stage_modules.emplace_back(nullptr);
+            shader_stages.emplace_back(ShaderStage{});
         }
     }
-    return stage_modules;
+    return shader_stages;
 }
 
 }  // namespace vvl::sc

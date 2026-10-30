@@ -143,8 +143,8 @@ TEST_F(NegativeShaderLimits, MaxSampleMaskWordsOutput) {
 }
 
 TEST_F(NegativeShaderLimits, MinAndMaxTexelGatherOffset) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test shader with offset less than minTexelGatherOffset and greather than maxTexelGatherOffset");
 
     RETURN_IF_SKIP(Init());
@@ -213,8 +213,8 @@ TEST_F(NegativeShaderLimits, MinAndMaxTexelGatherOffset) {
 }
 
 TEST_F(NegativeShaderLimits, MinAndMaxTexelOffset) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test shader with offset less than minTexelOffset and greather than maxTexelOffset");
 
     RETURN_IF_SKIP(Init());
@@ -440,8 +440,8 @@ TEST_F(NegativeShaderLimits, MaxComputeSharedMemorySizeArrayStride) {
 }
 
 TEST_F(NegativeShaderLimits, MaxFragmentOutputAttachments) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     RETURN_IF_SKIP(Init());
     if (m_device->Physical().limits_.maxFragmentOutputAttachments != 4) {
         GTEST_SKIP() << "maxFragmentOutputAttachments is not 4";
@@ -469,8 +469,8 @@ TEST_F(NegativeShaderLimits, MaxFragmentOutputAttachments) {
 }
 
 TEST_F(NegativeShaderLimits, MaxFragmentOutputAttachmentsArray) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     RETURN_IF_SKIP(Init());
     if (m_device->Physical().limits_.maxFragmentOutputAttachments != 4) {
         GTEST_SKIP() << "maxFragmentOutputAttachments is not 4";
@@ -490,8 +490,8 @@ TEST_F(NegativeShaderLimits, MaxFragmentOutputAttachmentsArray) {
 }
 
 TEST_F(NegativeShaderLimits, MaxFragmentOutputAttachmentsArrayAtEnd) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     RETURN_IF_SKIP(Init());
     if (m_device->Physical().limits_.maxFragmentOutputAttachments != 4) {
         GTEST_SKIP() << "maxFragmentOutputAttachments is not 4";
@@ -510,7 +510,7 @@ TEST_F(NegativeShaderLimits, MaxFragmentOutputAttachmentsArrayAtEnd) {
     m_errorMonitor->VerifyFound();
 }
 
-// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality, although it's only due to incorrect spec
+// TODO: Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality, although it's only due to incorrect spec
 TEST_F(NegativeShaderLimits, DISABLED_MaxFragmentCombinedOutputResources) {
     RETURN_IF_SKIP(Init());
     // limit we have in min_core.json

@@ -19,6 +19,7 @@
 
 #include "utils/hash_util.h"
 #include "state_tracker/pipeline_state.h"
+#include "state_tracker/shader_module.h"
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -173,17 +174,31 @@ class PipelineCache : public vvl::PipelineCache {
   public:
     class Entry {
       public:
+        struct ShaderStage {
+            std::vector<uint32_t> original_code;
+            std::shared_ptr<vvl::ShaderModule> shader_module;
+            spirv::StatelessData stateless_data;
+        };
+
         using ID = PipelineCacheData::Entry::ID;
-        using StageModules = std::vector<std::shared_ptr<vvl::ShaderModule>>;
+        using ShaderStages = std::vector<ShaderStage>;
 
         Entry(const DeviceState& state_data, const PipelineCacheData::Entry& cache_entry)
-            : id_(cache_entry.PipelineID()), shader_modules_(InitShaderModules(state_data, cache_entry)), json_data_(cache_entry) {}
+            : id_(cache_entry.PipelineID()), shader_stages_(InitShaderStages(state_data, cache_entry)), json_data_(cache_entry) {}
 
         ID PipelineID() const { return id_; }
 
+        const ShaderStage* GetShaderStage(size_t stage_index) const {
+            if (stage_index < shader_stages_.size()) {
+                return &shader_stages_[stage_index];
+            } else {
+                return nullptr;
+            }
+        }
+
         std::shared_ptr<vvl::ShaderModule> GetShaderModule(size_t stage_index) const {
-            if (stage_index < shader_modules_.size()) {
-                return shader_modules_[stage_index];
+            if (stage_index < shader_stages_.size()) {
+                return shader_stages_[stage_index].shader_module;
             } else {
                 return nullptr;
             }
@@ -206,10 +221,10 @@ class PipelineCache : public vvl::PipelineCache {
         }
 
       private:
-        StageModules InitShaderModules(const DeviceState& state_data, const PipelineCacheData::Entry& cache_entry);
+        ShaderStages InitShaderStages(const DeviceState& state_data, const PipelineCacheData::Entry& cache_entry);
 
         ID id_;
-        const StageModules shader_modules_;
+        const ShaderStages shader_stages_;
         PipelineJsonData json_data_;
     };
 

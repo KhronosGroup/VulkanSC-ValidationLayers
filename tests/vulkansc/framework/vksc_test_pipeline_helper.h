@@ -36,7 +36,7 @@ namespace vksc {
 // Helper class for building shaders to be used by pipeline builders
 class Shader {
   public:
-    enum class SourceType { ASM, GLSL };
+    enum class SourceType { ASM, GLSL, BINARY };
 
     Shader() = default;
     Shader& ASM(const char* source) {
@@ -47,6 +47,13 @@ class Shader {
     Shader& GLSL(const char* source) {
         source_ = source;
         source_type_ = SourceType::GLSL;
+        return *this;
+    }
+    Shader& Binary(const std::vector<uint32_t>& source) {
+        assert(!source.empty());
+        source_ = reinterpret_cast<const char*>(source.data());
+        source_type_ = SourceType::BINARY;
+        binary_word_size_ = source.size();
         return *this;
     }
     Shader& Stage(VkShaderStageFlagBits stage) {
@@ -80,6 +87,7 @@ class Shader {
 
   protected:
     const char* source_ = nullptr;
+    size_t binary_word_size_ = 0;
     SourceType source_type_ = SourceType::ASM;
     VkShaderStageFlagBits stage_ = VK_SHADER_STAGE_ALL;
     spv_target_env spirv_env_ = SPV_ENV_VULKAN_1_2;

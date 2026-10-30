@@ -221,8 +221,8 @@ TEST_F(NegativeShaderSpirv, MagicMaintenance5Compute) {
 }
 
 TEST_F(NegativeShaderSpirv, ShaderFloatControl) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test VK_KHR_shader_float_controls");
 
     // Need 1.1 to get SPIR-V 1.3 since OpExecutionModeId was added in SPIR-V 1.2
@@ -357,8 +357,8 @@ TEST_F(NegativeShaderSpirv, ShaderFloatControl) {
 }
 
 TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test VK_KHR_8bit_storage and VK_KHR_16bit_storage not having feature bits required for SPIR-V capability");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -612,8 +612,8 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 }
 
 TEST_F(NegativeShaderSpirv, InputOutput8Bit) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-Docs/issues/2595");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
@@ -749,8 +749,8 @@ TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5VertAndFrag) {
 }
 
 TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION(
         "Test VK_KHR_8bit_storage and VK_KHR_16bit_storage where the Int8/Int16 capability are only used and since they are "
         "superset of a capabilty");
@@ -1202,8 +1202,8 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 }
 
 TEST_F(NegativeShaderSpirv, ReadShaderClock) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Test VK_KHR_shader_clock");
 
     AddRequiredExtensions(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
@@ -1780,8 +1780,8 @@ TEST_F(NegativeShaderSpirv, DuplicatedSpecializationConstantID) {
 }
 
 TEST_F(NegativeShaderSpirv, ShaderModuleCheckCapability) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Create a shader in which a capability declared by the shader is not supported.");
     // Note that this failure message comes from spirv-tools, specifically the validator.
 
@@ -1802,8 +1802,8 @@ TEST_F(NegativeShaderSpirv, ShaderModuleCheckCapability) {
 }
 
 TEST_F(NegativeShaderSpirv, ShaderNotEnabled) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION(
         "Create a graphics pipeline in which a capability declared by the shader requires a feature not enabled on the device.");
 
@@ -1893,8 +1893,8 @@ TEST_F(NegativeShaderSpirv, ComputeShaderDerivativesEnabled) {
 }
 
 TEST_F(NegativeShaderSpirv, FragmentShaderInterlockEnabled) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Create a pipeline requiring the fragment shader interlock feature which has not enabled on the device.");
 
     AddRequiredExtensions(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME);
@@ -1914,8 +1914,8 @@ TEST_F(NegativeShaderSpirv, FragmentShaderInterlockEnabled) {
 }
 
 TEST_F(NegativeShaderSpirv, DemoteToHelperInvocation) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Create a pipeline requiring the demote to helper invocation feature which has not enabled on the device.");
 
     AddRequiredExtensions(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME);
@@ -1979,8 +1979,8 @@ TEST_F(NegativeShaderSpirv, DISABLED_NoUniformBufferStandardLayout10) {
 }
 
 TEST_F(NegativeShaderSpirv, NoUniformBufferStandardLayout12) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION(
         "Don't enable uniformBufferStandardLayout in Vulkan1.2 when VK_KHR_uniform_buffer_standard_layout was promoted");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2066,8 +2066,8 @@ TEST_F(NegativeShaderSpirv, DISABLED_NoScalarBlockLayout10) {
 }
 
 TEST_F(NegativeShaderSpirv, NoScalarBlockLayout12) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Don't enable scalarBlockLayout in Vulkan1.2 when VK_EXT_scalar_block_layout was promoted");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(Init());
@@ -2151,8 +2151,8 @@ TEST_F(NegativeShaderSpirv, SubgroupRotateClustered) {
 }
 
 TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Validate using Device memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2175,8 +2175,8 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
 }
 
 TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Validate using QueueFamily memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2200,8 +2200,8 @@ TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
 }
 
 TEST_F(NegativeShaderSpirv, DeviceMemoryScopeDebugInfo) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     RETURN_IF_SKIP(Init());
@@ -2264,8 +2264,8 @@ void main() {
 }
 
 TEST_F(NegativeShaderSpirv, ConservativeRasterizationPostDepthCoverage) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Make sure conservativeRasterizationPostDepthCoverage is set if needed.");
 
     AddRequiredExtensions(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
@@ -2307,8 +2307,8 @@ TEST_F(NegativeShaderSpirv, ConservativeRasterizationPostDepthCoverage) {
 }
 
 TEST_F(NegativeShaderSpirv, DynamicUniformIndex) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Check for the array dynamic array index features when the SPIR-V capabilities are requested.");
 
     VkPhysicalDeviceFeatures features{};
@@ -2510,8 +2510,8 @@ TEST_F(NegativeShaderSpirv, DescriptorCountConstantRuntimeArray) {
 }
 
 TEST_F(NegativeShaderSpirv, InvalidExtension) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("Use an invalid SPIR-V extension in OpExtension.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2632,8 +2632,8 @@ TEST_F(NegativeShaderSpirv, FPFastMathMode) {
 }
 
 TEST_F(NegativeShaderSpirv, ScalarBlockLayoutShaderCache) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8031");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
@@ -2671,8 +2671,8 @@ TEST_F(NegativeShaderSpirv, ScalarBlockLayoutShaderCache) {
 }
 
 TEST_F(NegativeShaderSpirv, ImageGatherOffsetMaintenance8) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     AddRequiredFeature(vkt::Feature::shaderImageGatherExtended);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -2861,8 +2861,8 @@ TEST_F(NegativeShaderSpirv, ShaderRelaxedExtendedInstruction) {
 }
 
 TEST_F(NegativeShaderSpirv, Bitwise32bitMaintenance9) {
-    // This test case requires SPIR-V debug information
-    RequiresSpvDebugInfo();
+    // This test case is a SPIR-V validation only test case
+    SpvValidationOnlyTest();
     AddRequiredFeature(vkt::Feature::shaderInt64);
     RETURN_IF_SKIP(Init());  // missing maintenance9
 
